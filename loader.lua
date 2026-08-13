@@ -92,18 +92,18 @@ end
 local loader = Loader.new()
 
 if waitForGameReady() then
-    local url = "https://raw.githubusercontent.com/glowpkj/DepHub/refs/heads/main/main"
-    local fetchSuccess, scriptContent = loader:fetchScript(url)
+    local mainUrl = "https://raw.githubusercontent.com/glowpkj/DepHub/refs/heads/main/main"
+    local fetchSuccess, scriptContent = loader:fetchScript(mainUrl)
     
     if fetchSuccess then
         local execSuccess, execMessage = loader:execute(scriptContent)
         if execSuccess then
-            print("Loader: Script executed successfully")
+            print("Loader: Main script executed successfully")
         else
             warn("Loader: Execution failed - " .. tostring(execMessage))
         end
     else
-        warn("Loader: Failed to fetch script - " .. tostring(scriptContent))
+        warn("Loader: Failed to fetch main script - " .. tostring(scriptContent))
     end
 else
     warn("Loader: Game did not load in time")
