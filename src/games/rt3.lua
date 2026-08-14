@@ -42,8 +42,6 @@ end
 
 local function loadModule(path)
     local okFetch, raw, url = fetch(path)
-    log("Baixando modulo: " .. path)
-
     if not okFetch then
         logWarn("Falha no modulo " .. path .. ": " .. tostring(raw))
         return nil
@@ -66,7 +64,6 @@ local function loadModule(path)
         return nil
     end
 
-    log("Modulo carregado: " .. path)
     return result
 end
 
@@ -76,6 +73,7 @@ local Scheduler = loadModule("src/core/scheduler.lua")
 local HealthMonitor = loadModule("src/core/health-monitor.lua")
 local Dashboard = loadModule("src/core/dashboard.lua")
 local Runtime = loadModule("src/core/runtime.lua")
+local AntiAFK = loadModule("src/core/anti-afk.lua")
 
 if not Scheduler or type(Scheduler.new) ~= "function" then
     logWarn("Scheduler indisponivel. Abortando inicializacao.")
@@ -94,6 +92,11 @@ end
 
 if not Runtime or type(Runtime.new) ~= "function" then
     logWarn("Runtime indisponivel. Abortando inicializacao.")
+    return false
+end
+
+if not AntiAFK or type(AntiAFK.Start) ~= "function" then
+    logWarn("Anti-AFK indisponivel. Abortando inicializacao.")
     return false
 end
 
@@ -125,6 +128,7 @@ env.__DEPHUB.Runtime = runtime
 env.__DEPHUB.Scheduler = runtime.Scheduler
 env.__DEPHUB.HealthMonitor = runtime.HealthMonitor
 env.__DEPHUB.Dashboard = runtime.Dashboard
+env.__DEPHUB.AntiAFK = AntiAFK
 
 runtime.HealthMonitor:Register("Dashboard", function()
     local data = runtime.Dashboard and runtime.Dashboard:Get()
@@ -135,11 +139,8 @@ runtime.HealthMonitor:Register("Runtime", function()
     return not runtime.Destroyed
 end)
 
-runtime:On("TaskRegistered", function(state)
-    log("Runtime task registrada: " .. tostring(state.Name))
-end)
-
 runtime:Start()
+AntiAFK.Start()
 
 local Library = loadModule("src/ui/init.lua")
 local AutoFarm = loadModule("src/games/features/autofarm.lua")
@@ -149,6 +150,7 @@ local AutoFarmFriends = loadModule("src/games/features/autofarm-friends.lua")
 
 if not Library or type(Library.new) ~= "function" then
     logWarn("Biblioteca de UI invalida ou sem Library.new. Abortando inicializacao.")
+    AntiAFK.Stop()
     runtime:Destroy()
     return false
 end
@@ -159,6 +161,7 @@ end)
 
 if not okWindow or type(Window) ~= "table" then
     logWarn("Falha ao criar janela: " .. tostring(Window))
+    AntiAFK.Stop()
     runtime:Destroy()
     return false
 end
@@ -170,6 +173,7 @@ end)
 if not okTab or type(MainTab) ~= "table" then
     logWarn("Falha ao criar aba principal: " .. tostring(MainTab))
     pcall(Window.Destroy, Window)
+    AntiAFK.Stop()
     runtime:Destroy()
     return false
 end
@@ -203,7 +207,6 @@ local function addToggle(title, description, module)
     end
 
     RegisteredFeatures = RegisteredFeatures + 1
-    log("Feature registrada: " .. title)
     return true
 end
 
@@ -215,6 +218,7 @@ addToggle("Auto Farm Friends", "Automatiza interações permitidas nos tycoons d
 if RegisteredFeatures == 0 then
     logWarn("Nenhuma feature foi registrada.")
     pcall(Window.Destroy, Window)
+    AntiAFK.Stop()
     runtime:Destroy()
     return false
 end
