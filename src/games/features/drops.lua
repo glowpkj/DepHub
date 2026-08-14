@@ -6,14 +6,14 @@ local AutoDropModule = {}
 AutoDropModule.Enabled = false
 
 local dropThread = nil
+local dropConnection = nil
 local activeDrops = {}
 
 local function processDrop(drop)
     if not AutoDropModule.Enabled or activeDrops[drop] then return end
-    
+
     local character = localPlayer.Character
-    if not character then return end
-    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
     activeDrops[drop] = true
@@ -21,20 +21,17 @@ local function processDrop(drop)
     task.spawn(function()
         pcall(function()
             local touchInterest = drop:FindFirstChildOfClass("TouchInterest") or drop:FindFirstChild("TouchInterest")
-            
             if touchInterest and firetouchinterest then
                 firetouchinterest(hrp, drop, 0)
                 task.wait(0.01)
                 firetouchinterest(hrp, drop, 1)
-            else
-                local targetCFrame = drop:IsA("Model") and drop:GetPivot() or drop.CFrame
-                if targetCFrame then
-                    drop:PivotTo(hrp.CFrame)
-                end
+            elseif drop:IsA("Model") then
+                drop:PivotTo(hrp.CFrame)
+            elseif drop:IsA("BasePart") then
+                drop.CFrame = hrp.CFrame
             end
         end)
 
-        print("[Drop] Coletado com sucesso.")
         task.wait(0.1)
         activeDrops[drop] = nil
     end)
@@ -45,26 +42,28 @@ function AutoDropModule.Start()
     AutoDropModule.Enabled = true
 
     dropThread = task.spawn(function()
-        local dropFolder = Workspace:WaitForChild("DropFolder")
-
-        local connection = dropFolder.ChildAdded:Connect(function(child)
-            if AutoDropModule.Enabled then
-                processDrop(child)
-            end
-        end)
-
         while AutoDropModule.Enabled do
-            pcall(function()
-                local drops = dropFolder:GetChildren()
-                for i = 1, #drops do
-                    if not AutoDropModule.Enabled then break end
-                    processDrop(drops[i])
-                end
-            end)
-            task.wait(0.1)
-        end
+            local dropFolder = Workspace:FindFirstChild("DropFolder")
 
-        if connection then connection:Disconnect() end
+            if dropFolder then
+                if not dropConnection then
+                    dropConnection = dropFolder.ChildAdded:Connect(function(child)
+                        if AutoDropModule.Enabled then
+                            processDrop(child)
+                        end
+                    end)
+                end
+
+                pcall(function()
+                    for _, drop in ipairs(dropFolder:GetChildren()) do
+                        if not AutoDropModule.Enabled then break end
+                        processDrop(drop)
+                    end
+                end)
+            end
+
+            task.wait(0.15)
+        end
     end)
 end
 
@@ -73,13 +72,16 @@ function AutoDropModule.Stop()
     AutoDropModule.Enabled = false
     table.clear(activeDrops)
 
+    if dropConnection then
+        pcall(function()
+            dropConnection:Disconnect()
+        end)
+        dropConnection = nil
+    end
+
     if dropThread then
         pcall(function()
-            if task and task.cancel then
-                task.cancel(dropThread)
-            else
-                coroutine.close(dropThread)
-            end
+            task.cancel(dropThread)
         end)
         dropThread = nil
     end
