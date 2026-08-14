@@ -10,77 +10,68 @@ local GetService = game.GetService
 local Players = GetService(game, "Players")
 local HttpService = GetService(game, "HttpService")
 local TeleportService = GetService(game, "TeleportService")
-local TweenService = GetService(game, "TweenService")
-local UserInputService = GetService(game, "UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local MANIFEST_URL = BASE_URL .. "src/update-manifest.json"
+local MANIFEST_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/update-manifest.json"
+local SERVERS_URL = "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100"
 
 local Updater = {}
 Updater.__index = Updater
 
-local function httpGet(Url)
+local function httpGet(url)
     local ok, result = pcall(function()
-        return game:HttpGet(Url)
+        return game:HttpGet(url)
     end)
-
     if ok and type(result) == "string" and #result > 0 then
         return true, result
     end
-
     return false, ok and "Resposta vazia" or tostring(result)
 end
 
-local function decodeManifest(Source)
-    local ok, data = pcall(function()
-        return HttpService:JSONDecode(Source)
+local function decode(source)
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(source)
     end)
-
-    if ok and type(data) == "table" then
-        return true, data
+    if ok and type(result) == "table" then
+        return true, result
     end
-
-    return false, ok and "Manifesto invalido" or tostring(data)
+    return false, ok and "JSON invalido" or tostring(result)
 end
 
-local function createLabel(Parent, Text, Size, Position, TextSize, Color)
-    local Label = Instance.new("TextLabel")
-    Label.Size = Size
-    Label.Position = Position
-    Label.BackgroundTransparency = 1
-    Label.Text = Text
-    Label.TextColor3 = Color
-    Label.Font = Enum.Font.Gotham
-    Label.TextSize = TextSize
-    Label.TextWrapped = true
-    Label.TextXAlignment = Enum.TextXAlignment.Center
-    Label.TextYAlignment = Enum.TextYAlignment.Center
-    Label.Parent = Parent
-    return Label
+local function label(parent, text, size, position, textSize, color, font)
+    local object = Instance.new("TextLabel")
+    object.Size = size
+    object.Position = position
+    object.BackgroundTransparency = 1
+    object.Text = text
+    object.TextColor3 = color
+    object.Font = font or Enum.Font.Gotham
+    object.TextSize = textSize
+    object.TextWrapped = true
+    object.TextXAlignment = Enum.TextXAlignment.Center
+    object.TextYAlignment = Enum.TextYAlignment.Center
+    object.Parent = parent
+    return object
 end
 
-function Updater.new(Options)
-    Options = Options or {}
-
-    local Self = setmetatable({}, Updater)
-    Self.PlaceId = tostring(Options.PlaceId or game.PlaceId)
-    Self.CurrentVersion = tostring(Options.CurrentVersion or "unknown")
-    Self.PollInterval = tonumber(Options.PollInterval) or 60
-    Self.Countdown = tonumber(Options.Countdown) or 12
-    Self.Mode = Options.Mode or "serverhop"
-    Self.CancelledVersions = {}
-    Self.Destroyed = false
-    Self.PromptOpen = false
-    Self.PromptVersion = nil
-    Self.Connections = {}
-    Self.ScreenGui = nil
-    Self.CountdownLabel = nil
-    Self.StatusLabel = nil
-    Self.ActionInProgress = false
-    return Self
+function Updater.new(options)
+    options = options or {}
+    local self = setmetatable({}, Updater)
+    self.PlaceId = tostring(options.PlaceId or game.PlaceId)
+    self.CurrentVersion = options.CurrentVersion and tostring(options.CurrentVersion) or nil
+    self.PollInterval = tonumber(options.PollInterval) or 60
+    self.Countdown = tonumber(options.Countdown) or 12
+    self.Mode = options.Mode or "serverhop"
+    self.CancelledVersions = {}
+    self.Destroyed = false
+    self.PromptOpen = false
+    self.PromptVersion = nil
+    self.ActionInProgress = false
+    self.ScreenGui = nil
+    self.Connections = {}
+    return self
 end
 
 function Updater:FetchVersion()
@@ -89,29 +80,24 @@ function Updater:FetchVersion()
         return false, source
     end
 
-    local decoded, manifest = decodeManifest(source)
+    local decoded, manifest = decode(source)
     if not decoded then
         return false, manifest
     end
 
     local games = manifest.games
-    local gameInfo = type(games) == "table" and games[self.PlaceId] or nil
-    if type(gameInfo) ~= "table" or not gameInfo.version then
-        return false, "Nenhuma versao registrada para este jogo"
+    local info = type(games) == "table" and games[self.PlaceId] or nil
+    if type(info) ~= "table" or not info.version then
+        return false, "Jogo sem versao registrada"
     end
 
     return true, {
-        Version = tostring(gameInfo.version),
-        Name = tostring(gameInfo.name or "DepHub"),
-        Commit = tostring(manifest.commit or "")
+        Version = tostring(info.version),
+        Name = tostring(info.name or "DepHub")
     }
 end
 
 function Updater:DestroyPrompt()
-    if self.Destroyed then
-        return
-    end
-
     for _, connection in self.Connections do
         if connection and connection.Disconnect then
             connection:Disconnect()
@@ -120,21 +106,12 @@ function Updater:DestroyPrompt()
     self.Connections = {}
 
     if self.ScreenGui then
-        local Gui = self.ScreenGui
+        self.ScreenGui:Destroy()
         self.ScreenGui = nil
-        TweenService:Create(Gui, TweenInfo.new(0.2, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {
-            GroupTransparency = 1
-        }):Play()
-        task.delay(0.22, function()
-            if Gui then
-                Gui:Destroy()
-            end
-        end)
     end
 
     self.PromptOpen = false
-    self.CountdownLabel = nil
-    self.StatusLabel = nil
+    self.PromptVersion = nil
 end
 
 function Updater:Cancel()
@@ -149,126 +126,118 @@ function Updater:Cancel()
     self:DestroyPrompt()
 end
 
-function Updater:CreatePrompt(Info)
-    if self.Destroyed or self.PromptOpen or self.CancelledVersions[Info.Version] then
+function Updater:CreatePrompt(info)
+    if self.Destroyed or self.PromptOpen or self.CancelledVersions[info.Version] then
         return
     end
 
     self.PromptOpen = true
-    self.PromptVersion = Info.Version
+    self.PromptVersion = info.Version
 
-    local Existing = PlayerGui:FindFirstChild("DepHubUpdatePrompt")
-    if Existing then
-        Existing:Destroy()
+    local existing = PlayerGui:FindFirstChild("DepHubUpdatePrompt")
+    if existing then
+        existing:Destroy()
     end
 
-    local Gui = Instance.new("ScreenGui")
-    Gui.Name = "DepHubUpdatePrompt"
-    Gui.IgnoreGuiInset = true
-    Gui.ResetOnSpawn = false
-    Gui.DisplayOrder = 10001
-    Gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    Gui.Parent = PlayerGui
-    self.ScreenGui = Gui
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "DepHubUpdatePrompt"
+    gui.IgnoreGuiInset = true
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = 10001
+    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    gui.Parent = PlayerGui
+    self.ScreenGui = gui
 
-    local Backdrop = Instance.new("Frame")
-    Backdrop.Size = UDim2.fromScale(1, 1)
-    Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    Backdrop.BackgroundTransparency = 0.35
-    Backdrop.BorderSizePixel = 0
-    Backdrop.Parent = Gui
+    local backdrop = Instance.new("Frame")
+    backdrop.Size = UDim2.fromScale(1, 1)
+    backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    backdrop.BackgroundTransparency = 0.35
+    backdrop.BorderSizePixel = 0
+    backdrop.Parent = gui
 
-    local Card = Instance.new("Frame")
-    Card.Size = UDim2.fromOffset(440, 240)
-    Card.Position = UDim2.fromScale(0.5, 0.5)
-    Card.AnchorPoint = Vector2.new(0.5, 0.5)
-    Card.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-    Card.BorderSizePixel = 0
-    Card.Parent = Backdrop
+    local card = Instance.new("Frame")
+    card.Size = UDim2.fromOffset(440, 240)
+    card.Position = UDim2.fromScale(0.5, 0.5)
+    card.AnchorPoint = Vector2.new(0.5, 0.5)
+    card.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+    card.BorderSizePixel = 0
+    card.Parent = backdrop
 
-    local Corner = Instance.new("UICorner")
-    Corner.CornerRadius = UDim.new(0, 12)
-    Corner.Parent = Card
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 12)
+    corner.Parent = card
 
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = Color3.fromRGB(45, 45, 45)
-    Stroke.Thickness = 1
-    Stroke.Parent = Card
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(45, 45, 45)
+    stroke.Parent = card
 
-    createLabel(Card, "DEPHUB ATUALIZADO", UDim2.new(1, -40, 0, 34), UDim2.fromOffset(20, 20), 19, Color3.fromRGB(255, 255, 255))
-    createLabel(Card, "Uma nova versão do script está disponível.", UDim2.new(1, -40, 0, 32), UDim2.fromOffset(20, 58), 12, Color3.fromRGB(155, 155, 155))
-    createLabel(Card, "Versão atualizada detectada", UDim2.new(1, -40, 0, 22), UDim2.fromOffset(20, 94), 11, Color3.fromRGB(100, 100, 100))
+    label(card, "DEPHUB ATUALIZADO", UDim2.new(1, -40, 0, 34), UDim2.fromOffset(20, 20), 19, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBold)
+    label(card, "Uma nova versão do script está disponível.", UDim2.new(1, -40, 0, 28), UDim2.fromOffset(20, 58), 12, Color3.fromRGB(155, 155, 155))
+    label(card, info.Name, UDim2.new(1, -40, 0, 22), UDim2.fromOffset(20, 88), 11, Color3.fromRGB(100, 100, 100), Enum.Font.GothamBold)
 
-    local Countdown = createLabel(Card, "Atualizando em " .. tostring(self.Countdown) .. "s", UDim2.new(1, -40, 0, 30), UDim2.fromOffset(20, 118), 14, Color3.fromRGB(255, 255, 255))
-    self.CountdownLabel = Countdown
+    local countdown = label(card, "Atualizando em " .. tostring(self.Countdown) .. "s", UDim2.new(1, -40, 0, 30), UDim2.fromOffset(20, 118), 14, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBold)
 
-    local CancelButton = Instance.new("TextButton")
-    CancelButton.Size = UDim2.fromOffset(180, 38)
-    CancelButton.Position = UDim2.fromScale(0.5, 1, 0, -18)
-    CancelButton.AnchorPoint = Vector2.new(0.5, 1)
-    CancelButton.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    CancelButton.BorderSizePixel = 0
-    CancelButton.Text = "CANCELAR"
-    CancelButton.TextColor3 = Color3.fromRGB(190, 190, 190)
-    CancelButton.Font = Enum.Font.GothamBold
-    CancelButton.TextSize = 11
-    CancelButton.AutoButtonColor = false
-    CancelButton.Parent = Card
+    local cancel = Instance.new("TextButton")
+    cancel.Size = UDim2.fromOffset(180, 38)
+    cancel.Position = UDim2.new(0.5, 0, 1, -18)
+    cancel.AnchorPoint = Vector2.new(0.5, 1)
+    cancel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    cancel.BorderSizePixel = 0
+    cancel.Text = "CANCELAR"
+    cancel.TextColor3 = Color3.fromRGB(190, 190, 190)
+    cancel.Font = Enum.Font.GothamBold
+    cancel.TextSize = 11
+    cancel.AutoButtonColor = false
+    cancel.Parent = card
 
-    local ButtonCorner = Instance.new("UICorner")
-    ButtonCorner.CornerRadius = UDim.new(0, 8)
-    ButtonCorner.Parent = CancelButton
+    local cancelCorner = Instance.new("UICorner")
+    cancelCorner.CornerRadius = UDim.new(0, 8)
+    cancelCorner.Parent = cancel
 
-    local ButtonStroke = Instance.new("UIStroke")
-    ButtonStroke.Color = Color3.fromRGB(50, 50, 50)
-    ButtonStroke.Parent = CancelButton
-
-    self.Connections[#self.Connections + 1] = CancelButton.MouseButton1Click:Connect(function()
+    self.Connections[#self.Connections + 1] = cancel.MouseButton1Click:Connect(function()
         self:Cancel()
     end)
 
     task.spawn(function()
-        for Remaining = self.Countdown, 0, -1 do
-            if self.Destroyed or not self.PromptOpen or self.PromptVersion ~= Info.Version then
+        for remaining = self.Countdown, 0, -1 do
+            if self.Destroyed or not self.PromptOpen or self.PromptVersion ~= info.Version then
                 return
             end
 
-            Countdown.Text = Remaining > 0 and "Atualizando em " .. tostring(Remaining) .. "s" or "Atualizando..."
+            countdown.Text = remaining > 0 and "Atualizando em " .. tostring(remaining) .. "s" or "Atualizando..."
 
-            if Remaining > 0 then
+            if remaining > 0 then
                 task.wait(1)
             end
         end
 
-        if self.Destroyed or not self.PromptOpen or self.PromptVersion ~= Info.Version then
+        if self.Destroyed or not self.PromptOpen or self.PromptVersion ~= info.Version then
             return
         end
 
-        self:UpdateNow(Info)
+        self:Teleport()
     end)
 end
 
 function Updater:GetServer()
-    local Url = "https://games.roblox.com/v1/games/" .. tostring(self.PlaceId) .. "/servers/Public?sortOrder=Asc&limit=100"
-    local ok, source = httpGet(Url)
+    local url = string.format(SERVERS_URL, self.PlaceId)
+    local ok, source = httpGet(url)
     if not ok then
         return false, source
     end
 
-    local decoded, data = decodeManifest(source)
+    local decoded, data = decode(source)
     if not decoded then
         return false, data
     end
 
-    if type(data.data) ~= "table" then
-        return false, "Lista de servidores invalida"
-    end
-
     local candidates = {}
-    for _, server in data.data do
-        if type(server) == "table" and server.id and tonumber(server.playing) and tonumber(server.maxPlayers) then
-            if server.id ~= game.JobId and server.playing < server.maxPlayers then
-                candidates[#candidates + 1] = server.id
+    if type(data.data) == "table" then
+        for _, server in data.data do
+            if type(server) == "table" and server.id and tonumber(server.playing) and tonumber(server.maxPlayers) then
+                if server.id ~= game.JobId and server.playing < server.maxPlayers then
+                    candidates[#candidates + 1] = server.id
+                end
             end
         end
     end
@@ -295,12 +264,12 @@ function Updater:Teleport()
         return
     end
 
-    local ok, JobId = self:GetServer()
-    if ok and JobId then
-        local success = pcall(function()
-            TeleportService:TeleportToPlaceInstance(tonumber(self.PlaceId), JobId, LocalPlayer)
+    local ok, jobId = self:GetServer()
+    if ok and jobId then
+        local teleported = pcall(function()
+            TeleportService:TeleportToPlaceInstance(tonumber(self.PlaceId), jobId, LocalPlayer)
         end)
-        if success then
+        if teleported then
             return
         end
     end
@@ -310,33 +279,26 @@ function Updater:Teleport()
     end)
 end
 
-function Updater:UpdateNow(Info)
-    if self.Destroyed or self.ActionInProgress then
-        return
-    end
-
-    self:Teleport()
-end
-
 function Updater:Check()
     if self.Destroyed or self.PromptOpen or self.ActionInProgress then
         return
     end
 
-    local ok, Info = self:FetchVersion()
+    local ok, info = self:FetchVersion()
     if not ok then
         return
     end
 
-    if Info.Version == self.CurrentVersion then
+    if not self.CurrentVersion then
+        self.CurrentVersion = info.Version
         return
     end
 
-    if self.CancelledVersions[Info.Version] then
+    if info.Version == self.CurrentVersion or self.CancelledVersions[info.Version] then
         return
     end
 
-    self:CreatePrompt(Info)
+    self:CreatePrompt(info)
 end
 
 function Updater:Start()
