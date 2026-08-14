@@ -1,0 +1,12 @@
+{
+  "119048529960596": {
+    "name": "Restaurant Tycoon 3",
+    "files": [
+      "src/games/rt3.lua",
+      "src/games/features/autofarm.lua",
+      "src/games/features/instant-cook.lua",
+      "src/games/features/drops.lua",
+      "src/games/features/autofarm-friends.lua"
+    ]
+  }
+}
