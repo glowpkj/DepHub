@@ -7,7 +7,6 @@ local pcall = pcall
 local os_clock = os.clock
 local math_floor = math.floor
 local string_match = string.match
-local string_format = string.format
 
 local GetService = game.GetService
 local Players = GetService(game, "Players")
@@ -160,6 +159,8 @@ function Dashboard:Start()
 
     self.Started = true
 
+    self:Collect()
+
     self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function(deltaTime)
         if deltaTime > 0 then
             local instant = 1 / deltaTime
@@ -169,8 +170,10 @@ function Dashboard:Start()
 
     task.spawn(function()
         while not self.Destroyed do
-            self:Collect()
             task.wait(self.Interval)
+            if not self.Destroyed then
+                self:Collect()
+            end
         end
     end)
 
