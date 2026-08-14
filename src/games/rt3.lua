@@ -141,7 +141,7 @@ end)
 
 runtime:Start()
 
-local Library = loadModule("src/ui/lib.lua")
+local Library = loadModule("src/ui/init.lua")
 local AutoFarm = loadModule("src/games/features/autofarm.lua")
 local InstantCook = loadModule("src/games/features/instant-cook.lua")
 local AutoDrop = loadModule("src/games/features/drops.lua")
