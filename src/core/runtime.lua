@@ -1,7 +1,7 @@
-local task = task
 local type = type
 local tostring = tostring
 local pcall = pcall
+local tonumber = tonumber
 local os_clock = os.clock
 
 local Runtime = {}
@@ -10,22 +10,45 @@ Runtime.__index = Runtime
 function Runtime.new(options)
     options = options or {}
 
+    local Scheduler = options.Scheduler
+    local HealthMonitor = options.HealthMonitor
+    local Dashboard = options.Dashboard
+
     local self = setmetatable({}, Runtime)
     self.Destroyed = false
-    self.Tasks = {}
-    self.TaskOrder = {}
-    self.NextTaskId = 0
-    self.Connections = {}
-    self.Services = {}
+    self.Started = false
     self.StartedAt = os_clock()
     self.ErrorCount = 0
     self.LastError = nil
     self.Health = "Healthy"
     self.Events = {}
-    self.MaxTaskErrors = tonumber(options.MaxTaskErrors) or 5
-    self.DefaultInterval = tonumber(options.DefaultInterval) or 0.1
-
+    self.Scheduler = type(Scheduler) == "table" and Scheduler.new(options.SchedulerOptions or {}) or nil
+    self.HealthMonitor = type(HealthMonitor) == "table" and HealthMonitor.new(options.HealthOptions or {}) or nil
+    self.Dashboard = type(Dashboard) == "table" and Dashboard.new(options.DashboardOptions or {}) or nil
     return self
+end
+
+function Runtime:On(name, callback)
+    if self.Destroyed or type(name) ~= "string" or type(callback) ~= "function" then
+        return function() end
+    end
+
+    local listeners = self.Events[name]
+    if not listeners then
+        listeners = {}
+        self.Events[name] = listeners
+    end
+
+    local connection = {Connected = true, Callback = callback}
+    listeners[connection] = true
+
+    return function()
+        if not connection.Connected then
+            return
+        end
+        connection.Connected = false
+        listeners[connection] = nil
+    end
 end
 
 function Runtime:Emit(name, ...)
@@ -45,131 +68,34 @@ function Runtime:Emit(name, ...)
     end
 end
 
-function Runtime:On(name, callback)
-    if self.Destroyed or type(name) ~= "string" or type(callback) ~= "function" then
-        return function() end
-    end
-
-    local listeners = self.Events[name]
-    if not listeners then
-        listeners = {}
-        self.Events[name] = listeners
-    end
-
-    local connection = {
-        Connected = true,
-        Callback = callback
-    }
-
-    listeners[connection] = true
-
-    return function()
-        if not connection.Connected then
-            return
-        end
-        connection.Connected = false
-        listeners[connection] = nil
-    end
-end
-
 function Runtime:Register(name, callback, options)
-    if self.Destroyed or type(name) ~= "string" or type(callback) ~= "function" then
+    if self.Destroyed or not self.Scheduler then
         return nil
     end
 
-    if self.Tasks[name] then
-        return self.Tasks[name]
+    local state = self.Scheduler:Register(name, callback, options)
+    if state then
+        self:Emit("TaskRegistered", state)
     end
-
-    options = options or {}
-
-    self.NextTaskId = self.NextTaskId + 1
-
-    local taskState = {
-        Id = self.NextTaskId,
-        Name = name,
-        Callback = callback,
-        Interval = math.max(tonumber(options.Interval) or self.DefaultInterval, 0.01),
-        Priority = tonumber(options.Priority) or 0,
-        Enabled = options.Enabled ~= false,
-        Running = false,
-        Errors = 0,
-        LastError = nil,
-        LastRun = 0,
-        LastSuccess = 0,
-        Destroyed = false,
-        Version = 0
-    }
-
-    self.Tasks[name] = taskState
-    self.TaskOrder[#self.TaskOrder + 1] = taskState
-
-    return taskState
+    return state
 end
 
 function Runtime:SetEnabled(name, enabled)
-    local taskState = self.Tasks[name]
-    if not taskState or self.Destroyed then
+    if self.Destroyed or not self.Scheduler then
         return false
     end
-
-    taskState.Enabled = enabled == true
-    taskState.Version = taskState.Version + 1
-    return true
+    return self.Scheduler:SetEnabled(name, enabled)
 end
 
 function Runtime:IsEnabled(name)
-    local taskState = self.Tasks[name]
-    return taskState ~= nil and taskState.Enabled == true
+    return self.Scheduler ~= nil and self.Scheduler:Get(name) ~= nil and self.Scheduler:Get(name).Enabled == true
 end
 
 function Runtime:GetTask(name)
-    return self.Tasks[name]
-end
-
-function Runtime:RunTask(taskState)
-    if self.Destroyed or taskState.Destroyed or not taskState.Enabled or taskState.Running then
-        return
+    if not self.Scheduler then
+        return nil
     end
-
-    taskState.Running = true
-    taskState.LastRun = os_clock()
-
-    local ok, err = pcall(taskState.Callback, taskState)
-
-    taskState.Running = false
-
-    if ok then
-        taskState.Errors = 0
-        taskState.LastError = nil
-        taskState.LastSuccess = os_clock()
-        return true
-    end
-
-    taskState.Errors = taskState.Errors + 1
-    taskState.LastError = tostring(err)
-    self.ErrorCount = self.ErrorCount + 1
-    self.LastError = taskState.LastError
-
-    if taskState.Errors >= self.MaxTaskErrors then
-        taskState.Enabled = false
-        self:Emit("TaskSuspended", taskState.Name, taskState.LastError)
-    end
-
-    return false
-end
-
-function Runtime:StartTask(taskState)
-    local version = taskState.Version
-
-    task.spawn(function()
-        while not self.Destroyed and not taskState.Destroyed and taskState.Version == version do
-            if taskState.Enabled then
-                self:RunTask(taskState)
-            end
-            task.wait(taskState.Interval)
-        end
-    end)
+    return self.Scheduler:Get(name)
 end
 
 function Runtime:Start()
@@ -182,72 +108,41 @@ function Runtime:Start()
     end
 
     self.Started = true
+    self.StartedAt = os_clock()
 
-    table.sort(self.TaskOrder, function(a, b)
-        return a.Priority > b.Priority
-    end)
+    if self.Dashboard then
+        self.Dashboard:Start()
+    end
 
-    for _, taskState in ipairs(self.TaskOrder) do
-        if taskState.Enabled then
-            self:StartTask(taskState)
-        end
+    if self.HealthMonitor then
+        self.HealthMonitor:Start()
+    end
+
+    if self.Scheduler then
+        self.Scheduler:Start()
     end
 
     self:Emit("Started")
     return true
 end
 
-function Runtime:RecalculateHealth()
-    if self.Destroyed then
-        self.Health = "Destroyed"
-        return self.Health
-    end
-
-    local suspended = 0
-    local running = 0
-
-    for _, taskState in ipairs(self.TaskOrder) do
-        if taskState.Enabled then
-            running = running + 1
-        elseif taskState.Errors >= self.MaxTaskErrors then
-            suspended = suspended + 1
-        end
-    end
-
-    if suspended > 0 then
-        self.Health = "Degraded"
-    else
-        self.Health = "Healthy"
-    end
-
-    self:Emit("HealthChanged", self.Health, running, suspended)
-    return self.Health
-end
-
 function Runtime:GetSnapshot()
-    local tasks = {}
+    local schedulerSnapshot = self.Scheduler and self.Scheduler:GetSnapshot() or {}
+    local healthSnapshot = self.HealthMonitor and self.HealthMonitor:GetSnapshot() or {Status = "Unavailable"}
+    local dashboardSnapshot = self.Dashboard and self.Dashboard:GetSnapshot() or {}
 
-    for _, taskState in ipairs(self.TaskOrder) do
-        tasks[#tasks + 1] = {
-            Name = taskState.Name,
-            Enabled = taskState.Enabled,
-            Running = taskState.Running,
-            Errors = taskState.Errors,
-            LastError = taskState.LastError,
-            LastRun = taskState.LastRun,
-            LastSuccess = taskState.LastSuccess,
-            Priority = taskState.Priority,
-            Interval = taskState.Interval
-        }
-    end
+    self.Health = healthSnapshot.Status or "Unknown"
 
     return {
-        Health = self:RecalculateHealth(),
+        Health = self.Health,
+        Started = self.Started,
         StartedAt = self.StartedAt,
         Uptime = math.max(os_clock() - self.StartedAt, 0),
         ErrorCount = self.ErrorCount,
         LastError = self.LastError,
-        Tasks = tasks
+        Tasks = schedulerSnapshot,
+        HealthMonitor = healthSnapshot,
+        Dashboard = dashboardSnapshot
     }
 end
 
@@ -257,22 +152,24 @@ function Runtime:Destroy()
     end
 
     self.Destroyed = true
+    self.Started = false
 
-    for _, taskState in ipairs(self.TaskOrder) do
-        taskState.Destroyed = true
-        taskState.Enabled = false
-        taskState.Version = taskState.Version + 1
+    if self.Scheduler then
+        pcall(self.Scheduler.Destroy, self.Scheduler)
     end
 
-    for _, disconnect in ipairs(self.Connections) do
-        pcall(disconnect)
+    if self.HealthMonitor then
+        pcall(self.HealthMonitor.Destroy, self.HealthMonitor)
     end
 
-    self.Connections = {}
+    if self.Dashboard then
+        pcall(self.Dashboard.Destroy, self.Dashboard)
+    end
+
+    self.Scheduler = nil
+    self.HealthMonitor = nil
+    self.Dashboard = nil
     self.Events = {}
-    self.Tasks = {}
-    self.TaskOrder = {}
-    self.Services = {}
     self.Health = "Destroyed"
 end
 
