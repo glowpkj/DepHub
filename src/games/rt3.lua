@@ -1,71 +1,135 @@
--- restauranty tycoon 3
-
 local game = game
 local pcall = pcall
-local task = task
-local getgenv = getgenv or function() return _G end
+local tostring = tostring
+local type = type
+local print = print
+local warn = warn
 
-local GetService = game.GetService
-local HttpService = GetService(game, "HttpService")
+local function log(message)
+    pcall(print, "[DEPHUB RT3] " .. tostring(message))
+end
+
+local function logWarn(message)
+    pcall(warn, "[DEPHUB RT3] " .. tostring(message))
+end
+
+local compiler = loadstring
+if type(compiler) ~= "function" then
+    logWarn("loadstring indisponivel.")
+    return
+end
+
+local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local function fetch(url)
-    local success, content = pcall(function()
+    local ok, result = pcall(function()
         return game:HttpGet(url)
     end)
-    if success and content and #content > 0 then
-        return content
+
+    if ok and type(result) == "string" and #result > 0 then
+        return true, result
     end
-    return nil
+
+    if not ok then
+        return false, tostring(result)
+    end
+
+    return false, "Resposta vazia"
 end
 
-local function loadModule(url)
-    local raw = fetch(url)
-    if not raw then return nil end
-    local loadstring = loadstring or (getgenv and getgenv().loadstring)
-    if not loadstring then return nil end
-    local executable, err = loadstring(raw)
-    if executable then
-        return executable()
+local function loadModule(path)
+    local url = BASE_URL .. path
+    log("Baixando modulo: " .. path)
+
+    local okFetch, raw = fetch(url)
+    if not okFetch then
+        logWarn("Falha no modulo " .. path .. ": " .. tostring(raw))
+        return nil
     end
-    return nil
+
+    local okCompile, chunk, compileError = pcall(compiler, raw)
+    if not okCompile then
+        logWarn("Erro compilando " .. path .. ": " .. tostring(chunk))
+        return nil
+    end
+
+    if type(chunk) ~= "function" then
+        logWarn("Codigo invalido em " .. path .. ": " .. tostring(compileError))
+        return nil
+    end
+
+    local okRun, result = pcall(chunk)
+    if not okRun then
+        logWarn("Erro executando " .. path .. ": " .. tostring(result))
+        return nil
+    end
+
+    log("Modulo carregado: " .. path)
+    return result
 end
 
-local Library = loadModule("https://githubusercontent.com")
-local AutoFarm = loadModule("https://githubusercontent.com")
-local InstantCook = loadModule("https://githubusercontent.com")
+log("Inicializando Restaurant Tycoon 3")
 
-if Library then
-    local Window = Library.new("DepHub", "Restaurant Tycoon 3", "rbxassetid://79507712997362")
-    
-    local MainTab = Window:CreateTab("Automação", nil, "Gerenciamento de rotinas automatizadas e telemetria.")
+local Library = loadModule("src/ui/lib.lua")
+local AutoFarm = loadModule("src/games/features/autofarm.lua")
+local InstantCook = loadModule("src/games/features/instant-cook.lua")
+local AutoDrop = loadModule("src/games/features/drops.lua")
+local AutoFarmFriends = loadModule("src/games/features/autofarm-friends.lua")
 
-    if AutoFarm then
-        MainTab:CreateToggle(
-            "Auto Farm Geral", 
-            "Ativa o recolhimento automático de pedidos, atendimento e limpeza do Tycoon.", 
-            false, 
-            function(state)
-                if AutoFarm.Toggle then
-                    AutoFarm.Toggle(state)
-                elseif AutoFarm.Set then
-                    AutoFarm.Set(state)
-                end
+if not Library then
+    logWarn("Biblioteca de UI nao foi carregada. Abortando inicializacao da interface.")
+    return
+end
+
+local okWindow, Window = pcall(function()
+    return Library.new("DepHub", "Restaurant Tycoon 3", "rbxassetid://79507712997362")
+end)
+
+if not okWindow or not Window then
+    logWarn("Falha ao criar janela: " .. tostring(Window))
+    return
+end
+
+local okTab, MainTab = pcall(function()
+    return Window:CreateTab("Automação", nil, "Gerenciamento de rotinas automatizadas e telemetria.")
+end)
+
+if not okTab or not MainTab then
+    logWarn("Falha ao criar aba principal: " .. tostring(MainTab))
+    return
+end
+
+local function addToggle(title, description, module)
+    if not module then
+        logWarn("Feature indisponivel: " .. title)
+        return
+    end
+
+    local handler = module.Toggle or module.Set
+    if type(handler) ~= "function" then
+        logWarn("Feature sem Toggle/Set: " .. title)
+        return
+    end
+
+    local ok, err = pcall(function()
+        MainTab:CreateToggle(title, description, false, function(state)
+            local success, executionError = pcall(handler, state)
+            if not success then
+                logWarn("Erro em " .. title .. ": " .. tostring(executionError))
             end
-        )
-    end
+        end)
+    end)
 
-    if InstantCook then
-        MainTab:CreateToggle(
-            "Cozimento Instantâneo", 
-            "Intercepta eventos remotos e finaliza o preparo de refeições instantaneamente.", 
-            false, 
-            function(state)
-                if InstantCook.Toggle then
-                    InstantCook.Toggle(state)
-                elseif InstantCook.Set then
-                    InstantCook.Set(state)
-                end
-            end
-        )
+    if not ok then
+        logWarn("Falha ao registrar " .. title .. ": " .. tostring(err))
+    else
+        log("Feature registrada: " .. title)
     end
 end
+
+addToggle("Auto Farm Geral", "Ativa o atendimento e gerenciamento automático.", AutoFarm)
+addToggle("Cozimento Instantâneo", "Automatiza o processamento das tarefas de cozinha.", InstantCook)
+addToggle("Auto Drop", "Coleta automaticamente os drops disponíveis.", AutoDrop)
+addToggle("Auto Farm Friends", "Automatiza interações permitidas nos tycoons de amigos.", AutoFarmFriends)
+
+log("Restaurant Tycoon 3 inicializado com sucesso")
