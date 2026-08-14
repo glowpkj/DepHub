@@ -61,7 +61,7 @@ function Updater.new(options)
     local self = setmetatable({}, Updater)
     self.PlaceId = tostring(options.PlaceId or game.PlaceId)
     self.CurrentVersion = options.CurrentVersion and tostring(options.CurrentVersion) or nil
-    self.PollInterval = tonumber(options.PollInterval) or 60
+    self.PollInterval = tonumber(options.PollInterval) or 15
     self.Countdown = tonumber(options.Countdown) or 12
     self.Mode = options.Mode or "serverhop"
     self.CancelledVersions = {}
