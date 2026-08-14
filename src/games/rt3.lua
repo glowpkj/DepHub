@@ -126,7 +126,7 @@ env.__DEPHUB.Scheduler = runtime.Scheduler
 env.__DEPHUB.HealthMonitor = runtime.HealthMonitor
 env.__DEPHUB.Dashboard = runtime.Dashboard
 
-autoDashboardHealth = runtime.HealthMonitor:Register("Dashboard", function()
+runtime.HealthMonitor:Register("Dashboard", function()
     local data = runtime.Dashboard and runtime.Dashboard:Get()
     return type(data) == "table" and data.GameId ~= nil
 end)
