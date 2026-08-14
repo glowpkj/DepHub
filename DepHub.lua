@@ -1,112 +1,62 @@
-local Loader = {}
-Loader.__index = Loader
+local game = game
+local pcall = pcall
+local task = task
+local tostring = tostring
+local getgenv = getgenv or function() return _G end
 
-local function createEnvironment()
-    local env = {}
-    local metatable = {
-        __index = function(_, key)
-            return rawget(env, key) or getgenv()[key]
-        end,
-        __newindex = function(_, key, value)
-            rawset(env, key, value)
-        end,
-        __metatable = "locked"
-    }
-    setmetatable(env, metatable)
-    return env
+local GetService = game.GetService
+local Players = GetService(game, "Players")
+local localPlayer = Players.LocalPlayer
+
+if getgenv().__DEPHUB_LOADER_EXECUTED then 
+    return 
 end
+getgenv().__DEPHUB_LOADER_EXECUTED = true
 
-function Loader.new()
-    local self = setmetatable({}, Loader)
-    self.environment = createEnvironment()
-    self.connections = {}
-    self.executed = false
-    return self
-end
+local GAME_SCRIPTS = {
+    ["119048529960596"] = "https://raw.githubusercontent.com/glowpkj/DepHub/refs/heads/main/src/games/rt3.lua"
+}
 
-function Loader:cleanup()
-    for _, connection in ipairs(self.connections) do
-        pcall(function()
-            if connection and connection.Disconnect then
-                connection:Disconnect()
-            end
-        end)
-    end
-    self.connections = {}
-    if self.environment then
-        for key in pairs(self.environment) do
-            self.environment[key] = nil
-        end
-        self.environment = nil
-    end
-    collectgarbage("collect")
-end
+local UNIVERSAL_URL = "https://githubusercontent.com"
 
-function Loader:execute(scriptSource)
-    if self.executed then
-        return false, "Loader already executed"
-    end
-
-    local success, errorMessage = pcall(function()
-        local func, err = loadstring(scriptSource)
-        if not func then
-            error("Loadstring failed: " .. tostring(err))
-        end
-        setfenv(func, self.environment)
-        func()
+local function fetchScript(targetUrl)
+    local success, content = pcall(function()
+        return game:HttpGet(targetUrl)
     end)
-
-    if not success then
-        self:cleanup()
-        return false, errorMessage
+    if success and content and #content > 0 then
+        return content
     end
-
-    self.executed = true
-    return true, "Execution successful"
+    return nil
 end
 
-function Loader:fetchScript(url)
-    local success, result = pcall(function()
-        return game:HttpGet(url)
-    end)
-    if success and result then
-        return true, result
-    end
-    return false, "Failed to fetch script from URL"
-end
+local function executePayload()
+    local loadstring = loadstring or (getgenv and getgenv().loadstring)
+    if not loadstring then return end
 
-local function waitForGameReady()
-    local startTime = tick()
-    while tick() - startTime < 10 do
-        local success, result = pcall(function()
-            return game:IsLoaded()
-        end)
-        if success and result then
-            return true
+    local currentGameId = tostring(game.GameId)
+    local targetUrl = GAME_SCRIPTS[currentGameId] or UNIVERSAL_URL
+    local scriptRaw = fetchScript(targetUrl)
+
+    if not scriptRaw and targetUrl ~= UNIVERSAL_URL then
+        scriptRaw = fetchScript(UNIVERSAL_URL)
+    end
+
+    if scriptRaw then
+        local executable, err = loadstring(scriptRaw)
+        if executable then
+            task.spawn(executable)
         end
-        task.wait(0.1)
     end
-    return false
 end
 
-local loader = Loader.new()
-
-if waitForGameReady() then
-    local mainUrl = "https://raw.githubusercontent.com/glowpkj/DepHub/refs/heads/main/main"
-    local fetchSuccess, scriptContent = loader:fetchScript(mainUrl)
-    
-    if fetchSuccess then
-        local execSuccess, execMessage = loader:execute(scriptContent)
-        if execSuccess then
-            print("Loader: Main script executed successfully")
-        else
-            warn("Loader: Execution failed - " .. tostring(execMessage))
-        end
+pcall(function()
+    if localPlayer.Character then
+        executePayload()
     else
-        warn("Loader: Failed to fetch main script - " .. tostring(scriptContent))
+        local connection
+        connection = localPlayer.CharacterAdded:Connect(function()
+            connection:Disconnect()
+            executePayload()
+        end)
     end
-else
-    warn("Loader: Game did not load in time")
-end
-
-return loader
+end)
