@@ -3,13 +3,10 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 
--- Verificação de segurança para os Remotes
 local eventsFolder = ReplicatedStorage:FindFirstChild("Events")
 local cookFolder = eventsFolder and eventsFolder:FindFirstChild("Cook")
-
-local cookInputRemote = cookFolder and cookFolder:WaitForChild("CookInputRequested")
-local cookUpdatedEvent = cookFolder and cookFolder:WaitForChild("CookUpdated")
-local tempFolder = workspace:WaitForChild("Temp")
+local cookInputRemote = cookFolder and cookFolder:FindFirstChild("CookInputRequested")
+local cookUpdatedEvent = cookFolder and cookFolder:FindFirstChild("CookUpdated")
 
 local CookModule = {
     Enabled = false,
@@ -19,17 +16,15 @@ local CookModule = {
 local connections = {}
 local loopThreads = {}
 
--- Função de processamento com pcall melhorado
 local function instantProcess(equipment, stationType)
     if not CookModule.Enabled or not equipment or not stationType or not cookInputRemote then return end
-    
+
     task.spawn(function()
-        local success, err = pcall(function()
+        pcall(function()
             cookInputRemote:FireServer("Interact", equipment, stationType)
-            task.wait(0.05) -- Um delay levemente maior evita que o servidor ignore o comando
+            task.wait(0.05)
             cookInputRemote:FireServer("CompleteTask", equipment, stationType, false)
         end)
-        if not success then print("[Instant Cook] Erro no Processo: " .. tostring(err)) end
     end)
 end
 
@@ -37,75 +32,78 @@ function CookModule.Start()
     if CookModule.Enabled then return end
     CookModule.Enabled = true
 
-    -- Trava de Posição mais suave
     local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
     if hrp then CookModule.FixedPosition = hrp.CFrame end
 
-    local lockPos = RunService.Heartbeat:Connect(function()
-        if CookModule.Enabled and CookModule.FixedPosition then
-            local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if root then
-                -- Em vez de forçar o CFrame toda hora, só reseta se afastar muito
-                if (root.Position - CookModule.FixedPosition.Position).Magnitude > 0.5 then
-                    root.CFrame = CookModule.FixedPosition
-                end
-                root.AssemblyLinearVelocity = Vector3.zero -- Zera a velocidade para não escorregar
-            end
-        end
-    end)
-    table.insert(connections, lockPos)
+    table.insert(connections, RunService.Heartbeat:Connect(function()
+        if not CookModule.Enabled or not CookModule.FixedPosition then return end
 
-    -- Evento de Culinária
+        local root = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            if (root.Position - CookModule.FixedPosition.Position).Magnitude > 0.5 then
+                root.CFrame = CookModule.FixedPosition
+            end
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+    end))
+
     if cookUpdatedEvent then
-        local cookConn = cookUpdatedEvent.OnClientEvent:Connect(function(actionType, p1, p2, p3, p4)
+        table.insert(connections, cookUpdatedEvent.OnClientEvent:Connect(function(actionType, p1, p2, p3, p4)
             if not CookModule.Enabled then return end
             if actionType == "DirectToEquipment" and typeof(p1) == "Instance" then
                 instantProcess(p1, p2)
             elseif actionType == "UpdateInteraction" and typeof(p2) == "Instance" and p4 == true then
                 instantProcess(p2, p3)
             end
-        end)
-        table.insert(connections, cookConn)
+        end))
     end
 
-    -- Scanner de ProximityPrompt otimizado
-    local scanThread = task.spawn(function()
+    loopThreads[#loopThreads + 1] = task.spawn(function()
         while CookModule.Enabled do
-            pcall(function()
-                for _, desc in ipairs(tempFolder:GetDescendants()) do
-                    if not CookModule.Enabled then break end
-                    if desc:IsA("ProximityPrompt") and desc.Enabled then
-                        if desc.ActionText == "Cook" or desc.ObjectText == "Cook" then
-                            -- Usa a função do executor se disponível
-                            if fireproximityprompt then
-                                fireproximityprompt(desc)
-                            else
-                                -- Fallback manual
-                                desc:InputHoldBegin()
-                                task.wait(desc.HoldDuration)
-                                desc:InputHoldEnd()
-                            end
+            local tempFolder = workspace:FindFirstChild("Temp")
+            if tempFolder then
+                pcall(function()
+                    for _, desc in ipairs(tempFolder:GetDescendants()) do
+                        if not CookModule.Enabled then break end
+                        if desc:IsA("ProximityPrompt") and desc.Enabled and (desc.ActionText == "Cook" or desc.ObjectText == "Cook") then
+                            pcall(function()
+                                if fireproximityprompt then
+                                    fireproximityprompt(desc)
+                                else
+                                    desc:InputHoldBegin()
+                                    task.wait(desc.HoldDuration)
+                                    desc:InputHoldEnd()
+                                end
+                            end)
                             task.wait(0.1)
                         end
                     end
-                end
-            end)
-            task.wait(0.5) -- Aumentei o tempo para poupar CPU
+                end)
+            end
+            task.wait(0.5)
         end
     end)
-    table.insert(loopThreads, scanThread)
-    
-    print("[Instant Cook] Ativado com Otimizações!")
 end
 
 function CookModule.Stop()
     if not CookModule.Enabled then return end
     CookModule.Enabled = false
-    for _, c in ipairs(connections) do if c then c:Disconnect() end end
-    for _, t in ipairs(loopThreads) do pcall(task.cancel, t) end
+
+    for _, connection in ipairs(connections) do
+        pcall(function()
+            connection:Disconnect()
+        end)
+    end
+
+    for _, thread in ipairs(loopThreads) do
+        pcall(function()
+            task.cancel(thread)
+        end)
+    end
+
     connections = {}
     loopThreads = {}
-    print("[Instant Cook] Desativado.")
+    CookModule.FixedPosition = nil
 end
 
 function CookModule.Toggle(state)
