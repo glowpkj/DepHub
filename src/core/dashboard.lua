@@ -5,16 +5,20 @@ local tostring = tostring
 local tonumber = tonumber
 local pcall = pcall
 local os_clock = os.clock
+local math_floor = math.floor
+local string_match = string.match
+local string_format = string.format
 
 local GetService = game.GetService
 local Players = GetService(game, "Players")
 local Stats = GetService(game, "Stats")
 local RunService = GetService(game, "RunService")
-
-local LocalPlayer = Players.LocalPlayer
+local HttpService = GetService(game, "HttpService")
 
 local Dashboard = {}
 Dashboard.__index = Dashboard
+
+local MANIFEST_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/update-manifest.json"
 
 local function safeCall(callback, fallback)
     local ok, result = pcall(callback)
@@ -24,29 +28,67 @@ local function safeCall(callback, fallback)
     return fallback
 end
 
+local function httpGet(url)
+    local ok, result = pcall(function()
+        return game:HttpGet(url)
+    end)
+    if ok and type(result) == "string" and #result > 0 then
+        return true, result
+    end
+    return false, nil
+end
+
+local function decode(source)
+    local ok, result = pcall(function()
+        return HttpService:JSONDecode(source)
+    end)
+    if ok and type(result) == "table" then
+        return result
+    end
+    return nil
+end
+
 local function getPing()
-    local value = safeCall(function()
+    return safeCall(function()
         local network = Stats:FindFirstChild("Network")
-        if not network then
-            return nil
-        end
-
-        local serverStats = network:FindFirstChild("ServerStatsItem")
-        if not serverStats then
-            return nil
-        end
-
-        local ping = serverStats:FindFirstChild("Data Ping") or serverStats:FindFirstChild("Ping")
+        local serverStats = network and network:FindFirstChild("ServerStatsItem")
+        local ping = serverStats and (serverStats:FindFirstChild("Data Ping") or serverStats:FindFirstChild("Ping"))
         if not ping then
             return nil
         end
-
-        local stringValue = ping:GetValueString()
-        local numericValue = tonumber(stringValue:match("[%d%.]+"))
-        return numericValue
+        local raw = ping:GetValueString()
+        return tonumber(string_match(raw, "[%d%.]+"))
     end, nil)
+end
 
-    return value
+local function detectExecutor()
+    return safeCall(function()
+        if type(identifyexecutor) ~= "function" then
+            return "Unknown"
+        end
+        local name, version = identifyexecutor()
+        if name and version then
+            return tostring(name) .. " " .. tostring(version)
+        end
+        return name and tostring(name) or "Unknown"
+    end, "Unknown")
+end
+
+local function getScriptVersion(placeId)
+    local ok, source = httpGet(MANIFEST_URL)
+    if not ok then
+        return "Unknown"
+    end
+
+    local manifest = decode(source)
+    local games = manifest and manifest.games
+    local info = type(games) == "table" and games[tostring(placeId)] or nil
+
+    if type(info) == "table" and info.version then
+        return tostring(info.version)
+    end
+
+    return "Unknown"
 end
 
 function Dashboard.new(options)
@@ -56,19 +98,8 @@ function Dashboard.new(options)
     self.Destroyed = false
     self.Started = false
     self.Interval = math.max(tonumber(options.Interval) or 1, 0.25)
-    self.Executor = safeCall(function()
-        local identify = identifyexecutor
-        if type(identify) == "function" then
-            local name, version = identify()
-            if name and version then
-                return tostring(name) .. " " .. tostring(version)
-            end
-            if name then
-                return tostring(name)
-            end
-        end
-        return "Unknown"
-    end, "Unknown")
+    self.Executor = detectExecutor()
+    self.ScriptVersion = options.ScriptVersion and tostring(options.ScriptVersion) or nil
     self.FPS = 0
     self.Ping = nil
     self.LastUpdate = 0
@@ -79,24 +110,14 @@ function Dashboard.new(options)
     return self
 end
 
-function Dashboard:SampleFPS()
-    local elapsed = safeCall(function()
-        return RunService.Heartbeat:Wait()
-    end, nil)
-
-    if elapsed and elapsed > 0 then
-        self.FPS = math.floor((1 / elapsed) + 0.5)
-    end
-end
-
 function Dashboard:Collect()
     if self.Destroyed then
         return nil
     end
 
-    local placeVersion = safeCall(function()
-        return game.PlaceVersion
-    end, nil)
+    if not self.ScriptVersion then
+        self.ScriptVersion = getScriptVersion(game.PlaceId)
+    end
 
     local playerCount = safeCall(function()
         return #Players:GetPlayers()
@@ -106,24 +127,23 @@ function Dashboard:Collect()
         return Players.MaxPlayers
     end, 0)
 
-    local ping = getPing()
     local data = {
         Executor = self.Executor,
-        Ping = ping,
+        Ping = getPing(),
         FPS = self.FPS,
         PlaceId = tostring(game.PlaceId),
         GameId = tostring(game.GameId),
         JobId = tostring(game.JobId),
         GameName = tostring(game.Name),
-        PlaceVersion = placeVersion and tostring(placeVersion) or "Unknown",
+        ScriptVersion = self.ScriptVersion or "Unknown",
         Players = playerCount,
         MaxPlayers = maxPlayers,
         Uptime = math.max(os_clock() - self.StartedAt, 0),
         Timestamp = os_clock()
     }
 
-    self.Ping = ping
-    self.LastUpdate = os_clock()
+    self.Ping = data.Ping
+    self.LastUpdate = data.Timestamp
     self.Data = data
 
     if self.OnUpdate then
@@ -134,31 +154,20 @@ function Dashboard:Collect()
 end
 
 function Dashboard:Start()
-    if self.Destroyed then
-        return false
-    end
-
-    if self.Started then
-        return true
+    if self.Destroyed or self.Started then
+        return not self.Destroyed
     end
 
     self.Started = true
 
+    self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function(deltaTime)
+        if deltaTime > 0 then
+            local instant = 1 / deltaTime
+            self.FPS = math_floor((self.FPS * 0.85) + (instant * 0.15) + 0.5)
+        end
+    end)
+
     task.spawn(function()
-        local lastFpsSample = os_clock()
-        local frames = 0
-
-        self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function()
-            frames = frames + 1
-            local now = os_clock()
-            local elapsed = now - lastFpsSample
-            if elapsed >= 1 then
-                self.FPS = math.floor((frames / elapsed) + 0.5)
-                frames = 0
-                lastFpsSample = now
-            end
-        end)
-
         while not self.Destroyed do
             self:Collect()
             task.wait(self.Interval)
