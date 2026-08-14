@@ -72,6 +72,75 @@ end
 
 log("Inicializando Restaurant Tycoon 3")
 
+local Scheduler = loadModule("src/core/scheduler.lua")
+local HealthMonitor = loadModule("src/core/health-monitor.lua")
+local Dashboard = loadModule("src/core/dashboard.lua")
+local Runtime = loadModule("src/core/runtime.lua")
+
+if not Scheduler or type(Scheduler.new) ~= "function" then
+    logWarn("Scheduler indisponivel. Abortando inicializacao.")
+    return false
+end
+
+if not HealthMonitor or type(HealthMonitor.new) ~= "function" then
+    logWarn("Health Monitor indisponivel. Abortando inicializacao.")
+    return false
+end
+
+if not Dashboard or type(Dashboard.new) ~= "function" then
+    logWarn("Dashboard provider indisponivel. Abortando inicializacao.")
+    return false
+end
+
+if not Runtime or type(Runtime.new) ~= "function" then
+    logWarn("Runtime indisponivel. Abortando inicializacao.")
+    return false
+end
+
+local env = type(getgenv) == "function" and getgenv() or _G
+local previousRuntime = env.__DEPHUB and env.__DEPHUB.Runtime
+if type(previousRuntime) == "table" and type(previousRuntime.Destroy) == "function" then
+    pcall(previousRuntime.Destroy, previousRuntime)
+end
+
+local runtime = Runtime.new({
+    Scheduler = Scheduler,
+    HealthMonitor = HealthMonitor,
+    Dashboard = Dashboard,
+    SchedulerOptions = {
+        DefaultInterval = 0.1,
+        MaxErrors = 5
+    },
+    HealthOptions = {
+        Interval = 2,
+        MaxErrors = 5
+    },
+    DashboardOptions = {
+        Interval = 1
+    }
+})
+
+env.__DEPHUB = env.__DEPHUB or {}
+env.__DEPHUB.Runtime = runtime
+env.__DEPHUB.Scheduler = runtime.Scheduler
+env.__DEPHUB.HealthMonitor = runtime.HealthMonitor
+env.__DEPHUB.Dashboard = runtime.Dashboard
+
+autoDashboardHealth = runtime.HealthMonitor:Register("Dashboard", function()
+    local data = runtime.Dashboard and runtime.Dashboard:Get()
+    return type(data) == "table" and data.GameId ~= nil
+end)
+
+runtime.HealthMonitor:Register("Runtime", function()
+    return not runtime.Destroyed
+end)
+
+runtime:On("TaskRegistered", function(state)
+    log("Runtime task registrada: " .. tostring(state.Name))
+end)
+
+runtime:Start()
+
 local Library = loadModule("src/ui/lib.lua")
 local AutoFarm = loadModule("src/games/features/autofarm.lua")
 local InstantCook = loadModule("src/games/features/instant-cook.lua")
@@ -80,6 +149,7 @@ local AutoFarmFriends = loadModule("src/games/features/autofarm-friends.lua")
 
 if not Library or type(Library.new) ~= "function" then
     logWarn("Biblioteca de UI invalida ou sem Library.new. Abortando inicializacao.")
+    runtime:Destroy()
     return false
 end
 
@@ -89,6 +159,7 @@ end)
 
 if not okWindow or type(Window) ~= "table" then
     logWarn("Falha ao criar janela: " .. tostring(Window))
+    runtime:Destroy()
     return false
 end
 
@@ -98,6 +169,8 @@ end)
 
 if not okTab or type(MainTab) ~= "table" then
     logWarn("Falha ao criar aba principal: " .. tostring(MainTab))
+    pcall(Window.Destroy, Window)
+    runtime:Destroy()
     return false
 end
 
@@ -142,8 +215,13 @@ addToggle("Auto Farm Friends", "Automatiza interações permitidas nos tycoons d
 if RegisteredFeatures == 0 then
     logWarn("Nenhuma feature foi registrada.")
     pcall(Window.Destroy, Window)
+    runtime:Destroy()
     return false
 end
 
+local snapshot = runtime:GetSnapshot()
+local dashboardData = snapshot.Dashboard or {}
+log("Dashboard: " .. tostring(dashboardData.GameName or "Unknown") .. " | Ping: " .. tostring(dashboardData.Ping or "Unknown") .. " ms | FPS: " .. tostring(dashboardData.FPS or "Unknown") .. " | Script: " .. tostring(dashboardData.ScriptVersion or "Unknown") .. " | Executor: " .. tostring(dashboardData.Executor or "Unknown"))
+log("Runtime health: " .. tostring(snapshot.Health))
 log("Restaurant Tycoon 3 inicializado com sucesso")
 return true
