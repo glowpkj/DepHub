@@ -55,12 +55,24 @@ log(capability("request", request))
 log(capability("http_request", http_request))
 log(capability("identifyexecutor", identifyexecutor))
 
-if env.__DEPHUB_LOADER_EXECUTED then
-    logWarn("Loader ja foi executado nesta sessao.")
+local previousState = env.__DEPHUB_LOADER_STATE
+if type(previousState) == "table" and previousState.status == "running" then
+    previousState.status = "failed"
+end
+
+if env.__DEPHUB_LOADER_EXECUTED and type(previousState) == "table" and previousState.status == "success" then
+    logWarn("Loader ja foi executado com sucesso nesta sessao.")
     return
 end
 
-env.__DEPHUB_LOADER_EXECUTED = true
+env.__DEPHUB_LOADER_EXECUTED = false
+env.__DEPHUB_LOADER_STATE = {
+    status = "running",
+    executor = executorName,
+    version = executorVersion,
+    startedAt = os.clock()
+}
+
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Executor = executorName
 env.__DEPHUB.ExecutorVersion = executorVersion
@@ -71,6 +83,18 @@ env.__DEPHUB.Capabilities = {
     http_request = type(http_request) == "function",
     identifyexecutor = type(identifyexecutor) == "function"
 }
+
+env.__DEPHUB.Loader = env.__DEPHUB.Loader or {}
+env.__DEPHUB.Loader.State = env.__DEPHUB_LOADER_STATE
+
+env.__DEPHUB.Loader.MarkFailed = function(reason)
+    local state = env.__DEPHUB_LOADER_STATE
+    if type(state) == "table" then
+        state.status = "failed"
+        state.error = tostring(reason or "Falha desconhecida")
+        env.__DEPHUB_LOADER_EXECUTED = false
+    end
+end
 
 local GAME_SCRIPTS = {
     ["119048529960596"] = "src/games/rt3.lua"
@@ -167,14 +191,14 @@ local function executePayload()
     end
 
     log("Execucao concluida: " .. url)
-    return true
+    return result ~= false
 end
 
 local function startUpdater()
     local updater = loadModule("src/core/updater.lua")
     if type(updater) ~= "table" or type(updater.new) ~= "function" then
         logWarn("Updater indisponivel.")
-        return
+        return false
     end
 
     local instance = updater.new({
@@ -187,21 +211,28 @@ local function startUpdater()
     env.__DEPHUB.Updater = instance
     instance:Start()
     log("Monitor de atualizacao iniciado: 60s")
+    return true
 end
 
 if not localPlayer then
+    env.__DEPHUB.Loader.MarkFailed("LocalPlayer indisponivel")
     logWarn("LocalPlayer indisponivel. Abortando carregamento.")
     return
 end
 
 local ok, result = pcall(executePayload)
 if not ok then
+    env.__DEPHUB.Loader.MarkFailed(result)
     logWarn("Falha inesperada no loader: " .. tostring(result))
 elseif result then
+    env.__DEPHUB_LOADER_EXECUTED = true
+    env.__DEPHUB_LOADER_STATE.status = "success"
+    env.__DEPHUB_LOADER_STATE.finishedAt = os.clock()
     log("========================================")
     log("DepHub carregado com sucesso")
     log("========================================")
     task.spawn(startUpdater)
 else
-    logWarn("DepHub nao foi carregado.")
+    env.__DEPHUB.Loader.MarkFailed("Payload nao inicializou corretamente")
+    logWarn("DepHub nao foi carregado. Uma nova tentativa sera permitida.")
 end
