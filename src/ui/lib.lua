@@ -2497,7 +2497,6 @@ function Window:Destroy()
 	end
 end
 
-Library.new = Window.new
 Library.__index = Window
 
 _G.DepHubLib = Library
