@@ -1,100 +1,169 @@
 local game = game
-local pcall = pcall
 local task = task
 local tostring = tostring
-local string = string
-local getgenv = getgenv or function() return _G end
+local type = type
+local pcall = pcall
+local warn = warn
+local print = print
 
 local GetService = game.GetService
 local Players = GetService(game, "Players")
 local localPlayer = Players.LocalPlayer
 
-local rprint = rconsoleprint or print
+local getgenvFn = type(getgenv) == "function" and getgenv or nil
+local env = getgenvFn and getgenvFn() or _G
 
-local function debugLog(message)
-    pcall(function()
-        rprint("[DEPHUB DEBUG] " .. tostring(message) .. "\n")
+local function log(message)
+    local text = "[DEPHUB] " .. tostring(message)
+    pcall(print, text)
+end
+
+local function logWarn(message)
+    local text = "[DEPHUB] " .. tostring(message)
+    pcall(warn, text)
+end
+
+local function detectExecutor()
+    local ok, name, version = pcall(function()
+        if type(identifyexecutor) == "function" then
+            local executorName, executorVersion = identifyexecutor()
+            return executorName, executorVersion
+        end
+        if type(getexecutorname) == "function" then
+            return getexecutorname(), nil
+        end
+        return nil, nil
     end)
+
+    if ok and name then
+        return tostring(name), version and tostring(version) or nil
+    end
+
+    return "Desconhecido", nil
 end
 
-if getgenv().__DEPHUB_LOADER_EXECUTED then 
-    debugLog("Abortado: Loader ja foi executado nesta sessao.")
-    return 
+local function capability(name, value)
+    return name .. ": " .. (type(value) == "function" and "OK" or "N/A")
 end
-getgenv().__DEPHUB_LOADER_EXECUTED = true
 
-local GAME_SCRIPTS = {
-    ["119048529960596"] = "https://raw.githubusercontent.com/glowpkj/DepHub/refs/heads/main/src/games/rt3.lua"
+local executorName, executorVersion = detectExecutor()
+
+log("Loader iniciado")
+log("Executor: " .. executorName .. (executorVersion and " " .. executorVersion or ""))
+log("PlaceId: " .. tostring(game.PlaceId))
+log("GameId: " .. tostring(game.GameId))
+log(capability("loadstring", loadstring))
+log(capability("getgenv", getgenvFn))
+log(capability("request", request))
+log(capability("http_request", http_request))
+log(capability("identifyexecutor", identifyexecutor))
+
+if env.__DEPHUB_LOADER_EXECUTED then
+    logWarn("Loader ja foi executado nesta sessao.")
+    return
+end
+
+env.__DEPHUB_LOADER_EXECUTED = true
+
+env.__DEPHUB = env.__DEPHUB or {}
+env.__DEPHUB.Executor = executorName
+env.__DEPHUB.ExecutorVersion = executorVersion
+
+env.__DEPHUB.Capabilities = {
+    loadstring = type(loadstring) == "function",
+    getgenv = getgenvFn ~= nil,
+    request = type(request) == "function",
+    http_request = type(http_request) == "function",
+    identifyexecutor = type(identifyexecutor) == "function"
 }
 
-local UNIVERSAL_URL = "https://githubusercontent.com"
+local GAME_SCRIPTS = {
+    ["119048529960596"] = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/games/rt3.lua"
+}
 
-local function fetchScript(targetUrl)
-    debugLog("Requisitando URL: " .. tostring(targetUrl))
-    local success, content = pcall(function()
-        return game:HttpGet(targetUrl)
+local function httpGet(url)
+    local ok, result = pcall(function()
+        return game:HttpGet(url)
     end)
-    if success and content and #content > 0 then
-        debugLog("Download concluido com sucesso (" .. #content .. " bytes).")
-        return content
+
+    if ok and type(result) == "string" and #result > 0 then
+        return true, result
     end
-    debugLog("Falha no download da URL informada.")
-    return nil
+
+    if not ok then
+        return false, tostring(result)
+    end
+
+    return false, "Resposta HTTP vazia"
+end
+
+local function compileAndRun(source, sourceName)
+    local compiler = loadstring
+    if type(compiler) ~= "function" then
+        logWarn("loadstring indisponivel. Nao foi possivel executar " .. sourceName .. ".")
+        return false
+    end
+
+    log("Compilando " .. sourceName .. " (" .. tostring(#source) .. " bytes)")
+
+    local okCompile, chunk, compileError = pcall(compiler, source)
+    if not okCompile then
+        logWarn("Falha interna ao compilar " .. sourceName .. ": " .. tostring(chunk))
+        return false
+    end
+
+    if type(chunk) ~= "function" then
+        logWarn("Falha de compilacao em " .. sourceName .. ": " .. tostring(compileError))
+        return false
+    end
+
+    log("Compilacao concluida: " .. sourceName)
+
+    local okRun, result = pcall(chunk)
+    if not okRun then
+        logWarn("Erro executando " .. sourceName .. ": " .. tostring(result))
+        return false
+    end
+
+    log("Execucao concluida: " .. sourceName)
+    return true, result
 end
 
 local function executePayload()
-    local loadstring = loadstring or (getgenv and getgenv().loadstring)
-    if not loadstring then 
-        debugLog("Erro Fatal: Executor nao suporta 'loadstring'.")
-        return 
+    local placeId = tostring(game.PlaceId)
+    local gameId = tostring(game.GameId)
+    local targetUrl = GAME_SCRIPTS[placeId] or GAME_SCRIPTS[gameId]
+
+    if not targetUrl then
+        logWarn("Nenhum script especifico encontrado para este jogo.")
+        return false
     end
 
-    local currentPlaceId = tostring(game.PlaceId)
-    local currentGameId = tostring(game.GameId)
-    
-    debugLog("Identificadores locais - PlaceId: " .. currentPlaceId .. " | GameId: " .. currentGameId)
+    log("Script selecionado: " .. targetUrl)
+    log("Baixando payload...")
 
-    local targetUrl = GAME_SCRIPTS[currentPlaceId] or GAME_SCRIPTS[currentGameId] or UNIVERSAL_URL
-    debugLog("Rota selecionada para o ambiente atual: " .. (GAME_SCRIPTS[currentPlaceId] and "Especifica por PlaceId" or GAME_SCRIPTS[currentGameId] and "Especifica por GameId" or "Failsafe Universal"))
-
-    local scriptRaw = fetchScript(targetUrl)
-
-    if not scriptRaw and targetUrl ~= UNIVERSAL_URL then
-        debugLog("Iniciando desvio de emergencia para o Script Universal.")
-        scriptRaw = fetchScript(UNIVERSAL_URL)
+    local okHttp, source = httpGet(targetUrl)
+    if not okHttp then
+        logWarn("Falha no download: " .. tostring(source))
+        return false
     end
 
-    if scriptRaw then
-        debugLog("Compilando bytecode via loadstring...")
-        local executable, err = loadstring(scriptRaw)
-        if executable then
-            debugLog("Injetando thread principal de execucao...")
-            task.spawn(function()
-                local executionSuccess, executionError = pcall(executable)
-                if not executionSuccess then
-                    debugLog("Erro em tempo de execucao do script principal: " .. tostring(executionError))
-                end
-            end)
-        else
-            debugLog("Erro de compilacao no script: " .. tostring(err))
-        end
-    else
-        debugLog("Erro Fatal: Nenhum codigo fonte valido foi recuperado.")
-    end
+    log("Download concluido: " .. tostring(#source) .. " bytes")
+    return compileAndRun(source, targetUrl)
 end
 
-pcall(function()
-    debugLog("Loader inicializado. Monitorando carregamento do Character...")
-    if localPlayer.Character then
-        debugLog("Character detectado imediatamente.")
-        executePayload()
-    else
-        debugLog("Aguardando evento CharacterAdded...")
-        local connection
-        connection = localPlayer.CharacterAdded:Connect(function()
-            connection:Disconnect()
-            debugLog("CharacterAdded disparado.")
-            executePayload()
-        end)
-    end
-end)
+if not localPlayer then
+    logWarn("LocalPlayer indisponivel. Abortando carregamento.")
+    return
+end
+
+local ok, result = pcall(executePayload)
+if not ok then
+    logWarn("Falha inesperada no loader: " .. tostring(result))
+elseif result then
+    log("========================================")
+    log("DepHub carregado com sucesso")
+    log("========================================")
+else
+    logWarn("DepHub nao foi carregado.")
+end
