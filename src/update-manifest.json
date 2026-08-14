@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "generatedAt": "2026-08-14T03:00:00Z",
+  "games": {
+    "119048529960596": {
+      "name": "Restaurant Tycoon 3",
+      "version": "b5e3019636d47bac56e90699d926dd54e1b79a56"
+    }
+  }
+}
