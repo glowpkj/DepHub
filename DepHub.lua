@@ -5,6 +5,7 @@ local type = type
 local pcall = pcall
 local warn = warn
 local print = print
+local os_clock = os.clock
 
 local GetService = game.GetService
 local Players = GetService(game, "Players")
@@ -70,7 +71,7 @@ env.__DEPHUB_LOADER_STATE = {
     status = "running",
     executor = executorName,
     version = executorVersion,
-    startedAt = os.clock()
+    startedAt = os_clock()
 }
 
 env.__DEPHUB = env.__DEPHUB or {}
@@ -100,17 +101,19 @@ local GAME_SCRIPTS = {
     ["119048529960596"] = "src/games/rt3.lua"
 }
 
-local function httpGet(url)
+local function httpGet(path)
+    local url = BASE_URL .. path
+    local cacheBust = "?dephub=" .. tostring(math.floor(os_clock() * 1000000))
     local ok, result = pcall(function()
-        return game:HttpGet(url)
+        return game:HttpGet(url .. cacheBust)
     end)
     if ok and type(result) == "string" and #result > 0 then
-        return true, result
+        return true, result, url
     end
     if not ok then
-        return false, tostring(result)
+        return false, tostring(result), url
     end
-    return false, "Resposta HTTP vazia"
+    return false, "Resposta HTTP vazia", url
 end
 
 local function compile(source, sourceName)
@@ -132,16 +135,15 @@ local function compile(source, sourceName)
 end
 
 local function loadModule(path)
-    local url = BASE_URL .. path
-    log("Baixando modulo: " .. path)
-
-    local okHttp, source = httpGet(url)
+    local okHttp, source, url = httpGet(path)
     if not okHttp then
         logWarn("Falha no download de " .. path .. ": " .. tostring(source))
         return nil
     end
 
-    local okCompile, chunk = compile(source, path)
+    log("Baixando modulo: " .. path)
+
+    local okCompile, chunk = compile(source, url)
     if not okCompile then
         return nil
     end
@@ -165,16 +167,13 @@ local function executePayload()
         return false
     end
 
-    local url = BASE_URL .. path
-    log("Script selecionado: " .. url)
-    log("Baixando payload...")
-
-    local okHttp, source = httpGet(url)
+    local okHttp, source, url = httpGet(path)
     if not okHttp then
         logWarn("Falha no download: " .. tostring(source))
         return false
     end
 
+    log("Script selecionado: " .. url)
     log("Download concluido: " .. tostring(#source) .. " bytes")
 
     local okCompile, chunk = compile(source, url)
@@ -190,8 +189,13 @@ local function executePayload()
         return false
     end
 
+    if result ~= true then
+        logWarn("Payload nao confirmou inicializacao completa.")
+        return false
+    end
+
     log("Execucao concluida: " .. url)
-    return result ~= false
+    return true
 end
 
 local function startUpdater()
@@ -227,7 +231,7 @@ if not ok then
 elseif result then
     env.__DEPHUB_LOADER_EXECUTED = true
     env.__DEPHUB_LOADER_STATE.status = "success"
-    env.__DEPHUB_LOADER_STATE.finishedAt = os.clock()
+    env.__DEPHUB_LOADER_STATE.finishedAt = os_clock()
     log("========================================")
     log("DepHub carregado com sucesso")
     log("========================================")
