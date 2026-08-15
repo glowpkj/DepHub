@@ -44,63 +44,6 @@ local function capability(name, value)
     return name .. ": " .. (type(value) == "function" and "OK" or "N/A")
 end
 
-local executorName, executorVersion = detectExecutor()
-
-log("Loader iniciado")
-log("Executor: " .. executorName .. (executorVersion and " " .. executorVersion or ""))
-log("PlaceId: " .. tostring(game.PlaceId))
-log("GameId: " .. tostring(game.GameId))
-log(capability("loadstring", loadstring))
-log(capability("getgenv", getgenvFn))
-log(capability("request", request))
-log(capability("http_request", http_request))
-log(capability("identifyexecutor", identifyexecutor))
-
-local previousState = env.__DEPHUB_LOADER_STATE
-if type(previousState) == "table" and previousState.status == "running" then
-    previousState.status = "failed"
-end
-
-if env.__DEPHUB_LOADER_EXECUTED and type(previousState) == "table" and previousState.status == "success" then
-    logWarn("Loader ja foi executado com sucesso nesta sessao.")
-    return
-end
-
-env.__DEPHUB_LOADER_EXECUTED = false
-env.__DEPHUB_LOADER_STATE = {
-    status = "running",
-    executor = executorName,
-    version = executorVersion,
-    startedAt = os_clock()
-}
-
-env.__DEPHUB = env.__DEPHUB or {}
-env.__DEPHUB.Executor = executorName
-env.__DEPHUB.ExecutorVersion = executorVersion
-env.__DEPHUB.Capabilities = {
-    loadstring = type(loadstring) == "function",
-    getgenv = getgenvFn ~= nil,
-    request = type(request) == "function",
-    http_request = type(http_request) == "function",
-    identifyexecutor = type(identifyexecutor) == "function"
-}
-
-env.__DEPHUB.Loader = env.__DEPHUB.Loader or {}
-env.__DEPHUB.Loader.State = env.__DEPHUB_LOADER_STATE
-
-env.__DEPHUB.Loader.MarkFailed = function(reason)
-    local state = env.__DEPHUB_LOADER_STATE
-    if type(state) == "table" then
-        state.status = "failed"
-        state.error = tostring(reason or "Falha desconhecida")
-        env.__DEPHUB_LOADER_EXECUTED = false
-    end
-end
-
-local GAME_SCRIPTS = {
-    ["119048529960596"] = "src/games/rt3.lua"
-}
-
 local function httpGet(path)
     local url = BASE_URL .. path
     local cacheBust = "?dephub=" .. tostring(math.floor(os_clock() * 1000000))
@@ -157,6 +100,80 @@ local function loadModule(path)
     return result
 end
 
+local executorName, executorVersion = detectExecutor()
+
+log("Loader iniciado")
+log("Executor: " .. executorName .. (executorVersion and " " .. executorVersion or ""))
+log("PlaceId: " .. tostring(game.PlaceId))
+log("GameId: " .. tostring(game.GameId))
+log(capability("loadstring", loadstring))
+log(capability("getgenv", getgenvFn))
+log(capability("request", request))
+log(capability("http_request", http_request))
+log(capability("identifyexecutor", identifyexecutor))
+
+local previousState = env.__DEPHUB_LOADER_STATE
+if type(previousState) == "table" and previousState.status == "running" then
+    previousState.status = "failed"
+end
+
+if env.__DEPHUB_LOADER_EXECUTED and type(previousState) == "table" and previousState.status == "success" then
+    logWarn("Loader ja foi executado com sucesso nesta sessao.")
+    return
+end
+
+env.__DEPHUB_LOADER_EXECUTED = false
+env.__DEPHUB_LOADER_STATE = {
+    status = "running",
+    executor = executorName,
+    version = executorVersion,
+    startedAt = os_clock()
+}
+
+env.__DEPHUB = env.__DEPHUB or {}
+env.__DEPHUB.Executor = executorName
+env.__DEPHUB.ExecutorVersion = executorVersion
+env.__DEPHUB.Capabilities = {
+    loadstring = type(loadstring) == "function",
+    getgenv = getgenvFn ~= nil,
+    request = type(request) == "function",
+    http_request = type(http_request) == "function",
+    identifyexecutor = type(identifyexecutor) == "function"
+}
+
+env.__DEPHUB.Loader = env.__DEPHUB.Loader or {}
+env.__DEPHUB.Loader.State = env.__DEPHUB_LOADER_STATE
+
+env.__DEPHUB.Loader.MarkFailed = function(reason)
+    local state = env.__DEPHUB_LOADER_STATE
+    if type(state) == "table" then
+        state.status = "failed"
+        state.error = tostring(reason or "Falha desconhecida")
+        env.__DEPHUB_LOADER_EXECUTED = false
+    end
+end
+
+local Loading = loadModule("src/ui/loading.lua")
+if type(Loading) == "table" and type(Loading.new) == "function" then
+    env.__DEPHUB_UI_LOADING = Loading
+    local okLoading, loadingInstance = pcall(function()
+        return Loading.new({
+            Title = "DEPHUB",
+            Status = "Preparando inicialização...",
+            LogoId = "rbxassetid://79507712997362",
+            DisplayOrder = 10000
+        })
+    end)
+    if okLoading and loadingInstance then
+        env.__DEPHUB_LOADING_INSTANCE = loadingInstance
+        loadingInstance:SetProgress(0.04, "Preparando inicialização...")
+    end
+end
+
+local GAME_SCRIPTS = {
+    ["119048529960596"] = "src/games/rt3.lua"
+}
+
 local function executePayload()
     local placeId = tostring(game.PlaceId)
     local gameId = tostring(game.GameId)
@@ -164,33 +181,52 @@ local function executePayload()
 
     if not path then
         logWarn("Nenhum script especifico encontrado para este jogo.")
+        local loading = env.__DEPHUB_LOADING_INSTANCE
+        if loading then loading:Destroy() end
         return false
+    end
+
+    local loading = env.__DEPHUB_LOADING_INSTANCE
+    if loading then
+        loading:SetProgress(0.08, "Carregando script do jogo...")
     end
 
     local okHttp, source, url = httpGet(path)
     if not okHttp then
         logWarn("Falha no download: " .. tostring(source))
+        if loading then loading:Destroy() end
         return false
     end
 
     log("Script selecionado: " .. url)
     log("Download concluido: " .. tostring(#source) .. " bytes")
 
+    if loading then
+        loading:SetProgress(0.16, "Compilando script do jogo...")
+    end
+
     local okCompile, chunk = compile(source, url)
     if not okCompile then
+        if loading then loading:Destroy() end
         return false
     end
 
     log("Compilacao concluida: " .. url)
 
+    if loading then
+        loading:SetProgress(0.24, "Inicializando módulos...")
+    end
+
     local okRun, result = pcall(chunk)
     if not okRun then
         logWarn("Erro executando payload: " .. tostring(result))
+        if loading then loading:Destroy() end
         return false
     end
 
     if result ~= true then
         logWarn("Payload nao confirmou inicializacao completa.")
+        if loading then loading:Destroy() end
         return false
     end
 
@@ -221,6 +257,8 @@ end
 if not localPlayer then
     env.__DEPHUB.Loader.MarkFailed("LocalPlayer indisponivel")
     logWarn("LocalPlayer indisponivel. Abortando carregamento.")
+    local loading = env.__DEPHUB_LOADING_INSTANCE
+    if loading then loading:Destroy() end
     return
 end
 
@@ -228,6 +266,8 @@ local ok, result = pcall(executePayload)
 if not ok then
     env.__DEPHUB.Loader.MarkFailed(result)
     logWarn("Falha inesperada no loader: " .. tostring(result))
+    local loading = env.__DEPHUB_LOADING_INSTANCE
+    if loading then loading:Destroy() end
 elseif result then
     env.__DEPHUB_LOADER_EXECUTED = true
     env.__DEPHUB_LOADER_STATE.status = "success"
