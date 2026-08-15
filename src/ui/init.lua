@@ -12,7 +12,8 @@ local MODULES = {
     "responsive",
     "watchdog",
     "components",
-    "window"
+    "window",
+    "loading"
 }
 
 if type(compiler) ~= "function" then
@@ -74,10 +75,17 @@ for _, name in ipairs(MODULES) do
 end
 
 local Library = env.__DEPHUB_UI_MODULES.window
+local Loading = env.__DEPHUB_UI_MODULES.loading
 restore()
+
+env.__DEPHUB_UI_LOADING = Loading
 
 if type(Library) ~= "table" or type(Library.new) ~= "function" then
     return nil
+end
+
+if type(Loading) == "table" then
+    Library.Loading = Loading
 end
 
 return Library
