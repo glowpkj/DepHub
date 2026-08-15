@@ -62,10 +62,10 @@ local function enhanceToggle(window)
     input.ZIndex = math.max(toggle.ZIndex + 10, 10000)
     input.Parent = toggle
 
-    local dragging = false
     local pressed = false
-    local dragStart = nil
-    local startPosition = nil
+    local dragging = false
+    local dragStart
+    local startPosition
     local moved = false
     local debounce = false
 
@@ -97,8 +97,10 @@ local function enhanceToggle(window)
         end
 
         pressed = true
+        dragging = false
         moved = false
         dragStart = io.Position
+
         local parent = toggle.Parent
         if parent and parent:IsA("GuiObject") then
             startPosition = UDim2.fromOffset(
@@ -119,15 +121,16 @@ local function enhanceToggle(window)
         end
 
         pressed = false
-        dragging = false
 
         if not moved and not debounce and window and not window.Destroyed then
             debounce = true
             window:SetOpen(not window.IsHidden)
-            task.delay(0.28, function()
+            task.delay(0.32, function()
                 debounce = false
             end)
         end
+
+        dragging = false
     end)
 
     UserInputService.InputChanged:Connect(function(io)
@@ -150,15 +153,13 @@ local function enhanceToggle(window)
         end
     end)
 
-    input.MouseEnter:Connect(function()
-        input.BackgroundTransparency = 1
-    end)
-
     clampToggle(toggle)
 
-    local viewportConnection = workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
+    local camera = workspace.CurrentCamera
+    local viewportConnection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
         clampToggle(toggle)
     end)
+
     input.AncestryChanged:Connect(function(_, parent)
         if not parent then
             viewportConnection:Disconnect()
@@ -185,8 +186,7 @@ local function enhanceResponsive(window)
             return
         end
 
-        local viewport = camera.ViewportSize
-        local width = viewport.X
+        local width = camera.ViewportSize.X
         local widthScale
         local heightScale
 
@@ -201,17 +201,55 @@ local function enhanceResponsive(window)
             heightScale = 0.74
         end
 
-        if not window.IsHidden then
-            main.Size = UDim2.new(widthScale, 0, heightScale, 0)
-        else
-            main.Size = UDim2.new(widthScale, 0, heightScale, 0)
-        end
+        main.Size = UDim2.new(widthScale, 0, heightScale, 0)
     end
 
     update()
+    window.__DEPHUBResponsiveConnection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
+end
 
-    local connection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
-    window.__DEPHUBResponsiveConnection = connection
+local function findStatLabels(stat)
+    local titleLabel
+    local valueLabel
+    if not stat or not stat.Card then
+        return nil, nil
+    end
+
+    for _, child in stat.Card:GetChildren() do
+        if child:IsA("TextLabel") then
+            if not titleLabel then
+                titleLabel = child
+            else
+                valueLabel = child
+                break
+            end
+        end
+    end
+
+    return titleLabel, valueLabel
+end
+
+local function addStatHelpers(stat)
+    if not stat or stat.__DEPHUBEnhanced then
+        return
+    end
+
+    local titleLabel, valueLabel = findStatLabels(stat)
+    stat.__DEPHUBEnhanced = true
+    stat.__DEPHUBTitleLabel = titleLabel
+    stat.__DEPHUBValueLabel = valueLabel
+
+    function stat:SetColor(color)
+        if self.__DEPHUBValueLabel and color then
+            self.__DEPHUBValueLabel.TextColor3 = color
+        end
+    end
+
+    function stat:SetTitle(newTitle)
+        if self.__DEPHUBTitleLabel then
+            self.__DEPHUBTitleLabel.Text = tostring(newTitle or "")
+        end
+    end
 end
 
 local function enhanceDashboard(window)
@@ -222,32 +260,17 @@ local function enhanceDashboard(window)
     window.__DEPHUBDashboardEnhanced = true
 
     local stats = window.DashboardStats
+    addStatHelpers(stats.Player)
+    addStatHelpers(stats.Status)
+    addStatHelpers(stats.Version)
+    addStatHelpers(stats.Ping)
+
     if stats.Status then
         stats.Status:SetTitle("VERSÃO")
     end
 
     if stats.Version then
         stats.Version:SetTitle("FPS")
-        local card = stats.Version.Card
-        for _, child in card:GetChildren() do
-            if child:IsA("TextLabel") and child ~= nil then
-                if child.Text == "--" then
-                    child.TextColor3 = Color3.fromRGB(80, 200, 120)
-                    window.__DEPHUBFPSLabel = child
-                    break
-                end
-            end
-        end
-    end
-
-    if stats.Ping then
-        local card = stats.Ping.Card
-        for _, child in card:GetChildren() do
-            if child:IsA("TextLabel") and child.Text == "--" then
-                window.__DEPHUBPingLabel = child
-                break
-            end
-        end
     end
 
     local playerCard = stats.Player and stats.Player.Card
@@ -265,10 +288,13 @@ local function enhanceDashboard(window)
         corner.CornerRadius = UDim.new(1, 0)
         corner.Parent = avatar
 
+        if stats.Player.__DEPHUBValueLabel then
+            stats.Player.__DEPHUBValueLabel.Size = UDim2.new(1, -65, 0, 28)
+        end
+
         task.spawn(function()
             local ok, image = pcall(function()
-                local content = Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
-                return content
+                return Players:GetUserThumbnailAsync(LocalPlayer.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
             end)
             if ok and image and avatar.Parent then
                 avatar.Image = image
