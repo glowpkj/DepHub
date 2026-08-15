@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T02:34:15.237511+00:00",
-  "commit": "6074d5617e171ad2af33896612238809aa22c4a4",
+  "generatedAt": "2026-08-15T02:34:26.611059+00:00",
+  "commit": "b9650306a6a526f180a6e2cbbee81a6e88cb6187",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "cd00c53286115ad1e8592538b2d9918e8173aa52124bc3e75ab72bacb30f90bd",
-      "commit": "6074d5617e171ad2af33896612238809aa22c4a4",
+      "version": "1bdf0306787eb595ee104adfc4fa62b1107289ba75d4d4a8050d95a2369bda3b",
+      "commit": "b9650306a6a526f180a6e2cbbee81a6e88cb6187",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,6 +24,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "b965030",
+      "Date": "2026-08-14T23:34:18-03:00",
+      "Changes": [
+        "perf: parallelize RT3 initialization and add loading flow"
+      ]
+    },
     {
       "Version": "6074d56",
       "Date": "2026-08-14T23:34:07-03:00",
@@ -50,13 +57,6 @@
       "Date": "2026-08-14T23:25:46-03:00",
       "Changes": [
         "fix: restrict instant cook to the player's tycoon"
-      ]
-    },
-    {
-      "Version": "9a23ced",
-      "Date": "2026-08-14T23:25:36-03:00",
-      "Changes": [
-        "fix: restrict autofarm to the player's tycoon"
       ]
     }
   ]
