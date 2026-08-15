@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T02:30:49.233557+00:00",
-  "commit": "2fcf7f4f0a9894f4ba251c7c48ff630ccb00dca7",
+  "generatedAt": "2026-08-15T02:33:24.957948+00:00",
+  "commit": "91b0c6604da601331aa664c32fa3e089aceb18c7",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "12ff46aadbe82c9a82885b12d3ae3f64c59083f9a9cefc44889ea36ec1246ac1",
-      "commit": "2fcf7f4f0a9894f4ba251c7c48ff630ccb00dca7",
+      "version": "4eaba7d21dd2c3112f6d142eaeb6a964e6e49f8fbadd4b47af3a2ff8506f3423",
+      "commit": "91b0c6604da601331aa664c32fa3e089aceb18c7",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
