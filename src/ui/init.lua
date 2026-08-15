@@ -1,4 +1,5 @@
 local game = game
+local task = task
 local type = type
 local tostring = tostring
 local pcall = pcall
@@ -12,7 +13,8 @@ local MODULES = {
     "responsive",
     "watchdog",
     "components",
-    "window"
+    "window",
+    "controller"
 }
 
 if type(compiler) ~= "function" then
@@ -51,9 +53,24 @@ local function restore()
     env.__DEPHUB_UI_MODULES = previousModules
 end
 
+local sources = {}
+local pending = #MODULES
+
 for _, name in ipairs(MODULES) do
-    local okFetch, source = fetch(name)
-    if not okFetch then
+    task.spawn(function()
+        local okFetch, source = fetch(name)
+        sources[name] = okFetch and source or false
+        pending = pending - 1
+    end)
+end
+
+while pending > 0 do
+    task.wait()
+end
+
+for _, name in ipairs(MODULES) do
+    local source = sources[name]
+    if type(source) ~= "string" then
         restore()
         return nil
     end
@@ -74,20 +91,8 @@ for _, name in ipairs(MODULES) do
 end
 
 local Library = env.__DEPHUB_UI_MODULES.window
+local Controller = env.__DEPHUB_UI_MODULES.controller
 local Loading = env.__DEPHUB_UI_LOADING
-
-if type(Loading) ~= "table" then
-    local okFetch, source = fetch("loading")
-    if okFetch then
-        local okCompile, chunk = compile(source, "loading")
-        if okCompile then
-            local okRun, result = pcall(chunk)
-            if okRun then
-                Loading = result
-            end
-        end
-    end
-end
 
 restore()
 
@@ -95,6 +100,14 @@ env.__DEPHUB_UI_LOADING = Loading
 
 if type(Library) ~= "table" or type(Library.new) ~= "function" then
     return nil
+end
+
+if type(Controller) == "table" and type(Controller.Enhance) == "function" then
+    local originalNew = Library.new
+    Library.new = function(...)
+        local window = originalNew(...)
+        return Controller.Enhance(window) or window
+    end
 end
 
 if type(Loading) == "table" then
