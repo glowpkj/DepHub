@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T03:05:49.229469+00:00",
-  "commit": "be468901b2864934e5e9fd3f866dc020b59c41a5",
+  "generatedAt": "2026-08-15T03:06:40.659367+00:00",
+  "commit": "03b49663dff6e5908076d8d2d200349e9ea4cbf6",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "eb7d6204ea4f0bc492665f9beab5a00666f3de10b5bd97aa33b61ede953d2e3d",
-      "commit": "be468901b2864934e5e9fd3f866dc020b59c41a5",
+      "version": "7eda8edbe84c7a274932cd7efb91f64a045329374c7433c9a9366e5f6662ebae",
+      "commit": "03b49663dff6e5908076d8d2d200349e9ea4cbf6",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,6 +24,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "03b4966",
+      "Date": "2026-08-15T00:06:31-03:00",
+      "Changes": [
+        "feat: show loading immediately from root loader"
+      ]
+    },
     {
       "Version": "be46890",
       "Date": "2026-08-15T00:05:40-03:00",
@@ -50,13 +57,6 @@
       "Date": "2026-08-14T23:34:07-03:00",
       "Changes": [
         "feat: polish dashboard version and update metadata"
-      ]
-    },
-    {
-      "Version": "91b0c66",
-      "Date": "2026-08-14T23:33:14-03:00",
-      "Changes": [
-        "feat: enrich dashboard with backend update metadata"
       ]
     }
   ]
