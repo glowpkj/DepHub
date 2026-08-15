@@ -37,8 +37,10 @@ jobs:
           games = {}
 
           for place_id, game in config.items():
+              tracked_files = list(game['files'])
               digest = hashlib.sha256()
-              for path in game['files']:
+
+              for path in tracked_files:
                   file_path = Path(path)
                   if not file_path.is_file():
                       raise SystemExit(f'Missing tracked file: {path}')
@@ -50,11 +52,13 @@ jobs:
 
               games[place_id] = {
                   'name': game['name'],
-                  'version': digest.hexdigest()
+                  'version': digest.hexdigest(),
+                  'commit': os.environ['COMMIT_SHA'],
+                  'files': tracked_files
               }
 
           manifest = {
-              'schema': 1,
+              'schema': 2,
               'generatedAt': datetime.now(timezone.utc).isoformat(),
               'commit': os.environ['COMMIT_SHA'],
               'games': games
