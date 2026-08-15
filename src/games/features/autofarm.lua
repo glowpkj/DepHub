@@ -26,7 +26,6 @@ AutoFarmModule.Enabled = false
 
 local activeInteractions = {}
 local farmThread = nil
-local afkConnection = nil
 
 local function getMyTycoon()
     local tycoonsFolder = cl_findfirstchild(cl_workspace, "Tycoons")
@@ -81,7 +80,7 @@ end
 
 local function triggerPrompt(prompt)
     if not AutoFarmModule.Enabled or activeInteractions[prompt] then return end
-    
+
     local name = prompt.Name
     local action = prompt.ActionText
     local object = prompt.ObjectText
@@ -95,10 +94,10 @@ local function triggerPrompt(prompt)
             local character = cl_localplayer.Character
             local rootPart = character and cl_findfirstchild(character, "HumanoidRootPart")
             local parentPart = prompt.Parent
-            
+
             local originalCFrame
             local targetPart = nil
-            
+
             if parentPart then
                 if cl_isa(parentPart, "BasePart") then
                     targetPart = parentPart
@@ -135,14 +134,6 @@ function AutoFarmModule.Start()
     if AutoFarmModule.Enabled then return end
     AutoFarmModule.Enabled = true
 
-    cl_pcall(function()
-        afkConnection = cl_localplayer.Idled:Connect(function()
-            cl_vu:Button2Down(cl_vector3(0,0,0), cl_workspace.CurrentCamera.CFrame)
-            cl_wait(0.5)
-            cl_vu:Button2Up(cl_vector3(0,0,0), cl_workspace.CurrentCamera.CFrame)
-        end)
-    end)
-
     farmThread = cl_spawn(function()
         local myTycoon
         local tempFolder
@@ -160,13 +151,13 @@ function AutoFarmModule.Start()
                 cl_pcall(function()
                     local items = cl_findfirstchild(myTycoon, "Items")
                     local surface = items and cl_findfirstchild(items, "Surface")
-                    
+
                     if surface then
                         local surfaceDescendants = cl_getdescendants(surface)
                         for i = 1, #surfaceDescendants do
                             local desc = surfaceDescendants[i]
                             if not AutoFarmModule.Enabled then break end
-                            
+
                             if cl_isa(desc, "Model") and (desc.Name == "Bill" or desc.Name == "Trash") then
                                 interactWithModel(desc)
                             end
@@ -177,7 +168,7 @@ function AutoFarmModule.Start()
                     for i = 1, #tycoonDescendants do
                         local desc = tycoonDescendants[i]
                         if not AutoFarmModule.Enabled then break end
-                        
+
                         if cl_isa(desc, "ProximityPrompt") and desc.Name == "CustomerInteractPrompt" and desc.Enabled then
                             triggerPrompt(desc)
                         end
@@ -207,13 +198,6 @@ function AutoFarmModule.Stop()
     if not AutoFarmModule.Enabled then return end
     AutoFarmModule.Enabled = false
     cl_clear(activeInteractions)
-
-    if afkConnection then
-        cl_pcall(function()
-            afkConnection:Disconnect()
-        end)
-        afkConnection = nil
-    end
 
     if farmThread then
         cl_pcall(function()
