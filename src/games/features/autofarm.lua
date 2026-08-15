@@ -38,7 +38,9 @@ local function getMyTycoon()
         if playerValue then
             if cl_isa(playerValue, "ObjectValue") and playerValue.Value == cl_localplayer then
                 return tycoon
-            elseif cl_isa(playerValue, "StringValue") and playerValue.Value == cl_localplayer.Name then
+            end
+
+            if cl_isa(playerValue, "StringValue") and tostring(playerValue.Value) == cl_localplayer.Name then
                 return tycoon
             end
         end
@@ -136,15 +138,10 @@ function AutoFarmModule.Start()
 
     farmThread = cl_spawn(function()
         local myTycoon
-        local tempFolder
 
         while AutoFarmModule.Enabled do
             if not myTycoon or not myTycoon.Parent then
                 myTycoon = getMyTycoon()
-            end
-
-            if not tempFolder or not tempFolder.Parent then
-                tempFolder = cl_findfirstchild(cl_workspace, "Temp")
             end
 
             if myTycoon then
@@ -170,19 +167,6 @@ function AutoFarmModule.Start()
                         if not AutoFarmModule.Enabled then break end
 
                         if cl_isa(desc, "ProximityPrompt") and desc.Name == "CustomerInteractPrompt" and desc.Enabled then
-                            triggerPrompt(desc)
-                        end
-                    end
-                end)
-            end
-
-            if tempFolder then
-                cl_pcall(function()
-                    local descendants = cl_getdescendants(tempFolder)
-                    for i = 1, #descendants do
-                        local desc = descendants[i]
-                        if not AutoFarmModule.Enabled then break end
-                        if cl_isa(desc, "ProximityPrompt") and desc.Enabled then
                             triggerPrompt(desc)
                         end
                     end
