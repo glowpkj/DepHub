@@ -91,6 +91,8 @@ log("Inicializando Restaurant Tycoon 3")
 local Loading = loadModule("src/ui/loading.lua")
 local loading
 if Loading and type(Loading.new) == "function" then
+    local loadingEnv = type(getgenv) == "function" and getgenv() or _G
+    loadingEnv.__DEPHUB_UI_LOADING = Loading
     loading = Loading.new({
         Title = "DEPHUB",
         Status = "Preparando inicialização...",
@@ -177,7 +179,6 @@ env.__DEPHUB.Scheduler = runtime.Scheduler
 env.__DEPHUB.HealthMonitor = runtime.HealthMonitor
 env.__DEPHUB.Dashboard = runtime.Dashboard
 env.__DEPHUB.AntiAFK = AntiAFK
-
 env.__DEPHUB_DASHBOARD = runtime.Dashboard
 
 runtime.HealthMonitor:Register("Dashboard", function()
