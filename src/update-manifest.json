@@ -1,11 +1,11 @@
 {
   "schema": 1,
-  "generatedAt": "2026-08-15T01:57:29.231768+00:00",
-  "commit": "adaeb9eebb75a94cb9bcb8b369c1b6876da7cbfe",
+  "generatedAt": "2026-08-15T02:14:56.430536+00:00",
+  "commit": "ce95d2fb248e36683e7a1c2469927ced547bcb15",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "59933f947ab2e65cb285787b0846d26c976efd7e7b4a22d710d6aa8f86763140"
+      "version": "bac38ca77e31963e727d34575f1aabc2721a7e55a592308447cbe4c70eeb67be"
     }
   }
 }
