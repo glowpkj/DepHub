@@ -86,19 +86,52 @@ local function loadModules(paths)
     return results
 end
 
+local function getLoading()
+    local env = type(getgenv) == "function" and getgenv() or _G
+    return env.__DEPHUB_LOADING_INSTANCE
+end
+
+local function metricColor(value, greenThreshold, yellowThreshold, invert)
+    if value == nil then
+        return Color3.fromRGB(150, 150, 150)
+    end
+
+    if invert then
+        if value <= greenThreshold then
+            return Color3.fromRGB(80, 200, 120)
+        elseif value <= yellowThreshold then
+            return Color3.fromRGB(230, 180, 60)
+        end
+        return Color3.fromRGB(230, 80, 80)
+    end
+
+    if value >= greenThreshold then
+        return Color3.fromRGB(80, 200, 120)
+    elseif value >= yellowThreshold then
+        return Color3.fromRGB(230, 180, 60)
+    end
+    return Color3.fromRGB(230, 80, 80)
+end
+
 log("Inicializando Restaurant Tycoon 3")
 
-local Loading = loadModule("src/ui/loading.lua")
-local loading
-if Loading and type(Loading.new) == "function" then
-    local loadingEnv = type(getgenv) == "function" and getgenv() or _G
-    loadingEnv.__DEPHUB_UI_LOADING = Loading
-    loading = Loading.new({
-        Title = "DEPHUB",
-        Status = "Preparando inicialização...",
-        LogoId = "rbxassetid://79507712997362"
-    })
-    loading:SetProgress(0.06, "Preparando inicialização...")
+local loading = getLoading()
+if not loading then
+    local Loading = loadModule("src/ui/loading.lua")
+    if Loading and type(Loading.new) == "function" then
+        local env = type(getgenv) == "function" and getgenv() or _G
+        env.__DEPHUB_UI_LOADING = Loading
+        loading = Loading.new({
+            Title = "DEPHUB",
+            Status = "Preparando inicialização...",
+            LogoId = "rbxassetid://79507712997362"
+        })
+        env.__DEPHUB_LOADING_INSTANCE = loading
+    end
+end
+
+if loading then
+    loading:SetProgress(0.08, "Preparando núcleo...")
 end
 
 local core = loadModules({
@@ -235,6 +268,8 @@ if not okWindow or type(Window) ~= "table" then
     return false
 end
 
+env.__DEPHUB.Window = Window
+
 local okTab, MainTab = pcall(function()
     return Window:CreateTab("Automação", nil, "Gerenciamento de rotinas automatizadas e telemetria.")
 end)
@@ -295,33 +330,51 @@ if RegisteredFeatures == 0 then
 end
 
 local dashboardData = runtime.Dashboard:Get()
-if Window.DashboardStats then
-    Window.DashboardStats.Ping:SetValue(dashboardData and dashboardData.Ping and tostring(dashboardData.Ping) .. " ms" or "--")
-end
-
+local dashboardStats = Window.DashboardStats
 local lastReleaseVersion = dashboardData and dashboardData.ScriptVersion or nil
-runtime.Dashboard.OnUpdate = function(data)
-    if not Window or Window.Destroyed then
+
+local function updateDashboard(data)
+    if not Window or Window.Destroyed or not Window.DashboardStats then
         return
     end
 
-    if Window.DashboardStats then
-        Window.DashboardStats.Ping:SetValue(data.Ping and tostring(data.Ping) .. " ms" or "--")
-        if data.ScriptVersion then
-            Window.DashboardStats.Version:SetValue(data.ScriptVersion)
-        end
+    local stats = Window.DashboardStats
+
+    if stats.Status then
+        stats.Status:SetValue(data.ScriptVersion or "--")
     end
+
+    if stats.Version then
+        local fps = data.FPS or 0
+        stats.Version:SetValue(tostring(fps))
+        stats.Version:SetColor(metricColor(fps, 55, 30, false))
+    end
+
+    if stats.Ping then
+        local ping = data.Ping
+        stats.Ping:SetValue(ping and tostring(math.floor(ping + 0.5)) .. " ms" or "--")
+        stats.Ping:SetColor(metricColor(ping, 60, 120, true))
+    end
+end
+
+runtime.Dashboard.OnUpdate = function(data)
+    updateDashboard(data)
 
     if data.ScriptVersion and data.ScriptVersion ~= lastReleaseVersion then
         lastReleaseVersion = data.ScriptVersion
         if data.RecentUpdates then
             Window:SetReleases(data.RecentUpdates)
         end
+    elseif data.RecentUpdates then
+        Window:SetReleases(data.RecentUpdates)
     end
 end
 
-if dashboardData and dashboardData.RecentUpdates then
-    Window:SetReleases(dashboardData.RecentUpdates)
+if dashboardData then
+    updateDashboard(dashboardData)
+    if dashboardData.RecentUpdates then
+        Window:SetReleases(dashboardData.RecentUpdates)
+    end
 end
 
 local snapshot = runtime:GetSnapshot()
@@ -333,6 +386,7 @@ log("Restaurant Tycoon 3 inicializado com sucesso")
 
 if loading then
     loading:Complete("Inicialização concluída")
+    env.__DEPHUB_LOADING_INSTANCE = nil
 end
 
 return true
