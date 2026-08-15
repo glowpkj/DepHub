@@ -5,6 +5,7 @@ local cl_localplayer = cl_players.LocalPlayer
 
 local cl_findfirstchild = cl_game.FindFirstChild
 local cl_getdescendants = cl_game.GetDescendants
+local cl_getchildren = cl_game.GetChildren
 local cl_isa = cl_game.IsA
 
 local cl_task = task
@@ -13,7 +14,6 @@ local cl_wait = cl_task.wait
 local cl_cancel = cl_task.cancel
 
 local cl_pcall = pcall
-local cl_ipairs = ipairs
 local cl_clear = table.clear
 local cl_vector3 = Vector3.new
 
@@ -36,10 +36,37 @@ local CookModule = {
 local connections = {}
 local loopThreads = {}
 
+local function getMyTycoon()
+    local tycoonsFolder = cl_findfirstchild(cl_workspace, "Tycoons")
+    if not tycoonsFolder then return nil end
+
+    local children = cl_getchildren(tycoonsFolder)
+    for i = 1, #children do
+        local tycoon = children[i]
+        local playerValue = cl_findfirstchild(tycoon, "Player")
+        if playerValue then
+            if cl_isa(playerValue, "ObjectValue") and playerValue.Value == cl_localplayer then
+                return tycoon
+            end
+
+            if cl_isa(playerValue, "StringValue") and tostring(playerValue.Value) == cl_localplayer.Name then
+                return tycoon
+            end
+        end
+    end
+
+    return nil
+end
+
+local function belongsToMyTycoon(instance, tycoon)
+    if not instance or not tycoon then return false end
+    return instance == tycoon or instance:IsDescendantOf(tycoon)
+end
+
 local function unanchorCharacter()
     local character = cl_localplayer.Character
     if not character then return end
-    
+
     local descendants = cl_getdescendants(character)
     for i = 1, #descendants do
         local part = descendants[i]
@@ -49,16 +76,17 @@ local function unanchorCharacter()
     end
 end
 
-local function instantProcess(equipment, stationType)
+local function instantProcess(equipment, stationType, myTycoon)
     if not CookModule.Enabled or not equipment or not stationType or not cookInputRemote then return end
+    if not belongsToMyTycoon(equipment, myTycoon) then return end
 
     CookModule.IsCooking = true
     unanchorCharacter()
-    
+
     local character = cl_localplayer.Character
     local hrp = character and cl_findfirstchild(character, "HumanoidRootPart")
-    if hrp then 
-        CookModule.FixedPosition = hrp.CFrame 
+    if hrp then
+        CookModule.FixedPosition = hrp.CFrame
     end
 
     cl_spawn(function()
@@ -80,7 +108,7 @@ function CookModule.Start()
 
     connections[#connections + 1] = cl_runservice.Heartbeat:Connect(function()
         if not CookModule.Enabled then return end
-        
+
         unanchorCharacter()
 
         if not CookModule.IsCooking or not CookModule.FixedPosition then return end
@@ -103,35 +131,48 @@ function CookModule.Start()
         end
     end)
 
+    local myTycoon = getMyTycoon()
+
     if cookUpdatedEvent then
         connections[#connections + 1] = cookUpdatedEvent.OnClientEvent:Connect(function(actionType, p1, p2, p3, p4)
             if not CookModule.Enabled then return end
+
+            local currentTycoon = myTycoon
+            if not currentTycoon or not currentTycoon.Parent then
+                currentTycoon = getMyTycoon()
+                myTycoon = currentTycoon
+            end
+
             if actionType == "DirectToEquipment" and typeof(p1) == "Instance" then
-                instantProcess(p1, p2)
+                instantProcess(p1, p2, currentTycoon)
             elseif actionType == "UpdateInteraction" and typeof(p2) == "Instance" and p4 == true then
-                instantProcess(p2, p3)
+                instantProcess(p2, p3, currentTycoon)
             end
         end)
     end
 
     loopThreads[#loopThreads + 1] = cl_spawn(function()
         while CookModule.Enabled do
-            local tempFolder = cl_findfirstchild(cl_workspace, "Temp")
-            if tempFolder and not CookModule.IsCooking then
+            if not myTycoon or not myTycoon.Parent then
+                myTycoon = getMyTycoon()
+            end
+
+            if myTycoon and not CookModule.IsCooking then
                 cl_pcall(function()
-                    local descendants = cl_getdescendants(tempFolder)
+                    local descendants = cl_getdescendants(myTycoon)
                     for i = 1, #descendants do
                         if not CookModule.Enabled or CookModule.IsCooking then break end
+
                         local desc = descendants[i]
                         if cl_isa(desc, "ProximityPrompt") and desc.Enabled and (desc.ActionText == "Cook" or desc.ObjectText == "Cook" or desc.Name == "Cook") then
-                            
                             unanchorCharacter()
+
                             local character = cl_localplayer.Character
                             local hrp = character and cl_findfirstchild(character, "HumanoidRootPart")
-                            if hrp then 
-                                CookModule.FixedPosition = hrp.CFrame 
+                            if hrp then
+                                CookModule.FixedPosition = hrp.CFrame
                             end
-                            
+
                             CookModule.IsCooking = true
 
                             cl_pcall(function()
@@ -143,7 +184,7 @@ function CookModule.Start()
                                     desc:InputHoldEnd()
                                 end
                             end)
-                            
+
                             cl_wait(0.05)
                             unanchorCharacter()
                             CookModule.IsCooking = false
@@ -152,6 +193,7 @@ function CookModule.Start()
                     end
                 end)
             end
+
             cl_wait(0.1)
         end
     end)
