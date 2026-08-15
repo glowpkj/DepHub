@@ -12,12 +12,11 @@ local GetService = game.GetService
 local Players = GetService(game, "Players")
 local Stats = GetService(game, "Stats")
 local RunService = GetService(game, "RunService")
-local HttpService = GetService(game, "HttpService")
 
 local Dashboard = {}
 Dashboard.__index = Dashboard
 
-local MANIFEST_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/update-manifest.json"
+local RELEASES_BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/games/updates/"
 
 local function safeCall(callback, fallback)
     local ok, result = pcall(callback)
@@ -37,16 +36,6 @@ local function httpGet(url)
     return false, nil
 end
 
-local function decode(source)
-    local ok, result = pcall(function()
-        return HttpService:JSONDecode(source)
-    end)
-    if ok and type(result) == "table" then
-        return result
-    end
-    return nil
-end
-
 local function getPing()
     return safeCall(function()
         local network = Stats:FindFirstChild("Network")
@@ -56,7 +45,7 @@ local function getPing()
             return nil
         end
         local raw = ping:GetValueString()
-        return tonumber(string_match(raw, "[%d%.]+"))
+        return math_floor((tonumber(string_match(raw, "[%d%.]+")) or 0) + 0.5)
     end, nil)
 end
 
@@ -73,31 +62,43 @@ local function detectExecutor()
     end, "Unknown")
 end
 
-local function fetchManifest(placeId)
-    local ok, source = httpGet(MANIFEST_URL .. "?dephubdashboard=" .. tostring(math_floor(os_clock() * 1000)))
+local function parseUpdates(source)
+    local updates = {}
+    if type(source) ~= "string" then
+        return updates
+    end
+
+    for line in source:gmatch("[^\r\n]+") do
+        line = line:gsub("^%s+", ""):gsub("%s+$", "")
+        if line ~= "" then
+            local version, change = line:match("^([^|]+)|(.+)$")
+            if version and change then
+                updates[#updates + 1] = {
+                    Version = version:gsub("^%s+", ""):gsub("%s+$", ""),
+                    Date = "",
+                    Changes = {change:gsub("^%s+", ""):gsub("%s+$", "")}
+                }
+            else
+                updates[#updates + 1] = {
+                    Version = line,
+                    Date = "",
+                    Changes = {}
+                }
+            end
+        end
+    end
+
+    return updates
+end
+
+local function getRecentUpdates(placeId)
+    local ok, source = httpGet(RELEASES_BASE_URL .. tostring(placeId) .. ".txt?dephubupdates=" .. tostring(math_floor(os_clock() * 1000000)))
     if not ok then
-        return nil
+        return {}, "Unknown"
     end
 
-    local manifest = decode(source)
-    local games = manifest and manifest.games
-    local info = type(games) == "table" and games[tostring(placeId)] or nil
-
-    if type(info) ~= "table" then
-        return nil
-    end
-
-    local version = tostring(info.version or "Unknown")
-    local commit = tostring(info.commit or manifest.commit or "Unknown")
-
-    return {
-        Version = version ~= "Unknown" and version:sub(1, 8) or version,
-        VersionFull = version,
-        Commit = commit ~= "Unknown" and commit:sub(1, 7) or commit,
-        CommitFull = commit,
-        GeneratedAt = tostring(manifest.generatedAt or "Unknown"),
-        RecentUpdates = type(manifest.recentUpdates) == "table" and manifest.recentUpdates or {}
-    }
+    local updates = parseUpdates(source)
+    return updates, updates[1] and updates[1].Version or "Unknown"
 end
 
 function Dashboard.new(options)
@@ -110,41 +111,28 @@ function Dashboard.new(options)
     self.ManifestInterval = math.max(tonumber(options.ManifestInterval) or 30, 5)
     self.Executor = detectExecutor()
     self.ScriptVersion = options.ScriptVersion and tostring(options.ScriptVersion) or nil
-    self.ScriptVersionFull = nil
-    self.ScriptCommit = "Unknown"
-    self.ScriptCommitFull = nil
-    self.LatestUpdate = "Unknown"
-    self.RecentUpdates = {}
     self.FPS = 0
     self.Ping = nil
     self.LastUpdate = 0
-    self.LastManifestFetch = 0
+    self.LastReleaseCheck = 0
     self.Connections = {}
     self.StartedAt = os_clock()
     self.Data = {}
     self.OnUpdate = options.OnUpdate
+    self.RecentUpdates = {}
     return self
 end
 
-function Dashboard:RefreshManifest(force)
+function Dashboard:RefreshUpdates(force)
     local now = os_clock()
-    if not force and now - self.LastManifestFetch < self.ManifestInterval then
+    if not force and now - self.LastReleaseCheck < self.ManifestInterval then
         return
     end
 
-    local manifest = fetchManifest(game.PlaceId)
-    self.LastManifestFetch = now
-
-    if not manifest then
-        return
-    end
-
-    self.ScriptVersion = manifest.Version
-    self.ScriptVersionFull = manifest.VersionFull
-    self.ScriptCommit = manifest.Commit
-    self.ScriptCommitFull = manifest.CommitFull
-    self.LatestUpdate = manifest.GeneratedAt
-    self.RecentUpdates = manifest.RecentUpdates
+    local updates, version = getRecentUpdates(game.PlaceId)
+    self.RecentUpdates = updates
+    self.ScriptVersion = version
+    self.LastReleaseCheck = now
 end
 
 function Dashboard:Collect()
@@ -152,7 +140,7 @@ function Dashboard:Collect()
         return nil
     end
 
-    self:RefreshManifest(false)
+    self:RefreshUpdates(false)
 
     local playerCount = safeCall(function()
         return #Players:GetPlayers()
@@ -171,10 +159,6 @@ function Dashboard:Collect()
         JobId = tostring(game.JobId),
         GameName = tostring(game.Name),
         ScriptVersion = self.ScriptVersion or "Unknown",
-        ScriptVersionFull = self.ScriptVersionFull,
-        ScriptCommit = self.ScriptCommit,
-        ScriptCommitFull = self.ScriptCommitFull,
-        LatestUpdate = self.LatestUpdate,
         RecentUpdates = self.RecentUpdates,
         Players = playerCount,
         MaxPlayers = maxPlayers,
@@ -199,7 +183,7 @@ function Dashboard:Start()
     end
 
     self.Started = true
-
+    self:RefreshUpdates(true)
     self:Collect()
 
     self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function(deltaTime)
