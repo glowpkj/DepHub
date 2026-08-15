@@ -5,21 +5,6 @@ local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
 
-local function findToggle(window)
-    if window.ToggleButton and window.ToggleButton:IsA("GuiObject") then
-        return window.ToggleButton
-    end
-
-    if window.ScreenGui then
-        local found = window.ScreenGui:FindFirstChild("ToggleButton", true)
-        if found and found:IsA("GuiObject") then
-            return found
-        end
-    end
-
-    return nil
-end
-
 local function clampToggle(toggle)
     local parent = toggle.Parent
     if not parent or not parent:IsA("GuiObject") then
@@ -28,7 +13,7 @@ local function clampToggle(toggle)
 
     local parentSize = parent.AbsoluteSize
     local size = toggle.AbsoluteSize
-    local margin = 8
+    local margin = 10
     local x = toggle.AbsolutePosition.X - parent.AbsolutePosition.X
     local y = toggle.AbsolutePosition.Y - parent.AbsolutePosition.Y
 
@@ -38,30 +23,53 @@ local function clampToggle(toggle)
     toggle.Position = UDim2.fromOffset(x, y)
 end
 
-local function enhanceToggle(window)
-    local toggle = findToggle(window)
-    if not toggle or toggle:FindFirstChild("DepHubToggleInput") then
+local function createToggleController(window)
+    if window.__DEPHUBToggleController then
         return
     end
 
-    toggle.Active = true
+    local original = window.ScreenGui and window.ScreenGui:FindFirstChild("DepHubToggle", true)
+    if not original or not original:IsA("GuiObject") then
+        return
+    end
 
-    local input = Instance.new("TextButton")
-    input.Name = "DepHubToggleInput"
-    input.Size = UDim2.fromScale(1, 1)
-    input.Position = UDim2.fromScale(0, 0)
-    input.BackgroundTransparency = 1
-    input.BorderSizePixel = 0
-    input.Text = ""
-    input.AutoButtonColor = false
-    input.ZIndex = math.max(toggle.ZIndex + 10, 10000)
-    input.Parent = toggle
+    original.Visible = false
+
+    local toggle = Instance.new("TextButton")
+    toggle.Name = "DepHubToggleControl"
+    toggle.Size = UDim2.fromOffset(50, 50)
+    toggle.Position = UDim2.fromOffset(18, 68)
+    toggle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    toggle.BorderSizePixel = 0
+    toggle.AutoButtonColor = false
+    toggle.Text = ""
+    toggle.ZIndex = 2000
+    toggle.Active = true
+    toggle.Parent = window.ScreenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0)
+    corner.Parent = toggle
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(35, 35, 35)
+    stroke.Transparency = 0.15
+    stroke.Parent = toggle
+
+    local logo = Instance.new("ImageLabel")
+    logo.Size = UDim2.fromOffset(26, 26)
+    logo.Position = UDim2.fromScale(0.5, 0.5)
+    logo.AnchorPoint = Vector2.new(0.5, 0.5)
+    logo.BackgroundTransparency = 1
+    logo.Image = window.LogoId
+    logo.ScaleType = Enum.ScaleType.Fit
+    logo.Parent = toggle
 
     local pressed = false
     local dragging = false
+    local moved = false
     local dragStart
     local startPosition
-    local moved = false
     local debounce = false
 
     local function setPosition(inputPosition)
@@ -69,45 +77,57 @@ local function enhanceToggle(window)
             return
         end
 
-        local delta = inputPosition - dragStart
         local parent = toggle.Parent
         if not parent or not parent:IsA("GuiObject") then
             return
         end
 
-        local parentSize = parent.AbsoluteSize
+        local delta = inputPosition - dragStart
         local size = toggle.AbsoluteSize
+        local parentSize = parent.AbsoluteSize
         local x = startPosition.X.Offset + delta.X
         local y = startPosition.Y.Offset + delta.Y
 
-        x = math.clamp(x, 8, math.max(8, parentSize.X - size.X - 8))
-        y = math.clamp(y, 8, math.max(8, parentSize.Y - size.Y - 8))
+        x = math.clamp(x, 10, math.max(10, parentSize.X - size.X - 10))
+        y = math.clamp(y, 10, math.max(10, parentSize.Y - size.Y - 10))
 
         toggle.Position = UDim2.fromOffset(x, y)
     end
 
-    input.InputBegan:Connect(function(io)
-        if io.UserInputType ~= Enum.UserInputType.MouseButton1 and io.UserInputType ~= Enum.UserInputType.Touch then
+    toggle.InputBegan:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
             return
         end
 
         pressed = true
         dragging = false
         moved = false
-        dragStart = io.Position
+        dragStart = input.Position
+        startPosition = UDim2.fromOffset(toggle.Position.X.Offset, toggle.Position.Y.Offset)
+    end)
 
-        local parent = toggle.Parent
-        if parent and parent:IsA("GuiObject") then
-            startPosition = UDim2.fromOffset(
-                toggle.AbsolutePosition.X - parent.AbsolutePosition.X,
-                toggle.AbsolutePosition.Y - parent.AbsolutePosition.Y
-            )
-            toggle.Position = startPosition
+    UserInputService.InputChanged:Connect(function(input)
+        if not pressed then
+            return
+        end
+
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+            return
+        end
+
+        local delta = input.Position - dragStart
+        if not dragging and delta.Magnitude >= 6 then
+            dragging = true
+            moved = true
+        end
+
+        if dragging then
+            setPosition(input.Position)
         end
     end)
 
-    input.InputEnded:Connect(function(io)
-        if io.UserInputType ~= Enum.UserInputType.MouseButton1 and io.UserInputType ~= Enum.UserInputType.Touch then
+    toggle.InputEnded:Connect(function(input)
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
             return
         end
 
@@ -116,35 +136,38 @@ local function enhanceToggle(window)
         end
 
         pressed = false
+        dragging = false
 
-        if not moved and not debounce and window and not window.Destroyed then
+        if not moved and not debounce and not window.Destroyed then
             debounce = true
             window:SetOpen(not window.IsHidden)
-            task.delay(0.32, function()
+            task.delay(0.35, function()
                 debounce = false
             end)
         end
-
-        dragging = false
     end)
 
-    UserInputService.InputChanged:Connect(function(io)
+    toggle.MouseEnter:Connect(function()
         if not pressed then
-            return
+            toggle.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
         end
+    end)
 
-        if io.UserInputType ~= Enum.UserInputType.MouseMovement and io.UserInputType ~= Enum.UserInputType.Touch then
-            return
+    toggle.MouseLeave:Connect(function()
+        if not pressed then
+            toggle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         end
+    end)
 
-        local delta = io.Position - dragStart
-        if not dragging and delta.Magnitude >= 6 then
-            dragging = true
-            moved = true
+    toggle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            toggle.BackgroundColor3 = Color3.fromRGB(38, 38, 38)
         end
+    end)
 
-        if dragging then
-            setPosition(io.Position)
+    toggle.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            toggle.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
         end
     end)
 
@@ -155,11 +178,15 @@ local function enhanceToggle(window)
         clampToggle(toggle)
     end)
 
-    input.AncestryChanged:Connect(function(_, parent)
-        if not parent then
+    toggle.AncestryChanged:Connect(function(_, parent)
+        if not parent and viewportConnection then
             viewportConnection:Disconnect()
         end
     end)
+
+    window.ToggleButton = toggle
+    window.__DEPHUBToggleController = true
+    window.__DEPHUBToggleConnection = viewportConnection
 end
 
 local function enhanceResponsive(window)
@@ -171,7 +198,7 @@ local function enhanceResponsive(window)
     for _, child in main:GetChildren() do
         if child:IsA("UISizeConstraint") then
             child.MinSize = Vector2.new(320, 240)
-            child.MaxSize = Vector2.new(1500, 1000)
+            child.MaxSize = Vector2.new(1400, 900)
         end
     end
 
@@ -186,20 +213,25 @@ local function enhanceResponsive(window)
         local heightScale
 
         if width <= 600 then
-            widthScale = 0.94
-            heightScale = 0.76
+            widthScale = 0.88
+            heightScale = 0.62
         elseif width <= 1000 then
-            widthScale = 0.86
-            heightScale = 0.76
+            widthScale = 0.78
+            heightScale = 0.66
         else
-            widthScale = 0.72
-            heightScale = 0.74
+            widthScale = 0.62
+            heightScale = 0.68
         end
 
         main.Size = UDim2.new(widthScale, 0, heightScale, 0)
     end
 
     update()
+
+    if window.__DEPHUBResponsiveConnection then
+        window.__DEPHUBResponsiveConnection:Disconnect()
+    end
+
     window.__DEPHUBResponsiveConnection = camera:GetPropertyChangedSignal("ViewportSize"):Connect(update)
 end
 
@@ -296,22 +328,6 @@ local function enhanceDashboard(window)
             end
         end)
     end
-
-    if not window.__DEPHUBOriginalSetReleases and type(window.SetReleases) == "function" then
-        window.__DEPHUBOriginalSetReleases = window.SetReleases
-        window.SetReleases = function(self, changelog)
-            self.__DEPHUBOriginalSetReleases(self, changelog)
-
-            local latestVersion = changelog and changelog[1] and changelog[1].Version
-            if self.DashboardStats and self.DashboardStats.Status and latestVersion then
-                self.DashboardStats.Status:SetValue(latestVersion)
-            end
-
-            if self.DashboardStats and self.DashboardStats.Version and self.__DEPHUBLastFPS ~= nil then
-                self.DashboardStats.Version:SetValue(tostring(self.__DEPHUBLastFPS))
-            end
-        end
-    end
 end
 
 function Controller.Enhance(window)
@@ -323,12 +339,12 @@ function Controller.Enhance(window)
         window.__DEPHUBOriginalSetOpen = window.SetOpen
         window.__DEPHUBTransitioning = false
         window.SetOpen = function(self, shouldOpen)
-            if self.Destroyed or self.__DEPHUBTransitioning then
+            if self.Destroyed or self.__DEPHUBTransitioning or not self.Window then
                 return
             end
 
             local targetOpen = shouldOpen == true
-            if self.IsHidden == not targetOpen then
+            if self.IsHidden == targetOpen then
                 return
             end
 
@@ -343,28 +359,8 @@ function Controller.Enhance(window)
         end
     end
 
-    if not window.__DEPHUBOriginalCreateTab and type(window.CreateTab) == "function" then
-        window.__DEPHUBOriginalCreateTab = window.CreateTab
-        window.CreateTab = function(self, ...)
-            local tab = self.__DEPHUBOriginalCreateTab(self, ...)
-            task.defer(function()
-                enhanceDashboard(self)
-            end)
-            return tab
-        end
-    end
-
-    if not window.__DEPHUBOriginalCreateDashboard and type(window.CreateDashboard) == "function" then
-        window.__DEPHUBOriginalCreateDashboard = window.CreateDashboard
-        window.CreateDashboard = function(self, ...)
-            local tab = self.__DEPHUBOriginalCreateDashboard(self, ...)
-            enhanceDashboard(self)
-            return tab
-        end
-    end
-
+    createToggleController(window)
     enhanceResponsive(window)
-    enhanceToggle(window)
     enhanceDashboard(window)
 
     return window
