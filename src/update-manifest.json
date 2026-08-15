@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T02:33:24.957948+00:00",
-  "commit": "91b0c6604da601331aa664c32fa3e089aceb18c7",
+  "generatedAt": "2026-08-15T02:34:15.237511+00:00",
+  "commit": "6074d5617e171ad2af33896612238809aa22c4a4",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "4eaba7d21dd2c3112f6d142eaeb6a964e6e49f8fbadd4b47af3a2ff8506f3423",
-      "commit": "91b0c6604da601331aa664c32fa3e089aceb18c7",
+      "version": "cd00c53286115ad1e8592538b2d9918e8173aa52124bc3e75ab72bacb30f90bd",
+      "commit": "6074d5617e171ad2af33896612238809aa22c4a4",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -22,5 +22,42 @@
         "src/games/features/autofarm-friends.lua"
       ]
     }
-  }
+  },
+  "recentUpdates": [
+    {
+      "Version": "6074d56",
+      "Date": "2026-08-14T23:34:07-03:00",
+      "Changes": [
+        "feat: polish dashboard version and update metadata"
+      ]
+    },
+    {
+      "Version": "91b0c66",
+      "Date": "2026-08-14T23:33:14-03:00",
+      "Changes": [
+        "feat: enrich dashboard with backend update metadata"
+      ]
+    },
+    {
+      "Version": "2fcf7f4",
+      "Date": "2026-08-14T23:30:40-03:00",
+      "Changes": [
+        "feat: validate backend updates and add updater diagnostics"
+      ]
+    },
+    {
+      "Version": "4b73ef1",
+      "Date": "2026-08-14T23:25:46-03:00",
+      "Changes": [
+        "fix: restrict instant cook to the player's tycoon"
+      ]
+    },
+    {
+      "Version": "9a23ced",
+      "Date": "2026-08-14T23:25:36-03:00",
+      "Changes": [
+        "fix: restrict autofarm to the player's tycoon"
+      ]
+    }
+  ]
 }
