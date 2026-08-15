@@ -73,21 +73,26 @@ local function detectExecutor()
     end, "Unknown")
 end
 
-local function getScriptVersion(placeId)
-    local ok, source = httpGet(MANIFEST_URL)
+local function fetchManifest(placeId)
+    local ok, source = httpGet(MANIFEST_URL .. "?dephubdashboard=" .. tostring(math_floor(os_clock() * 1000)))
     if not ok then
-        return "Unknown"
+        return nil
     end
 
     local manifest = decode(source)
     local games = manifest and manifest.games
     local info = type(games) == "table" and games[tostring(placeId)] or nil
 
-    if type(info) == "table" and info.version then
-        return tostring(info.version)
+    if type(info) ~= "table" then
+        return nil
     end
 
-    return "Unknown"
+    return {
+        Version = tostring(info.version or "Unknown"),
+        Commit = tostring(info.commit or manifest.commit or "Unknown"),
+        GeneratedAt = tostring(manifest.generatedAt or "Unknown"),
+        RecentUpdates = type(manifest.recentUpdates) == "table" and manifest.recentUpdates or {}
+    }
 end
 
 function Dashboard.new(options)
@@ -97,11 +102,16 @@ function Dashboard.new(options)
     self.Destroyed = false
     self.Started = false
     self.Interval = math.max(tonumber(options.Interval) or 1, 0.25)
+    self.ManifestInterval = math.max(tonumber(options.ManifestInterval) or 30, 5)
     self.Executor = detectExecutor()
     self.ScriptVersion = options.ScriptVersion and tostring(options.ScriptVersion) or nil
+    self.ScriptCommit = "Unknown"
+    self.LatestUpdate = "Unknown"
+    self.RecentUpdates = {}
     self.FPS = 0
     self.Ping = nil
     self.LastUpdate = 0
+    self.LastManifestFetch = 0
     self.Connections = {}
     self.StartedAt = os_clock()
     self.Data = {}
@@ -109,14 +119,31 @@ function Dashboard.new(options)
     return self
 end
 
+function Dashboard:RefreshManifest(force)
+    local now = os_clock()
+    if not force and now - self.LastManifestFetch < self.ManifestInterval then
+        return
+    end
+
+    local manifest = fetchManifest(game.PlaceId)
+    self.LastManifestFetch = now
+
+    if not manifest then
+        return
+    end
+
+    self.ScriptVersion = manifest.Version
+    self.ScriptCommit = manifest.Commit
+    self.LatestUpdate = manifest.GeneratedAt
+    self.RecentUpdates = manifest.RecentUpdates
+end
+
 function Dashboard:Collect()
     if self.Destroyed then
         return nil
     end
 
-    if not self.ScriptVersion then
-        self.ScriptVersion = getScriptVersion(game.PlaceId)
-    end
+    self:RefreshManifest(false)
 
     local playerCount = safeCall(function()
         return #Players:GetPlayers()
@@ -135,6 +162,9 @@ function Dashboard:Collect()
         JobId = tostring(game.JobId),
         GameName = tostring(game.Name),
         ScriptVersion = self.ScriptVersion or "Unknown",
+        ScriptCommit = self.ScriptCommit,
+        LatestUpdate = self.LatestUpdate,
+        RecentUpdates = self.RecentUpdates,
         Players = playerCount,
         MaxPlayers = maxPlayers,
         Uptime = math.max(os_clock() - self.StartedAt, 0),
