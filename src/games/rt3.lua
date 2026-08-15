@@ -330,7 +330,6 @@ if RegisteredFeatures == 0 then
 end
 
 local dashboardData = runtime.Dashboard:Get()
-local dashboardStats = Window.DashboardStats
 local lastReleaseVersion = dashboardData and dashboardData.ScriptVersion or nil
 
 local function updateDashboard(data)
@@ -339,19 +338,21 @@ local function updateDashboard(data)
     end
 
     local stats = Window.DashboardStats
+    local fps = data.FPS or 0
+    local ping = data.Ping
+
+    Window.__DEPHUBLastFPS = fps
 
     if stats.Status then
         stats.Status:SetValue(data.ScriptVersion or "--")
     end
 
     if stats.Version then
-        local fps = data.FPS or 0
         stats.Version:SetValue(tostring(fps))
         stats.Version:SetColor(metricColor(fps, 55, 30, false))
     end
 
     if stats.Ping then
-        local ping = data.Ping
         stats.Ping:SetValue(ping and tostring(math.floor(ping + 0.5)) .. " ms" or "--")
         stats.Ping:SetColor(metricColor(ping, 60, 120, true))
     end
