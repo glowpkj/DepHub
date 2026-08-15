@@ -29,15 +29,18 @@ jobs:
           python3 - <<'PY'
           import hashlib
           import json
+          import subprocess
           from datetime import datetime, timezone
           from pathlib import Path
           import os
 
           config = json.loads(Path('.github/dephub-games.json').read_text())
           games = {}
+          all_tracked = set()
 
           for place_id, game in config.items():
               tracked_files = list(game['files'])
+              all_tracked.update(tracked_files)
               digest = hashlib.sha256()
 
               for path in tracked_files:
@@ -57,11 +60,46 @@ jobs:
                   'files': tracked_files
               }
 
+          recent = []
+          commit_list = subprocess.check_output(
+              ['git', 'rev-list', '--max-count=30', os.environ['COMMIT_SHA']],
+              text=True
+          ).splitlines()
+
+          for commit in commit_list:
+              if len(recent) >= 5:
+                  break
+
+              changed = subprocess.check_output(
+                  ['git', 'diff-tree', '--no-commit-id', '--name-only', '-r', commit],
+                  text=True
+              ).splitlines()
+              relevant = [path for path in changed if path in all_tracked]
+
+              if not relevant:
+                  continue
+
+              subject = subprocess.check_output(
+                  ['git', 'show', '-s', '--format=%s', commit],
+                  text=True
+              ).strip()
+              date = subprocess.check_output(
+                  ['git', 'show', '-s', '--format=%cI', commit],
+                  text=True
+              ).strip()
+
+              recent.append({
+                  'Version': commit[:7],
+                  'Date': date,
+                  'Changes': [subject]
+              })
+
           manifest = {
               'schema': 2,
               'generatedAt': datetime.now(timezone.utc).isoformat(),
               'commit': os.environ['COMMIT_SHA'],
-              'games': games
+              'games': games,
+              'recentUpdates': recent
           }
 
           Path('src/update-manifest.json').write_text(
