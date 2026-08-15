@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T03:08:19.446661+00:00",
-  "commit": "6b4319456f812f4cff1d0f063a8746d57506672a",
+  "generatedAt": "2026-08-15T03:08:46.588400+00:00",
+  "commit": "88187360a7ba7bde544134b0c7a046f1042e29ab",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "13b4e279310d51317f7f5a7ba95af8d0c8926bdd5085aade4c43a7df1a4328ea",
-      "commit": "6b4319456f812f4cff1d0f063a8746d57506672a",
+      "version": "d97e27bc8be555a2653b836d5c645b7df0becb0b1cc42b52086107d1dcdc9d10",
+      "commit": "88187360a7ba7bde544134b0c7a046f1042e29ab",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,6 +24,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "8818736",
+      "Date": "2026-08-15T00:08:38-03:00",
+      "Changes": [
+        "fix: prevent startup manifest synchronization from triggering teleport"
+      ]
+    },
     {
       "Version": "6b43194",
       "Date": "2026-08-15T00:08:10-03:00",
@@ -50,13 +57,6 @@
       "Date": "2026-08-15T00:05:40-03:00",
       "Changes": [
         "feat: read game updates from per-game text file"
-      ]
-    },
-    {
-      "Version": "a6a6882",
-      "Date": "2026-08-14T23:34:43-03:00",
-      "Changes": [
-        "fix: reuse preloaded loading module during RT3 startup"
       ]
     }
   ]
