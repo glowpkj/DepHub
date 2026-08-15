@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T03:06:40.659367+00:00",
-  "commit": "03b49663dff6e5908076d8d2d200349e9ea4cbf6",
+  "generatedAt": "2026-08-15T03:07:41.316577+00:00",
+  "commit": "682bc181b9c57a36d1f68c8ad04f6de4163a154e",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "7eda8edbe84c7a274932cd7efb91f64a045329374c7433c9a9366e5f6662ebae",
-      "commit": "03b49663dff6e5908076d8d2d200349e9ea4cbf6",
+      "version": "2f4b2be1f5ce2a0441a130e304478ddf68cd73efc16bab94684cb5cfb850fa96",
+      "commit": "682bc181b9c57a36d1f68c8ad04f6de4163a154e",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,6 +24,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "439df5b",
+      "Date": "2026-08-15T00:07:28-03:00",
+      "Changes": [
+        "feat: finalize dashboard metrics and reuse early loading screen"
+      ]
+    },
     {
       "Version": "03b4966",
       "Date": "2026-08-15T00:06:31-03:00",
@@ -50,13 +57,6 @@
       "Date": "2026-08-14T23:34:18-03:00",
       "Changes": [
         "perf: parallelize RT3 initialization and add loading flow"
-      ]
-    },
-    {
-      "Version": "6074d56",
-      "Date": "2026-08-14T23:34:07-03:00",
-      "Changes": [
-        "feat: polish dashboard version and update metadata"
       ]
     }
   ]
