@@ -12,8 +12,7 @@ local MODULES = {
     "responsive",
     "watchdog",
     "components",
-    "window",
-    "loading"
+    "window"
 }
 
 if type(compiler) ~= "function" then
@@ -75,7 +74,21 @@ for _, name in ipairs(MODULES) do
 end
 
 local Library = env.__DEPHUB_UI_MODULES.window
-local Loading = env.__DEPHUB_UI_MODULES.loading
+local Loading = env.__DEPHUB_UI_LOADING
+
+if type(Loading) ~= "table" then
+    local okFetch, source = fetch("loading")
+    if okFetch then
+        local okCompile, chunk = compile(source, "loading")
+        if okCompile then
+            local okRun, result = pcall(chunk)
+            if okRun then
+                Loading = result
+            end
+        end
+    end
+end
+
 restore()
 
 env.__DEPHUB_UI_LOADING = Loading
