@@ -4,8 +4,9 @@ local TweenService = game:GetService("TweenService")
 local Loading = {}
 Loading.__index = Loading
 
-local function tween(instance, duration, style, direction, properties)
-    local animation = TweenService:Create(instance, TweenInfo.new(duration, style, direction), properties)
+local function tween(instance, duration, style, direction, properties, repeatCount, reverses)
+    local info = TweenInfo.new(duration, style, direction, repeatCount or 0, reverses or false)
+    local animation = TweenService:Create(instance, info, properties)
     animation:Play()
     return animation
 end
@@ -121,18 +122,13 @@ function Loading.new(options)
         Size = UDim2.new(options.Width or 0.38, 0, options.Height or 0.42, 0)
     })
 
-    local floatTween = tween(logo, 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, {
+    self.FloatTween = tween(logo, 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, {
         Position = UDim2.new(0.5, 0, 0.38, 0)
-    })
-    floatTween.Looped = true
+    }, -1, true)
 
-    local rotateTween = tween(logo, 2.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, {
+    self.RotateTween = tween(logo, 2.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, {
         Rotation = 12
-    })
-    rotateTween.Looped = true
-
-    self.FloatTween = floatTween
-    self.RotateTween = rotateTween
+    }, -1, true)
 
     return self
 end
