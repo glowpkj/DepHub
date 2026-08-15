@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T02:34:50.516056+00:00",
-  "commit": "a6a6882a35b2fef0cf68d0262e1de1840494385d",
+  "generatedAt": "2026-08-15T03:05:49.229469+00:00",
+  "commit": "be468901b2864934e5e9fd3f866dc020b59c41a5",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "fc4da0f46da8d6976d747b202264749254bd00c52966b1b2b34d995ad92df623",
-      "commit": "a6a6882a35b2fef0cf68d0262e1de1840494385d",
+      "version": "eb7d6204ea4f0bc492665f9beab5a00666f3de10b5bd97aa33b61ede953d2e3d",
+      "commit": "be468901b2864934e5e9fd3f866dc020b59c41a5",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,6 +24,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "be46890",
+      "Date": "2026-08-15T00:05:40-03:00",
+      "Changes": [
+        "feat: read game updates from per-game text file"
+      ]
+    },
     {
       "Version": "a6a6882",
       "Date": "2026-08-14T23:34:43-03:00",
@@ -50,13 +57,6 @@
       "Date": "2026-08-14T23:33:14-03:00",
       "Changes": [
         "feat: enrich dashboard with backend update metadata"
-      ]
-    },
-    {
-      "Version": "2fcf7f4",
-      "Date": "2026-08-14T23:30:40-03:00",
-      "Changes": [
-        "feat: validate backend updates and add updater diagnostics"
       ]
     }
   ]
