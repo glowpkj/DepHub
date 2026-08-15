@@ -207,14 +207,14 @@ local function startUpdater()
 
     local instance = updater.new({
         PlaceId = game.PlaceId,
-        PollInterval = 60,
+        PollInterval = 15,
         Countdown = 12,
         Mode = "serverhop"
     })
 
     env.__DEPHUB.Updater = instance
     instance:Start()
-    log("Monitor de atualizacao iniciado: 60s")
+    log("Monitor de atualizacao iniciado: 15s")
     return true
 end
 
