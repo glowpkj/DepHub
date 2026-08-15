@@ -4,7 +4,6 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local function findToggle(window)
     if window.ToggleButton and window.ToggleButton:IsA("GuiObject") then
@@ -41,11 +40,7 @@ end
 
 local function enhanceToggle(window)
     local toggle = findToggle(window)
-    if not toggle then
-        return
-    end
-
-    if toggle:FindFirstChild("DepHubToggleInput") then
+    if not toggle or toggle:FindFirstChild("DepHubToggleInput") then
         return
     end
 
@@ -301,6 +296,22 @@ local function enhanceDashboard(window)
             end
         end)
     end
+
+    if not window.__DEPHUBOriginalSetReleases and type(window.SetReleases) == "function" then
+        window.__DEPHUBOriginalSetReleases = window.SetReleases
+        window.SetReleases = function(self, changelog)
+            self.__DEPHUBOriginalSetReleases(self, changelog)
+
+            local latestVersion = changelog and changelog[1] and changelog[1].Version
+            if self.DashboardStats and self.DashboardStats.Status and latestVersion then
+                self.DashboardStats.Status:SetValue(latestVersion)
+            end
+
+            if self.DashboardStats and self.DashboardStats.Version and self.__DEPHUBLastFPS ~= nil then
+                self.DashboardStats.Version:SetValue(tostring(self.__DEPHUBLastFPS))
+            end
+        end
+    end
 end
 
 function Controller.Enhance(window)
@@ -329,6 +340,26 @@ function Controller.Enhance(window)
                     self.__DEPHUBTransitioning = false
                 end
             end)
+        end
+    end
+
+    if not window.__DEPHUBOriginalCreateTab and type(window.CreateTab) == "function" then
+        window.__DEPHUBOriginalCreateTab = window.CreateTab
+        window.CreateTab = function(self, ...)
+            local tab = self.__DEPHUBOriginalCreateTab(self, ...)
+            task.defer(function()
+                enhanceDashboard(self)
+            end)
+            return tab
+        end
+    end
+
+    if not window.__DEPHUBOriginalCreateDashboard and type(window.CreateDashboard) == "function" then
+        window.__DEPHUBOriginalCreateDashboard = window.CreateDashboard
+        window.CreateDashboard = function(self, ...)
+            local tab = self.__DEPHUBOriginalCreateDashboard(self, ...)
+            enhanceDashboard(self)
+            return tab
         end
     end
 
