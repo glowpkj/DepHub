@@ -2,6 +2,13 @@
   "119048529960596": {
     "name": "Restaurant Tycoon 3",
     "files": [
+      "DepHub.lua",
+      "src/core/anti-afk.lua",
+      "src/core/dashboard.lua",
+      "src/core/health-monitor.lua",
+      "src/core/runtime.lua",
+      "src/core/scheduler.lua",
+      "src/core/updater.lua",
       "src/games/rt3.lua",
       "src/games/features/autofarm.lua",
       "src/games/features/instant-cook.lua",
