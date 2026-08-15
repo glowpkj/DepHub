@@ -5,7 +5,7 @@ local Loading = {}
 Loading.__index = Loading
 
 local function tween(instance, duration, style, direction, properties, repeatCount, reverses)
-    local info = TweenInfo.new(duration, style, direction, repeatCount or 0, reverses or false)
+    local info = TweenInfo.new(duration, style, direction, repeatCount or 0, reverses == true)
     local animation = TweenService:Create(instance, info, properties)
     animation:Play()
     return animation
@@ -118,7 +118,7 @@ function Loading.new(options)
     fill.Parent = progressContainer
     self.ProgressFill = fill
 
-    tween(mainFrame, options.OpenDuration or 0.55, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
+    tween(mainFrame, options.OpenDuration or 0.45, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
         Size = UDim2.new(options.Width or 0.38, 0, options.Height or 0.42, 0)
     })
 
@@ -145,7 +145,7 @@ function Loading:SetProgress(progress, status)
     end
 
     if self.ProgressFill then
-        tween(self.ProgressFill, 0.28, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
+        tween(self.ProgressFill, 0.18, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
             Size = UDim2.new(self.CurrentProgress, 0, 1, 0)
         })
     end
@@ -174,33 +174,33 @@ function Loading:Complete(status)
         self.RotateTween:Cancel()
     end
 
-    task.wait(0.25)
+    task.wait(0.18)
 
-    tween(self.Logo, 0.25, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
+    tween(self.Logo, 0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
         ImageTransparency = 1,
         Size = UDim2.fromOffset(0, 0),
         Rotation = 0
     })
 
     if self.StatusLabel then
-        tween(self.StatusLabel, 0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
+        tween(self.StatusLabel, 0.16, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
             TextTransparency = 1
         })
     end
 
     if self.TitleLabel then
-        tween(self.TitleLabel, 0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
+        tween(self.TitleLabel, 0.16, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
             TextTransparency = 1
         })
     end
 
     if self.ProgressFill then
-        tween(self.ProgressFill, 0.2, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
+        tween(self.ProgressFill, 0.16, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
             BackgroundTransparency = 1
         })
     end
 
-    local collapse = tween(self.MainFrame, 0.45, Enum.EasingStyle.Cubic, Enum.EasingDirection.In, {
+    local collapse = tween(self.MainFrame, 0.36, Enum.EasingStyle.Cubic, Enum.EasingDirection.In, {
         Size = UDim2.new(0, 0, 0, 0),
         BackgroundTransparency = 1
     })
