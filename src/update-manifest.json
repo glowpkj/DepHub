@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T02:34:26.611059+00:00",
-  "commit": "b9650306a6a526f180a6e2cbbee81a6e88cb6187",
+  "generatedAt": "2026-08-15T02:34:50.516056+00:00",
+  "commit": "a6a6882a35b2fef0cf68d0262e1de1840494385d",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "1bdf0306787eb595ee104adfc4fa62b1107289ba75d4d4a8050d95a2369bda3b",
-      "commit": "b9650306a6a526f180a6e2cbbee81a6e88cb6187",
+      "version": "fc4da0f46da8d6976d747b202264749254bd00c52966b1b2b34d995ad92df623",
+      "commit": "a6a6882a35b2fef0cf68d0262e1de1840494385d",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,6 +24,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "a6a6882",
+      "Date": "2026-08-14T23:34:43-03:00",
+      "Changes": [
+        "fix: reuse preloaded loading module during RT3 startup"
+      ]
+    },
     {
       "Version": "b965030",
       "Date": "2026-08-14T23:34:18-03:00",
@@ -50,13 +57,6 @@
       "Date": "2026-08-14T23:30:40-03:00",
       "Changes": [
         "feat: validate backend updates and add updater diagnostics"
-      ]
-    },
-    {
-      "Version": "4b73ef1",
-      "Date": "2026-08-14T23:25:46-03:00",
-      "Changes": [
-        "fix: restrict instant cook to the player's tycoon"
       ]
     }
   ]
