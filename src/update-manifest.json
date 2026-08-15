@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-15T03:07:41.316577+00:00",
-  "commit": "682bc181b9c57a36d1f68c8ad04f6de4163a154e",
+  "generatedAt": "2026-08-15T03:08:19.446661+00:00",
+  "commit": "6b4319456f812f4cff1d0f063a8746d57506672a",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "2f4b2be1f5ce2a0441a130e304478ddf68cd73efc16bab94684cb5cfb850fa96",
-      "commit": "682bc181b9c57a36d1f68c8ad04f6de4163a154e",
+      "version": "13b4e279310d51317f7f5a7ba95af8d0c8926bdd5085aade4c43a7df1a4328ea",
+      "commit": "6b4319456f812f4cff1d0f063a8746d57506672a",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,6 +24,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "6b43194",
+      "Date": "2026-08-15T00:08:10-03:00",
+      "Changes": [
+        "fix: preserve FPS card during changelog refresh"
+      ]
+    },
     {
       "Version": "439df5b",
       "Date": "2026-08-15T00:07:28-03:00",
@@ -50,13 +57,6 @@
       "Date": "2026-08-14T23:34:43-03:00",
       "Changes": [
         "fix: reuse preloaded loading module during RT3 startup"
-      ]
-    },
-    {
-      "Version": "b965030",
-      "Date": "2026-08-14T23:34:18-03:00",
-      "Changes": [
-        "perf: parallelize RT3 initialization and add loading flow"
       ]
     }
   ]
