@@ -5,6 +5,7 @@ local tostring = tostring
 local tonumber = tonumber
 local pcall = pcall
 local math_random = math.random
+local os_clock = os.clock
 
 local GetService = game.GetService
 local Players = GetService(game, "Players")
@@ -87,6 +88,8 @@ function Updater.new(options)
     self.PollInterval = tonumber(options.PollInterval) or 15
     self.Countdown = tonumber(options.Countdown) or 12
     self.Mode = options.Mode or "serverhop"
+    self.StartupGrace = tonumber(options.StartupGrace) or 90
+    self.StartedAt = os_clock()
     self.CancelledVersions = {}
     self.RejectedVersions = {}
     self.Destroyed = false
@@ -396,6 +399,8 @@ function Updater:Check()
         return
     end
 
+    local startupAge = os_clock() - self.StartedAt
+
     if not self.CurrentVersion then
         self.CurrentVersion = info.Version
         self.CurrentCommit = info.Commit
@@ -404,6 +409,13 @@ function Updater:Check()
     end
 
     if info.Version == self.CurrentVersion then
+        return
+    end
+
+    if startupAge < self.StartupGrace then
+        updateLog("Mudança de manifest durante inicialização detectada. Sincronizando baseline sem teleportar.")
+        self.CurrentVersion = info.Version
+        self.CurrentCommit = info.Commit
         return
     end
 
