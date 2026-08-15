@@ -87,9 +87,14 @@ local function fetchManifest(placeId)
         return nil
     end
 
+    local version = tostring(info.version or "Unknown")
+    local commit = tostring(info.commit or manifest.commit or "Unknown")
+
     return {
-        Version = tostring(info.version or "Unknown"),
-        Commit = tostring(info.commit or manifest.commit or "Unknown"),
+        Version = version ~= "Unknown" and version:sub(1, 8) or version,
+        VersionFull = version,
+        Commit = commit ~= "Unknown" and commit:sub(1, 7) or commit,
+        CommitFull = commit,
         GeneratedAt = tostring(manifest.generatedAt or "Unknown"),
         RecentUpdates = type(manifest.recentUpdates) == "table" and manifest.recentUpdates or {}
     }
@@ -105,7 +110,9 @@ function Dashboard.new(options)
     self.ManifestInterval = math.max(tonumber(options.ManifestInterval) or 30, 5)
     self.Executor = detectExecutor()
     self.ScriptVersion = options.ScriptVersion and tostring(options.ScriptVersion) or nil
+    self.ScriptVersionFull = nil
     self.ScriptCommit = "Unknown"
+    self.ScriptCommitFull = nil
     self.LatestUpdate = "Unknown"
     self.RecentUpdates = {}
     self.FPS = 0
@@ -133,7 +140,9 @@ function Dashboard:RefreshManifest(force)
     end
 
     self.ScriptVersion = manifest.Version
+    self.ScriptVersionFull = manifest.VersionFull
     self.ScriptCommit = manifest.Commit
+    self.ScriptCommitFull = manifest.CommitFull
     self.LatestUpdate = manifest.GeneratedAt
     self.RecentUpdates = manifest.RecentUpdates
 end
@@ -162,7 +171,9 @@ function Dashboard:Collect()
         JobId = tostring(game.JobId),
         GameName = tostring(game.Name),
         ScriptVersion = self.ScriptVersion or "Unknown",
+        ScriptVersionFull = self.ScriptVersionFull,
         ScriptCommit = self.ScriptCommit,
+        ScriptCommitFull = self.ScriptCommitFull,
         LatestUpdate = self.LatestUpdate,
         RecentUpdates = self.RecentUpdates,
         Players = playerCount,
