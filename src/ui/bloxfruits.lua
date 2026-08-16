@@ -286,6 +286,7 @@ function UI.new(state)
     makeToggle(mainFrame, "Dash Customizer", toggle("DashCustomizer"), state:GetToggle("DashCustomizer"))
     makeToggle(mainFrame, "Flashstep No Cooldown", toggle("FlashstepNoCooldown"), state:GetToggle("FlashstepNoCooldown"))
     makeToggle(mainFrame, "Water Walking", toggle("WaterWalking"), state:GetToggle("WaterWalking"))
+    makeToggle(mainFrame, "Silent Aim", toggle("SilentAim"), state:GetToggle("SilentAim"))
     makeToggle(mainFrame, "Visual Cloner", toggle("VisualCloner"), state:GetToggle("VisualCloner"))
     makeToggle(mainFrame, "Auto Join Team", toggle("AutoJoinTeam"), state:GetToggle("AutoJoinTeam"))
 
