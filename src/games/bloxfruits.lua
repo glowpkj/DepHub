@@ -153,6 +153,7 @@ config:Load({
     WaterWalking = false,
     VisualCloner = false,
     AutoJoinTeam = true,
+    SilentAim = false,
     DashLength = 1,
     PreferredTeam = "Pirates"
 })
@@ -170,7 +171,8 @@ local State = {
         FlashstepNoCooldown = config:Get("FlashstepNoCooldown", false),
         WaterWalking = config:Get("WaterWalking", false),
         VisualCloner = config:Get("VisualCloner", false),
-        AutoJoinTeam = config:Get("AutoJoinTeam", true)
+        AutoJoinTeam = config:Get("AutoJoinTeam", true),
+        SilentAim = config:Get("SilentAim", false)
     },
     Values = {
         DashLength = tonumber(config:Get("DashLength", 1)) or 1
@@ -205,7 +207,8 @@ local featurePaths = {
     FlashstepNoCooldown = "src/games/features/bloxfruits/flashstep.lua",
     WaterWalking = "src/games/features/bloxfruits/waterwalking.lua",
     AutoJoinTeam = "src/games/features/bloxfruits/team.lua",
-    VisualCloner = "src/games/features/bloxfruits/visualcloner.lua"
+    VisualCloner = "src/games/features/bloxfruits/visualcloner.lua",
+    SilentAim = "src/games/features/bloxfruits/silentaim.lua"
 }
 
 local features = {}
@@ -274,6 +277,7 @@ function State:SaveConfig()
         WaterWalking = self.Toggles.WaterWalking,
         VisualCloner = self.Toggles.VisualCloner,
         AutoJoinTeam = self.Toggles.AutoJoinTeam,
+        SilentAim = self.Toggles.SilentAim,
         DashLength = self.Values.DashLength,
         PreferredTeam = self:GetPreferredTeam()
     })
@@ -321,7 +325,7 @@ function State:Start()
     self.Started = true
     self.Features.CameraShake:Debug()
     if self.Toggles.ObservationHaki then self.Features.ObservationHaki:Enable() end
-    for _, name in ipairs({"PlayerESP", "FruitESP", "UnbreakableAll", "DashCustomizer", "FlashstepNoCooldown", "WaterWalking", "VisualCloner"}) do
+    for _, name in ipairs({"PlayerESP", "FruitESP", "UnbreakableAll", "DashCustomizer", "FlashstepNoCooldown", "WaterWalking", "VisualCloner", "SilentAim"}) do
         if self.Toggles[name] then
             local ok = self.Features[name]:Enable()
             if not ok then self.Toggles[name] = false end
