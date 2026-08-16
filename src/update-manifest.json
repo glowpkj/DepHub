@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-16T17:18:06.942117+00:00",
-  "commit": "1ab682481df33203d980be962910a90b5a11a3a1",
+  "generatedAt": "2026-08-16T17:18:17.529804+00:00",
+  "commit": "af9896689e82ace284ce610eab0db5b43605aaf5",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "6ee3b99bc57a197f160e0c37c4c5649e8b2c3a81624fc8fbd00cd2b1dea4936a",
-      "commit": "1ab682481df33203d980be962910a90b5a11a3a1",
+      "version": "8286e07ce7da0c58d0e4d828b856305c4264cbc747fc80d85d967dba8a07508e",
+      "commit": "af9896689e82ace284ce610eab0db5b43605aaf5",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,8 +24,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "ea5b21c65eabeaf0e09b1c2199e7aafef0da31fc2b8badf2ac3cdfbfa826f825",
-      "commit": "1ab682481df33203d980be962910a90b5a11a3a1",
+      "version": "cd1e65f448df211c6ddeba1d2429ac523ce18ca3a95b79029dad9e5077ac41bf",
+      "commit": "af9896689e82ace284ce610eab0db5b43605aaf5",
       "files": [
         "DepHub.lua",
         "src/games/bloxfruits.lua"
@@ -33,6 +33,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "af98966",
+      "Date": "2026-08-16T14:18:10-03:00",
+      "Changes": [
+        "fix: preserve RT3 loader result contract"
+      ]
+    },
     {
       "Version": "1ab6824",
       "Date": "2026-08-16T14:17:58-03:00",
@@ -59,13 +66,6 @@
       "Date": "2026-08-16T13:58:15-03:00",
       "Changes": [
         "perf: optimize loader startup and fix loading completion"
-      ]
-    },
-    {
-      "Version": "ed52bb5",
-      "Date": "2026-08-16T13:50:23-03:00",
-      "Changes": [
-        "feat: route Blox Fruits places to new core"
       ]
     }
   ]
