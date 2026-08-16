@@ -1,5 +1,4 @@
 local game = game
-local task = task
 local type = type
 local tonumber = tonumber
 local tostring = tostring
@@ -125,38 +124,10 @@ local function loadModule(path, context)
     return true, module
 end
 
-local baseContext = {
-    LocalPlayer = LocalPlayer,
-    Players = Players,
-    Workspace = Workspace,
-    Connect = connect,
-    DisconnectAll = disconnectAll,
-    Destroy = destroy,
-    GetRoot = getRoot,
-    GetPlayer = getPlayer,
-    GetHumanoid = getHumanoid,
-    HealthText = healthText,
-    IsProtectionName = isProtectionName,
-    HasProtection = hasProtection,
-    TeamColor = teamColor,
-    ChangeSetting = ChangeSetting
-}
-
+local baseContext = {LocalPlayer = LocalPlayer, Players = Players, Workspace = Workspace, Connect = connect, DisconnectAll = disconnectAll, Destroy = destroy, GetRoot = getRoot, GetPlayer = getPlayer, GetHumanoid = getHumanoid, HealthText = healthText, IsProtectionName = isProtectionName, HasProtection = hasProtection, TeamColor = teamColor, ChangeSetting = ChangeSetting}
 local configOk, config = loadModule("src/games/features/bloxfruits/config.lua", baseContext)
 if not configOk then return false end
-config:Load({
-    PlayerESP = false,
-    FruitESP = false,
-    UnbreakableAll = false,
-    DashCustomizer = false,
-    FlashstepNoCooldown = false,
-    WaterWalking = false,
-    VisualCloner = false,
-    AutoJoinTeam = true,
-    SilentAim = false,
-    DashLength = 1,
-    PreferredTeam = "Pirates"
-})
+config:Load({PlayerESP = false, FruitESP = false, UnbreakableAll = false, DashCustomizer = false, FlashstepNoCooldown = false, WaterWalking = false, VisualCloner = false, AutoJoinTeam = true, SilentAim = false, SilentAimFilters = {Melee = true, ["Demon Fruit"] = true, Gun = true, Sword = true}, FruitSignatures = {}, DashLength = 1, PreferredTeam = "Pirates"})
 
 local State = {
     Started = false,
@@ -172,23 +143,18 @@ local State = {
         WaterWalking = config:Get("WaterWalking", false),
         VisualCloner = config:Get("VisualCloner", false),
         AutoJoinTeam = config:Get("AutoJoinTeam", true),
-        SilentAim = config:Get("SilentAim", false)
+        SilentAim = config:Get("SilentAim", false),
+        SilentAimFilters = config:Get("SilentAimFilters", {Melee = true, ["Demon Fruit"] = true, Gun = true, Sword = true})
     },
-    Values = {
-        DashLength = tonumber(config:Get("DashLength", 1)) or 1
-    },
+    FruitSignatures = config:Get("FruitSignatures", {}),
+    Values = {DashLength = tonumber(config:Get("DashLength", 1)) or 1},
     Connections = {},
     PlayerESP = {},
     FruitESP = {},
     OriginalUnbreakableAll = nil,
     UnbreakableCaptured = false,
     CameraShakeDisabled = false,
-    Paths = {
-        IceEffect = IceEffect,
-        LegendarySwordDealer = LegendarySwordDealer,
-        IceEffectPath = "game:GetService(\"ReplicatedStorage\").Effect.Container.Ice1.Waterwalk.ice",
-        LegendarySwordDealerPath = "game:GetService(\"ReplicatedStorage\").NPCs[\"Legendary Sword Dealer\"]"
-    }
+    Paths = {IceEffect = IceEffect, LegendarySwordDealer = LegendarySwordDealer, IceEffectPath = "game:GetService(\"ReplicatedStorage\").Effect.Container.Ice1.Waterwalk.ice", LegendarySwordDealerPath = "game:GetService(\"ReplicatedStorage\").NPCs[\"Legendary Sword Dealer\"]"}
 }
 
 baseContext.State = State
@@ -197,20 +163,7 @@ env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.BloxFruits = State
 env.__DEPHUB.BloxFruitsPaths = State.Paths
 
-local featurePaths = {
-    PlayerESP = "src/games/features/bloxfruits/playeresp.lua",
-    FruitESP = "src/games/features/bloxfruits/fruit.lua",
-    ObservationHaki = "src/games/features/bloxfruits/observation.lua",
-    UnbreakableAll = "src/games/features/bloxfruits/unbreakable.lua",
-    CameraShake = "src/games/features/bloxfruits/camerashake.lua",
-    DashCustomizer = "src/games/features/bloxfruits/dash.lua",
-    FlashstepNoCooldown = "src/games/features/bloxfruits/flashstep.lua",
-    WaterWalking = "src/games/features/bloxfruits/waterwalking.lua",
-    AutoJoinTeam = "src/games/features/bloxfruits/team.lua",
-    VisualCloner = "src/games/features/bloxfruits/visualcloner.lua",
-    SilentAim = "src/games/features/bloxfruits/silentaim.lua"
-}
-
+local featurePaths = {PlayerESP = "src/games/features/bloxfruits/playeresp.lua", FruitESP = "src/games/features/bloxfruits/fruit.lua", ObservationHaki = "src/games/features/bloxfruits/observation.lua", UnbreakableAll = "src/games/features/bloxfruits/unbreakable.lua", CameraShake = "src/games/features/bloxfruits/camerashake.lua", DashCustomizer = "src/games/features/bloxfruits/dash.lua", FlashstepNoCooldown = "src/games/features/bloxfruits/flashstep.lua", WaterWalking = "src/games/features/bloxfruits/waterwalking.lua", AutoJoinTeam = "src/games/features/bloxfruits/team.lua", VisualCloner = "src/games/features/bloxfruits/visualcloner.lua", SilentAim = "src/games/features/bloxfruits/silentaim.lua"}
 local features = {}
 for name, path in pairs(featurePaths) do
     local ok, feature = loadModule(path, baseContext)
@@ -232,86 +185,62 @@ function State:RemovePlayerESP(character)
     local feature = self.Features and self.Features.PlayerESP
     if feature and type(feature._remove) == "function" then feature:_remove(character) end
 end
-
 function State:RemoveFruitESP(tool)
     local feature = self.Features and self.Features.FruitESP
     if feature and type(feature._remove) == "function" then feature:_remove(tool) end
 end
-
 function State:SetCameraShake(enabled)
     if self.Destroyed then return false end
     return self.Features.CameraShake:SetEnabled(enabled == true)
 end
-
 function State:SetDashLength(value)
     if self.Destroyed or not self.Features or not self.Features.DashCustomizer then return false end
     local ok = self.Features.DashCustomizer:SetValue(value)
-    if ok then
-        self.Values.DashLength = self.Features.DashCustomizer:GetValue()
-        self.Config:Set("DashLength", self.Values.DashLength)
-    end
+    if ok then self.Values.DashLength = self.Features.DashCustomizer:GetValue(); self.Config:Set("DashLength", self.Values.DashLength) end
     return ok
 end
-
-function State:GetDashLength()
-    return self.Values.DashLength
-end
-
+function State:GetDashLength() return self.Values.DashLength end
 function State:SetPreferredTeam(team)
     if self.Destroyed or not self.Features or not self.Features.AutoJoinTeam then return false end
     return self.Features.AutoJoinTeam:SetTeam(team)
 end
-
 function State:GetPreferredTeam()
     return self.Features and self.Features.AutoJoinTeam and self.Features.AutoJoinTeam.PreferredTeam or self.Config:Get("PreferredTeam", "Pirates")
 end
-
-function State:SaveConfig()
-    if self.Destroyed then return false end
-    self.Config:Update({
-        PlayerESP = self.Toggles.PlayerESP,
-        FruitESP = self.Toggles.FruitESP,
-        UnbreakableAll = self.Toggles.UnbreakableAll,
-        DashCustomizer = self.Toggles.DashCustomizer,
-        FlashstepNoCooldown = self.Toggles.FlashstepNoCooldown,
-        WaterWalking = self.Toggles.WaterWalking,
-        VisualCloner = self.Toggles.VisualCloner,
-        AutoJoinTeam = self.Toggles.AutoJoinTeam,
-        SilentAim = self.Toggles.SilentAim,
-        DashLength = self.Values.DashLength,
-        PreferredTeam = self:GetPreferredTeam()
-    })
+function State:SetSilentAimFilter(weaponType, enabled)
+    if self.Destroyed or type(weaponType) ~= "string" then return false end
+    self.Toggles.SilentAimFilters[weaponType] = enabled == true
+    self:SaveConfig()
     return true
 end
-
+function State:GetSilentAimFilter(weaponType)
+    return self.Toggles.SilentAimFilters[weaponType] == true
+end
+function State:SaveConfig()
+    if self.Destroyed then return false end
+    self.Config:Update({PlayerESP = self.Toggles.PlayerESP, FruitESP = self.Toggles.FruitESP, UnbreakableAll = self.Toggles.UnbreakableAll, DashCustomizer = self.Toggles.DashCustomizer, FlashstepNoCooldown = self.Toggles.FlashstepNoCooldown, WaterWalking = self.Toggles.WaterWalking, VisualCloner = self.Toggles.VisualCloner, AutoJoinTeam = self.Toggles.AutoJoinTeam, SilentAim = self.Toggles.SilentAim, SilentAimFilters = self.Toggles.SilentAimFilters, FruitSignatures = self.FruitSignatures, DashLength = self.Values.DashLength, PreferredTeam = self:GetPreferredTeam()})
+    return true
+end
 function State:SetToggle(name, enabled)
     if self.Destroyed or type(name) ~= "string" then return false end
     enabled = enabled == true
-    if self.Toggles[name] == enabled then
-        self:SaveConfig()
-        return true
-    end
+    if self.Toggles[name] == enabled then self:SaveConfig(); return true end
     local feature = self.Features[name]
     if not feature then return false end
     local ok = enabled and feature:Enable() or feature:Disable()
     if ok == false then return false end
     self.Toggles[name] = enabled
-    if name == "UnbreakableAll" then
-        self.UnbreakableCaptured = feature.Captured == true
-        self.OriginalUnbreakableAll = feature.Original
-    end
+    if name == "UnbreakableAll" then self.UnbreakableCaptured = feature.Captured == true; self.OriginalUnbreakableAll = feature.Original end
     self:SaveConfig()
     return true
 end
-
 function State:GetToggle(name) return self.Toggles[name] == true end
 function State:GetPaths() return self.Paths end
-
 function State:Destroy()
     if self.Destroyed then return end
     self:SaveConfig()
     self.Destroyed = true
-    for name in pairs(self.Toggles) do self.Toggles[name] = false end
+    for name in pairs(self.Toggles) do if name ~= "SilentAimFilters" then self.Toggles[name] = false end end
     for _, feature in pairs(self.Features or {}) do pcall(feature.Destroy, feature) end
     pcall(config.Destroy, config)
     disconnectAll(self.Connections)
@@ -319,22 +248,15 @@ function State:Destroy()
     if env[STATE_KEY] == self then env[STATE_KEY] = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
 end
-
 function State:Start()
     if self.Destroyed or self.Started then return false end
     self.Started = true
     self.Features.CameraShake:Debug()
     if self.Toggles.ObservationHaki then self.Features.ObservationHaki:Enable() end
     for _, name in ipairs({"PlayerESP", "FruitESP", "UnbreakableAll", "DashCustomizer", "FlashstepNoCooldown", "WaterWalking", "VisualCloner", "SilentAim"}) do
-        if self.Toggles[name] then
-            local ok = self.Features[name]:Enable()
-            if not ok then self.Toggles[name] = false end
-        end
+        if self.Toggles[name] then local ok = self.Features[name]:Enable(); if not ok then self.Toggles[name] = false end end
     end
-    if self.Toggles.AutoJoinTeam then
-        local ok = self.Features.AutoJoinTeam:Enable()
-        if not ok then self.Toggles.AutoJoinTeam = false end
-    end
+    if self.Toggles.AutoJoinTeam then local ok = self.Features.AutoJoinTeam:Enable(); if not ok then self.Toggles.AutoJoinTeam = false end end
     return true
 end
 
