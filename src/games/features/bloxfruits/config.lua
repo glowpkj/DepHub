@@ -16,16 +16,14 @@ function Feature.new(context)
     self.Context = context
     self.Enabled = true
     self.Data = {}
-    self.FileName = "DepHub_BloxFruits_" .. tostring(game.PlaceId) .. ".json"
+    self.FileName = "DepHub_BloxFruits_" .. tostring(game.GameId) .. ".json"
     self.MemoryKey = "__DEPHUB_BLOXFRUITS_CONFIG"
     return self
 end
 
 function Feature:Load(defaults)
     self.Data = {}
-    for key, value in pairs(defaults or {}) do
-        self.Data[key] = value
-    end
+    for key, value in pairs(defaults or {}) do self.Data[key] = value end
     local f = funcs()
     local env = type(getgenv) == "function" and getgenv() or _G
     local loaded
