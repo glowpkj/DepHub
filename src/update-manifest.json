@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-16T17:17:34.561928+00:00",
-  "commit": "9a7678c1ba0f536b21f8757557cdb22399817045",
+  "generatedAt": "2026-08-16T17:18:06.942117+00:00",
+  "commit": "1ab682481df33203d980be962910a90b5a11a3a1",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "6ee3b99bc57a197f160e0c37c4c5649e8b2c3a81624fc8fbd00cd2b1dea4936a",
-      "commit": "9a7678c1ba0f536b21f8757557cdb22399817045",
+      "commit": "1ab682481df33203d980be962910a90b5a11a3a1",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,8 +24,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "b44df9f957bbc31317925a0040c38fad38d75a6b2c2208e156b2e4508babec03",
-      "commit": "9a7678c1ba0f536b21f8757557cdb22399817045",
+      "version": "ea5b21c65eabeaf0e09b1c2199e7aafef0da31fc2b8badf2ac3cdfbfa826f825",
+      "commit": "1ab682481df33203d980be962910a90b5a11a3a1",
       "files": [
         "DepHub.lua",
         "src/games/bloxfruits.lua"
@@ -33,6 +33,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "1ab6824",
+      "Date": "2026-08-16T14:17:58-03:00",
+      "Changes": [
+        "refactor: modularize Blox Fruits features and fix camera handling"
+      ]
+    },
     {
       "Version": "9a7678c",
       "Date": "2026-08-16T14:17:26-03:00",
@@ -59,13 +66,6 @@
       "Date": "2026-08-16T13:50:23-03:00",
       "Changes": [
         "feat: route Blox Fruits places to new core"
-      ]
-    },
-    {
-      "Version": "3a18a25",
-      "Date": "2026-08-16T13:49:56-03:00",
-      "Changes": [
-        "feat: add Blox Fruits core module without frontend"
       ]
     }
   ]
