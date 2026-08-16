@@ -245,11 +245,15 @@ if not okCoreCompile then
 end
 
 local okCoreRun, coreResult = pcall(coreChunk)
-if not okCoreRun or type(coreResult) ~= "table" then
+if not okCoreRun then
     return fail(coreResult, loading)
 end
 
 if gameId == "994732206" then
+    if type(coreResult) ~= "table" then
+        return fail(coreResult, loading)
+    end
+
     env.__DEPHUB.BloxFruits = coreResult
 
     if loading then
@@ -273,7 +277,9 @@ if gameId == "994732206" then
 
     env.__DEPHUB.BloxFruitsUI = uiInstance
 else
-    env.__DEPHUB.Runtime = coreResult
+    if coreResult ~= true then
+        return fail(coreResult, loading)
+    end
 end
 
 if loading then
