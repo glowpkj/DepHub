@@ -1,6 +1,9 @@
 local game = game
 local type = type
 local pcall = pcall
+local tonumber = tonumber
+local tostring = tostring
+local math_floor = math.floor
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -10,9 +13,7 @@ local UI = {}
 UI.__index = UI
 
 local function safeDestroy(instance)
-    if instance then
-        pcall(instance.Destroy, instance)
-    end
+    if instance then pcall(instance.Destroy, instance) end
 end
 
 local function corner(parent, radius)
@@ -68,7 +69,6 @@ local function makeToggle(parent, title, callback)
     button.Size = UDim2.fromOffset(48, 26)
     button.Position = UDim2.new(1, -60, 0.5, 0)
     button.AnchorPoint = Vector2.new(0, 0.5)
-
     local enabled = false
 
     local function render()
@@ -79,9 +79,7 @@ local function makeToggle(parent, title, callback)
     button.MouseButton1Click:Connect(function()
         local nextState = not enabled
         local ok, result = pcall(callback, nextState)
-        if ok and result ~= false then
-            enabled = nextState
-        end
+        if ok and result ~= false then enabled = nextState end
         render()
     end)
 
@@ -89,16 +87,68 @@ local function makeToggle(parent, title, callback)
     return row
 end
 
+local function makeValueInput(parent, title, initialValue, callback)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, -24, 0, 42)
+    row.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    row.BorderSizePixel = 0
+    row.Parent = parent
+    corner(row, 8)
+
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.new(1, -104, 1, 0)
+    label.Position = UDim2.fromOffset(12, 0)
+    label.BackgroundTransparency = 1
+    label.Font = Enum.Font.GothamMedium
+    label.Text = title
+    label.TextColor3 = Color3.fromRGB(225, 225, 225)
+    label.TextSize = 12
+    label.TextXAlignment = Enum.TextXAlignment.Left
+    label.Parent = row
+
+    local input = Instance.new("TextBox")
+    input.Size = UDim2.fromOffset(76, 26)
+    input.Position = UDim2.new(1, -88, 0.5, 0)
+    input.AnchorPoint = Vector2.new(0, 0.5)
+    input.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+    input.BorderSizePixel = 0
+    input.ClearTextOnFocus = false
+    input.Font = Enum.Font.GothamMedium
+    input.Text = tostring(initialValue)
+    input.TextColor3 = Color3.fromRGB(235, 235, 235)
+    input.TextSize = 12
+    input.Parent = row
+    corner(input, 8)
+
+    local currentValue = math_floor(tonumber(initialValue) or 1)
+
+    input.FocusLost:Connect(function()
+        local value = tonumber(input.Text)
+        if not value then
+            input.Text = tostring(currentValue)
+            return
+        end
+        value = math_floor(value + 0.5)
+        if value < 1 then value = 1 end
+        if value > 500 then value = 500 end
+        local ok, result = pcall(callback, value)
+        if ok and result ~= false then
+            currentValue = value
+            input.Text = tostring(value)
+        else
+            input.Text = tostring(currentValue)
+        end
+    end)
+
+    return row
+end
+
 function UI.new(state)
     local playerGui = LocalPlayer and LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if not playerGui then
-        return nil
-    end
+    if not playerGui then return nil end
 
     local oldGui = playerGui:FindFirstChild("DepHubBloxFruitsUI")
-    if oldGui then
-        oldGui:Destroy()
-    end
+    if oldGui then oldGui:Destroy() end
 
     local self = setmetatable({}, UI)
     self.State = state
@@ -122,7 +172,7 @@ function UI.new(state)
     self.ToggleButton = toggleButton
 
     local frame = Instance.new("Frame")
-    frame.Size = UDim2.fromOffset(300, 220)
+    frame.Size = UDim2.fromOffset(300, 390)
     frame.Position = UDim2.fromOffset(18, 128)
     frame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
     frame.BorderSizePixel = 0
@@ -156,10 +206,14 @@ function UI.new(state)
     close.AnchorPoint = Vector2.new(0, 0.5)
     close.TextSize = 11
 
-    local list = Instance.new("Frame")
+    local list = Instance.new("ScrollingFrame")
     list.Size = UDim2.new(1, 0, 1, -40)
     list.Position = UDim2.fromOffset(0, 40)
     list.BackgroundTransparency = 1
+    list.BorderSizePixel = 0
+    list.ScrollBarThickness = 3
+    list.CanvasSize = UDim2.fromOffset(0, 0)
+    list.AutomaticCanvasSize = Enum.AutomaticSize.Y
     list.Parent = frame
 
     local layout = Instance.new("UIListLayout")
@@ -170,28 +224,26 @@ function UI.new(state)
 
     local padding = Instance.new("UIPadding")
     padding.PaddingTop = UDim.new(0, 10)
+    padding.PaddingBottom = UDim.new(0, 10)
     padding.Parent = list
 
-    makeToggle(list, "Player ESP", function(enabled)
-        if not self.State or type(self.State.SetToggle) ~= "function" then
-            return false
+    local function toggle(name)
+        return function(enabled)
+            if not self.State or type(self.State.SetToggle) ~= "function" then return false end
+            return self.State:SetToggle(name, enabled)
         end
-        return self.State:SetToggle("PlayerESP", enabled)
-    end)
+    end
 
-    makeToggle(list, "Fruit ESP", function(enabled)
-        if not self.State or type(self.State.SetToggle) ~= "function" then
-            return false
-        end
-        return self.State:SetToggle("FruitESP", enabled)
+    makeToggle(list, "Player ESP", toggle("PlayerESP"))
+    makeToggle(list, "Fruit ESP", toggle("FruitESP"))
+    makeToggle(list, "Unbreakable All", toggle("UnbreakableAll"))
+    makeValueInput(list, "Dash Length", state.Values and state.Values.DashLength or 1, function(value)
+        if not self.State or type(self.State.SetDashLength) ~= "function" then return false end
+        return self.State:SetDashLength(value)
     end)
-
-    makeToggle(list, "Unbreakable All", function(enabled)
-        if not self.State or type(self.State.SetToggle) ~= "function" then
-            return false
-        end
-        return self.State:SetToggle("UnbreakableAll", enabled)
-    end)
+    makeToggle(list, "Dash Customizer", toggle("DashCustomizer"))
+    makeToggle(list, "Flashstep No Cooldown", toggle("FlashstepNoCooldown"))
+    makeToggle(list, "Water Walking", toggle("WaterWalking"))
 
     local dragging = false
     local dragStart
@@ -206,14 +258,8 @@ function UI.new(state)
     end)
 
     self.Connections[#self.Connections + 1] = UserInputService.InputChanged:Connect(function(input)
-        if not dragging then
-            return
-        end
-
-        if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
-            return
-        end
-
+        if not dragging then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then return end
         local delta = input.Position - dragStart
         frame.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
     end)
@@ -236,30 +282,20 @@ function UI.new(state)
 end
 
 function UI:SetVisible(value)
-    if self.Destroyed or not self.Frame then
-        return
-    end
-
+    if self.Destroyed or not self.Frame then return end
     self.Visible = value == true
     self.Frame.Visible = self.Visible
 end
 
 function UI:Destroy()
-    if self.Destroyed then
-        return
-    end
-
+    if self.Destroyed then return end
     self.Destroyed = true
     self.Visible = false
-
     for index = #self.Connections, 1, -1 do
         local connection = self.Connections[index]
         self.Connections[index] = nil
-        if connection then
-            pcall(connection.Disconnect, connection)
-        end
+        if connection then pcall(connection.Disconnect, connection) end
     end
-
     safeDestroy(self.Gui)
     self.Gui = nil
     self.Frame = nil
