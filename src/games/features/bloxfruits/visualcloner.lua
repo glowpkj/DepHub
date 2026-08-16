@@ -184,7 +184,6 @@ function Feature:CloneOption(id)
     if not destination then return false end
     local ok, clone = pcall(record.Instance.Clone, record.Instance)
     if not ok or not clone then return false end
-    clone.Name = "DepHubVisualClone_" .. tostring(record.Name)
     clone.Parent = destination
     self.LocalClones[clone] = true
     return true
