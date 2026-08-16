@@ -38,7 +38,18 @@ if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy
 local State = {
     Started = false,
     Destroyed = false,
-    Toggles = {ObservationHaki = true, PlayerESP = false, FruitESP = false, UnbreakableAll = false},
+    Toggles = {
+        ObservationHaki = true,
+        PlayerESP = false,
+        FruitESP = false,
+        UnbreakableAll = false,
+        DashCustomizer = false,
+        FlashstepNoCooldown = false,
+        WaterWalking = false
+    },
+    Values = {
+        DashLength = 1
+    },
     Connections = {},
     PlayerESP = {},
     FruitESP = {},
@@ -173,8 +184,12 @@ local featurePaths = {
     FruitESP = "src/games/features/bloxfruits/fruit.lua",
     ObservationHaki = "src/games/features/bloxfruits/observation.lua",
     UnbreakableAll = "src/games/features/bloxfruits/unbreakable.lua",
-    CameraShake = "src/games/features/bloxfruits/camerashake.lua"
+    CameraShake = "src/games/features/bloxfruits/camerashake.lua",
+    DashCustomizer = "src/games/features/bloxfruits/dash.lua",
+    FlashstepNoCooldown = "src/games/features/bloxfruits/flashstep.lua",
+    WaterWalking = "src/games/features/bloxfruits/waterwalking.lua"
 }
+
 local features = {}
 for name, path in pairs(featurePaths) do
     local ok, feature = loadFeature(path, context)
@@ -204,6 +219,15 @@ end
 function State:SetCameraShake(enabled)
     if self.Destroyed then return false end
     return self.Features.CameraShake:SetEnabled(enabled == true)
+end
+
+function State:SetDashLength(value)
+    if self.Destroyed or not self.Features or not self.Features.DashCustomizer then return false end
+    return self.Features.DashCustomizer:SetValue(value)
+end
+
+function State:GetDashLength()
+    return self.Values.DashLength
 end
 
 function State:SetToggle(name, enabled)
@@ -238,7 +262,6 @@ end
 function State:Start()
     if self.Destroyed or self.Started then return false end
     self.Started = true
-    self.Features.CameraShake:SetEnabled(false)
     if self.Toggles.ObservationHaki then self.Features.ObservationHaki:Enable() end
     return true
 end
