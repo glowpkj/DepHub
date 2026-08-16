@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-16T17:17:21.238810+00:00",
-  "commit": "84ce630230103732bb6f8d22ad294bf22c1f99ac",
+  "generatedAt": "2026-08-16T17:17:34.561928+00:00",
+  "commit": "9a7678c1ba0f536b21f8757557cdb22399817045",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "601ac38ed323c5a5d986bedab2586b632b66c5d3accc776f0f0ed0de16e9802c",
-      "commit": "84ce630230103732bb6f8d22ad294bf22c1f99ac",
+      "version": "6ee3b99bc57a197f160e0c37c4c5649e8b2c3a81624fc8fbd00cd2b1dea4936a",
+      "commit": "9a7678c1ba0f536b21f8757557cdb22399817045",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -25,7 +25,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "b44df9f957bbc31317925a0040c38fad38d75a6b2c2208e156b2e4508babec03",
-      "commit": "84ce630230103732bb6f8d22ad294bf22c1f99ac",
+      "commit": "9a7678c1ba0f536b21f8757557cdb22399817045",
       "files": [
         "DepHub.lua",
         "src/games/bloxfruits.lua"
@@ -33,6 +33,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "9a7678c",
+      "Date": "2026-08-16T14:17:26-03:00",
+      "Changes": [
+        "fix: use universe id for manifest and silence updater logs"
+      ]
+    },
     {
       "Version": "84ce630",
       "Date": "2026-08-16T14:17:11-03:00",
@@ -59,13 +66,6 @@
       "Date": "2026-08-16T13:49:56-03:00",
       "Changes": [
         "feat: add Blox Fruits core module without frontend"
-      ]
-    },
-    {
-      "Version": "8818736",
-      "Date": "2026-08-15T00:08:38-03:00",
-      "Changes": [
-        "fix: prevent startup manifest synchronization from triggering teleport"
       ]
     }
   ]
