@@ -1,11 +1,9 @@
 local game = game
 local type = type
 local pcall = pcall
-local tostring = tostring
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-
 local LocalPlayer = Players.LocalPlayer
 
 local UI = {}
@@ -79,10 +77,10 @@ local function makeToggle(parent, title, callback)
     end
 
     button.MouseButton1Click:Connect(function()
-        enabled = not enabled
-        local ok = pcall(callback, enabled)
-        if not ok then
-            enabled = not enabled
+        local nextState = not enabled
+        local ok, result = pcall(callback, nextState)
+        if ok and result ~= false then
+            enabled = nextState
         end
         render()
     end)
@@ -92,12 +90,12 @@ local function makeToggle(parent, title, callback)
 end
 
 function UI.new(state)
-    local existing = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if not existing then
+    local playerGui = LocalPlayer and LocalPlayer:FindFirstChildOfClass("PlayerGui")
+    if not playerGui then
         return nil
     end
 
-    local oldGui = existing:FindFirstChild("DepHubBloxFruitsUI")
+    local oldGui = playerGui:FindFirstChild("DepHubBloxFruitsUI")
     if oldGui then
         oldGui:Destroy()
     end
@@ -114,7 +112,7 @@ function UI.new(state)
     gui.IgnoreGuiInset = true
     gui.DisplayOrder = 9999
     gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = existing
+    gui.Parent = playerGui
     self.Gui = gui
 
     local toggleButton = makeButton(gui, "DEPHUB")
@@ -175,35 +173,29 @@ function UI.new(state)
     padding.Parent = list
 
     makeToggle(list, "Player ESP", function(enabled)
-        if self.State and type(self.State.SetToggle) == "function" then
-            return self.State:SetToggle("PlayerESP", enabled)
+        if not self.State or type(self.State.SetToggle) ~= "function" then
+            return false
         end
+        return self.State:SetToggle("PlayerESP", enabled)
     end)
 
     makeToggle(list, "Fruit ESP", function(enabled)
-        if self.State and type(self.State.SetToggle) == "function" then
-            return self.State:SetToggle("FruitESP", enabled)
+        if not self.State or type(self.State.SetToggle) ~= "function" then
+            return false
         end
+        return self.State:SetToggle("FruitESP", enabled)
     end)
 
     makeToggle(list, "Unbreakable All", function(enabled)
-        if self.State and type(self.State.SetToggle) == "function" then
-            return self.State:SetToggle("UnbreakableAll", enabled)
+        if not self.State or type(self.State.SetToggle) ~= "function" then
+            return false
         end
+        return self.State:SetToggle("UnbreakableAll", enabled)
     end)
 
     local dragging = false
     local dragStart
     local frameStart
-
-    local function updateDrag(input)
-        if not dragging then
-            return
-        end
-
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
-    end
 
     self.Connections[#self.Connections + 1] = titleBar.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
@@ -214,9 +206,16 @@ function UI.new(state)
     end)
 
     self.Connections[#self.Connections + 1] = UserInputService.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            updateDrag(input)
+        if not dragging then
+            return
         end
+
+        if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+            return
+        end
+
+        local delta = input.Position - dragStart
+        frame.Position = UDim2.new(frameStart.X.Scale, frameStart.X.Offset + delta.X, frameStart.Y.Scale, frameStart.Y.Offset + delta.Y)
     end)
 
     self.Connections[#self.Connections + 1] = UserInputService.InputEnded:Connect(function(input)
