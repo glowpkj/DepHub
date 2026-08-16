@@ -6,38 +6,35 @@ local string_lower = string.lower
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
-local DEFAULT_FILTERS = {
-    Melee = true,
-    ["Demon Fruit"] = true,
-    Gun = true,
-    Sword = true
-}
+local DEFAULT_FILTERS = {Melee = true, ["Demon Fruit"] = true, Gun = true, Sword = true}
+local DEFAULT_SKILLS = {Z = true, X = true, C = true, V = true}
+local KEY_TO_SKILL = {[Enum.KeyCode.Z] = "Z", [Enum.KeyCode.X] = "X", [Enum.KeyCode.C] = "C", [Enum.KeyCode.V] = "V"}
 
 local Feature = {}
 Feature.__index = Feature
 
 function Feature.new(context)
-    return setmetatable({
-        Context = context,
-        State = context.State,
-        LocalPlayer = LocalPlayer,
-        Enabled = false,
-        Destroyed = false,
-        Connections = {},
-        CharacterConnections = {},
-        ToolConnection = nil,
-        ActiveTool = nil,
-        MousePos = nil,
-        WeaponType = nil,
-        Target = nil,
-        TargetPosition = nil,
-        TargetRefresh = 0,
-        Characters = nil,
-        Character = nil
-    }, Feature)
+    local state = context.State
+    if state then
+        state.SilentAimSkills = type(state.SilentAimSkills) == "table" and state.SilentAimSkills or {}
+        for skill, enabled in pairs(DEFAULT_SKILLS) do
+            if state.SilentAimSkills[skill] == nil then state.SilentAimSkills[skill] = enabled end
+        end
+        function state:SetSilentAimSkill(skill, enabled)
+            if self.Destroyed or type(skill) ~= "string" or DEFAULT_SKILLS[skill] == nil then return false end
+            self.SilentAimSkills[skill] = enabled == true
+            if self.Config and type(self.Config.Set) == "function" then pcall(self.Config.Set, self.Config, "SilentAimSkills", self.SilentAimSkills) end
+            return true
+        end
+        function state:GetSilentAimSkill(skill)
+            return self.SilentAimSkills[skill] == true
+        end
+    end
+    return setmetatable({Context = context, State = state, LocalPlayer = LocalPlayer, Enabled = false, Destroyed = false, Connections = {}, CharacterConnections = {}, ToolConnection = nil, InputConnection = nil, ActiveSkills = {}, ActiveTool = nil, MousePos = nil, WeaponType = nil, Target = nil, TargetPosition = nil, TargetRefresh = 0, Characters = nil, Character = nil}, Feature)
 end
 
 function Feature:_disconnect(list)
@@ -65,10 +62,30 @@ function Feature:_getFilters()
     return filters
 end
 
+function Feature:_getSkills()
+    local skills = self.State and self.State.SilentAimSkills
+    if type(skills) ~= "table" then
+        skills = {}
+        for name, enabled in pairs(DEFAULT_SKILLS) do skills[name] = enabled end
+        if self.State then self.State.SilentAimSkills = skills end
+    end
+    return skills
+end
+
 function Feature:_isWeaponAllowed()
     local weaponType = self.WeaponType
     if type(weaponType) ~= "string" then return false end
     return self:_getFilters()[weaponType] == true
+end
+
+function Feature:_isSkillAllowed()
+    local hasActiveSkill = false
+    local skills = self:_getSkills()
+    for skill in pairs(self.ActiveSkills) do
+        hasActiveSkill = true
+        if skills[skill] == true then return true end
+    end
+    return not hasActiveSkill
 end
 
 function Feature:_getCharacter(player)
@@ -119,11 +136,9 @@ function Feature:_selectTarget()
     local localCharacter = self.LocalPlayer and self.LocalPlayer.Character
     local localRoot = localCharacter and localCharacter:FindFirstChild("HumanoidRootPart")
     if not localRoot or not localRoot:IsA("BasePart") then return nil, nil end
-
     local closestPlayer = nil
     local closestDistance = math_huge
     local closestPosition = nil
-
     for _, player in pairs(Players:GetPlayers()) do
         if self:_isValidTarget(player) then
             local character = self:_getCharacter(player)
@@ -139,7 +154,6 @@ function Feature:_selectTarget()
             end
         end
     end
-
     return closestPlayer, closestPosition
 end
 
@@ -160,29 +174,16 @@ function Feature:_bindTool(tool)
     local ok, weaponType = pcall(tool.GetAttribute, tool, "WeaponType")
     self.WeaponType = ok and weaponType or nil
     self.TargetRefresh = 0
-    self.ToolConnection = RunService.PreSimulation:Connect(function()
-        self:_preSimulation()
-    end)
+    self.ToolConnection = RunService.PreSimulation:Connect(function() self:_preSimulation() end)
 end
 
 function Feature:_scanCharacter(character)
     self:_disconnect(self.CharacterConnections)
     self.Character = character
-    if not character then
-        self:_clearTool()
-        return
-    end
-
-    for _, child in pairs(character:GetChildren()) do
-        if child:IsA("Tool") then self:_bindTool(child) end
-    end
-
-    self.CharacterConnections[#self.CharacterConnections + 1] = character.ChildAdded:Connect(function(child)
-        if child:IsA("Tool") then self:_bindTool(child) end
-    end)
-    self.CharacterConnections[#self.CharacterConnections + 1] = character.ChildRemoved:Connect(function(child)
-        if child == self.ActiveTool then self:_clearTool() end
-    end)
+    if not character then self:_clearTool(); return end
+    for _, child in pairs(character:GetChildren()) do if child:IsA("Tool") then self:_bindTool(child) end end
+    self.CharacterConnections[#self.CharacterConnections + 1] = character.ChildAdded:Connect(function(child) if child:IsA("Tool") then self:_bindTool(child) end end)
+    self.CharacterConnections[#self.CharacterConnections + 1] = character.ChildRemoved:Connect(function(child) if child == self.ActiveTool then self:_clearTool() end end)
 end
 
 function Feature:_findCharacter()
@@ -211,11 +212,8 @@ end
 function Feature:_preSimulation()
     if not self.Enabled or self.Destroyed then return end
     local mousePos = self.MousePos
-    if not mousePos or not mousePos.Parent or not self.ActiveTool or self.ActiveTool.Parent == nil then
-        self:_clearTool()
-        return
-    end
-    if not self:_isWeaponAllowed() then return end
+    if not mousePos or not mousePos.Parent or not self.ActiveTool or self.ActiveTool.Parent == nil then self:_clearTool(); return end
+    if not self:_isWeaponAllowed() or not self:_isSkillAllowed() then return end
     if os.clock() - self.TargetRefresh >= 0.05 then self:_refreshTarget() end
     local position = self.TargetPosition
     if position then pcall(function() mousePos.Value = position end) end
@@ -224,17 +222,11 @@ end
 function Feature:Enable()
     if self.Destroyed or self.Enabled then return true end
     self.Enabled = true
-    self.Connections[#self.Connections + 1] = Workspace.ChildAdded:Connect(function(child)
-        if child.Name == "Characters" then self:_bindCharacters(child) end
-    end)
-    self.Connections[#self.Connections + 1] = Workspace.ChildRemoved:Connect(function(child)
-        if child == self.Characters then
-            self:_disconnect(self.CharacterConnections)
-            self:_clearTool()
-            self.Character = nil
-            self.Characters = nil
-        end
-    end)
+    self.Connections[#self.Connections + 1] = Workspace.ChildAdded:Connect(function(child) if child.Name == "Characters" then self:_bindCharacters(child) end end)
+    self.Connections[#self.Connections + 1] = Workspace.ChildRemoved:Connect(function(child) if child == self.Characters then self:_disconnect(self.CharacterConnections); self:_clearTool(); self.Character = nil; self.Characters = nil end end)
+    self.InputConnection = UserInputService.InputBegan:Connect(function(input, processed) if processed then return end; local skill = KEY_TO_SKILL[input.KeyCode]; if skill then self.ActiveSkills[skill] = true end end)
+    self.Connections[#self.Connections + 1] = self.InputConnection
+    self.Connections[#self.Connections + 1] = UserInputService.InputEnded:Connect(function(input) local skill = KEY_TO_SKILL[input.KeyCode]; if skill then self.ActiveSkills[skill] = nil end end)
     self:_bindCharacters(Workspace:FindFirstChild("Characters"))
     self:_refreshTarget()
     return true
@@ -246,11 +238,13 @@ function Feature:Disable()
     self:_disconnect(self.Connections)
     self:_disconnect(self.CharacterConnections)
     self:_clearTool()
+    self.ActiveSkills = {}
     self.Target = nil
     self.TargetPosition = nil
     self.TargetRefresh = 0
     self.Characters = nil
     self.Character = nil
+    self.InputConnection = nil
     return true
 end
 
