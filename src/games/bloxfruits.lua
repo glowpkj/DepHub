@@ -124,6 +124,16 @@ local function loadModule(path, context)
     return true, module
 end
 
+local function loadUILibrary()
+    local okGet, source = pcall(function() return game:HttpGet(BASE_URL .. "src/ui/init.lua") end)
+    if not okGet or type(source) ~= "string" or #source == 0 then return false, tostring(source) end
+    local okCompile, chunk = compile(source)
+    if not okCompile then return false, chunk end
+    local okRun, library = pcall(chunk)
+    if not okRun or type(library) ~= "table" or type(library.new) ~= "function" then return false, tostring(library) end
+    return true, library
+end
+
 local baseContext = {LocalPlayer = LocalPlayer, Players = Players, Workspace = Workspace, Connect = connect, DisconnectAll = disconnectAll, Destroy = destroy, GetRoot = getRoot, GetPlayer = getPlayer, GetHumanoid = getHumanoid, HealthText = healthText, IsProtectionName = isProtectionName, HasProtection = hasProtection, TeamColor = teamColor, ChangeSetting = ChangeSetting}
 local configOk, config = loadModule("src/games/features/bloxfruits/config.lua", baseContext)
 if not configOk then return false end
@@ -225,7 +235,7 @@ function State:GetToggle(name) return self.Toggles[name] == true end
 function State:GetPaths() return self.Paths end
 function State:CreateUI()
     if self.Destroyed then return false end
-    local okLibrary, Library = loadModule("src/ui/init.lua")
+    local okLibrary, Library = loadUILibrary()
     if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then return false end
     local okWindow, Window = pcall(Library.new, "DepHub", "Blox Fruits", "rbxassetid://79507712997362")
     if not okWindow or type(Window) ~= "table" then return false end
@@ -242,8 +252,7 @@ function State:CreateUI()
 
     local function addToggle(title, description, name)
         local ok = pcall(MainTab.CreateToggle, MainTab, title, description, self:GetToggle(name), function(enabled)
-            local success = self:SetToggle(name, enabled)
-            if not success then return end
+            self:SetToggle(name, enabled)
         end)
         return ok
     end
