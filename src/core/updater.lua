@@ -22,13 +22,11 @@ local COMPARE_URL = "https://api.github.com/repos/glowpkj/DepHub/compare/%s...%s
 local Updater = {}
 Updater.__index = Updater
 
-local function updateLog(message)
-    pcall(print, "[DEPHUB UPDATE] " .. tostring(message))
+local function silent()
 end
 
-local function updateWarn(message)
-    pcall(warn, "[DEPHUB UPDATE] " .. tostring(message))
-end
+local updateLog = silent
+local updateWarn = silent
 
 local function httpGet(url)
     local ok, result = pcall(function()
@@ -83,6 +81,8 @@ function Updater.new(options)
     options = options or {}
     local self = setmetatable({}, Updater)
     self.PlaceId = tostring(options.PlaceId or game.PlaceId)
+    self.GameId = tostring(options.GameId or game.GameId)
+    self.ManifestId = tostring(options.ManifestId or self.GameId)
     self.CurrentVersion = options.CurrentVersion and tostring(options.CurrentVersion) or nil
     self.CurrentCommit = options.CurrentCommit and tostring(options.CurrentCommit) or nil
     self.PollInterval = tonumber(options.PollInterval) or 15
@@ -102,32 +102,24 @@ function Updater.new(options)
 end
 
 function Updater:FetchVersion()
-    updateLog("Verificando atualização...")
-
     local ok, source = httpGet(MANIFEST_URL .. "?dephubupdate=" .. tostring(math_random(1000000, 9999999)))
     if not ok then
-        updateWarn("Falha ao baixar manifest: " .. tostring(source))
         return false, source
     end
 
     local decoded, manifest = decode(source)
     if not decoded then
-        updateWarn("Manifest inválido: " .. tostring(manifest))
         return false, manifest
     end
 
     local games = manifest.games
-    local info = type(games) == "table" and games[self.PlaceId] or nil
+    local info = type(games) == "table" and (games[self.ManifestId] or games[self.PlaceId]) or nil
     if type(info) ~= "table" or not info.version then
-        updateWarn("Jogo sem versão registrada no manifest.")
         return false, "Jogo sem versao registrada"
     end
 
     local commit = tostring(info.commit or manifest.commit or "")
     local files = type(info.files) == "table" and info.files or {}
-
-    updateLog("Versão remota: " .. tostring(info.version))
-    updateLog("Commit remoto: " .. (commit ~= "" and commit or "desconhecido"))
 
     return true, {
         Version = tostring(info.version),
@@ -139,32 +131,25 @@ end
 
 function Updater:ValidateBackendChange(info)
     if not self.CurrentCommit or self.CurrentCommit == "" then
-        updateWarn("Commit atual indisponível; não é possível validar mudança real.")
         return false
     end
 
     if not info.Commit or info.Commit == "" then
-        updateWarn("Commit remoto indisponível; atualização rejeitada.")
         return false
     end
 
     if self.CurrentCommit == info.Commit then
-        updateLog("Manifest mudou, mas o commit de origem continua igual. Ignorando falso update.")
         return false
     end
 
     local url = string.format(COMPARE_URL, self.CurrentCommit, info.Commit)
-    updateLog("Validando mudanças entre commits...")
-
     local ok, source = httpGet(url)
     if not ok then
-        updateWarn("Não foi possível validar o diff: " .. tostring(source))
         return false
     end
 
     local decoded, compareData = decode(source)
     if not decoded then
-        updateWarn("Resposta de comparação inválida: " .. tostring(compareData))
         return false
     end
 
@@ -180,29 +165,19 @@ function Updater:ValidateBackendChange(info)
         end
     end
 
-    if #changedTracked == 0 then
-        updateLog("Nenhuma alteração em código rastreado. Ignorando update fake/UI-only.")
-        return false
-    end
-
-    updateLog("Mudanças válidas detectadas: " .. tostring(#changedTracked))
-    for _, filename in ipairs(changedTracked) do
-        updateLog("  - " .. filename)
-    end
-
-    return true
+    return #changedTracked > 0
 end
 
 function Updater:DestroyPrompt()
     for _, connection in self.Connections do
         if connection and connection.Disconnect then
-            connection:Disconnect()
+            pcall(connection.Disconnect, connection)
         end
     end
     self.Connections = {}
 
     if self.ScreenGui then
-        self.ScreenGui:Destroy()
+        pcall(self.ScreenGui.Destroy, self.ScreenGui)
         self.ScreenGui = nil
     end
 
@@ -219,7 +194,6 @@ function Updater:Cancel()
         self.CancelledVersions[self.PromptVersion] = true
     end
 
-    updateLog("Atualização cancelada pelo usuário.")
     self:DestroyPrompt()
 end
 
@@ -295,8 +269,6 @@ function Updater:CreatePrompt(info)
         self:Cancel()
     end)
 
-    updateLog("Atualização confirmada. Countdown iniciado: " .. tostring(self.Countdown) .. "s")
-
     task.spawn(function()
         for remaining = self.Countdown, 0, -1 do
             if self.Destroyed or not self.PromptOpen or self.PromptVersion ~= info.Version then
@@ -320,17 +292,13 @@ end
 
 function Updater:GetServer()
     local url = string.format(SERVERS_URL, self.PlaceId)
-    updateLog("Procurando servidor para hop...")
-
     local ok, source = httpGet(url)
     if not ok then
-        updateWarn("Falha ao obter servidores: " .. tostring(source))
         return false, source
     end
 
     local decoded, data = decode(source)
     if not decoded then
-        updateWarn("Lista de servidores inválida: " .. tostring(data))
         return false, data
     end
 
@@ -346,7 +314,6 @@ function Updater:GetServer()
     end
 
     if #candidates == 0 then
-        updateWarn("Nenhum servidor alternativo disponível.")
         return false, "Nenhum servidor disponivel"
     end
 
@@ -362,26 +329,20 @@ function Updater:Teleport(info)
     self:DestroyPrompt()
 
     if self.Mode == "rejoin" then
-        updateLog("Atualização válida. Iniciando rejoin...")
-        local teleported = pcall(function()
-            TeleportService:Teleport(tonumber(self.PlaceId), LocalPlayer)
+        pcall(function()
+            TeleportService:Teleport(self.PlaceId, LocalPlayer)
         end)
-        if not teleported then
-            updateWarn("Rejoin falhou.")
-        end
         return
     end
 
     local ok, jobId = self:GetServer()
     if ok and jobId then
-        updateLog("Atualização válida. Iniciando server hop...")
         local teleported = pcall(function()
             TeleportService:TeleportToPlaceInstance(tonumber(self.PlaceId), jobId, LocalPlayer)
         end)
         if teleported then
             return
         end
-        updateWarn("Server hop falhou; tentando rejoin.")
     end
 
     pcall(function()
@@ -404,7 +365,6 @@ function Updater:Check()
     if not self.CurrentVersion then
         self.CurrentVersion = info.Version
         self.CurrentCommit = info.Commit
-        updateLog("Versão inicial registrada: " .. tostring(info.Version))
         return
     end
 
@@ -413,21 +373,14 @@ function Updater:Check()
     end
 
     if startupAge < self.StartupGrace then
-        updateLog("Mudança de manifest durante inicialização detectada. Sincronizando baseline sem teleportar.")
         self.CurrentVersion = info.Version
         self.CurrentCommit = info.Commit
         return
     end
 
-    if self.CancelledVersions[info.Version] then
+    if self.CancelledVersions[info.Version] or self.RejectedVersions[info.Version] then
         return
     end
-
-    if self.RejectedVersions[info.Version] then
-        return
-    end
-
-    updateLog("Diferença de versão detectada. Validando mudança real no backend...")
 
     if not self:ValidateBackendChange(info) then
         self.RejectedVersions[info.Version] = true
@@ -442,15 +395,19 @@ function Updater:Start()
         return
     end
 
-    updateLog("Updater iniciado. Intervalo: " .. tostring(self.PollInterval) .. "s")
-
     task.spawn(function()
         task.wait(5)
+        if self.Destroyed then
+            return
+        end
+
         self:Check()
 
         while not self.Destroyed do
             task.wait(self.PollInterval)
-            self:Check()
+            if not self.Destroyed then
+                self:Check()
+            end
         end
     end)
 end
@@ -460,7 +417,6 @@ function Updater:Destroy()
         return
     end
 
-    updateLog("Updater encerrado.")
     self.Destroyed = true
     self:DestroyPrompt()
 end
