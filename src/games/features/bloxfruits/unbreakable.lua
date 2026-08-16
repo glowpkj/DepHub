@@ -2,7 +2,7 @@ local Feature = {}
 Feature.__index = Feature
 
 function Feature.new(context)
-    return setmetatable({Context = context, State = context.State, Enabled = false, Character = nil, CharacterConnections = {}, RespawnConnection = nil, Originals = {}}, Feature)
+    return setmetatable({Context = context, State = context.State, Enabled = false, Character = nil, CharacterConnections = {}, RespawnConnection = nil, Originals = {}, Captured = false, Original = nil}, Feature)
 end
 
 function Feature:_disconnectCharacter()
@@ -22,10 +22,14 @@ end
 function Feature:_bind(character)
     self:_disconnectCharacter()
     self.Character = character
+    self.Captured = false
+    self.Original = nil
     if not character then return end
-    if self.Originals[character] == nil then
-        self.Originals[character] = character:GetAttribute("UnbreakableAll")
+    if not self.Originals[character] then
+        self.Originals[character] = {Value = character:GetAttribute("UnbreakableAll")}
     end
+    self.Captured = true
+    self.Original = self.Originals[character].Value
     self:_apply(character)
     self.Context.Connect(self.CharacterConnections, character:GetAttributeChangedSignal("UnbreakableAll"), function()
         self:_apply(character)
@@ -51,11 +55,13 @@ function Feature:Disable()
         pcall(self.RespawnConnection.Disconnect, self.RespawnConnection)
         self.RespawnConnection = nil
     end
-    local original = character and self.Originals[character]
-    if character and character.Parent and original ~= nil then
-        pcall(function() character:SetAttribute("UnbreakableAll", original) end)
+    local captured = character and self.Originals[character]
+    if character and character.Parent and captured then
+        pcall(function() character:SetAttribute("UnbreakableAll", captured.Value) end)
     end
     if character then self.Originals[character] = nil end
+    self.Captured = false
+    self.Original = nil
     return true
 end
 
