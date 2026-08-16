@@ -8,6 +8,8 @@ local pairs = pairs
 local ipairs = ipairs
 local string_sub = string.sub
 local string_lower = string.lower
+local string_find = string.find
+local string_gsub = string.gsub
 local math_floor = math.floor
 
 local Players = game:GetService("Players")
@@ -51,6 +53,7 @@ local State = {
     FruitESP = {},
     OriginalUnbreakableAll = nil,
     UnbreakableCaptured = false,
+    CameraShakeDisabled = false,
     Paths = {
         IceEffect = IceEffect,
         LegendarySwordDealer = LegendarySwordDealer,
@@ -167,7 +170,7 @@ local function hasProtection(character)
         return true
     end
 
-    local names = {
+    local attributeNames = {
         "PvPDisabled",
         "PVPDisabled",
         "PvPProtection",
@@ -177,7 +180,7 @@ local function hasProtection(character)
         "NoPvP"
     }
 
-    for _, name in ipairs(names) do
+    for _, name in ipairs(attributeNames) do
         if character:GetAttribute(name) == true then
             return true
         end
@@ -212,12 +215,21 @@ local function teamColor(player)
     return BrickColor.new("Institutional white").Color
 end
 
-local function updatePlayerHealth(record)
+local function updatePlayerText(record)
     if not record.Label or not record.Label.Parent then
         return
     end
 
-    record.Label.Text = record.Player.Name .. "\n" .. healthText(record.Humanoid) .. "\nPvP: " .. (record.Protected and "Desativado" or "Ativado")
+    local lines = {
+        record.Player.Name,
+        healthText(record.Humanoid)
+    }
+
+    if not record.Protected then
+        lines[#lines + 1] = "PvP: Ativado"
+    end
+
+    record.Label.Text = table.concat(lines, "\n")
 end
 
 local function updatePlayerAppearance(record)
@@ -227,9 +239,16 @@ local function updatePlayerAppearance(record)
 
     local color = teamColor(record.Player)
     record.Highlight.FillColor = color
-    record.Highlight.OutlineColor = color
-    record.Label.TextColor3 = color
-    updatePlayerHealth(record)
+    record.Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    record.Label.TextColor3 = Color3.fromRGB(255, 255, 255)
+    updatePlayerText(record)
+end
+
+local function updatePlayerHealth(record)
+    if State.Destroyed then
+        return
+    end
+    updatePlayerText(record)
 end
 
 local function updatePlayerProtection(record)
@@ -238,7 +257,7 @@ local function updatePlayerProtection(record)
     end
 
     record.Protected = hasProtection(record.Character)
-    updatePlayerHealth(record)
+    updatePlayerText(record)
 end
 
 local function createPlayerESP(character)
@@ -265,8 +284,9 @@ local function createPlayerESP(character)
     highlight.Name = "DepHubPlayerESP"
     highlight.Adornee = character
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
-    highlight.FillTransparency = 0.55
+    highlight.FillTransparency = 0
     highlight.OutlineTransparency = 0
+    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
     highlight.Parent = character
 
     local billboard = Instance.new("BillboardGui")
@@ -274,16 +294,17 @@ local function createPlayerESP(character)
     billboard.Adornee = head
     billboard.AlwaysOnTop = true
     billboard.MaxDistance = 10000
-    billboard.Size = UDim2.fromOffset(230, 70)
-    billboard.StudsOffset = Vector3.new(0, 3.2, 0)
+    billboard.Size = UDim2.fromOffset(250, 76)
+    billboard.StudsOffset = Vector3.new(0, 3.25, 0)
     billboard.Parent = head
 
     local label = Instance.new("TextLabel")
     label.BackgroundTransparency = 1
     label.Size = UDim2.fromScale(1, 1)
     label.Font = Enum.Font.GothamBold
-    label.TextSize = 13
-    label.TextStrokeTransparency = 0.35
+    label.TextSize = 14
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextStrokeTransparency = 0
     label.Parent = billboard
 
     local record = {
@@ -293,12 +314,11 @@ local function createPlayerESP(character)
         Highlight = highlight,
         Billboard = billboard,
         Label = label,
-        Protected = false,
+        Protected = hasProtection(character),
         Connections = {}
     }
 
     State.PlayerESP[character] = record
-    record.Protected = hasProtection(character)
     updatePlayerAppearance(record)
 
     connect(record.Connections, humanoid:GetPropertyChangedSignal("Health"), function()
@@ -408,51 +428,143 @@ local function startPlayerESP()
     return true
 end
 
-local function fruitAdornee(instance)
-    if instance:IsA("BasePart") then
-        return instance
+local function fruitRootFromInstance(instance)
+    if not instance then
+        return nil
     end
 
-    if instance:IsA("Model") then
-        return instance.PrimaryPart or instance:FindFirstChildWhichIsA("BasePart", true)
-    end
-
-    if instance:IsA("Attachment") then
-        return instance
-    end
-
-    return instance:FindFirstChildWhichIsA("BasePart", true)
-end
-
-local function fruitPosition(instance, adornee)
-    if instance:IsA("Model") then
-        local ok, pivot = pcall(instance.GetPivot, instance)
-        if ok then
-            return pivot.Position
+    local current = instance
+    while current and current ~= Workspace do
+        if current:IsA("Tool") then
+            return current
         end
-    end
-
-    if adornee:IsA("BasePart") then
-        return adornee.Position
-    end
-
-    if adornee:IsA("Attachment") then
-        return adornee.WorldPosition
+        current = current.Parent
     end
 
     return nil
 end
 
-local function createFruitESP(instance)
-    if State.Destroyed or not State.Toggles.FruitESP or State.FruitESP[instance] then
+local function fruitModel(tool)
+    if not tool or not tool:IsA("Tool") then
+        return nil
+    end
+
+    return tool:FindFirstChild("Fruit")
+end
+
+local function fruitAdornee(tool, fruit)
+    if fruit then
+        if fruit:IsA("Model") then
+            return fruit.PrimaryPart or fruit:FindFirstChildWhichIsA("BasePart", true)
+        end
+
+        if fruit:IsA("BasePart") then
+            return fruit
+        end
+
+        if fruit:IsA("Attachment") then
+            return fruit
+        end
+    end
+
+    if tool then
+        local handle = tool:FindFirstChild("Handle")
+        if handle and handle:IsA("BasePart") then
+            return handle
+        end
+        return tool:FindFirstChildWhichIsA("BasePart", true)
+    end
+
+    return nil
+end
+
+local function fruitPosition(tool, fruit, adornee)
+    if fruit and fruit:IsA("Model") then
+        local ok, pivot = pcall(fruit.GetPivot, fruit)
+        if ok then
+            return pivot.Position
+        end
+    end
+
+    if adornee and adornee:IsA("BasePart") then
+        return adornee.Position
+    end
+
+    if adornee and adornee:IsA("Attachment") then
+        return adornee.WorldPosition
+    end
+
+    if tool then
+        local handle = tool:FindFirstChild("Handle")
+        if handle and handle:IsA("BasePart") then
+            return handle.Position
+        end
+    end
+
+    return nil
+end
+
+local function fruitName(tool)
+    if not tool then
+        return "Fruit"
+    end
+
+    local name = tostring(tool.Name)
+    local lower = string_lower(name)
+
+    if string_sub(lower, -6) == " fruit" then
+        return name
+    end
+
+    local spaced = string_gsub(name, "([Ff][Rr][Uu][Ii][Tt])", "Fruit")
+    if string_find(string_lower(spaced), "fruit", 1, true) then
+        return spaced
+    end
+
+    return name
+end
+
+local function isDroppedFruitTool(tool)
+    if not tool or not tool:IsA("Tool") or tool.Parent ~= Workspace then
+        return false
+    end
+
+    return fruitModel(tool) ~= nil
+end
+
+local function updateFruitRecord(record)
+    if State.Destroyed or not record.Label or not record.Label.Parent then
         return
     end
 
-    if string_sub(instance.Name, 1, 6) ~= "Fruit " then
+    local fruit = fruitModel(record.Tool)
+    local adornee = fruitAdornee(record.Tool, fruit)
+    local position = fruitPosition(record.Tool, fruit, adornee)
+    local root = getRoot(LocalPlayer.Character)
+
+    if not position or not root then
         return
     end
 
-    local adornee = fruitAdornee(instance)
+    local distance = (root.Position - position).Magnitude
+    record.Label.Text = fruitName(record.Tool) .. "\nDistância: " .. tostring(math_floor(distance + 0.5)) .. " studs"
+
+    if record.Billboard.Adornee ~= adornee then
+        record.Billboard.Adornee = adornee
+    end
+end
+
+local function createFruitESP(tool)
+    if State.Destroyed or not State.Toggles.FruitESP or State.FruitESP[tool] then
+        return
+    end
+
+    if not isDroppedFruitTool(tool) then
+        return
+    end
+
+    local fruit = fruitModel(tool)
+    local adornee = fruitAdornee(tool, fruit)
     if not adornee then
         return
     end
@@ -462,8 +574,8 @@ local function createFruitESP(instance)
     billboard.Adornee = adornee
     billboard.AlwaysOnTop = true
     billboard.MaxDistance = 10000
-    billboard.Size = UDim2.fromOffset(260, 46)
-    billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+    billboard.Size = UDim2.fromOffset(270, 48)
+    billboard.StudsOffset = Vector3.new(0, 2.6, 0)
     billboard.Parent = adornee
 
     local label = Instance.new("TextLabel")
@@ -471,136 +583,167 @@ local function createFruitESP(instance)
     label.Size = UDim2.fromScale(1, 1)
     label.Font = Enum.Font.GothamBold
     label.TextSize = 13
-    label.TextStrokeTransparency = 0.35
-    label.TextColor3 = Color3.fromRGB(255, 220, 80)
-    label.Text = instance.Name .. "\nDistância: --"
+    label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+    label.TextStrokeTransparency = 0
+    label.TextColor3 = Color3.fromRGB(255, 235, 90)
     label.Parent = billboard
 
     local record = {
-        Instance = instance,
+        Tool = tool,
+        Fruit = fruit,
         Billboard = billboard,
         Label = label,
         Connections = {}
     }
 
-    State.FruitESP[instance] = record
+    State.FruitESP[tool] = record
+    updateFruitRecord(record)
 
-    connect(record.Connections, instance.AncestryChanged, function(_, parent)
-        if not parent then
-            State:RemoveFruitESP(instance)
+    connect(record.Connections, tool.AncestryChanged, function(_, parent)
+        if not parent or not isDroppedFruitTool(tool) then
+            State:RemoveFruitESP(tool)
         end
+    end)
+
+    connect(record.Connections, tool.ChildAdded, function(child)
+        if child.Name == "Fruit" then
+            record.Fruit = child
+            updateFruitRecord(record)
+        end
+    end)
+
+    connect(record.Connections, tool.ChildRemoved, function(child)
+        if child == record.Fruit then
+            task.defer(function()
+                if State.FruitESP[tool] then
+                    record.Fruit = fruitModel(tool)
+                    if not record.Fruit then
+                        State:RemoveFruitESP(tool)
+                    else
+                        updateFruitRecord(record)
+                    end
+                end
+            end)
+        end
+    end)
+
+    connect(record.Connections, tool:GetPropertyChangedSignal("Name"), function()
+        updateFruitRecord(record)
     end)
 end
 
-function State:RemoveFruitESP(instance)
-    local record = self.FruitESP[instance]
+function State:RemoveFruitESP(tool)
+    local record = self.FruitESP[tool]
     if not record then
         return
     end
 
-    self.FruitESP[instance] = nil
+    self.FruitESP[tool] = nil
     disconnectAll(record.Connections)
     destroy(record.Billboard)
 end
 
 local function clearFruitESP()
-    for instance in pairs(State.FruitESP) do
-        State:RemoveFruitESP(instance)
+    for tool in pairs(State.FruitESP) do
+        State:RemoveFruitESP(tool)
+    end
+end
+
+local function scanDroppedFruits()
+    for _, instance in ipairs(Workspace:GetChildren()) do
+        if instance:IsA("Tool") and isDroppedFruitTool(instance) then
+            createFruitESP(instance)
+        end
     end
 end
 
 local function startFruitESP()
     clearFruitESP()
-
-    for _, instance in ipairs(Workspace:GetChildren()) do
-        if string_sub(instance.Name, 1, 6) == "Fruit " then
-            createFruitESP(instance)
-        end
-    end
+    scanDroppedFruits()
 
     local connections = State.Connections.FruitESP or {}
     State.Connections.FruitESP = connections
 
     connect(connections, Workspace.ChildAdded, function(instance)
-        if State.Toggles.FruitESP and string_sub(instance.Name, 1, 6) == "Fruit " then
+        if State.Toggles.FruitESP and instance:IsA("Tool") then
             task.defer(createFruitESP, instance)
         end
     end)
 
     connect(connections, Workspace.ChildRemoved, function(instance)
-        State:RemoveFruitESP(instance)
+        if instance:IsA("Tool") then
+            State:RemoveFruitESP(instance)
+        end
+    end)
+
+    task.spawn(function()
+        while not State.Destroyed and State.Toggles.FruitESP do
+            for tool, record in pairs(State.FruitESP) do
+                if not isDroppedFruitTool(tool) or not record.Label or not record.Label.Parent then
+                    State:RemoveFruitESP(tool)
+                else
+                    updateFruitRecord(record)
+                end
+            end
+            task.wait(0.2)
+        end
     end)
 
     return true
 end
 
-local function startFruitDistanceLoop()
-    task.spawn(function()
-        while not State.Destroyed and State.Toggles.FruitESP do
-            local root = getRoot(LocalPlayer.Character)
-            if root then
-                for instance, record in pairs(State.FruitESP) do
-                    if not instance.Parent or not record.Label.Parent then
-                        State:RemoveFruitESP(instance)
-                    else
-                        local adornee = fruitAdornee(instance)
-                        local position = adornee and fruitPosition(instance, adornee)
-                        if position then
-                            local distance = (root.Position - position).Magnitude
-                            record.Label.Text = instance.Name .. "\nDistância: " .. tostring(math_floor(distance + 0.5)) .. " studs"
-                        end
-                    end
-                end
-            end
-            task.wait(0.25)
-        end
-    end)
-end
-
-local function applyCameraShake(enabled)
-    if not ChangeSetting or not ChangeSetting:IsA("RemoteEvent") then
-        return false
-    end
-
-    return pcall(ChangeSetting.FireServer, ChangeSetting, "CameraShake", enabled)
-end
-
-function State:SetCameraShake(enabled)
-    if self.Destroyed then
-        return false
-    end
-
-    return applyCameraShake(enabled == true)
-end
-
-local function setVisionRadius()
+local function setVisionRadius(value)
     if not LocalPlayer then
-        return
+        return false
     end
 
     local ok = pcall(function()
-        if LocalPlayer.VisionRadius ~= 5000 then
-            LocalPlayer.VisionRadius = 5000
+        if LocalPlayer.VisionRadius ~= value then
+            LocalPlayer.VisionRadius = value
         end
     end)
 
-    if not ok then
-        local valueObject = LocalPlayer:FindFirstChild("VisionRadius")
-        if valueObject and valueObject:IsA("NumberValue") and valueObject.Value ~= 5000 then
-            pcall(function()
-                valueObject.Value = 5000
-            end)
-        end
+    if ok and LocalPlayer.VisionRadius == value then
+        return true
     end
+
+    local valueObject = LocalPlayer:FindFirstChild("VisionRadius")
+    if valueObject and valueObject:IsA("NumberValue") and valueObject.Value ~= value then
+        pcall(function()
+            valueObject.Value = value
+        end)
+    end
+
+    return valueObject and valueObject:IsA("NumberValue") and valueObject.Value == value or false
 end
 
 local function startObservationHaki()
     task.spawn(function()
         while not State.Destroyed and State.Toggles.ObservationHaki do
-            setVisionRadius()
+            pcall(function()
+                if LocalPlayer.VisionRadius ~= 5000 then
+                    setVisionRadius(5000)
+                end
+            end)
             task.wait(0.5)
         end
     end)
+end
+
+local function setCameraShake(enabled)
+    if not ChangeSetting or not ChangeSetting:IsA("RemoteEvent") then
+        return false
+    end
+
+    local ok = pcall(function()
+        ChangeSetting:FireServer("CameraShake", enabled)
+    end)
+
+    if ok then
+        State.CameraShakeDisabled = not enabled
+    end
+
+    return ok
 end
 
 local function startUnbreakableAll()
@@ -627,8 +770,8 @@ local function stopUnbreakableAll()
     end
 
     local original = State.OriginalUnbreakableAll
-    State.OriginalUnbreakableAll = nil
     State.UnbreakableCaptured = false
+    State.OriginalUnbreakableAll = nil
 
     pcall(function()
         LocalPlayer:SetAttribute("UnbreakableAll", original)
@@ -636,15 +779,23 @@ local function stopUnbreakableAll()
 end
 
 local function stopPlayerESP()
-    disconnectAll(State.Connections.PlayerESP)
+    disconnectAll(State.Connections.PlayerESP or {})
     State.Connections.PlayerESP = nil
     clearPlayerESP()
 end
 
 local function stopFruitESP()
-    disconnectAll(State.Connections.FruitESP)
+    disconnectAll(State.Connections.FruitESP or {})
     State.Connections.FruitESP = nil
     clearFruitESP()
+end
+
+function State:SetCameraShake(enabled)
+    if self.Destroyed then
+        return false
+    end
+
+    return setCameraShake(enabled == true)
 end
 
 function State:SetToggle(name, enabled)
@@ -653,48 +804,37 @@ function State:SetToggle(name, enabled)
     end
 
     enabled = enabled == true
+    if self.Toggles[name] == enabled then
+        return true
+    end
 
-    if name == "PlayerESP" then
-        self.Toggles.PlayerESP = enabled
+    self.Toggles[name] = enabled
+
+    if name == "ObservationHaki" then
+        if enabled then
+            startObservationHaki()
+        end
+    elseif name == "PlayerESP" then
         if enabled then
             return startPlayerESP()
         end
         stopPlayerESP()
-        return true
-    end
-
-    if name == "FruitESP" then
-        self.Toggles.FruitESP = enabled
+    elseif name == "FruitESP" then
         if enabled then
-            local ok = startFruitESP()
-            if ok then
-                startFruitDistanceLoop()
-            end
-            return ok
+            return startFruitESP()
         end
         stopFruitESP()
-        return true
-    end
-
-    if name == "UnbreakableAll" then
-        self.Toggles.UnbreakableAll = enabled
+    elseif name == "UnbreakableAll" then
         if enabled then
             startUnbreakableAll()
         else
             stopUnbreakableAll()
         end
-        return true
+    else
+        return false
     end
 
-    if name == "ObservationHaki" then
-        self.Toggles.ObservationHaki = enabled
-        if enabled then
-            startObservationHaki()
-        end
-        return true
-    end
-
-    return false
+    return true
 end
 
 function State:GetToggle(name)
@@ -711,7 +851,6 @@ function State:Destroy()
     end
 
     self.Destroyed = true
-    self.Started = false
     self.Toggles.ObservationHaki = false
     self.Toggles.PlayerESP = false
     self.Toggles.FruitESP = false
@@ -733,16 +872,12 @@ end
 
 function State:Start()
     if self.Destroyed or self.Started then
-        return self.Started
-    end
-
-    if not LocalPlayer then
         return false
     end
 
-    applyCameraShake(false)
-    startObservationHaki()
     self.Started = true
+    setCameraShake(false)
+    startObservationHaki()
     return true
 end
 
@@ -751,7 +886,7 @@ if not LocalPlayer then
 end
 
 local ok, started = pcall(State.Start, State)
-if not ok or started ~= true then
+if not ok or not started then
     pcall(State.Destroy, State)
     return false
 end
