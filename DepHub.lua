@@ -197,8 +197,7 @@ local placeId = tostring(game.PlaceId)
 
 local targets = {
     ["994732206"] = {
-        Core = "src/games/bloxfruits.lua",
-        UI = "src/ui/bloxfruits.lua"
+        Core = "src/games/bloxfruits.lua"
     },
     ["119048529960596"] = {
         Core = "src/games/rt3.lua",
@@ -208,7 +207,7 @@ local targets = {
 
 local target = targets[gameId]
 local corePrefetch = target and prefetch(target.Core) or nil
-local uiPrefetch = target and prefetch(target.UI) or nil
+local uiPrefetch = target and target.UI and prefetch(target.UI) or nil
 
 local loading
 
@@ -262,9 +261,13 @@ if not okCoreSource then
     return fail(coreError, loading)
 end
 
-local okUISource, uiSource, uiError = waitPrefetch(uiPrefetch)
-if not okUISource then
-    return fail(uiError, loading)
+local uiSource
+if uiPrefetch then
+    local okUISource, source, uiError = waitPrefetch(uiPrefetch)
+    if not okUISource then
+        return fail(uiError, loading)
+    end
+    uiSource = source
 end
 
 if loading then
@@ -287,27 +290,6 @@ if gameId == "994732206" then
     end
 
     env.__DEPHUB.BloxFruits = coreResult
-
-    if loading then
-        pcall(loading.SetProgress, loading, 0.66, "Inicializando interface...")
-    end
-
-    local okUICompile, uiChunk = compile(uiSource)
-    if not okUICompile then
-        return fail(uiChunk, loading)
-    end
-
-    local okUIRun, UI = pcall(uiChunk)
-    if not okUIRun or type(UI) ~= "table" or type(UI.new) ~= "function" then
-        return fail(UI, loading)
-    end
-
-    local okUICreate, uiInstance = pcall(UI.new, coreResult)
-    if not okUICreate or type(uiInstance) ~= "table" then
-        return fail(uiInstance, loading)
-    end
-
-    env.__DEPHUB.BloxFruitsUI = uiInstance
 else
     if coreResult ~= true then
         return fail(coreResult, loading)
