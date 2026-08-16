@@ -8,8 +8,6 @@ local pairs = pairs
 local ipairs = ipairs
 local string_sub = string.sub
 local string_lower = string.lower
-local string_find = string.find
-local string_gsub = string.gsub
 local math_floor = math.floor
 
 local Players = game:GetService("Players")
@@ -34,40 +32,6 @@ local STATE_KEY = "__DEPHUB_BLOXFRUITS"
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 local previous = type(env[STATE_KEY]) == "table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
-
-local State = {
-    Started = false,
-    Destroyed = false,
-    Toggles = {
-        ObservationHaki = true,
-        PlayerESP = false,
-        FruitESP = false,
-        UnbreakableAll = false,
-        DashCustomizer = false,
-        FlashstepNoCooldown = false,
-        WaterWalking = false
-    },
-    Values = {
-        DashLength = 1
-    },
-    Connections = {},
-    PlayerESP = {},
-    FruitESP = {},
-    OriginalUnbreakableAll = nil,
-    UnbreakableCaptured = false,
-    CameraShakeDisabled = false,
-    Paths = {
-        IceEffect = IceEffect,
-        LegendarySwordDealer = LegendarySwordDealer,
-        IceEffectPath = "game:GetService(\"ReplicatedStorage\").Effect.Container.Ice1.Waterwalk.ice",
-        LegendarySwordDealerPath = "game:GetService(\"ReplicatedStorage\").NPCs[\"Legendary Sword Dealer\"]"
-    }
-}
-
-env[STATE_KEY] = State
-env.__DEPHUB = env.__DEPHUB or {}
-env.__DEPHUB.BloxFruits = State
-env.__DEPHUB.BloxFruitsPaths = State.Paths
 
 local function connect(list, signal, callback)
     if not signal then return nil end
@@ -149,24 +113,22 @@ local function compile(source)
     return true, chunk
 end
 
-local function loadFeature(path, context)
+local function loadModule(path, context)
     local okGet, source = pcall(function() return game:HttpGet(BASE_URL .. path) end)
     if not okGet or type(source) ~= "string" or #source == 0 then return false, tostring(source) end
     local okCompile, chunk = compile(source)
     if not okCompile then return false, chunk end
     local okRun, factory = pcall(chunk)
     if not okRun or type(factory) ~= "table" or type(factory.new) ~= "function" then return false, tostring(factory) end
-    local okNew, feature = pcall(factory.new, context)
-    if not okNew or type(feature) ~= "table" then return false, tostring(feature) end
-    return true, feature
+    local okNew, module = pcall(factory.new, context)
+    if not okNew or type(module) ~= "table" then return false, tostring(module) end
+    return true, module
 end
 
-local context = {
-    State = State,
+local baseContext = {
     LocalPlayer = LocalPlayer,
     Players = Players,
     Workspace = Workspace,
-    ChangeSetting = ChangeSetting,
     Connect = connect,
     DisconnectAll = disconnectAll,
     Destroy = destroy,
@@ -176,8 +138,62 @@ local context = {
     HealthText = healthText,
     IsProtectionName = isProtectionName,
     HasProtection = hasProtection,
-    TeamColor = teamColor
+    TeamColor = teamColor,
+    ChangeSetting = ChangeSetting
 }
+
+local configOk, config = loadModule("src/games/features/bloxfruits/config.lua", baseContext)
+if not configOk then return false end
+config:Load({
+    PlayerESP = false,
+    FruitESP = false,
+    UnbreakableAll = false,
+    DashCustomizer = false,
+    FlashstepNoCooldown = false,
+    WaterWalking = false,
+    VisualCloner = false,
+    AutoJoinTeam = true,
+    DashLength = 1,
+    PreferredTeam = "Pirates"
+})
+
+local State = {
+    Started = false,
+    Destroyed = false,
+    Config = config,
+    Toggles = {
+        ObservationHaki = true,
+        PlayerESP = config:Get("PlayerESP", false),
+        FruitESP = config:Get("FruitESP", false),
+        UnbreakableAll = config:Get("UnbreakableAll", false),
+        DashCustomizer = config:Get("DashCustomizer", false),
+        FlashstepNoCooldown = config:Get("FlashstepNoCooldown", false),
+        WaterWalking = config:Get("WaterWalking", false),
+        VisualCloner = config:Get("VisualCloner", false),
+        AutoJoinTeam = config:Get("AutoJoinTeam", true)
+    },
+    Values = {
+        DashLength = tonumber(config:Get("DashLength", 1)) or 1
+    },
+    Connections = {},
+    PlayerESP = {},
+    FruitESP = {},
+    OriginalUnbreakableAll = nil,
+    UnbreakableCaptured = false,
+    CameraShakeDisabled = false,
+    Paths = {
+        IceEffect = IceEffect,
+        LegendarySwordDealer = LegendarySwordDealer,
+        IceEffectPath = "game:GetService(\"ReplicatedStorage\").Effect.Container.Ice1.Waterwalk.ice",
+        LegendarySwordDealerPath = "game:GetService(\"ReplicatedStorage\").NPCs[\"Legendary Sword Dealer\"]"
+    }
+}
+
+baseContext.State = State
+env[STATE_KEY] = State
+env.__DEPHUB = env.__DEPHUB or {}
+env.__DEPHUB.BloxFruits = State
+env.__DEPHUB.BloxFruitsPaths = State.Paths
 
 local featurePaths = {
     PlayerESP = "src/games/features/bloxfruits/playeresp.lua",
@@ -187,14 +203,17 @@ local featurePaths = {
     CameraShake = "src/games/features/bloxfruits/camerashake.lua",
     DashCustomizer = "src/games/features/bloxfruits/dash.lua",
     FlashstepNoCooldown = "src/games/features/bloxfruits/flashstep.lua",
-    WaterWalking = "src/games/features/bloxfruits/waterwalking.lua"
+    WaterWalking = "src/games/features/bloxfruits/waterwalking.lua",
+    AutoJoinTeam = "src/games/features/bloxfruits/team.lua",
+    VisualCloner = "src/games/features/bloxfruits/visualcloner.lua"
 }
 
 local features = {}
 for name, path in pairs(featurePaths) do
-    local ok, feature = loadFeature(path, context)
+    local ok, feature = loadModule(path, baseContext)
     if not ok then
         for _, loaded in pairs(features) do pcall(loaded.Destroy, loaded) end
+        pcall(config.Destroy, config)
         if env[STATE_KEY] == State then env[STATE_KEY] = nil end
         if env.__DEPHUB and env.__DEPHUB.BloxFruits == State then env.__DEPHUB.BloxFruits = nil end
         return false
@@ -223,17 +242,51 @@ end
 
 function State:SetDashLength(value)
     if self.Destroyed or not self.Features or not self.Features.DashCustomizer then return false end
-    return self.Features.DashCustomizer:SetValue(value)
+    local ok = self.Features.DashCustomizer:SetValue(value)
+    if ok then
+        self.Values.DashLength = self.Features.DashCustomizer:GetValue()
+        self.Config:Set("DashLength", self.Values.DashLength)
+    end
+    return ok
 end
 
 function State:GetDashLength()
     return self.Values.DashLength
 end
 
+function State:SetPreferredTeam(team)
+    if self.Destroyed or not self.Features or not self.Features.AutoJoinTeam then return false end
+    return self.Features.AutoJoinTeam:SetTeam(team)
+end
+
+function State:GetPreferredTeam()
+    return self.Features and self.Features.AutoJoinTeam and self.Features.AutoJoinTeam.PreferredTeam or self.Config:Get("PreferredTeam", "Pirates")
+end
+
+function State:SaveConfig()
+    if self.Destroyed then return false end
+    self.Config:Update({
+        PlayerESP = self.Toggles.PlayerESP,
+        FruitESP = self.Toggles.FruitESP,
+        UnbreakableAll = self.Toggles.UnbreakableAll,
+        DashCustomizer = self.Toggles.DashCustomizer,
+        FlashstepNoCooldown = self.Toggles.FlashstepNoCooldown,
+        WaterWalking = self.Toggles.WaterWalking,
+        VisualCloner = self.Toggles.VisualCloner,
+        AutoJoinTeam = self.Toggles.AutoJoinTeam,
+        DashLength = self.Values.DashLength,
+        PreferredTeam = self:GetPreferredTeam()
+    })
+    return true
+end
+
 function State:SetToggle(name, enabled)
     if self.Destroyed or type(name) ~= "string" then return false end
     enabled = enabled == true
-    if self.Toggles[name] == enabled then return true end
+    if self.Toggles[name] == enabled then
+        self:SaveConfig()
+        return true
+    end
     local feature = self.Features[name]
     if not feature then return false end
     local ok = enabled and feature:Enable() or feature:Disable()
@@ -243,6 +296,7 @@ function State:SetToggle(name, enabled)
         self.UnbreakableCaptured = feature.Captured == true
         self.OriginalUnbreakableAll = feature.Original
     end
+    self:SaveConfig()
     return true
 end
 
@@ -251,9 +305,11 @@ function State:GetPaths() return self.Paths end
 
 function State:Destroy()
     if self.Destroyed then return end
+    self:SaveConfig()
     self.Destroyed = true
     for name in pairs(self.Toggles) do self.Toggles[name] = false end
     for _, feature in pairs(self.Features or {}) do pcall(feature.Destroy, feature) end
+    pcall(config.Destroy, config)
     disconnectAll(self.Connections)
     self.Features = nil
     if env[STATE_KEY] == self then env[STATE_KEY] = nil end
@@ -265,6 +321,16 @@ function State:Start()
     self.Started = true
     self.Features.CameraShake:Debug()
     if self.Toggles.ObservationHaki then self.Features.ObservationHaki:Enable() end
+    for _, name in ipairs({"PlayerESP", "FruitESP", "UnbreakableAll", "DashCustomizer", "FlashstepNoCooldown", "WaterWalking", "VisualCloner"}) do
+        if self.Toggles[name] then
+            local ok = self.Features[name]:Enable()
+            if not ok then self.Toggles[name] = false end
+        end
+    end
+    if self.Toggles.AutoJoinTeam then
+        local ok = self.Features.AutoJoinTeam:Enable()
+        if not ok then self.Toggles.AutoJoinTeam = false end
+    end
     return true
 end
 
