@@ -2,37 +2,60 @@ local Feature = {}
 Feature.__index = Feature
 
 function Feature.new(context)
-    return setmetatable({Context = context, State = context.State, Enabled = false, Thread = nil, Captured = false, Original = nil}, Feature)
+    return setmetatable({Context = context, State = context.State, Enabled = false, Character = nil, CharacterConnections = {}, RespawnConnection = nil, Originals = {}}, Feature)
+end
+
+function Feature:_disconnectCharacter()
+    self.Context.DisconnectAll(self.CharacterConnections)
+    self.Character = nil
+end
+
+function Feature:_apply(character)
+    if not self.Enabled or not character or not character.Parent then return end
+    pcall(function()
+        if character:GetAttribute("UnbreakableAll") ~= true then
+            character:SetAttribute("UnbreakableAll", true)
+        end
+    end)
+end
+
+function Feature:_bind(character)
+    self:_disconnectCharacter()
+    self.Character = character
+    if not character then return end
+    if self.Originals[character] == nil then
+        self.Originals[character] = character:GetAttribute("UnbreakableAll")
+    end
+    self:_apply(character)
+    self.Context.Connect(self.CharacterConnections, character:GetAttributeChangedSignal("UnbreakableAll"), function()
+        self:_apply(character)
+    end)
 end
 
 function Feature:Enable()
     if self.Enabled or self.State.Destroyed then return true end
-    if not self.Captured then
-        self.Original = self.Context.LocalPlayer:GetAttribute("UnbreakableAll")
-        self.Captured = true
-    end
     self.Enabled = true
-    self.Thread = task.spawn(function()
-        while self.Enabled and not self.State.Destroyed do
-            pcall(function()
-                if self.Context.LocalPlayer:GetAttribute("UnbreakableAll") ~= true then self.Context.LocalPlayer:SetAttribute("UnbreakableAll", true) end
-            end)
-            task.wait(0.75)
-        end
+    self:_bind(self.Context.LocalPlayer.Character)
+    self.RespawnConnection = self.Context.Connect({}, self.Context.LocalPlayer.CharacterAdded, function(character)
+        if self.Enabled then self:_bind(character) end
     end)
     return true
 end
 
 function Feature:Disable()
-    if not self.Enabled and not self.Captured then return true end
+    if not self.Enabled then return true end
     self.Enabled = false
-    if self.Thread then pcall(task.cancel, self.Thread); self.Thread = nil end
-    if self.Captured then
-        local original = self.Original
-        self.Captured = false
-        self.Original = nil
-        pcall(function() self.Context.LocalPlayer:SetAttribute("UnbreakableAll", original) end)
+    local character = self.Character
+    self:_disconnectCharacter()
+    if self.RespawnConnection then
+        pcall(self.RespawnConnection.Disconnect, self.RespawnConnection)
+        self.RespawnConnection = nil
     end
+    local original = character and self.Originals[character]
+    if character and character.Parent and original ~= nil then
+        pcall(function() character:SetAttribute("UnbreakableAll", original) end)
+    end
+    if character then self.Originals[character] = nil end
     return true
 end
 
@@ -40,6 +63,7 @@ function Feature:IsEnabled() return self.Enabled end
 function Feature:Destroy()
     if not self.Context then return end
     self:Disable()
+    self.Originals = {}
     self.Context = nil
     self.State = nil
 end
