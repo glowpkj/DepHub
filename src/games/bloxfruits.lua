@@ -236,13 +236,14 @@ function State:SetToggle(name, enabled)
     if self.Toggles[name] == enabled then return true end
     local feature = self.Features[name]
     if not feature then return false end
-    self.Toggles[name] = enabled
     local ok = enabled and feature:Enable() or feature:Disable()
+    if ok == false then return false end
+    self.Toggles[name] = enabled
     if name == "UnbreakableAll" then
         self.UnbreakableCaptured = feature.Captured == true
         self.OriginalUnbreakableAll = feature.Original
     end
-    return ok ~= false
+    return true
 end
 
 function State:GetToggle(name) return self.Toggles[name] == true end
