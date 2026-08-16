@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-16T16:50:07.096685+00:00",
-  "commit": "3a18a25c37f05aedbd5ec669babce4aa4dc97814",
+  "generatedAt": "2026-08-16T16:50:35.742106+00:00",
+  "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "d97e27bc8be555a2653b836d5c645b7df0becb0b1cc42b52086107d1dcdc9d10",
-      "commit": "3a18a25c37f05aedbd5ec669babce4aa4dc97814",
+      "version": "6983a4948028c88174c52cee1fb6cead34df43cc24fc0a96ed143ac11dd3748b",
+      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -21,9 +21,59 @@
         "src/games/features/drops.lua",
         "src/games/features/autofarm-friends.lua"
       ]
+    },
+    "994732206": {
+      "name": "Blox Fruits",
+      "version": "04a6abbfb40e198c39856655d8fdb7b791aaa1200c73760468fc055db8b49f6d",
+      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
+      "files": [
+        "DepHub.lua",
+        "src/games/bloxfruits.lua"
+      ]
+    },
+    "2753915549": {
+      "name": "Blox Fruits",
+      "version": "04a6abbfb40e198c39856655d8fdb7b791aaa1200c73760468fc055db8b49f6d",
+      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
+      "files": [
+        "DepHub.lua",
+        "src/games/bloxfruits.lua"
+      ]
+    },
+    "4442272183": {
+      "name": "Blox Fruits Second Sea",
+      "version": "04a6abbfb40e198c39856655d8fdb7b791aaa1200c73760468fc055db8b49f6d",
+      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
+      "files": [
+        "DepHub.lua",
+        "src/games/bloxfruits.lua"
+      ]
+    },
+    "7449423635": {
+      "name": "Blox Fruits Third Sea",
+      "version": "04a6abbfb40e198c39856655d8fdb7b791aaa1200c73760468fc055db8b49f6d",
+      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
+      "files": [
+        "DepHub.lua",
+        "src/games/bloxfruits.lua"
+      ]
     }
   },
   "recentUpdates": [
+    {
+      "Version": "ed52bb5",
+      "Date": "2026-08-16T13:50:23-03:00",
+      "Changes": [
+        "feat: route Blox Fruits places to new core"
+      ]
+    },
+    {
+      "Version": "3a18a25",
+      "Date": "2026-08-16T13:49:56-03:00",
+      "Changes": [
+        "feat: add Blox Fruits core module without frontend"
+      ]
+    },
     {
       "Version": "8818736",
       "Date": "2026-08-15T00:08:38-03:00",
@@ -43,20 +93,6 @@
       "Date": "2026-08-15T00:07:28-03:00",
       "Changes": [
         "feat: finalize dashboard metrics and reuse early loading screen"
-      ]
-    },
-    {
-      "Version": "03b4966",
-      "Date": "2026-08-15T00:06:31-03:00",
-      "Changes": [
-        "feat: show loading immediately from root loader"
-      ]
-    },
-    {
-      "Version": "be46890",
-      "Date": "2026-08-15T00:05:40-03:00",
-      "Changes": [
-        "feat: read game updates from per-game text file"
       ]
     }
   ]
