@@ -232,17 +232,17 @@ end
 
 local modules = loadModules({
     "src/ui/init.lua",
-    "src/games/features/autofarm.lua",
-    "src/games/features/instant-cook.lua",
-    "src/games/features/drops.lua",
-    "src/games/features/autofarm-friends.lua"
+    "src/games/rt3/features/autofarm.lua",
+    "src/games/rt3/features/instant-cook.lua",
+    "src/games/rt3/features/drops.lua",
+    "src/games/rt3/features/autofarm-friends.lua"
 })
 
 local Library = modules["src/ui/init.lua"]
-local AutoFarm = modules["src/games/features/autofarm.lua"]
-local InstantCook = modules["src/games/features/instant-cook.lua"]
-local AutoDrop = modules["src/games/features/drops.lua"]
-local AutoFarmFriends = modules["src/games/features/autofarm-friends.lua"]
+local AutoFarm = modules["src/games/rt3/features/autofarm.lua"]
+local InstantCook = modules["src/games/rt3/features/instant-cook.lua"]
+local AutoDrop = modules["src/games/rt3/features/drops.lua"]
+local AutoFarmFriends = modules["src/games/rt3/features/autofarm-friends.lua"]
 
 if loading then
     loading:SetProgress(0.68, "Interface e automações carregadas...")
