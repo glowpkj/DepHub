@@ -10,31 +10,37 @@ end
 local function fruitName(name)
     local text = tostring(name or "")
     local normalized = lower(text)
-    if normalized == "buddha-buddha" or normalized == "portal-portal" then return true end
     local separator = string.find(text, "-", 1, true)
     if not separator then return false end
     local left = string.sub(normalized, 1, separator - 1)
     local right = string.sub(normalized, separator + 1)
-    return left ~= "" and right ~= "" and left == right
+    if left == "" or right == "" or left ~= right then return false end
+    return true
 end
 
-local function visualContent(instance)
+local function hasVisualContent(instance)
     return instance:FindFirstChildWhichIsA("BasePart", true)
         or instance:FindFirstChildWhichIsA("ParticleEmitter", true)
         or instance:FindFirstChildWhichIsA("Beam", true)
         or instance:FindFirstChildWhichIsA("Trail", true)
         or instance:FindFirstChildWhichIsA("Animation", true)
         or instance:FindFirstChildWhichIsA("AnimationController", true)
+        or instance:FindFirstChildWhichIsA("GuiObject", true)
+        or instance:IsA("GuiObject")
 end
 
 local function looksLikeVisual(instance)
-    if not instance:IsA("Model") or not visualContent(instance) then return false end
+    if not instance:IsA("Model") and not instance:IsA("Folder") and not instance:IsA("Tool") and not instance:IsA("ScreenGui") then return false end
     local name = lower(instance.Name)
-    if fruitName(instance.Name) then return true end
-    if string.find(name, "fruit", 1, true) or string.find(name, "effect", 1, true) or string.find(name, "transform", 1, true) or string.find(name, "aura", 1, true) or string.find(name, "skill", 1, true) or string.find(name, "attack", 1, true) then return true end
-    for _, child in ipairs(instance:GetDescendants()) do
+    if fruitName(instance.Name) then return hasVisualContent(instance) or instance:IsA("Tool") end
+    if string.find(name, "fruit", 1, true) or string.find(name, "effect", 1, true) or string.find(name, "transform", 1, true) or string.find(name, "aura", 1, true) or string.find(name, "skill", 1, true) or string.find(name, "attack", 1, true) or string.find(name, "vfx", 1, true) then
+        return hasVisualContent(instance)
+    end
+    for _, child in ipairs(instance:GetChildren()) do
         local childName = lower(child.Name)
-        if childName == "fruit" or string.find(childName, "fruit", 1, true) or string.find(childName, "effect", 1, true) or string.find(childName, "skill", 1, true) or string.find(childName, "attack", 1, true) then return true end
+        if childName == "fruit" or string.find(childName, "fruit", 1, true) or string.find(childName, "effect", 1, true) or string.find(childName, "skill", 1, true) or string.find(childName, "attack", 1, true) or string.find(childName, "vfx", 1, true) then
+            if hasVisualContent(instance) then return true end
+        end
     end
     return false
 end
@@ -49,7 +55,6 @@ function Feature.new(context)
         Records = {},
         Options = {},
         Connections = {},
-        PlayerConnections = {},
         Thread = nil,
         RefreshCallback = nil,
         NextId = 0,
@@ -62,17 +67,17 @@ function Feature:SetRefreshCallback(callback)
     if self.RefreshCallback then self.RefreshCallback(self:GetOptions()) end
 end
 
-function Feature:_add(instance, player, source)
+function Feature:_add(instance, player, source, kind)
     if self.Options[instance] then return end
-    if not instance.Archivable then return end
+    if instance.Archivable == false then return end
     self.NextId += 1
     local record = {
         Id = tostring(self.NextId),
         Instance = instance,
-        Model = instance,
         Player = player,
         Name = instance.Name,
         Source = source,
+        Kind = kind or instance.ClassName,
         Connections = {}
     }
     self.Options[instance] = record
@@ -94,13 +99,13 @@ function Feature:_scanContainer(container, player, source)
     if not container then return end
     for _, instance in ipairs(container:GetChildren()) do
         if instance:IsA("Tool") and fruitName(instance.Name) then
-            self:_add(instance, player, source)
-        elseif instance:IsA("Model") and looksLikeVisual(instance) then
-            self:_add(instance, player, source)
+            self:_add(instance, player, source, "FruitTool")
+        elseif looksLikeVisual(instance) then
+            self:_add(instance, player, source, instance.ClassName)
         end
         for _, descendant in ipairs(instance:GetDescendants()) do
-            if descendant:IsA("Model") and looksLikeVisual(descendant) then
-                self:_add(descendant, player, source)
+            if looksLikeVisual(descendant) then
+                self:_add(descendant, player, source, descendant.ClassName)
             end
         end
     end
@@ -132,11 +137,14 @@ function Feature:GetOptions()
     local list = {}
     for _, record in pairs(self.Records) do
         if record.Instance and record.Instance.Parent then
+            local name = record.Name
+            local playerName = record.Player and record.Player.Name or "Unknown"
             list[#list + 1] = {
                 Id = record.Id,
-                Name = record.Name,
-                Player = record.Player and record.Player.Name or "Unknown",
-                Source = record.Source or "Unknown"
+                Name = name,
+                Player = playerName,
+                Source = record.Source or "Unknown",
+                Kind = record.Kind or "Unknown"
             }
         end
     end
@@ -150,15 +158,23 @@ function Feature:GetOptions()
     return list
 end
 
+local function cloneDestination(localPlayer, source)
+    if source == "PlayerGui" then
+        return localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:FindFirstChild("PlayerGui") or localPlayer.Character
+    end
+    return localPlayer.Character
+end
+
 function Feature:CloneOption(id)
     local record = self.Records[tostring(id)]
-    local character = self.LocalPlayer.Character
-    if self.State.Destroyed or not record or not record.Instance or not record.Instance.Parent or not character then return false end
+    if self.State.Destroyed or not record or not record.Instance or not record.Instance.Parent then return false end
     if record.Instance.Archivable == false then return false end
+    local destination = cloneDestination(self.LocalPlayer, record.Source)
+    if not destination then return false end
     local ok, clone = pcall(record.Instance.Clone, record.Instance)
     if not ok or not clone then return false end
     clone.Name = "DepHubVisualClone_" .. tostring(record.Name)
-    clone.Parent = character
+    clone.Parent = destination
     self.LocalClones[clone] = true
     return true
 end
@@ -199,28 +215,20 @@ end
 function Feature:Enable()
     if self.Enabled or self.State.Destroyed then return true end
     self.Enabled = true
-
     self.Context.Connect(self.Connections, Players.PlayerAdded, function(player)
-        if self.Enabled then
-            task.defer(function()
-                self:_scanPlayer(player, {})
-                self:_scan()
-            end)
-        end
+        if self.Enabled then task.defer(function() self:_scan() end) end
     end)
     self.Context.Connect(self.Connections, Players.PlayerRemoving, function(player)
         for instance, record in pairs(self.Options) do
             if record.Player == player then self:_remove(instance) end
         end
     end)
-
     self.Thread = task.spawn(function()
         while self.Enabled and not self.State.Destroyed do
             self:_scan()
-            task.wait(0.75)
+            task.wait(0.5)
         end
     end)
-
     self:_scan()
     return true
 end
@@ -229,7 +237,6 @@ function Feature:Disable()
     if not self.Enabled then return true end
     self.Enabled = false
     self.Context.DisconnectAll(self.Connections)
-    self.Context.DisconnectAll(self.PlayerConnections)
     if self.Thread then pcall(task.cancel, self.Thread); self.Thread = nil end
     for instance in pairs(self.Options) do self:_remove(instance) end
     return true
