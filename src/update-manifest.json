@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-16T16:50:35.742106+00:00",
-  "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
+  "generatedAt": "2026-08-16T16:58:29.561657+00:00",
+  "commit": "7b3c335d62aa147d5066bf4ed93b5cd59a63d2d7",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "6983a4948028c88174c52cee1fb6cead34df43cc24fc0a96ed143ac11dd3748b",
-      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
+      "version": "5b18cc6f3d424672141d3dd388512dde2d667ea1155e66c00f28e617e1588cf1",
+      "commit": "7b3c335d62aa147d5066bf4ed93b5cd59a63d2d7",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -23,36 +23,9 @@
       ]
     },
     "994732206": {
-      "name": "Blox Fruits",
-      "version": "04a6abbfb40e198c39856655d8fdb7b791aaa1200c73760468fc055db8b49f6d",
-      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
-      "files": [
-        "DepHub.lua",
-        "src/games/bloxfruits.lua"
-      ]
-    },
-    "2753915549": {
-      "name": "Blox Fruits",
-      "version": "04a6abbfb40e198c39856655d8fdb7b791aaa1200c73760468fc055db8b49f6d",
-      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
-      "files": [
-        "DepHub.lua",
-        "src/games/bloxfruits.lua"
-      ]
-    },
-    "4442272183": {
-      "name": "Blox Fruits Second Sea",
-      "version": "04a6abbfb40e198c39856655d8fdb7b791aaa1200c73760468fc055db8b49f6d",
-      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
-      "files": [
-        "DepHub.lua",
-        "src/games/bloxfruits.lua"
-      ]
-    },
-    "7449423635": {
-      "name": "Blox Fruits Third Sea",
-      "version": "04a6abbfb40e198c39856655d8fdb7b791aaa1200c73760468fc055db8b49f6d",
-      "commit": "d4326cf139f26cd72bb59ac403a441d814ab7907",
+      "name": "Blox Fruits Sea 2",
+      "version": "53b60e779da774fec0747e50f988ca38ef1db9c345e26ffd80591f3ef0aa7a2d",
+      "commit": "7b3c335d62aa147d5066bf4ed93b5cd59a63d2d7",
       "files": [
         "DepHub.lua",
         "src/games/bloxfruits.lua"
@@ -60,6 +33,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "7122656",
+      "Date": "2026-08-16T13:58:15-03:00",
+      "Changes": [
+        "perf: optimize loader startup and fix loading completion"
+      ]
+    },
     {
       "Version": "ed52bb5",
       "Date": "2026-08-16T13:50:23-03:00",
@@ -86,13 +66,6 @@
       "Date": "2026-08-15T00:08:10-03:00",
       "Changes": [
         "fix: preserve FPS card during changelog refresh"
-      ]
-    },
-    {
-      "Version": "439df5b",
-      "Date": "2026-08-15T00:07:28-03:00",
-      "Changes": [
-        "feat: finalize dashboard metrics and reuse early loading screen"
       ]
     }
   ]
