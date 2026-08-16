@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-16T17:19:17.502241+00:00",
-  "commit": "d22ac2864bbf499bd721874d636b82f9015d75cb",
+  "generatedAt": "2026-08-16T17:46:38.567570+00:00",
+  "commit": "b328690de84b57d787e11e59c0d1d55571559622",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "8d159c292dffd97984d150f00bd186c8fd7f9d18b94c0ac52ba35342b0a37390",
-      "commit": "d22ac2864bbf499bd721874d636b82f9015d75cb",
+      "commit": "b328690de84b57d787e11e59c0d1d55571559622",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,8 +24,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "c021bdc9aea5da36477c82e1c680ba2bacae85c2e898f80655b9915b73f0e6b7",
-      "commit": "d22ac2864bbf499bd721874d636b82f9015d75cb",
+      "version": "26bd4bcb053c7478a4b3aeed7d450e9fb80238f92067b55c25ad393749ba5201",
+      "commit": "b328690de84b57d787e11e59c0d1d55571559622",
       "files": [
         "DepHub.lua",
         "src/games/bloxfruits.lua"
@@ -33,6 +33,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "b328690",
+      "Date": "2026-08-16T14:46:31-03:00",
+      "Changes": [
+        "feat: improve Blox Fruits player and dropped fruit ESP"
+      ]
+    },
     {
       "Version": "d22ac28",
       "Date": "2026-08-16T14:19:09-03:00",
@@ -59,13 +66,6 @@
       "Date": "2026-08-16T14:17:26-03:00",
       "Changes": [
         "fix: use universe id for manifest and silence updater logs"
-      ]
-    },
-    {
-      "Version": "84ce630",
-      "Date": "2026-08-16T14:17:11-03:00",
-      "Changes": [
-        "refactor: harden loader lifecycle and universal startup gate"
       ]
     }
   ]
