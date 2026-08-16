@@ -4,7 +4,7 @@ Feature.__index = Feature
 local function clamp(value)
     value = tonumber(value) or 1
     if value < 1 then return 1 end
-    if value > 500 then return 500 end
+    if value > 100 then return 100 end
     return math.floor(value + 0.5)
 end
 
