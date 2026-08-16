@@ -3,6 +3,7 @@
     "name": "Restaurant Tycoon 3",
     "files": [
       "DepHub.lua",
+      "src/version.txt",
       "src/core/anti-afk.lua",
       "src/core/dashboard.lua",
       "src/core/health-monitor.lua",
@@ -13,15 +14,23 @@
       "src/games/features/autofarm.lua",
       "src/games/features/instant-cook.lua",
       "src/games/features/drops.lua",
-      "src/games/features/autofarm-friends.lua"
+      "src/games/features/autofarm-friends.lua",
+      "src/ui/init.lua",
+      "src/ui/utils.lua",
+      "src/ui/responsive.lua",
+      "src/ui/watchdog.lua",
+      "src/ui/components.lua",
+      "src/ui/window.lua",
+      "src/ui/controller.lua",
+      "src/ui/loading.lua"
     ]
   },
   "994732206": {
     "name": "Blox Fruits Sea 2",
     "files": [
       "DepHub.lua",
+      "src/version.txt",
       "src/games/bloxfruits.lua",
-      "src/ui/bloxfruits.lua",
       "src/games/features/bloxfruits/playeresp.lua",
       "src/games/features/bloxfruits/fruit.lua",
       "src/games/features/bloxfruits/observation.lua",
@@ -32,15 +41,22 @@
       "src/games/features/bloxfruits/waterwalking.lua",
       "src/games/features/bloxfruits/config.lua",
       "src/games/features/bloxfruits/team.lua",
-      "src/games/features/bloxfruits/visualcloner.lua"
+      "src/ui/init.lua",
+      "src/ui/utils.lua",
+      "src/ui/responsive.lua",
+      "src/ui/watchdog.lua",
+      "src/ui/components.lua",
+      "src/ui/window.lua",
+      "src/ui/controller.lua",
+      "src/ui/loading.lua"
     ]
   },
   "85211729168715": {
     "name": "Blox Fruits Sea 1",
     "files": [
       "DepHub.lua",
+      "src/version.txt",
       "src/games/bloxfruits.lua",
-      "src/ui/bloxfruits.lua",
       "src/games/features/bloxfruits/playeresp.lua",
       "src/games/features/bloxfruits/fruit.lua",
       "src/games/features/bloxfruits/observation.lua",
@@ -51,7 +67,14 @@
       "src/games/features/bloxfruits/waterwalking.lua",
       "src/games/features/bloxfruits/config.lua",
       "src/games/features/bloxfruits/team.lua",
-      "src/games/features/bloxfruits/visualcloner.lua"
+      "src/ui/init.lua",
+      "src/ui/utils.lua",
+      "src/ui/responsive.lua",
+      "src/ui/watchdog.lua",
+      "src/ui/components.lua",
+      "src/ui/window.lua",
+      "src/ui/controller.lua",
+      "src/ui/loading.lua"
     ]
   }
 }
