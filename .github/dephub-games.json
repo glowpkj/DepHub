@@ -20,7 +20,12 @@
     "name": "Blox Fruits Sea 2",
     "files": [
       "DepHub.lua",
-      "src/games/bloxfruits.lua"
+      "src/games/bloxfruits.lua",
+      "src/games/features/bloxfruits/playeresp.lua",
+      "src/games/features/bloxfruits/fruit.lua",
+      "src/games/features/bloxfruits/observation.lua",
+      "src/games/features/bloxfruits/unbreakable.lua",
+      "src/games/features/bloxfruits/camerashake.lua"
     ]
   }
 }
