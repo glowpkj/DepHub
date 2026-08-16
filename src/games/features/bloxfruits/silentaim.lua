@@ -21,6 +21,7 @@ function Feature.new(context)
         Destroyed = false,
         Connections = {},
         CharacterConnections = {},
+        ToolConnection = nil,
         ActiveTool = nil,
         MousePos = nil,
         Target = nil,
@@ -37,6 +38,12 @@ function Feature:_disconnect(list)
         list[index] = nil
         if connection then pcall(connection.Disconnect, connection) end
     end
+end
+
+function Feature:_disconnectToolRoutine()
+    local connection = self.ToolConnection
+    self.ToolConnection = nil
+    if connection then pcall(connection.Disconnect, connection) end
 end
 
 function Feature:_getCharacter(player)
@@ -112,6 +119,7 @@ function Feature:_selectTarget()
 end
 
 function Feature:_clearTool()
+    self:_disconnectToolRoutine()
     self.ActiveTool = nil
     self.MousePos = nil
 end
@@ -123,6 +131,10 @@ function Feature:_bindTool(tool)
     self:_clearTool()
     self.ActiveTool = tool
     self.MousePos = mousePos
+    self.TargetRefresh = 0
+    self.ToolConnection = RunService.PreSimulation:Connect(function()
+        self:_preSimulation()
+    end)
 end
 
 function Feature:_scanCharacter(character)
@@ -183,7 +195,10 @@ end
 function Feature:_preSimulation()
     if not self.Enabled or self.Destroyed then return end
     local mousePos = self.MousePos
-    if not mousePos or not mousePos.Parent or not self.ActiveTool or self.ActiveTool.Parent == nil then return end
+    if not mousePos or not mousePos.Parent or not self.ActiveTool or self.ActiveTool.Parent == nil then
+        self:_clearTool()
+        return
+    end
     if os.clock() - self.TargetRefresh >= 0.05 then self:_refreshTarget() end
     local position = self.TargetPosition
     if position then pcall(function() mousePos.Value = position end) end
@@ -192,17 +207,12 @@ end
 function Feature:Enable()
     if self.Destroyed or self.Enabled then return true end
     self.Enabled = true
-
-    self.Connections[#self.Connections + 1] = RunService.PreSimulation:Connect(function()
-        self:_preSimulation()
-    end)
     self.Connections[#self.Connections + 1] = Workspace.ChildAdded:Connect(function(child)
         self:_onCharactersAdded(child)
     end)
     self.Connections[#self.Connections + 1] = Workspace.ChildRemoved:Connect(function(child)
         self:_onCharactersRemoved(child)
     end)
-
     self:_bindCharacters(Workspace:FindFirstChild("Characters"))
     self:_refreshTarget()
     return true
