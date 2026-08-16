@@ -107,11 +107,6 @@ Library.new = function(...)
         end
         if window.ToggleButton then
             window.ToggleButton.Position = UDim2_new(0, 50, 0, 50)
-            window.ToggleButton.MouseButton1Click:Connect(function()
-                if window.Destroyed or not window.Window then return end
-                window.Window.Visible = not window.Window.Visible
-                window.IsHidden = not window.Window.Visible
-            end)
         end
     end
     return window
