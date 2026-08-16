@@ -1,380 +1,318 @@
 local game = game
 local task = task
-local tostring = tostring
 local type = type
+local tostring = tostring
 local pcall = pcall
-local warn = warn
 local print = print
-local os_clock = os.clock
 
 local GetService = game.GetService
 local Players = GetService(game, "Players")
-local localPlayer = Players.LocalPlayer
-
-local getgenvFn = type(getgenv) == "function" and getgenv or nil
-local env = getgenvFn and getgenvFn() or _G
+local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local env = type(getgenv) == "function" and getgenv() or _G
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local SOURCE_CACHE = env.__DEPHUB_SOURCE_CACHE or {}
-env.__DEPHUB_SOURCE_CACHE = SOURCE_CACHE
+local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
+local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
+local STATE_KEY = "__DEPHUB_LOADER_STATE"
 
-local function log(message)
+local function allowedLog(message)
     pcall(print, "[DEPHUB] " .. tostring(message))
 end
 
-local function logWarn(message)
-    pcall(warn, "[DEPHUB] " .. tostring(message))
-end
-
 local function detectExecutor()
-    local ok, name, version = pcall(function()
+    local ok, name = pcall(function()
         if type(identifyexecutor) == "function" then
-            local executorName, executorVersion = identifyexecutor()
-            return executorName, executorVersion
+            return identifyexecutor()
         end
         if type(getexecutorname) == "function" then
-            return getexecutorname(), nil
+            return getexecutorname()
         end
-        return nil, nil
+        return "Desconhecido"
     end)
-    if ok and name then
-        return tostring(name), version and tostring(version) or nil
-    end
-    return "Desconhecido", nil
+    return ok and tostring(name) or "Desconhecido"
 end
 
-local function capability(name, value)
-    return name .. ": " .. (type(value) == "function" and "OK" or "N/A")
+local function cleanupRuntime()
+    local state = env.__DEPHUB
+    if type(state) ~= "table" then
+        return
+    end
+
+    local targets = {
+        state.BloxFruitsUI,
+        state.BloxFruits,
+        state.Updater,
+        state.Runtime,
+        state.Window
+    }
+
+    for _, target in ipairs(targets) do
+        if type(target) == "table" and type(target.Destroy) == "function" then
+            pcall(target.Destroy, target)
+        end
+    end
+
+    state.BloxFruitsUI = nil
+    state.BloxFruits = nil
+    state.Updater = nil
+    state.Runtime = nil
+    state.Window = nil
+end
+
+local previousState = env[STATE_KEY]
+if env[EXECUTED_KEY] and type(previousState) == "table" and previousState.status == "success" then
+    allowedLog("Loader ja foi executado com sucesso nesta sessao.")
+    return
+end
+
+cleanupRuntime()
+env[EXECUTED_KEY] = false
+env[STATE_KEY] = {
+    status = "running",
+    startedAt = os.clock()
+}
+
+env.__DEPHUB = env.__DEPHUB or {}
+env.__DEPHUB.Executor = detectExecutor()
+env.__DEPHUB.Loader = env.__DEPHUB.Loader or {}
+env.__DEPHUB.Loader.State = env[STATE_KEY]
+
+env.__DEPHUB.Loader.MarkFailed = function(reason)
+    local state = env[STATE_KEY]
+    if type(state) == "table" then
+        state.status = "failed"
+        state.error = tostring(reason or "Falha desconhecida")
+        state.finishedAt = os.clock()
+    end
+    env[EXECUTED_KEY] = false
+end
+
+local function fail(reason, loading)
+    if loading then
+        pcall(loading.Destroy, loading)
+    end
+    env.__DEPHUB_LOADING_INSTANCE = nil
+    cleanupRuntime()
+    env.__DEPHUB.Loader.MarkFailed(reason)
+    return false
 end
 
 local function httpGet(path)
-    local url = BASE_URL .. path
+    local cache = env[CACHE_KEY]
+    if type(cache) ~= "table" then
+        cache = {}
+        env[CACHE_KEY] = cache
+    end
+
+    local cached = cache[path]
+    if type(cached) == "string" and #cached > 0 then
+        return true, cached
+    end
+
     local ok, result = pcall(function()
-        return game:HttpGet(url)
+        return game:HttpGet(BASE_URL .. path)
     end)
-    if ok and type(result) == "string" and #result > 0 then
-        return true, result, url
+
+    if not ok or type(result) ~= "string" or #result == 0 then
+        return false, ok and "Resposta HTTP vazia" or tostring(result)
     end
-    if not ok then
-        return false, tostring(result), url
-    end
-    return false, "Resposta HTTP vazia", url
+
+    cache[path] = result
+    return true, result
 end
 
-local function compile(source, sourceName)
+local function compile(source)
     if type(loadstring) ~= "function" then
-        logWarn("loadstring indisponivel para " .. sourceName)
-        return false
+        return false, "loadstring indisponivel"
     end
 
-    local okCompile, chunk, compileError = pcall(loadstring, source)
-    if not okCompile then
-        logWarn("Falha interna ao compilar " .. sourceName .. ": " .. tostring(chunk))
-        return false
+    local ok, chunk, compileError = pcall(loadstring, source)
+    if not ok or type(chunk) ~= "function" then
+        return false, tostring(compileError or chunk)
     end
-    if type(chunk) ~= "function" then
-        logWarn("Falha de compilacao em " .. sourceName .. ": " .. tostring(compileError))
-        return false
-    end
+
     return true, chunk
 end
 
 local function loadModule(path)
-    local cached = SOURCE_CACHE[path]
-    local source
-    local url = BASE_URL .. path
-
-    if type(cached) == "string" and #cached > 0 then
-        source = cached
-    else
-        local okHttp, downloaded, downloadedUrl = httpGet(path)
-        if not okHttp then
-            logWarn("Falha no download de " .. path .. ": " .. tostring(downloaded))
-            return nil
-        end
-        source = downloaded
-        url = downloadedUrl
-        SOURCE_CACHE[path] = source
+    local okSource, source = httpGet(path)
+    if not okSource then
+        return false, source
     end
 
-    local okCompile, chunk = compile(source, url)
+    local okCompile, chunk = compile(source)
     if not okCompile then
-        SOURCE_CACHE[path] = nil
-        return nil
+        return false, chunk
     end
 
     local okRun, result = pcall(chunk)
     if not okRun then
-        logWarn("Erro executando " .. path .. ": " .. tostring(result))
-        return nil
+        return false, tostring(result)
     end
 
-    return result
+    return true, result
 end
 
-local function beginPrefetch(path)
-    local state = {
-        done = false,
-        ok = false,
-        source = nil,
-        url = BASE_URL .. path,
-        error = nil
-    }
-
-    local cached = SOURCE_CACHE[path]
-    if type(cached) == "string" and #cached > 0 then
-        state.done = true
-        state.ok = true
-        state.source = cached
-        return state
+local function waitForGameReady()
+    if not game:IsLoaded() then
+        game.Loaded:Wait()
     end
 
-    task.spawn(function()
-        local ok, source, url = httpGet(path)
-        state.ok = ok
-        state.source = ok and source or nil
-        state.url = url
-        state.error = ok and nil or source
-        if ok then
-            SOURCE_CACHE[path] = source
+    local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui")
+    if not playerGui then
+        playerGui = localPlayer:WaitForChild("PlayerGui", 30)
+    end
+
+    if not playerGui then
+        return false
+    end
+
+    task.wait()
+    task.wait()
+    return true
+end
+
+local loading
+
+do
+    local ok, Loading = loadModule("src/ui/loading.lua")
+    if ok and type(Loading) == "table" and type(Loading.new) == "function" then
+        env.__DEPHUB_UI_LOADING = Loading
+        local okLoading, instance = pcall(function()
+            return Loading.new({
+                Title = "DEPHUB",
+                Status = "Aguardando jogo carregar...",
+                LogoId = "rbxassetid://79507712997362",
+                DisplayOrder = 10000,
+                OpenDuration = 0.2
+            })
+        end)
+        if okLoading and instance then
+            loading = instance
+            env.__DEPHUB_LOADING_INSTANCE = instance
+            pcall(instance.SetProgress, instance, 0.08, "Aguardando jogo carregar...")
         end
-        state.done = true
-    end)
-
-    return state
+    end
 end
 
-local executorName, executorVersion = detectExecutor()
+if not waitForGameReady() then
+    return fail("Jogo nao inicializou completamente", loading)
+end
+
 local gameId = tostring(game.GameId)
 local placeId = tostring(game.PlaceId)
 
-log("Loader iniciado")
-log("Executor: " .. executorName .. (executorVersion and " " .. executorVersion or ""))
-log("PlaceId: " .. placeId)
-log("GameId: " .. gameId)
-log(capability("loadstring", loadstring))
-log(capability("getgenv", getgenvFn))
+allowedLog("Executor: " .. tostring(env.__DEPHUB.Executor))
+allowedLog("PlaceId: " .. placeId)
+allowedLog("GameId: " .. gameId)
 
-local previousState = env.__DEPHUB_LOADER_STATE
-if type(previousState) == "table" and previousState.status == "running" then
-    previousState.status = "failed"
-end
-
-if env.__DEPHUB_LOADER_EXECUTED and type(previousState) == "table" and previousState.status == "success" then
-    logWarn("Loader ja foi executado com sucesso nesta sessao.")
-    return
-end
-
-env.__DEPHUB_LOADER_EXECUTED = false
-env.__DEPHUB_LOADER_STATE = {
-    status = "running",
-    executor = executorName,
-    version = executorVersion,
-    startedAt = os_clock()
+local targets = {
+    ["994732206"] = {
+        Core = "src/games/bloxfruits.lua",
+        UI = "src/ui/bloxfruits.lua"
+    },
+    ["119048529960596"] = {
+        Core = "src/games/rt3.lua",
+        UI = "src/ui/init.lua"
+    }
 }
 
-env.__DEPHUB = env.__DEPHUB or {}
-env.__DEPHUB.Executor = executorName
-env.__DEPHUB.ExecutorVersion = executorVersion
-env.__DEPHUB.Capabilities = {
-    loadstring = type(loadstring) == "function",
-    getgenv = getgenvFn ~= nil,
-    request = type(request) == "function",
-    http_request = type(http_request) == "function",
-    identifyexecutor = type(identifyexecutor) == "function"
-}
+local target = targets[gameId]
+if not target then
+    return fail("Jogo nao suportado", loading)
+end
 
-env.__DEPHUB.Loader = env.__DEPHUB.Loader or {}
-env.__DEPHUB.Loader.State = env.__DEPHUB_LOADER_STATE
+if loading then
+    pcall(loading.SetProgress, loading, 0.22, "Jogo carregado. Preparando modulo...")
+end
 
-env.__DEPHUB.Loader.MarkFailed = function(reason)
-    local state = env.__DEPHUB_LOADER_STATE
-    if type(state) == "table" then
-        state.status = "failed"
-        state.error = tostring(reason or "Falha desconhecida")
-        env.__DEPHUB_LOADER_EXECUTED = false
+local okCoreSource, coreSource = httpGet(target.Core)
+if not okCoreSource then
+    return fail(coreSource, loading)
+end
+
+local okUISource, uiSource = httpGet(target.UI)
+if not okUISource then
+    return fail(uiSource, loading)
+end
+
+if loading then
+    pcall(loading.SetProgress, loading, 0.42, "Inicializando modulo do jogo...")
+end
+
+local okCoreCompile, coreChunk = compile(coreSource)
+if not okCoreCompile then
+    return fail(coreChunk, loading)
+end
+
+local okCoreRun, coreResult = pcall(coreChunk)
+if not okCoreRun or type(coreResult) ~= "table" then
+    return fail(coreResult, loading)
+end
+
+if gameId == "994732206" then
+    env.__DEPHUB.BloxFruits = coreResult
+
+    if loading then
+        pcall(loading.SetProgress, loading, 0.66, "Inicializando interface...")
     end
+
+    local okUICompile, uiChunk = compile(uiSource)
+    if not okUICompile then
+        return fail(uiChunk, loading)
+    end
+
+    local okUIRun, UI = pcall(uiChunk)
+    if not okUIRun or type(UI) ~= "table" or type(UI.new) ~= "function" then
+        return fail(UI, loading)
+    end
+
+    local okUICreate, uiInstance = pcall(UI.new, coreResult)
+    if not okUICreate or type(uiInstance) ~= "table" then
+        return fail(uiInstance, loading)
+    end
+
+    env.__DEPHUB.BloxFruitsUI = uiInstance
+else
+    env.__DEPHUB.Runtime = coreResult
 end
 
-local GAME_SCRIPTS = {
-    ["119048529960596"] = "src/games/rt3.lua",
-    ["994732206"] = "src/games/bloxfruits.lua"
-}
+if loading then
+    pcall(loading.SetProgress, loading, 0.92, "Finalizando inicializacao...")
+end
 
-local path = GAME_SCRIPTS[gameId]
-local prefetch = path and beginPrefetch(path) or nil
+env[EXECUTED_KEY] = true
+env[STATE_KEY].status = "success"
+env[STATE_KEY].finishedAt = os.clock()
 
-local Loading = loadModule("src/ui/loading.lua")
-if type(Loading) == "table" and type(Loading.new) == "function" then
-    env.__DEPHUB_UI_LOADING = Loading
-    local okLoading, loadingInstance = pcall(function()
-        return Loading.new({
-            Title = "DEPHUB",
-            Status = "Preparando inicialização...",
-            LogoId = "rbxassetid://79507712997362",
-            DisplayOrder = 10000
-        })
+if loading then
+    task.spawn(function()
+        pcall(loading.Complete, loading, "Inicializacao concluida")
+        env.__DEPHUB_LOADING_INSTANCE = nil
     end)
-    if okLoading and loadingInstance then
-        env.__DEPHUB_LOADING_INSTANCE = loadingInstance
-        pcall(loadingInstance.SetProgress, loadingInstance, 0.06, "Carregando núcleo...")
-    end
 end
 
-local function finishLoading(message)
-    local loading = env.__DEPHUB_LOADING_INSTANCE
-    if not loading then
+allowedLog("DepHub carregado com sucesso")
+
+task.defer(function()
+    local ok, updaterModule = loadModule("src/core/updater.lua")
+    if not ok or type(updaterModule) ~= "table" or type(updaterModule.new) ~= "function" then
         return
     end
 
-    local completed = false
-    pcall(function()
-        if type(loading.Complete) == "function" then
-            loading:Complete(message or "Inicialização concluída")
-            completed = true
-        end
+    local okNew, updater = pcall(function()
+        return updaterModule.new({
+            PlaceId = game.PlaceId,
+            GameId = game.GameId,
+            PollInterval = 15,
+            Countdown = 12,
+            Mode = "serverhop"
+        })
     end)
 
-    if not completed then
-        pcall(loading.Destroy, loading)
+    if okNew and updater then
+        env.__DEPHUB.Updater = updater
+        pcall(updater.Start, updater)
     end
+end)
 
-    env.__DEPHUB_LOADING_INSTANCE = nil
-end
-
-local function abortLoading()
-    local loading = env.__DEPHUB_LOADING_INSTANCE
-    if loading then
-        pcall(loading.Destroy, loading)
-    end
-    env.__DEPHUB_LOADING_INSTANCE = nil
-end
-
-local function executePayload()
-    if not path then
-        logWarn("Nenhum script especifico encontrado para este jogo.")
-        abortLoading()
-        return false
-    end
-
-    local loading = env.__DEPHUB_LOADING_INSTANCE
-    if loading then
-        pcall(loading.SetProgress, loading, 0.15, "Carregando script do jogo...")
-    end
-
-    local source
-    local url = BASE_URL .. path
-
-    if prefetch then
-        while not prefetch.done do
-            task.wait()
-        end
-
-        if not prefetch.ok then
-            logWarn("Falha no download: " .. tostring(prefetch.error))
-            abortLoading()
-            return false
-        end
-
-        source = prefetch.source
-        url = prefetch.url
-    else
-        local okHttp, downloaded, downloadedUrl = httpGet(path)
-        if not okHttp then
-            logWarn("Falha no download: " .. tostring(downloaded))
-            abortLoading()
-            return false
-        end
-        source = downloaded
-        url = downloadedUrl
-        SOURCE_CACHE[path] = source
-    end
-
-    if type(source) ~= "string" or #source == 0 then
-        abortLoading()
-        return false
-    end
-
-    log("Script selecionado: " .. url)
-    log("Download concluido: " .. tostring(#source) .. " bytes")
-
-    if loading then
-        pcall(loading.SetProgress, loading, 0.28, "Compilando núcleo...")
-    end
-
-    local okCompile, chunk = compile(source, url)
-    if not okCompile then
-        abortLoading()
-        return false
-    end
-
-    if loading then
-        pcall(loading.SetProgress, loading, 0.55, "Inicializando módulos...")
-    end
-
-    local okRun, result = pcall(chunk)
-    if not okRun then
-        logWarn("Erro executando payload: " .. tostring(result))
-        abortLoading()
-        return false
-    end
-
-    if result ~= true and not (path == "src/games/bloxfruits.lua" and type(result) == "table") then
-        logWarn("Payload nao confirmou inicializacao completa.")
-        abortLoading()
-        return false
-    end
-
-    if path == "src/games/bloxfruits.lua" then
-        env.__DEPHUB.BloxFruits = result
-    end
-
-    log("Execucao concluida: " .. url)
-    return true
-end
-
-local function startUpdater()
-    local updater = loadModule("src/core/updater.lua")
-    if type(updater) ~= "table" or type(updater.new) ~= "function" then
-        logWarn("Updater indisponivel.")
-        return false
-    end
-
-    local instance = updater.new({
-        PlaceId = game.PlaceId,
-        PollInterval = 15,
-        Countdown = 12,
-        Mode = "serverhop"
-    })
-
-    env.__DEPHUB.Updater = instance
-    instance:Start()
-    log("Monitor de atualizacao iniciado: 15s")
-    return true
-end
-
-if not localPlayer then
-    env.__DEPHUB.Loader.MarkFailed("LocalPlayer indisponivel")
-    logWarn("LocalPlayer indisponivel. Abortando carregamento.")
-    abortLoading()
-    return
-end
-
-local ok, result = pcall(executePayload)
-if not ok then
-    env.__DEPHUB.Loader.MarkFailed(result)
-    logWarn("Falha inesperada no loader: " .. tostring(result))
-    abortLoading()
-elseif result then
-    env.__DEPHUB_LOADER_EXECUTED = true
-    env.__DEPHUB_LOADER_STATE.status = "success"
-    env.__DEPHUB_LOADER_STATE.finishedAt = os_clock()
-    finishLoading(gameId == "994732206" and "Blox Fruits carregado" or "Inicialização concluída")
-    log("========================================")
-    log("DepHub carregado com sucesso")
-    log("========================================")
-    task.defer(startUpdater)
-else
-    env.__DEPHUB.Loader.MarkFailed("Payload nao inicializou corretamente")
-    logWarn("DepHub nao foi carregado. Uma nova tentativa sera permitida.")
-    abortLoading()
-end
+return true
