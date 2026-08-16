@@ -192,7 +192,7 @@ end
 function State:SetDashLength(value)
     if self.Destroyed or not self.Features or not self.Features.DashCustomizer then return false end
     local ok = self.Features.DashCustomizer:SetValue(value)
-    if ok then self.Values.DashLength = self.Features.DashCustomizer:GetValue(); self.Config:Set("DashLength", self.Values.DashLength) end
+    if ok then self.Values.DashLength = self.Features.DashCustomizer:GetValue() end
     return ok
 end
 function State:GetDashLength() return self.Values.DashLength end
@@ -223,10 +223,59 @@ function State:SetToggle(name, enabled)
 end
 function State:GetToggle(name) return self.Toggles[name] == true end
 function State:GetPaths() return self.Paths end
+function State:CreateUI()
+    if self.Destroyed then return false end
+    local okLibrary, Library = loadModule("src/ui/init.lua")
+    if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then return false end
+    local okWindow, Window = pcall(Library.new, "DepHub", "Blox Fruits", "rbxassetid://79507712997362")
+    if not okWindow or type(Window) ~= "table" then return false end
+    self.UI = Window
+    env.__DEPHUB.Window = Window
+
+    local okTab, MainTab = pcall(Window.CreateTab, Window, "Blox Fruits", nil, "Recursos, movimentação e automações do jogo.")
+    if not okTab or type(MainTab) ~= "table" then
+        pcall(Window.Destroy, Window)
+        self.UI = nil
+        env.__DEPHUB.Window = nil
+        return false
+    end
+
+    local function addToggle(title, description, name)
+        local ok = pcall(MainTab.CreateToggle, MainTab, title, description, self:GetToggle(name), function(enabled)
+            local success = self:SetToggle(name, enabled)
+            if not success then return end
+        end)
+        return ok
+    end
+
+    addToggle("Player ESP", "Exibe informações dos jogadores próximos.", "PlayerESP")
+    addToggle("Fruit ESP", "Exibe frutas detectadas no mapa.", "FruitESP")
+    addToggle("Unbreakable All", "Aplica o comportamento de durabilidade disponível.", "UnbreakableAll")
+    MainTab:CreateSlider("Dash Length", "Define o comprimento do dash.", 1, 100, self.Values.DashLength, function(value)
+        self:SetDashLength(value)
+    end)
+    addToggle("Dash Customizer", "Ativa o controle personalizado do dash.", "DashCustomizer")
+    addToggle("Flashstep No Cooldown", "Remove o cooldown do Flashstep quando suportado.", "FlashstepNoCooldown")
+    addToggle("Water Walking", "Ativa a caminhada sobre a água.", "WaterWalking")
+    addToggle("Auto Join Team", "Entra automaticamente no time selecionado.", "AutoJoinTeam")
+
+    MainTab:CreateDivider("PREFERRED TEAM")
+    MainTab:CreateButton("Pirates", function()
+        self:SetPreferredTeam("Pirates")
+    end)
+    MainTab:CreateButton("Marines", function()
+        self:SetPreferredTeam("Marines")
+    end)
+
+    return true
+end
 function State:Destroy()
     if self.Destroyed then return end
     self:SaveConfig()
     self.Destroyed = true
+    if self.UI then pcall(self.UI.Destroy, self.UI) end
+    self.UI = nil
+    if env.__DEPHUB and env.__DEPHUB.Window then env.__DEPHUB.Window = nil end
     for name in pairs(self.Toggles) do self.Toggles[name] = false end
     for _, feature in pairs(self.Features or {}) do pcall(feature.Destroy, feature) end
     pcall(config.Destroy, config)
@@ -250,4 +299,6 @@ end
 if not LocalPlayer then return false end
 local ok, started = pcall(State.Start, State)
 if not ok or not started then pcall(State.Destroy, State); return false end
+local okUI, uiCreated = pcall(State.CreateUI, State)
+if not okUI or not uiCreated then pcall(State.Destroy, State); return false end
 return State
