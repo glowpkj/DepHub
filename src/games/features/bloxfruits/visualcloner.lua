@@ -68,8 +68,11 @@ function Feature:SetRefreshCallback(callback)
 end
 
 function Feature:_add(instance, player, source, kind)
-    if self.Options[instance] then return end
-    if instance.Archivable == false then return end
+    if not instance then return end
+    if source == "PlayerGui" and instance:IsA("GuiObject") then
+        instance = instance:FindFirstAncestorOfClass("ScreenGui")
+    end
+    if not instance or self.Options[instance] or instance.Archivable == false then return end
     self.NextId += 1
     local record = {
         Id = tostring(self.NextId),
@@ -106,6 +109,13 @@ function Feature:_scanContainer(container, player, source)
         for _, descendant in ipairs(instance:GetDescendants()) do
             if looksLikeVisual(descendant) then
                 self:_add(descendant, player, source, descendant.ClassName)
+            elseif source == "PlayerGui" and descendant:IsA("GuiObject") then
+                local screenGui = descendant:FindFirstAncestorOfClass("ScreenGui")
+                local screenName = screenGui and lower(screenGui.Name) or ""
+                local descendantName = lower(descendant.Name)
+                if screenGui and (fruitName(descendant.Name) or string.find(descendantName, "fruit", 1, true) or string.find(descendantName, "effect", 1, true) or string.find(descendantName, "attack", 1, true) or string.find(descendantName, "skill", 1, true) or string.find(descendantName, "vfx", 1, true) or string.find(screenName, "fruit", 1, true) or string.find(screenName, "effect", 1, true) or string.find(screenName, "vfx", 1, true)) then
+                    self:_add(screenGui, player, source, "ScreenGui")
+                end
             end
         end
     end
@@ -137,12 +147,10 @@ function Feature:GetOptions()
     local list = {}
     for _, record in pairs(self.Records) do
         if record.Instance and record.Instance.Parent then
-            local name = record.Name
-            local playerName = record.Player and record.Player.Name or "Unknown"
             list[#list + 1] = {
                 Id = record.Id,
-                Name = name,
-                Player = playerName,
+                Name = record.Name,
+                Player = record.Player and record.Player.Name or "Unknown",
                 Source = record.Source or "Unknown",
                 Kind = record.Kind or "Unknown"
             }
@@ -158,9 +166,12 @@ function Feature:GetOptions()
     return list
 end
 
-local function cloneDestination(localPlayer, source)
-    if source == "PlayerGui" then
-        return localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:FindFirstChild("PlayerGui") or localPlayer.Character
+local function cloneDestination(localPlayer, record)
+    if record.Source == "PlayerGui" then
+        local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:FindFirstChild("PlayerGui")
+        if not playerGui then return nil end
+        if record.Instance:IsA("ScreenGui") then return playerGui end
+        return localPlayer.Character
     end
     return localPlayer.Character
 end
@@ -169,7 +180,7 @@ function Feature:CloneOption(id)
     local record = self.Records[tostring(id)]
     if self.State.Destroyed or not record or not record.Instance or not record.Instance.Parent then return false end
     if record.Instance.Archivable == false then return false end
-    local destination = cloneDestination(self.LocalPlayer, record.Source)
+    local destination = cloneDestination(self.LocalPlayer, record)
     if not destination then return false end
     local ok, clone = pcall(record.Instance.Clone, record.Instance)
     if not ok or not clone then return false end
@@ -215,7 +226,7 @@ end
 function Feature:Enable()
     if self.Enabled or self.State.Destroyed then return true end
     self.Enabled = true
-    self.Context.Connect(self.Connections, Players.PlayerAdded, function(player)
+    self.Context.Connect(self.Connections, Players.PlayerAdded, function()
         if self.Enabled then task.defer(function() self:_scan() end) end
     end)
     self.Context.Connect(self.Connections, Players.PlayerRemoving, function(player)
