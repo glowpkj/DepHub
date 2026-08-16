@@ -17,28 +17,7 @@
     ]
   },
   "994732206": {
-    "name": "Blox Fruits",
-    "files": [
-      "DepHub.lua",
-      "src/games/bloxfruits.lua"
-    ]
-  },
-  "2753915549": {
-    "name": "Blox Fruits",
-    "files": [
-      "DepHub.lua",
-      "src/games/bloxfruits.lua"
-    ]
-  },
-  "4442272183": {
-    "name": "Blox Fruits Second Sea",
-    "files": [
-      "DepHub.lua",
-      "src/games/bloxfruits.lua"
-    ]
-  },
-  "7449423635": {
-    "name": "Blox Fruits Third Sea",
+    "name": "Blox Fruits Sea 2",
     "files": [
       "DepHub.lua",
       "src/games/bloxfruits.lua"
