@@ -20,8 +20,8 @@ end
 function Feature:_apply(character)
     if not self.Enabled or not character or not character.Parent then return end
     pcall(function()
-        if character:GetAttribute("FlashstepCooldown") ~= 0 then
-            character:SetAttribute("FlashstepCooldown", 0)
+        if character:GetAttribute("FlashstepCooldown") ~= 1 then
+            character:SetAttribute("FlashstepCooldown", 1)
         end
     end)
 end
@@ -49,10 +49,16 @@ end
 function Feature:Disable()
     if not self.Enabled then return true end
     self.Enabled = false
+    local character = self.Character
     self:_disconnectCharacter()
     if self.RespawnConnection then
         pcall(self.RespawnConnection.Disconnect, self.RespawnConnection)
         self.RespawnConnection = nil
+    end
+    if character and character.Parent then
+        pcall(function()
+            character:SetAttribute("FlashstepCooldown", 0)
+        end)
     end
     return true
 end
