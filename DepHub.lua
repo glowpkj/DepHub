@@ -3,10 +3,10 @@ local task = task
 local type = type
 local tostring = tostring
 local pcall = pcall
-local print = print
+local pairs = pairs
+local ipairs = ipairs
 
-local GetService = game.GetService
-local Players = GetService(game, "Players")
+local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
@@ -32,6 +32,12 @@ local function detectExecutor()
 end
 
 local function cleanupRuntime()
+    local oldLoading = env.__DEPHUB_LOADING_INSTANCE
+    if oldLoading then
+        pcall(oldLoading.Destroy, oldLoading)
+        env.__DEPHUB_LOADING_INSTANCE = nil
+    end
+
     local state = env.__DEPHUB
     if type(state) ~= "table" then
         return
@@ -120,6 +126,40 @@ local function httpGet(path)
     return true, result
 end
 
+local function prefetch(path)
+    local state = {
+        Done = false,
+        Ok = false,
+        Source = nil,
+        Error = nil
+    }
+
+    local cache = env[CACHE_KEY]
+    if type(cache) == "table" and type(cache[path]) == "string" and #cache[path] > 0 then
+        state.Done = true
+        state.Ok = true
+        state.Source = cache[path]
+        return state
+    end
+
+    task.spawn(function()
+        local ok, source = httpGet(path)
+        state.Ok = ok
+        state.Source = ok and source or nil
+        state.Error = ok and nil or source
+        state.Done = true
+    end)
+
+    return state
+end
+
+local function waitPrefetch(state)
+    while not state.Done do
+        task.wait()
+    end
+    return state.Ok, state.Source, state.Error
+end
+
 local function compile(source)
     if type(loadstring) ~= "function" then
         return false, "loadstring indisponivel"
@@ -152,24 +192,23 @@ local function loadModule(path)
     return true, result
 end
 
-local function waitForGameReady()
-    if not game:IsLoaded() then
-        game.Loaded:Wait()
-    end
+local gameId = tostring(game.GameId)
+local placeId = tostring(game.PlaceId)
 
-    local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui")
-    if not playerGui then
-        playerGui = localPlayer:WaitForChild("PlayerGui", 30)
-    end
+local targets = {
+    ["994732206"] = {
+        Core = "src/games/bloxfruits.lua",
+        UI = "src/ui/bloxfruits.lua"
+    },
+    ["119048529960596"] = {
+        Core = "src/games/rt3.lua",
+        UI = "src/ui/init.lua"
+    }
+}
 
-    if not playerGui then
-        return false
-    end
-
-    task.wait()
-    task.wait()
-    return true
-end
+local target = targets[gameId]
+local corePrefetch = target and prefetch(target.Core) or nil
+local uiPrefetch = target and prefetch(target.UI) or nil
 
 local loading
 
@@ -194,29 +233,22 @@ do
     end
 end
 
-if not waitForGameReady() then
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:WaitForChild("PlayerGui", 30)
+if not playerGui then
     return fail("Jogo nao inicializou completamente", loading)
 end
 
-local gameId = tostring(game.GameId)
-local placeId = tostring(game.PlaceId)
+task.wait()
+task.wait()
 
 allowedLog("Executor: " .. tostring(env.__DEPHUB.Executor))
 allowedLog("PlaceId: " .. placeId)
 allowedLog("GameId: " .. gameId)
 
-local targets = {
-    ["994732206"] = {
-        Core = "src/games/bloxfruits.lua",
-        UI = "src/ui/bloxfruits.lua"
-    },
-    ["119048529960596"] = {
-        Core = "src/games/rt3.lua",
-        UI = "src/ui/init.lua"
-    }
-}
-
-local target = targets[gameId]
 if not target then
     return fail("Jogo nao suportado", loading)
 end
@@ -225,14 +257,14 @@ if loading then
     pcall(loading.SetProgress, loading, 0.22, "Jogo carregado. Preparando modulo...")
 end
 
-local okCoreSource, coreSource = httpGet(target.Core)
+local okCoreSource, coreSource, coreError = waitPrefetch(corePrefetch)
 if not okCoreSource then
-    return fail(coreSource, loading)
+    return fail(coreError, loading)
 end
 
-local okUISource, uiSource = httpGet(target.UI)
+local okUISource, uiSource, uiError = waitPrefetch(uiPrefetch)
 if not okUISource then
-    return fail(uiSource, loading)
+    return fail(uiError, loading)
 end
 
 if loading then
