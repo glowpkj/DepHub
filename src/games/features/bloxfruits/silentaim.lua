@@ -9,6 +9,13 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
+local DEFAULT_FILTERS = {
+    Melee = true,
+    ["Demon Fruit"] = true,
+    Gun = true,
+    Sword = true
+}
+
 local Feature = {}
 Feature.__index = Feature
 
@@ -24,6 +31,7 @@ function Feature.new(context)
         ToolConnection = nil,
         ActiveTool = nil,
         MousePos = nil,
+        WeaponType = nil,
         Target = nil,
         TargetPosition = nil,
         TargetRefresh = 0,
@@ -44,6 +52,23 @@ function Feature:_disconnectToolRoutine()
     local connection = self.ToolConnection
     self.ToolConnection = nil
     if connection then pcall(connection.Disconnect, connection) end
+end
+
+function Feature:_getFilters()
+    local toggles = self.State and self.State.Toggles
+    local filters = toggles and toggles.SilentAimFilters
+    if type(filters) ~= "table" then
+        filters = {}
+        for name, enabled in pairs(DEFAULT_FILTERS) do filters[name] = enabled end
+        if toggles then toggles.SilentAimFilters = filters end
+    end
+    return filters
+end
+
+function Feature:_isWeaponAllowed()
+    local weaponType = self.WeaponType
+    if type(weaponType) ~= "string" then return false end
+    return self:_getFilters()[weaponType] == true
 end
 
 function Feature:_getCharacter(player)
@@ -122,6 +147,7 @@ function Feature:_clearTool()
     self:_disconnectToolRoutine()
     self.ActiveTool = nil
     self.MousePos = nil
+    self.WeaponType = nil
 end
 
 function Feature:_bindTool(tool)
@@ -131,6 +157,8 @@ function Feature:_bindTool(tool)
     self:_clearTool()
     self.ActiveTool = tool
     self.MousePos = mousePos
+    local ok, weaponType = pcall(tool.GetAttribute, tool, "WeaponType")
+    self.WeaponType = ok and weaponType or nil
     self.TargetRefresh = 0
     self.ToolConnection = RunService.PreSimulation:Connect(function()
         self:_preSimulation()
@@ -173,18 +201,6 @@ function Feature:_bindCharacters(characters)
     return true
 end
 
-function Feature:_onCharactersRemoved(child)
-    if child ~= self.Characters then return end
-    self:_disconnect(self.CharacterConnections)
-    self:_clearTool()
-    self.Character = nil
-    self.Characters = nil
-end
-
-function Feature:_onCharactersAdded(child)
-    if child.Name == "Characters" then self:_bindCharacters(child) end
-end
-
 function Feature:_refreshTarget()
     local target, position = self:_selectTarget()
     self.Target = target
@@ -199,6 +215,7 @@ function Feature:_preSimulation()
         self:_clearTool()
         return
     end
+    if not self:_isWeaponAllowed() then return end
     if os.clock() - self.TargetRefresh >= 0.05 then self:_refreshTarget() end
     local position = self.TargetPosition
     if position then pcall(function() mousePos.Value = position end) end
@@ -208,10 +225,15 @@ function Feature:Enable()
     if self.Destroyed or self.Enabled then return true end
     self.Enabled = true
     self.Connections[#self.Connections + 1] = Workspace.ChildAdded:Connect(function(child)
-        self:_onCharactersAdded(child)
+        if child.Name == "Characters" then self:_bindCharacters(child) end
     end)
     self.Connections[#self.Connections + 1] = Workspace.ChildRemoved:Connect(function(child)
-        self:_onCharactersRemoved(child)
+        if child == self.Characters then
+            self:_disconnect(self.CharacterConnections)
+            self:_clearTool()
+            self.Character = nil
+            self.Characters = nil
+        end
     end)
     self:_bindCharacters(Workspace:FindFirstChild("Characters"))
     self:_refreshTarget()
@@ -232,9 +254,7 @@ function Feature:Disable()
     return true
 end
 
-function Feature:IsEnabled()
-    return self.Enabled
-end
+function Feature:IsEnabled() return self.Enabled end
 
 function Feature:Destroy()
     if self.Destroyed then return end
