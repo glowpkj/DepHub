@@ -72,6 +72,14 @@ function Feature:Disable()
         pcall(self.RespawnConnection.Disconnect, self.RespawnConnection)
         self.RespawnConnection = nil
     end
+    local character = self.Context.LocalPlayer.Character
+    if character and character.Parent then
+        pcall(function()
+            character:SetAttribute("DashLength", 1)
+            character:SetAttribute("DashLengthAir", 1)
+            character:SetAttribute("DashLengthGround", 1)
+        end)
+    end
     return true
 end
 
