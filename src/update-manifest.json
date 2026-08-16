@@ -16,10 +16,10 @@
         "src/core/scheduler.lua",
         "src/core/updater.lua",
         "src/games/rt3.lua",
-        "src/games/features/autofarm.lua",
-        "src/games/features/instant-cook.lua",
-        "src/games/features/drops.lua",
-        "src/games/features/autofarm-friends.lua"
+        "src/games/rt3/features/autofarm.lua",
+        "src/games/rt3/features/instant-cook.lua",
+        "src/games/rt3/features/drops.lua",
+        "src/games/rt3/features/autofarm-friends.lua"
       ]
     },
     "994732206": {
