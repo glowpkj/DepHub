@@ -17,6 +17,21 @@ local GENERIC_NAMES = {
     EatRemote = true,
 }
 
+local WORLD_NON_ISLANDS = {
+    Camera = true,
+    Characters = true,
+    _WorldOrigin = true,
+    Map = true,
+    Effects = true,
+    Effect = true,
+    Debris = true,
+    Ignore = true,
+    Temp = true,
+    Temporary = true,
+    SpawnLocation = true,
+    Fruit = true,
+}
+
 local function safeText(value)
     if value == nil then return nil end
     local text = tostring(value)
@@ -171,38 +186,77 @@ function Feature:_directMapModel(instance)
     if current and current.Parent == map and current:IsA("Model") then return current end
 end
 
-function Feature:_nearestIsland(position)
+function Feature:_directWorldModel(instance)
+    if not instance then return nil end
     local map = self:_getMap()
-    if not map or not position then return nil end
+    local current = instance
+    while current and current.Parent do
+        if current.Parent == self.Context.Workspace then
+            if current:IsA("Model") and not WORLD_NON_ISLANDS[current.Name] then
+                return current
+            end
+            return nil
+        end
+        if map and current.Parent == map then return nil end
+        current = current.Parent
+    end
+end
+
+function Feature:_isWorldIslandModel(instance)
+    if not instance or not instance:IsA("Model") then return false end
+    if WORLD_NON_ISLANDS[instance.Name] then return false end
+    return instance.Parent == self.Context.Workspace
+end
+
+function Feature:_islandCandidates()
+    local candidates = {}
+    local map = self:_getMap()
+    if map then
+        for _, island in ipairs(map:GetChildren()) do
+            if island:IsA("Model") then candidates[#candidates + 1] = island end
+        end
+    end
+    for _, object in ipairs(self.Context.Workspace:GetChildren()) do
+        if self:_isWorldIslandModel(object) then
+            candidates[#candidates + 1] = object
+        end
+    end
+    return candidates
+end
+
+function Feature:_nearestIsland(position)
+    if not position then return nil end
+    local candidates = self:_islandCandidates()
+    if #candidates == 0 then return nil end
 
     local rayParams = RaycastParams.new()
     rayParams.FilterType = Enum.RaycastFilterType.Include
-    rayParams.FilterDescendantsInstances = {map}
-    local hit = self.Context.Workspace:Raycast(position + Vector3.new(0, 40, 0), Vector3.new(0, -160, 0), rayParams)
+    rayParams.FilterDescendantsInstances = candidates
+    local hit = self.Context.Workspace:Raycast(position + Vector3.new(0, 80, 0), Vector3.new(0, -260, 0), rayParams)
     if hit and hit.Instance then
-        local island = self:_directMapModel(hit.Instance)
-        if island then return island end
+        local directMap = self:_directMapModel(hit.Instance)
+        if directMap then return directMap end
+        local directWorld = self:_directWorldModel(hit.Instance)
+        if directWorld then return directWorld end
     end
 
     local bestIsland
     local bestDistance = math.huge
-    for _, island in ipairs(map:GetChildren()) do
-        if island:IsA("Model") then
-            local ok, boxCFrame, boxSize = pcall(island.GetBoundingBox, island)
-            if ok and boxCFrame and boxSize then
-                local localPoint = boxCFrame:PointToObjectSpace(position)
-                local half = boxSize * 0.5
-                local clamped = Vector3.new(
-                    math.clamp(localPoint.X, -half.X, half.X),
-                    math.clamp(localPoint.Y, -half.Y, half.Y),
-                    math.clamp(localPoint.Z, -half.Z, half.Z)
-                )
-                local closest = boxCFrame:PointToWorldSpace(clamped)
-                local distance = (closest - position).Magnitude
-                if distance < bestDistance then
-                    bestDistance = distance
-                    bestIsland = island
-                end
+    for _, island in ipairs(candidates) do
+        local ok, boxCFrame, boxSize = pcall(island.GetBoundingBox, island)
+        if ok and boxCFrame and boxSize then
+            local localPoint = boxCFrame:PointToObjectSpace(position)
+            local half = boxSize * 0.5
+            local clamped = Vector3.new(
+                math.clamp(localPoint.X, -half.X, half.X),
+                math.clamp(localPoint.Y, -half.Y, half.Y),
+                math.clamp(localPoint.Z, -half.Z, half.Z)
+            )
+            local closest = boxCFrame:PointToWorldSpace(clamped)
+            local distance = (closest - position).Magnitude
+            if distance < bestDistance then
+                bestDistance = distance
+                bestIsland = island
             end
         end
     end
@@ -212,6 +266,8 @@ end
 function Feature:_islandName(instance, position)
     local direct = self:_directMapModel(instance)
     if direct then return direct.Name end
+    local worldDirect = self:_directWorldModel(instance)
+    if worldDirect then return worldDirect.Name end
     local nearest = self:_nearestIsland(position)
     return nearest and nearest.Name or "Desconhecida"
 end
