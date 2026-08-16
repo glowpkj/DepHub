@@ -130,7 +130,7 @@ local function makeValueInput(parent, title, initialValue, callback)
         end
         value = math_floor(value + 0.5)
         if value < 1 then value = 1 end
-        if value > 500 then value = 500 end
+        if value > 100 then value = 100 end
         local ok, result = pcall(callback, value)
         if ok and result ~= false then
             currentValue = value
