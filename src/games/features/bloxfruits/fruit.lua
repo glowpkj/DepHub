@@ -11,6 +11,7 @@ local GENERIC_NAMES = {
     Keep = true,
     Script = true,
     LocalScript = true,
+    ToolScript = true,
     ClientEatScript = true,
     FruitAnimator = true,
     EatRemote = true,
@@ -31,8 +32,6 @@ function Feature.new(context)
     self.Records = {}
     self.Enabled = false
     self.Thread = nil
-    self.Camera = workspace.CurrentCamera
-    self.CameraConnection = nil
     return self
 end
 
@@ -42,16 +41,17 @@ end
 
 function Feature:_isSpawnedFruit(instance)
     if not instance or not instance:IsA("Model") or instance.Name ~= "Fruit" then return false end
-    return instance:IsDescendantOf(self.Context.Workspace) and instance ~= self.Context.Workspace:FindFirstChild("Map")
+    if instance:FindFirstAncestorOfClass("Tool") then return false end
+    return instance:IsDescendantOf(self.Context.Workspace)
 end
 
 function Feature:_isFruitSpawnEntry(instance)
     if not instance then return false end
-    local fruitSpawns = self.Context.Workspace:FindFirstChild("_WorldOrigin")
-    fruitSpawns = fruitSpawns and fruitSpawns:FindFirstChild("FruitSpawns")
+    local worldOrigin = self.Context.Workspace:FindFirstChild("_WorldOrigin")
+    local fruitSpawns = worldOrigin and worldOrigin:FindFirstChild("FruitSpawns")
     if not fruitSpawns or not instance:IsDescendantOf(fruitSpawns) then return false end
     if instance:IsA("Tool") then return instance:FindFirstChild("Fruit") ~= nil end
-    return instance:IsA("Model") and instance.Name == "Fruit"
+    return instance:IsA("Model") and instance.Name == "Fruit" and not instance:FindFirstAncestorOfClass("Tool")
 end
 
 function Feature:_isFruit(instance)
@@ -59,7 +59,9 @@ function Feature:_isFruit(instance)
 end
 
 function Feature:_fruitModel(instance)
-    return instance and instance:IsA("Tool") and instance:FindFirstChild("Fruit") or (instance and instance:IsA("Model") and instance or nil)
+    if not instance then return nil end
+    if instance:IsA("Tool") then return instance:FindFirstChild("Fruit") end
+    if instance:IsA("Model") then return instance end
 end
 
 function Feature:_adornee(instance)
@@ -263,24 +265,17 @@ function Feature:_startSpectate(record)
     if not record or record.Spectating or self.State.Destroyed then return end
     local camera = workspace.CurrentCamera
     if not camera or not record.Instance or not record.Instance.Parent then return end
-    self:_stopSpectate(record)
     record.Spectating = true
-    record.PreviousCamera = {
-        Type = camera.CameraType,
-        Subject = camera.CameraSubject,
-        CFrame = camera.CFrame
-    }
+    record.PreviousCamera = {Type = camera.CameraType, Subject = camera.CameraSubject, CFrame = camera.CFrame}
     camera.CameraType = Enum.CameraType.Scriptable
     record.SpectateThread = task.spawn(function()
         while record.Spectating and self.Enabled and not self.State.Destroyed do
-            local position = self:_position(record.Instance, self:_adornee(record.Instance))
+            local adornee = self:_adornee(record.Instance)
+            local position = self:_position(record.Instance, adornee)
             if not position then break end
             local target = position + Vector3.new(0, 2.5, 0)
-            local current = camera.CFrame.Position
-            local direction = (target - current)
-            local distance = direction.Magnitude
-            local offset = distance > 6 and direction.Unit * math.min(distance - 4, 2) or Vector3.zero
-            camera.CFrame = CFrame.lookAt(current + offset, target)
+            local cameraPosition = target + Vector3.new(0, 5, 12)
+            camera.CFrame = CFrame.lookAt(cameraPosition, target)
             task.wait()
         end
         if record.Spectating then self:_stopSpectate(record) end
@@ -300,25 +295,21 @@ function Feature:_spectateButton(record)
     button.TextSize = 10
     button.Parent = record.Billboard
 
-    local function begin()
-        self:_startSpectate(record)
-    end
-
-    local function finish()
-        self:_stopSpectate(record)
-    end
-
     self.Context.Connect(record.Connections, button.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then begin() end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            self:_startSpectate(record)
+        end
     end)
     self.Context.Connect(record.Connections, button.InputEnded, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then finish() end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            self:_stopSpectate(record)
+        end
     end)
     self.Context.Connect(record.Connections, UserInputService.InputEnded, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then finish() end
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            self:_stopSpectate(record)
+        end
     end)
-
-    return button
 end
 
 function Feature:_update(record)
@@ -382,7 +373,7 @@ function Feature:_create(instance)
     beam.LightEmission = 1
     beam.Color = ColorSequence.new(Color3.fromRGB(255, 255, 255))
     beam.Transparency = NumberSequence.new(0.12)
-    beam.Parent = self.Context.LocalPlayer.Character or self.Context.Workspace
+    beam.Parent = self.Context.Workspace
 
     local record = {
         Instance = instance,
@@ -426,8 +417,7 @@ end
 
 function Feature:_scanRoot(root)
     if not root then return end
-    local objects = root == self.Context.Workspace and root:GetDescendants() or root:GetDescendants()
-    for _, instance in ipairs(objects) do
+    for _, instance in ipairs(root:GetDescendants()) do
         if self:_isFruit(instance) then self:_create(instance) end
     end
 end
@@ -437,8 +427,8 @@ function Feature:Enable()
     self.Enabled = true
     self:_scanRoot(self.Context.Workspace)
 
-    local fruitSpawns = self.Context.Workspace:FindFirstChild("_WorldOrigin")
-    fruitSpawns = fruitSpawns and fruitSpawns:FindFirstChild("FruitSpawns")
+    local worldOrigin = self.Context.Workspace:FindFirstChild("_WorldOrigin")
+    local fruitSpawns = worldOrigin and worldOrigin:FindFirstChild("FruitSpawns")
     if fruitSpawns then self:_scanRoot(fruitSpawns) end
 
     self.Context.Connect(self.Connections, self.Context.Workspace.DescendantAdded, function(instance)
