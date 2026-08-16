@@ -6,6 +6,7 @@ local Feature = {}
 Feature.__index = Feature
 
 function Feature.new(context)
+    local savedTeam = context.State and context.State.Config and context.State.Config:Get("PreferredTeam", "Pirates") or "Pirates"
     return setmetatable({
         Context = context,
         State = context.State,
@@ -14,7 +15,7 @@ function Feature.new(context)
         Marines = Teams:FindFirstChild("Marines"),
         CommF = nil,
         Enabled = false,
-        PreferredTeam = "Pirates",
+        PreferredTeam = savedTeam == "Marines" and "Marines" or "Pirates",
         Thread = nil,
         RespawnConnection = nil
     }, Feature)
@@ -46,7 +47,7 @@ end
 function Feature:Enable()
     if self.Enabled or self.State.Destroyed then return true end
     self.Enabled = true
-    self.PreferredTeam = self:_normalize(self.State.Config and self.State.Config:Get("PreferredTeam", "Pirates") or "Pirates")
+    self.PreferredTeam = self:_normalize(self.State.Config and self.State.Config:Get("PreferredTeam", self.PreferredTeam) or self.PreferredTeam)
     if not game:IsLoaded() then game.Loaded:Wait() end
     self:_ensure()
     self.Thread = task.spawn(function()
