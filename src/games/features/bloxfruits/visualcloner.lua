@@ -3,29 +3,6 @@ local Players = game:GetService("Players")
 local Feature = {}
 Feature.__index = Feature
 
-local IGNORE = {
-    Humanoid = true,
-    HumanoidRootPart = true,
-    Head = true,
-    Torso = true,
-    UpperTorso = true,
-    LowerTorso = true,
-    LeftHand = true,
-    RightHand = true,
-    LeftFoot = true,
-    RightFoot = true,
-    LeftLowerArm = true,
-    RightLowerArm = true,
-    LeftLowerLeg = true,
-    RightLowerLeg = true,
-    LeftUpperArm = true,
-    RightUpperArm = true,
-    LeftUpperLeg = true,
-    RightUpperLeg = true,
-    Root = true,
-    Handle = true
-}
-
 local function visualContent(model)
     return model:FindFirstChildWhichIsA("BasePart", true)
         or model:FindFirstChildWhichIsA("ParticleEmitter", true)
@@ -34,7 +11,7 @@ local function visualContent(model)
 end
 
 local function looksLikeVisual(model)
-    if not model:IsA("Model") or IGNORE[model.Name] or not visualContent(model) then return false end
+    if not model:IsA("Model") or not visualContent(model) then return false end
     local name = string.lower(model.Name)
     if string.find(name, "fruit", 1, true) or string.find(name, "effect", 1, true) or string.find(name, "transform", 1, true) or string.find(name, "aura", 1, true) then return true end
     for _, child in ipairs(model:GetChildren()) do
@@ -120,39 +97,15 @@ function Feature:GetOptions()
     return list
 end
 
-function Feature:_prepareClone(clone)
-    for _, descendant in ipairs(clone:GetDescendants()) do
-        if descendant:IsA("Script") or descendant:IsA("LocalScript") or descendant:IsA("RemoteEvent") or descendant:IsA("RemoteFunction") then
-            descendant:Destroy()
-        elseif descendant:IsA("BasePart") then
-            descendant.CanCollide = false
-            descendant.CanTouch = false
-            descendant.CanQuery = false
-            descendant.Massless = true
-            descendant.Anchored = false
-        end
-    end
-end
-
 function Feature:CloneOption(id)
     local record = self.Records[tostring(id)]
     local character = self.LocalPlayer.Character
-    local root = character and character:FindFirstChild("HumanoidRootPart")
-    if self.State.Destroyed or not record or not record.Model or not record.Model.Parent or not root then return false end
+    if self.State.Destroyed or not record or not record.Model or not record.Model.Parent or not character then return false end
+    if record.Model.Archivable == false then return false end
     local ok, clone = pcall(record.Model.Clone, record.Model)
     if not ok or not clone then return false end
-    self:_prepareClone(clone)
     clone.Name = "DepHubVisualClone_" .. tostring(record.Name)
     clone.Parent = character
-    pcall(function() clone:PivotTo(root.CFrame) end)
-    for _, part in ipairs(clone:GetDescendants()) do
-        if part:IsA("BasePart") then
-            local weld = Instance.new("WeldConstraint")
-            weld.Part0 = root
-            weld.Part1 = part
-            weld.Parent = part
-        end
-    end
     self.LocalClones[clone] = true
     return true
 end
