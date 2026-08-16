@@ -1,6 +1,13 @@
 local Feature = {}
 Feature.__index = Feature
 
+local function colorToHex(color)
+    local r = math.floor(color.R * 255 + 0.5)
+    local g = math.floor(color.G * 255 + 0.5)
+    local b = math.floor(color.B * 255 + 0.5)
+    return string.format("#%02X%02X%02X", r, g, b)
+end
+
 function Feature.new(context)
     local self = setmetatable({}, Feature)
     self.Context = context
@@ -13,8 +20,14 @@ end
 
 function Feature:_updateText(record)
     if not record.Label or not record.Label.Parent then return end
-    local lines = {record.Player.Name, self.Context.HealthText(record.Humanoid)}
-    if not record.Protected then lines[#lines + 1] = "PvP: Ativado" end
+    local nameColor = colorToHex(self.Context.TeamColor(record.Player))
+    local lines = {
+        string.format('<font color="%s">%s</font>', nameColor, record.Player.Name),
+        string.format('<font color="#FFFFFF">%s</font>', self.Context.HealthText(record.Humanoid))
+    }
+    if not record.Protected then
+        lines[#lines + 1] = string.format('<font color="%s">PvP: Ativado</font>', nameColor)
+    end
     record.Label.Text = table.concat(lines, "\n")
 end
 
@@ -76,6 +89,8 @@ function Feature:_create(character)
     label.TextSize = 14
     label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
     label.TextStrokeTransparency = 0
+    label.RichText = true
+    label.TextColor3 = Color3.fromRGB(255, 255, 255)
     label.Parent = billboard
 
     local record = {Character = character, Player = player, Humanoid = humanoid, Highlight = highlight, Billboard = billboard, Label = label, Protected = self.Context.HasProtection(character), Connections = {}}
