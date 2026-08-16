@@ -171,7 +171,11 @@ if type(Loading) == "table" and type(Loading.new) == "function" then
 end
 
 local GAME_SCRIPTS = {
-    ["119048529960596"] = "src/games/rt3.lua"
+    ["119048529960596"] = "src/games/rt3.lua",
+    ["2753915549"] = "src/games/bloxfruits.lua",
+    ["4442272183"] = "src/games/bloxfruits.lua",
+    ["7449423635"] = "src/games/bloxfruits.lua",
+    ["994732206"] = "src/games/bloxfruits.lua"
 }
 
 local function executePayload()
@@ -224,10 +228,14 @@ local function executePayload()
         return false
     end
 
-    if result ~= true then
+    if result ~= true and not (path == "src/games/bloxfruits.lua" and type(result) == "table") then
         logWarn("Payload nao confirmou inicializacao completa.")
         if loading then loading:Destroy() end
         return false
+    end
+
+    if path == "src/games/bloxfruits.lua" then
+        env.__DEPHUB.BloxFruits = result
     end
 
     log("Execucao concluida: " .. url)
