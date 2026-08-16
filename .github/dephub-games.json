@@ -21,6 +21,7 @@
     "files": [
       "DepHub.lua",
       "src/games/bloxfruits.lua",
+      "src/ui/bloxfruits.lua",
       "src/games/features/bloxfruits/playeresp.lua",
       "src/games/features/bloxfruits/fruit.lua",
       "src/games/features/bloxfruits/observation.lua",
@@ -28,7 +29,29 @@
       "src/games/features/bloxfruits/camerashake.lua",
       "src/games/features/bloxfruits/dash.lua",
       "src/games/features/bloxfruits/flashstep.lua",
-      "src/games/features/bloxfruits/waterwalking.lua"
+      "src/games/features/bloxfruits/waterwalking.lua",
+      "src/games/features/bloxfruits/config.lua",
+      "src/games/features/bloxfruits/team.lua",
+      "src/games/features/bloxfruits/visualcloner.lua"
+    ]
+  },
+  "85211729168715": {
+    "name": "Blox Fruits Sea 1",
+    "files": [
+      "DepHub.lua",
+      "src/games/bloxfruits.lua",
+      "src/ui/bloxfruits.lua",
+      "src/games/features/bloxfruits/playeresp.lua",
+      "src/games/features/bloxfruits/fruit.lua",
+      "src/games/features/bloxfruits/observation.lua",
+      "src/games/features/bloxfruits/unbreakable.lua",
+      "src/games/features/bloxfruits/camerashake.lua",
+      "src/games/features/bloxfruits/dash.lua",
+      "src/games/features/bloxfruits/flashstep.lua",
+      "src/games/features/bloxfruits/waterwalking.lua",
+      "src/games/features/bloxfruits/config.lua",
+      "src/games/features/bloxfruits/team.lua",
+      "src/games/features/bloxfruits/visualcloner.lua"
     ]
   }
 }
