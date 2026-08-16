@@ -25,7 +25,10 @@
       "src/games/features/bloxfruits/fruit.lua",
       "src/games/features/bloxfruits/observation.lua",
       "src/games/features/bloxfruits/unbreakable.lua",
-      "src/games/features/bloxfruits/camerashake.lua"
+      "src/games/features/bloxfruits/camerashake.lua",
+      "src/games/features/bloxfruits/dash.lua",
+      "src/games/features/bloxfruits/flashstep.lua",
+      "src/games/features/bloxfruits/waterwalking.lua"
     ]
   }
 }
