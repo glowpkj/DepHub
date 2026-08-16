@@ -41,7 +41,7 @@ function Feature:_updateAppearance(record)
     if self.State.Destroyed or not record.Highlight or not record.Label then return end
     local color = self.Context.TeamColor(record.Player)
     record.Highlight.FillColor = color
-    record.Highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    record.Highlight.OutlineColor = color
     record.Label.TextColor3 = Color3.fromRGB(255, 255, 255)
     self:_updateText(record)
 end
@@ -70,7 +70,9 @@ function Feature:_create(character)
     highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
     highlight.FillTransparency = 0
     highlight.OutlineTransparency = 0
-    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+    local color = self.Context.TeamColor(player)
+    highlight.FillColor = color
+    highlight.OutlineColor = color
     highlight.Parent = character
 
     local billboard = Instance.new("BillboardGui")
