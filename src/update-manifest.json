@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-16T17:46:38.567570+00:00",
-  "commit": "b328690de84b57d787e11e59c0d1d55571559622",
+  "generatedAt": "2026-08-16T19:35:00Z",
+  "commit": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
   "games": {
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "8d159c292dffd97984d150f00bd186c8fd7f9d18b94c0ac52ba35342b0a37390",
-      "commit": "b328690de84b57d787e11e59c0d1d55571559622",
+      "version": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
+      "commit": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
       "files": [
         "DepHub.lua",
         "src/core/anti-afk.lua",
@@ -24,48 +24,56 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "26bd4bcb053c7478a4b3aeed7d450e9fb80238f92067b55c25ad393749ba5201",
-      "commit": "b328690de84b57d787e11e59c0d1d55571559622",
+      "version": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
+      "commit": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
       "files": [
         "DepHub.lua",
-        "src/games/bloxfruits.lua"
+        "src/games/bloxfruits.lua",
+        "src/games/features/bloxfruits/playeresp.lua",
+        "src/games/features/bloxfruits/fruit.lua",
+        "src/games/features/bloxfruits/observation.lua",
+        "src/games/features/bloxfruits/unbreakable.lua",
+        "src/games/features/bloxfruits/camerashake.lua",
+        "src/games/features/bloxfruits/dash.lua",
+        "src/games/features/bloxfruits/flashstep.lua",
+        "src/games/features/bloxfruits/waterwalking.lua"
       ]
     }
   },
   "recentUpdates": [
     {
+      "Version": "837ac27",
+      "Date": "2026-08-16T19:35:00Z",
+      "Changes": [
+        "feat: modular Blox Fruits movement and combat attribute features"
+      ]
+    },
+    {
+      "Version": "a593cdd",
+      "Date": "2026-08-16T18:50:05Z",
+      "Changes": [
+        "refactor: isolate Blox Fruits features"
+      ]
+    },
+    {
       "Version": "b328690",
-      "Date": "2026-08-16T14:46:31-03:00",
+      "Date": "2026-08-16T17:46:31Z",
       "Changes": [
         "feat: improve Blox Fruits player and dropped fruit ESP"
       ]
     },
     {
       "Version": "d22ac28",
-      "Date": "2026-08-16T14:19:09-03:00",
+      "Date": "2026-08-16T17:19:09Z",
       "Changes": [
         "perf: prefetch modules during startup gate and harden cleanup"
       ]
     },
     {
       "Version": "af98966",
-      "Date": "2026-08-16T14:18:10-03:00",
+      "Date": "2026-08-16T17:18:10Z",
       "Changes": [
         "fix: preserve RT3 loader result contract"
-      ]
-    },
-    {
-      "Version": "1ab6824",
-      "Date": "2026-08-16T14:17:58-03:00",
-      "Changes": [
-        "refactor: modularize Blox Fruits features and fix camera handling"
-      ]
-    },
-    {
-      "Version": "9a7678c",
-      "Date": "2026-08-16T14:17:26-03:00",
-      "Changes": [
-        "fix: use universe id for manifest and silence updater logs"
       ]
     }
   ]
