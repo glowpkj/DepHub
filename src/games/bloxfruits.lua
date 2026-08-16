@@ -263,6 +263,7 @@ end
 function State:Start()
     if self.Destroyed or self.Started then return false end
     self.Started = true
+    self.Features.CameraShake:Debug()
     if self.Toggles.ObservationHaki then self.Features.ObservationHaki:Enable() end
     return true
 end
