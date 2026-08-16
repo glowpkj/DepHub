@@ -8,6 +8,8 @@ on:
       - "DepHub.lua"
       - "src/core/**"
       - "src/games/**"
+      - "src/ui/**"
+      - "src/version.txt"
       - ".github/dephub-games.json"
 
 permissions:
@@ -98,6 +100,7 @@ jobs:
               'schema': 2,
               'generatedAt': datetime.now(timezone.utc).isoformat(),
               'commit': os.environ['COMMIT_SHA'],
+              'version': Path('src/version.txt').read_text().strip(),
               'games': games,
               'recentUpdates': recent
           }
