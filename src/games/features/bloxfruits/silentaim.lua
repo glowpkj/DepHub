@@ -1,8 +1,8 @@
 local game = game
-local type = type
 local pcall = pcall
 local pairs = pairs
 local math_huge = math.huge
+local string_lower = string.lower
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -53,9 +53,15 @@ function Feature:_isProtected(character)
     if not character or character:FindFirstChildOfClass("ForceField") then return true end
     for _, name in pairs({"PvPDisabled", "PVPDisabled", "PvPProtection", "Protection", "Protected", "SafeZone", "NoPvP"}) do
         if character:GetAttribute(name) == true then return true end
+        local object = character:FindFirstChild(name)
+        if object then
+            if object:IsA("BoolValue") and object.Value then return true end
+            if (object:IsA("IntValue") or object:IsA("NumberValue")) and object.Value ~= 0 then return true end
+            if object:IsA("ObjectValue") and object.Value ~= nil then return true end
+        end
     end
-    for _, object in pairs(character:GetDescendants()) do
-        local lowered = string.lower(object.Name)
+    for _, object in pairs(character:GetChildren()) do
+        local lowered = string_lower(object.Name)
         if lowered == "pvpdisabled" or lowered == "pvpdisabledvalue" or lowered == "pvpprotection" or lowered == "protection" or lowered == "protected" or lowered == "safezone" or lowered == "nopvp" then
             if object:IsA("BoolValue") and object.Value then return true end
             if (object:IsA("IntValue") or object:IsA("NumberValue")) and object.Value ~= 0 then return true end
@@ -146,18 +152,25 @@ function Feature:_findCharacter()
     return character and character:IsA("Model") and character or nil
 end
 
-function Feature:_bindCharacters()
-    local characters = Workspace:FindFirstChild("Characters")
-    if not characters then return false end
+function Feature:_bindCharacters(characters)
+    if not characters or self.Destroyed or not self.Enabled then return false end
+    if self.Characters == characters then return true end
+    self:_disconnect(self.CharacterConnections)
     self.Characters = characters
     self:_scanCharacter(self:_findCharacter())
-    self.Connections[#self.Connections + 1] = characters.ChildAdded:Connect(function(child)
-        if child.Name == self.LocalPlayer.Name and child:IsA("Model") then self:_scanCharacter(child) end
-    end)
-    self.Connections[#self.Connections + 1] = characters.ChildRemoved:Connect(function(child)
-        if child == self.Character then self:_scanCharacter(nil) end
-    end)
     return true
+end
+
+function Feature:_onCharactersRemoved(child)
+    if child ~= self.Characters then return end
+    self:_disconnect(self.CharacterConnections)
+    self:_clearTool()
+    self.Character = nil
+    self.Characters = nil
+end
+
+function Feature:_onCharactersAdded(child)
+    if child.Name == "Characters" then self:_bindCharacters(child) end
 end
 
 function Feature:_refreshTarget()
@@ -179,16 +192,18 @@ end
 function Feature:Enable()
     if self.Destroyed or self.Enabled then return true end
     self.Enabled = true
-    if not self:_bindCharacters() then
-        self.Enabled = false
-        return false
-    end
+
     self.Connections[#self.Connections + 1] = RunService.PreSimulation:Connect(function()
         self:_preSimulation()
     end)
     self.Connections[#self.Connections + 1] = Workspace.ChildAdded:Connect(function(child)
-        if child.Name == "Characters" and child:IsA("Folder") and not self.Characters then self:_bindCharacters() end
+        self:_onCharactersAdded(child)
     end)
+    self.Connections[#self.Connections + 1] = Workspace.ChildRemoved:Connect(function(child)
+        self:_onCharactersRemoved(child)
+    end)
+
+    self:_bindCharacters(Workspace:FindFirstChild("Characters"))
     self:_refreshTarget()
     return true
 end
