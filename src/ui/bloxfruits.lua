@@ -1,9 +1,6 @@
 local game = game
 local type = type
 local pcall = pcall
-local tonumber = tonumber
-local tostring = tostring
-local math_floor = math.floor
 local ipairs = ipairs
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
@@ -183,13 +180,18 @@ function UI.new(state)
     makeToggle(mainFrame, "Flashstep No Cooldown", toggle("FlashstepNoCooldown"), state:GetToggle("FlashstepNoCooldown"))
     makeToggle(mainFrame, "Water Walking", toggle("WaterWalking"), state:GetToggle("WaterWalking"))
     makeToggle(mainFrame, "Silent Aim", toggle("SilentAim"), state:GetToggle("SilentAim"))
-    makeLabel(mainFrame, "SILENT AIM FILTERS", 24)
-    local filterNames = {"Melee", "Demon Fruit", "Gun", "Sword"}
-    for _, weaponType in ipairs(filterNames) do
+    makeLabel(mainFrame, "SILENT AIM", 24)
+    makeLabel(mainFrame, "WEAPON TYPE", 22)
+    for _, weaponType in ipairs({"Melee", "Sword", "Gun", "Demon Fruit"}) do
         makeToggle(mainFrame, weaponType, function(enabled)
-            if not self.State or type(self.State.SetSilentAimFilter) ~= "function" then return false end
-            return self.State:SetSilentAimFilter(weaponType, enabled)
+            return self.State and self.State.SetSilentAimFilter and self.State:SetSilentAimFilter(weaponType, enabled) or false
         end, state:GetSilentAimFilter(weaponType))
+    end
+    makeLabel(mainFrame, "SKILLS", 22)
+    for _, skill in ipairs({"Z", "X", "C", "V"}) do
+        makeToggle(mainFrame, skill, function(enabled)
+            return self.State and self.State.SetSilentAimSkill and self.State:SetSilentAimSkill(skill, enabled) or false
+        end, state:GetSilentAimSkill(skill))
     end
     makeToggle(mainFrame, "Visual Cloner", toggle("VisualCloner"), state:GetToggle("VisualCloner"))
     makeToggle(mainFrame, "Auto Join Team", toggle("AutoJoinTeam"), state:GetToggle("AutoJoinTeam"))
