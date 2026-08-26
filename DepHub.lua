@@ -143,7 +143,7 @@ local placeId = tostring(game.PlaceId)
 local targets = {
     ["994732206"] = {Core = "src/games/bloxfruits.lua"},
     ["85211729168715"] = {Core = "src/games/bloxfruits.lua"},
-    ["119048529960596"] = {Core = "src/games/rt3.lua", UI = "src/ui/init.lua"}
+    ["119048529960596"] = {Core = "src/games/rt3.lua"}
 }
 local target = targets[gameId]
 
@@ -178,14 +178,7 @@ if loading then pcall(loading.SetProgress, loading, 0.72, "Modulo do jogo inicia
 
 env.__DEPHUB.BloxFruits = gameId ~= "119048529960596" and coreResult or nil
 
-if target.UI then
-    local okUI, UI = loadModule(target.UI, false)
-    if not okUI or type(UI) ~= "table" or type(UI.new) ~= "function" then return fail(UI, loading) end
-    if type(coreResult) ~= "boolean" or not coreResult then return fail("Core do jogo nao inicializou corretamente", loading) end
-    local okWindow, Window = pcall(UI.new, "DepHub", "Restaurant Tycoon 3", "rbxassetid://79507712997362")
-    if not okWindow or type(Window) ~= "table" then return fail(Window, loading) end
-    env.__DEPHUB.Window = Window
-else
+if gameId ~= "119048529960596" then
     if type(coreResult) ~= "table" then return fail(coreResult, loading) end
 end
 
