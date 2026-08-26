@@ -13,7 +13,7 @@ local lastFriendUpdate = 0
 local function updateFriendsList()
     local currentTime = tick()
     if currentTime - lastFriendUpdate < 30 then return end
-    
+
     table.clear(friendList)
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= localPlayer then
@@ -52,18 +52,15 @@ local function getFriendTycoons()
     return friendTycoons
 end
 
-local function instantRemoteTrigger(prompt, sourceName)
+local function instantRemoteTrigger(prompt)
     if not AutoFarmFriendsModule.Enabled then return end
     if activeInteractions[prompt] then return end
-    
-    if prompt.ActionText == "Cook" or prompt.ObjectText == "Cook" or prompt.Name == "Cook" then
-        return
-    end
+    if prompt.ActionText == "Cook" or prompt.ObjectText == "Cook" or prompt.Name == "Cook" then return end
 
     activeInteractions[prompt] = true
 
     task.spawn(function()
-        local success, err = pcall(function()
+        pcall(function()
             if fireproximityprompt then
                 fireproximityprompt(prompt)
             else
@@ -72,7 +69,7 @@ local function instantRemoteTrigger(prompt, sourceName)
                 prompt:InputHoldEnd()
             end
         end)
-        
+
         task.wait(0.05)
         activeInteractions[prompt] = nil
     end)
@@ -81,16 +78,12 @@ end
 function AutoFarmFriendsModule.Start()
     if AutoFarmFriendsModule.Enabled then return end
     AutoFarmFriendsModule.Enabled = true
-
     updateFriendsList()
 
     farmThread = task.spawn(function()
-        local tempFolder = workspace:WaitForChild("Temp")
-
         while AutoFarmFriendsModule.Enabled do
             updateFriendsList()
 
-            -- 1. Varredura nos Tycoons de Amigos (Apenas CustomerInteractPrompt)
             pcall(function()
                 local friendTycoons = getFriendTycoons()
                 for _, tycoon in ipairs(friendTycoons) do
@@ -100,23 +93,25 @@ function AutoFarmFriendsModule.Start()
                         if not AutoFarmFriendsModule.Enabled then break end
                         local desc = tycoonDescendants[i]
                         if desc:IsA("ProximityPrompt") and desc.Name == "CustomerInteractPrompt" and desc.Enabled then
-                            instantRemoteTrigger(desc, "Tycoon_Amigo")
+                            instantRemoteTrigger(desc)
                         end
                     end
                 end
             end)
 
-            -- 2. Varredura Remota na pasta Temp (Prompts Globais)
-            pcall(function()
-                local tempDescendants = tempFolder:GetDescendants()
-                for i = 1, #tempDescendants do
-                    if not AutoFarmFriendsModule.Enabled then break end
-                    local desc = tempDescendants[i]
-                    if desc:IsA("ProximityPrompt") and desc.Enabled then
-                        instantRemoteTrigger(desc, "Pasta_Temp")
+            local tempFolder = workspace:FindFirstChild("Temp")
+            if tempFolder then
+                pcall(function()
+                    local tempDescendants = tempFolder:GetDescendants()
+                    for i = 1, #tempDescendants do
+                        if not AutoFarmFriendsModule.Enabled then break end
+                        local desc = tempDescendants[i]
+                        if desc:IsA("ProximityPrompt") and desc.Enabled then
+                            instantRemoteTrigger(desc)
+                        end
                     end
-                end
-            end)
+                end)
+            end
 
             task.wait(0.1)
         end
