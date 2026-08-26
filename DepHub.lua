@@ -145,7 +145,8 @@ local targets = {
     ["85211729168715"] = {Core = "src/games/bloxfruits.lua"},
     ["119048529960596"] = {Core = "src/games/rt3.lua"}
 }
-local target = targets[gameId]
+local target = targets[placeId] or targets[gameId]
+local isRT3 = target and target.Core == "src/games/rt3.lua"
 
 local loading
 local okLoading, Loading = loadModule("src/ui/loading.lua", false)
@@ -176,10 +177,9 @@ local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then return fail(coreResult, loading) end
 if loading then pcall(loading.SetProgress, loading, 0.72, "Modulo do jogo inicializado...") end
 
-env.__DEPHUB.BloxFruits = gameId ~= "119048529960596" and coreResult or nil
-
-if gameId ~= "119048529960596" then
-    if type(coreResult) ~= "table" then return fail(coreResult, loading) end
+if not isRT3 then
+    env.__DEPHUB.BloxFruits = coreResult
+    if type(coreResult) ~= "table" then return fail("Modulo do jogo nao inicializou corretamente", loading) end
 end
 
 if loading then pcall(loading.SetProgress, loading, 0.92, "Finalizando inicializacao...") end
