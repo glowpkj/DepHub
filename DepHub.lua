@@ -2,15 +2,15 @@ local game = game
 local task = task
 local type = type
 local tostring = tostring
-local pcall = pcall
 local ipairs = ipairs
+local pcall = pcall
 local math_floor = math.floor
 
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.2"
+local VERSION = "0.0.3"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -82,20 +82,57 @@ local function fail(reason, loading)
     return false
 end
 
+local function performRequest(url)
+    local requestFunctions = {
+        type(request) == "function" and request or nil,
+        type(http_request) == "function" and http_request or nil,
+        type(syn) == "table" and type(syn.request) == "function" and syn.request or nil
+    }
+
+    for _, requestFunction in ipairs(requestFunctions) do
+        if requestFunction then
+            local ok, response = pcall(requestFunction, {Url = url, Method = "GET"})
+            if ok and type(response) == "table" then
+                local body = response.Body or response.body
+                local status = tonumber(response.StatusCode or response.status_code or 200) or 200
+                if status >= 200 and status < 400 and type(body) == "string" and #body > 0 then
+                    return true, body
+                end
+            end
+        end
+    end
+
+    local ok, result = pcall(function()
+        return game:HttpGet(url)
+    end)
+
+    if ok and type(result) == "string" and #result > 0 then
+        return true, result
+    end
+
+    return false, ok and "Resposta HTTP vazia" or tostring(result)
+end
+
 local function httpGet(path, useCache)
     local cache = env[CACHE_KEY]
     if type(cache) ~= "table" then
         cache = {}
         env[CACHE_KEY] = cache
     end
+
     if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then
         return true, cache[path]
     end
-    local ok, result = pcall(function() return game:HttpGet(BASE_URL .. path) end)
-    if not ok or type(result) ~= "string" or #result == 0 then
-        return false, ok and "Resposta HTTP vazia" or tostring(result)
+
+    local ok, result = performRequest(BASE_URL .. path)
+    if not ok then
+        return false, result
     end
-    if useCache ~= false then cache[path] = result end
+
+    if useCache ~= false then
+        cache[path] = result
+    end
+
     return true, result
 end
 
@@ -120,23 +157,24 @@ local function compile(source)
 end
 
 local function loadModule(path, useCache)
+    allowedLog("Carregando: " .. path)
     local okSource, source = httpGet(path, useCache)
     if not okSource then return false, source end
     local okCompile, chunk = compile(source)
     if not okCompile then return false, chunk end
     local okRun, result = pcall(chunk)
     if not okRun then return false, tostring(result) end
+    allowedLog("Carregado: " .. path)
     return true, result
 end
+
+allowedLog("Iniciando loader v" .. VERSION)
+allowedLog("Executor detectado: " .. tostring(env.__DEPHUB.Executor))
 
 local okVersion, remoteVersion = httpGet("src/version.txt", false)
 if okVersion then
     remoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION
     env.__DEPHUB.RemoteVersion = remoteVersion
-    local comparison = compareVersions(VERSION, remoteVersion)
-    if comparison < 0 then
-        allowedLog("Nova build detectada: " .. remoteVersion .. ". O loader usa os arquivos atuais da branch main.")
-    end
 end
 
 local gameId = tostring(game.GameId)
@@ -149,6 +187,7 @@ local targets = {
 local target = targets[placeId] or targets[gameId]
 
 local loading
+allowedLog("Carregando loading screen")
 local okLoading, Loading = loadModule("src/ui/loading.lua", false)
 if okLoading and type(Loading) == "table" and type(Loading.new) == "function" then
     env.__DEPHUB_UI_LOADING = Loading
@@ -159,6 +198,8 @@ if okLoading and type(Loading) == "table" and type(Loading.new) == "function" th
         loading = instance
         env.__DEPHUB_LOADING_INSTANCE = instance
         pcall(instance.SetProgress, instance, 0.08, "Aguardando jogo carregar...")
+    else
+        allowedLog("Loading screen nao pode ser criada: " .. tostring(instance))
     end
 end
 
@@ -170,9 +211,12 @@ allowedLog("Executor: " .. env.__DEPHUB.Executor)
 allowedLog("PlaceId: " .. placeId)
 allowedLog("GameId: " .. gameId)
 allowedLog("Versao local: " .. VERSION .. " | Versao remota: " .. tostring(env.__DEPHUB.RemoteVersion or VERSION))
+allowedLog("Alvo: " .. tostring(target and target.Core or "nenhum"))
+
 if not target then return fail("Jogo nao suportado", loading) end
 if loading then pcall(loading.SetProgress, loading, 0.22, "Jogo carregado. Preparando modulo...") end
 
+allowedLog("Iniciando modulo do jogo")
 local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then return fail(coreResult, loading) end
 if loading then pcall(loading.SetProgress, loading, 0.72, "Modulo do jogo inicializado...") end
