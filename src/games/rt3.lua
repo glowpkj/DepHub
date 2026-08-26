@@ -25,9 +25,8 @@ local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local function fetch(path)
     local url = BASE_URL .. path
-    local cacheBust = "?dephub=" .. tostring(math.floor(os_clock() * 1000000))
     local ok, result = pcall(function()
-        return game:HttpGet(url .. cacheBust)
+        return game:HttpGet(url)
     end)
 
     if ok and type(result) == "string" and #result > 0 then
@@ -42,6 +41,7 @@ local function fetch(path)
 end
 
 local function loadModule(path)
+    log("Carregando modulo: " .. path)
     local okFetch, raw, url = fetch(path)
     if not okFetch then
         logWarn("Falha no modulo " .. path .. ": " .. tostring(raw))
@@ -65,25 +65,8 @@ local function loadModule(path)
         return nil
     end
 
+    log("Modulo carregado: " .. path)
     return result
-end
-
-local function loadModules(paths)
-    local results = {}
-    local remaining = #paths
-
-    for _, path in ipairs(paths) do
-        task.spawn(function()
-            results[path] = loadModule(path)
-            remaining = remaining - 1
-        end)
-    end
-
-    while remaining > 0 do
-        task.wait()
-    end
-
-    return results
 end
 
 local function getLoading()
@@ -121,26 +104,37 @@ if not loading then
     if Loading and type(Loading.new) == "function" then
         local env = type(getgenv) == "function" and getgenv() or _G
         env.__DEPHUB_UI_LOADING = Loading
-        loading = Loading.new({
-            Title = "DEPHUB",
-            Status = "Preparando inicialização...",
-            LogoId = "rbxassetid://79507712997362"
-        })
-        env.__DEPHUB_LOADING_INSTANCE = loading
+        local okLoading, instance = pcall(function()
+            return Loading.new({
+                Title = "DEPHUB",
+                Status = "Preparando inicialização...",
+                LogoId = "rbxassetid://79507712997362"
+            })
+        end)
+        if okLoading then
+            loading = instance
+            env.__DEPHUB_LOADING_INSTANCE = instance
+        else
+            logWarn("Falha criando loading: " .. tostring(instance))
+        end
     end
 end
 
 if loading then
-    loading:SetProgress(0.08, "Preparando núcleo...")
+    pcall(loading.SetProgress, loading, 0.08, "Preparando núcleo...")
 end
 
-local core = loadModules({
+local corePaths = {
     "src/core/scheduler.lua",
     "src/core/health-monitor.lua",
     "src/core/dashboard.lua",
     "src/core/runtime.lua",
     "src/core/anti-afk.lua"
-})
+}
+local core = {}
+for _, path in ipairs(corePaths) do
+    core[path] = loadModule(path)
+end
 
 local Scheduler = core["src/core/scheduler.lua"]
 local HealthMonitor = core["src/core/health-monitor.lua"]
@@ -149,36 +143,36 @@ local Runtime = core["src/core/runtime.lua"]
 local AntiAFK = core["src/core/anti-afk.lua"]
 
 if loading then
-    loading:SetProgress(0.28, "Núcleo carregado...")
+    pcall(loading.SetProgress, loading, 0.28, "Núcleo carregado...")
 end
 
 if not Scheduler or type(Scheduler.new) ~= "function" then
     logWarn("Scheduler indisponivel. Abortando inicializacao.")
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 if not HealthMonitor or type(HealthMonitor.new) ~= "function" then
     logWarn("Health Monitor indisponivel. Abortando inicializacao.")
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 if not Dashboard or type(Dashboard.new) ~= "function" then
     logWarn("Dashboard provider indisponivel. Abortando inicializacao.")
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 if not Runtime or type(Runtime.new) ~= "function" then
     logWarn("Runtime indisponivel. Abortando inicializacao.")
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 if not AntiAFK or type(AntiAFK.Start) ~= "function" then
     logWarn("Anti-AFK indisponivel. Abortando inicializacao.")
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
@@ -188,23 +182,31 @@ if type(previousRuntime) == "table" and type(previousRuntime.Destroy) == "functi
     pcall(previousRuntime.Destroy, previousRuntime)
 end
 
-local runtime = Runtime.new({
-    Scheduler = Scheduler,
-    HealthMonitor = HealthMonitor,
-    Dashboard = Dashboard,
-    SchedulerOptions = {
-        DefaultInterval = 0.1,
-        MaxErrors = 5
-    },
-    HealthOptions = {
-        Interval = 2,
-        MaxErrors = 5
-    },
-    DashboardOptions = {
-        Interval = 1,
-        ManifestInterval = 30
-    }
-})
+local okRuntime, runtime = pcall(function()
+    return Runtime.new({
+        Scheduler = Scheduler,
+        HealthMonitor = HealthMonitor,
+        Dashboard = Dashboard,
+        SchedulerOptions = {
+            DefaultInterval = 0.1,
+            MaxErrors = 5
+        },
+        HealthOptions = {
+            Interval = 2,
+            MaxErrors = 5
+        },
+        DashboardOptions = {
+            Interval = 1,
+            ManifestInterval = 30
+        }
+    })
+end)
+
+if not okRuntime or type(runtime) ~= "table" then
+    logWarn("Falha criando Runtime: " .. tostring(runtime))
+    if loading then pcall(loading.Destroy, loading) end
+    return false
+end
 
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Runtime = runtime
@@ -223,36 +225,51 @@ runtime.HealthMonitor:Register("Runtime", function()
     return not runtime.Destroyed
 end)
 
-runtime:Start()
-AntiAFK.Start()
-
-if loading then
-    loading:SetProgress(0.42, "Runtime e dashboard iniciados...")
+local okStart, startError = pcall(runtime.Start, runtime)
+if not okStart then
+    logWarn("Falha iniciando Runtime: " .. tostring(startError))
+    AntiAFK.Stop()
+    runtime:Destroy()
+    if loading then pcall(loading.Destroy, loading) end
+    return false
 end
 
-local modules = loadModules({
-    "src/ui/init.lua",
-    "src/games/features/autofarm.lua",
-    "src/games/features/instant-cook.lua",
-    "src/games/features/drops.lua",
-    "src/games/features/autofarm-friends.lua"
-})
-
-local Library = modules["src/ui/init.lua"]
-local AutoFarm = modules["src/games/features/autofarm.lua"]
-local InstantCook = modules["src/games/features/instant-cook.lua"]
-local AutoDrop = modules["src/games/features/drops.lua"]
-local AutoFarmFriends = modules["src/games/features/autofarm-friends.lua"]
+local okAntiAFK, antiAFKError = pcall(AntiAFK.Start)
+if not okAntiAFK then
+    logWarn("Falha iniciando Anti-AFK: " .. tostring(antiAFKError))
+end
 
 if loading then
-    loading:SetProgress(0.68, "Interface e automações carregadas...")
+    pcall(loading.SetProgress, loading, 0.42, "Runtime e dashboard iniciados...")
+end
+
+local featurePaths = {
+    "src/ui/init.lua",
+    "src/games/features/restauranttycoon3/autofarm.lua",
+    "src/games/features/restauranttycoon3/instant-cook.lua",
+    "src/games/features/restauranttycoon3/drops.lua",
+    "src/games/features/restauranttycoon3/autofarm-friends.lua"
+}
+local modules = {}
+for _, path in ipairs(featurePaths) do
+    modules[path] = loadModule(path)
+end
+
+local Library = modules["src/ui/init.lua"]
+local AutoFarm = modules["src/games/features/restauranttycoon3/autofarm.lua"]
+local InstantCook = modules["src/games/features/restauranttycoon3/instant-cook.lua"]
+local AutoDrop = modules["src/games/features/restauranttycoon3/drops.lua"]
+local AutoFarmFriends = modules["src/games/features/restauranttycoon3/autofarm-friends.lua"]
+
+if loading then
+    pcall(loading.SetProgress, loading, 0.68, "Interface e automações carregadas...")
 end
 
 if not Library or type(Library.new) ~= "function" then
     logWarn("Biblioteca de UI invalida ou sem Library.new. Abortando inicializacao.")
     AntiAFK.Stop()
     runtime:Destroy()
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
@@ -264,7 +281,7 @@ if not okWindow or type(Window) ~= "table" then
     logWarn("Falha ao criar janela: " .. tostring(Window))
     AntiAFK.Stop()
     runtime:Destroy()
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
@@ -279,7 +296,7 @@ if not okTab or type(MainTab) ~= "table" then
     pcall(Window.Destroy, Window)
     AntiAFK.Stop()
     runtime:Destroy()
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
@@ -325,7 +342,7 @@ if RegisteredFeatures == 0 then
     pcall(Window.Destroy, Window)
     AntiAFK.Stop()
     runtime:Destroy()
-    if loading then loading:Destroy() end
+    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
@@ -386,7 +403,7 @@ log("Runtime health: " .. tostring(snapshot.Health))
 log("Restaurant Tycoon 3 inicializado com sucesso")
 
 if loading then
-    loading:Complete("Inicialização concluída")
+    pcall(loading.Complete, loading, "Inicialização concluída")
     env.__DEPHUB_LOADING_INSTANCE = nil
 end
 
