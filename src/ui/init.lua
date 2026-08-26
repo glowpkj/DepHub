@@ -17,9 +17,8 @@ end
 
 local function fetch(name)
     local url = BASE_URL .. name .. ".lua"
-    local cacheBust = "?dephubui=" .. tostring(math_floor(os.clock() * 1000000))
     local ok, result = pcall(function()
-        return game:HttpGet(url .. cacheBust)
+        return game:HttpGet(url)
     end)
     if ok and type(result) == "string" and #result > 0 then
         return true, result
@@ -43,36 +42,25 @@ local function restore()
     env.__DEPHUB_UI_MODULES = previousModules
 end
 
-local sources = {}
-local pending = #MODULES
 for _, name in ipairs(MODULES) do
-    task.spawn(function()
-        local okFetch, source = fetch(name)
-        sources[name] = okFetch and source or false
-        pending -= 1
-    end)
-end
-
-while pending > 0 do
-    task.wait()
-end
-
-for _, name in ipairs(MODULES) do
-    local source = sources[name]
-    if type(source) ~= "string" then
+    local okFetch, source = fetch(name)
+    if not okFetch then
         restore()
         return nil
     end
+
     local okCompile, chunk = compile(source, name)
     if not okCompile then
         restore()
         return nil
     end
+
     local okRun, result = pcall(chunk)
     if not okRun then
         restore()
         return nil
     end
+
     env.__DEPHUB_UI_MODULES[name] = result
 end
 
