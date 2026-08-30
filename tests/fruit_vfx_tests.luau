@@ -102,38 +102,4 @@ do
     check(not feature:Apply("Rumble", "Purple", "Default") and normal.WriteCount == writes, "empty Default has no fabricated original colors")
     feature:Destroy(); root:Destroy()
 
-    -- Exercise the real dependent selectors and button callbacks, not just setters.
-    root, normal, shifted = data()
-    feature = Factory.new({LocalPlayer=player})
-    local ui = modules.window.new("DepHub", "Blox Fruits")
-    local visual = ui:CreateTab("Visual/ESP", nil, "Visual tools")
-    local controls = feature:MountUI(visual, ui)
-    ui:SelectTab("Visual/ESP")
-    check(not controls.Controls.Frame.Visible, "color controls hidden until fruit selection")
-    ui.SearchBox.Text = "paleta"; ui.SearchBox.Text = ""
-    check(not controls.Controls.Frame.Visible, "search cannot reveal unselected fruit controls")
-    controls.Fruit:SetValue("Rumble")
-    check(controls.Controls.Frame.Visible and controls.Color:GetValue() == "Original (cor/skin anterior)", "choosing Rumble reveals dependent colors with safe original default")
-    local menu = controls.Color.Frame:FindFirstChildOfClass("Frame")
-    local function optionCount()
-        local count = 0
-        for _, item in ipairs(menu:GetChildren()) do if item:IsA("TextButton") then count += 1 end end
-        return count
-    end
-    check(optionCount() == 11, "dependent color menu contains all ten palettes and original")
-    controls.Fruit:SetValue("Selecione uma fruta"); controls.Fruit:SetValue("Rumble")
-    check(optionCount() == 11, "changing fruit rebuilds choices without duplicate buttons")
-    check(normal.WriteCount == 0 and shifted.WriteCount == 0, "selecting fruit does not auto-apply a skin")
-    controls.Color:SetValue("Roxo")
-    check(normal.WriteCount == 0, "selecting color waits for explicit Apply")
-    controls.Apply.Button.MouseButton1Click:Fire()
-    check(normal:GetAttribute("Default_Color1") == Color3.fromRGB(140,0,255) and shifted.WriteCount == 0, "Apply button targets chosen fruit/color/form")
-    controls.Form:SetValue("Ambas"); controls.Apply.Button.MouseButton1Click:Fire()
-    check(shifted:GetAttribute("Shifted_Color7") == Color3.fromRGB(125,20,220), "form selector can apply to both variants")
-    controls.Color:SetValue("Original (cor/skin anterior)"); controls.Apply.Button.MouseButton1Click:Fire()
-    check(normal:GetAttribute("Default_Color1") == Color3.fromRGB(11,22,33) and shifted:GetAttribute("Shifted_Color7") == nil, "Original dropdown selection restores instead of applying a fixed palette")
-    controls.Fruit:SetValue("Selecione uma fruta")
-    ui:SelectTab("Dashboard"); ui:SelectTab("Visual/ESP")
-    check(not controls.Controls.Frame.Visible, "clearing fruit stays hidden across tab changes")
-    feature:Destroy(); ui:Destroy(); root:Destroy()
 end

@@ -11,7 +11,6 @@ local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 local env = type(getgenv) == "function" and getgenv() or _G
 local STATE_KEY = "__DEPHUB_UNIVERSAL"
-local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local previous = env[STATE_KEY]
 if type(previous) == "table" and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
@@ -37,15 +36,6 @@ local function compile(source)
     return true, chunk
 end
 
-local function loadUI()
-    local ok, source = pcall(function() return game:HttpGet(BASE_URL .. "src/ui/init.lua?universal=" .. tostring(os.clock())) end)
-    if not ok or type(source) ~= "string" then return false end
-    local compiled, chunk = compile(source)
-    if not compiled then return false end
-    local ran, library = pcall(chunk)
-    return ran and type(library) == "table" and library or false
-end
-
 local function characterParts()
     local character = LocalPlayer.Character
     return character, character and character:FindFirstChildOfClass("Humanoid"), character and character:FindFirstChild("HumanoidRootPart")
@@ -55,14 +45,15 @@ local State = {
     Destroyed = false, Connections = {}, FeatureConnections = {}, ESPObjects = {}, Keys = {},
     Values = {WalkSpeed = 16, JumpPower = 50, FlySpeed = 70, ESPRange = 2000, ESPTextSize = 14, ESPColor = Color3.fromRGB(90, 170, 255), AimbotFOV = 180, AimPart = "Head", ChatMessage = "DepHub Universal", ChatInterval = 5},
     Toggles = {WalkSpeed = false, Jump = false, Fly = false, Noclip = false, ESP = false, ESPNames = true, ESPDistance = true, ESPHealth = true, TeamCheck = false, TeamColors = true, Chams = true, Fullbright = false, InfiniteZoom = false, Aimbot = false, ChatLoop = false},
-    UI = nil, TeleportTool = nil, FlyVelocity = nil, FlyGyro = nil, OriginalCollisions = {}, OriginalLighting = nil, OriginalZoom = LocalPlayer.CameraMaxZoomDistance
+    TeleportTool = nil, FlyVelocity = nil, FlyGyro = nil, OriginalCollisions = {}, OriginalLighting = nil, OriginalZoom = LocalPlayer.CameraMaxZoomDistance
 }
 env[STATE_KEY] = State
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Universal = State
 
 function State:Notify(message, kind)
-    if self.UI and type(self.UI.Notify) == "function" then pcall(self.UI.Notify, self.UI, "DepHub Universal", message, 3, kind or "Info") end
+    -- Keep operation feedback as data for a future frontend; do not create a popup.
+    self.LastNotification = {Message = tostring(message), Kind = kind or "Info"}
 end
 
 function State:ClearFeature(name)
@@ -253,68 +244,18 @@ function State:RunExternal(url, name)
     self:Notify(ran and (name .. " iniciado.") or ("Falha ao iniciar " .. name .. "."), ran and "Success" or "Error")
 end
 
-function State:CreateUI()
-    local Library = loadUI()
-    if not Library or type(Library.new) ~= "function" then return false end
-    local ok, Window = pcall(Library.new, "DepHub Universal", "Universal", "rbxassetid://79507712997362")
-    if not ok or type(Window) ~= "table" then return false end
-    self.UI, env.__DEPHUB.Window = Window, Window
-    local Movement = Window:CreateTab("Movimento", nil, "Movimento universal e teleporte.")
-    local Visual = Window:CreateTab("Visual", nil, "ESP e ajustes de iluminação.")
-    local Aim = Window:CreateTab("Mira", nil, "Assistência de câmera pelo cursor.")
-    local Chat = Window:CreateTab("Chat", nil, "Envio configurável com intervalo seguro.")
-    local Server = Window:CreateTab("Servidor", nil, "Reconexão e troca de servidor.")
-    local Developer = Window:CreateTab("Desenvolvedor", nil, "Ferramentas externas de inspeção.")
+-- Actions previously embedded in button/toggle callbacks remain backend APIs.
+function State:SetInfiniteZoom(enabled)
+    self.Toggles.InfiniteZoom = enabled == true
+    LocalPlayer.CameraMaxZoomDistance = self.Toggles.InfiniteZoom and 100000 or self.OriginalZoom
+end
 
-    local Locomotion = Movement:CreateSection("Velocidade e salto")
-    local Flight = Movement:CreateSection("Voo e teleporte")
-    Movement = Locomotion
-    local ESPInfo = Visual:CreateSection("Player ESP")
-    local ESPStyle = Visual:CreateSection("Aparência do ESP")
-    local Environment = Visual:CreateSection("Ambiente")
-    Visual = ESPInfo
-    Aim = Aim:CreateSection("Controle da mira")
-    Chat = Chat:CreateSection("Mensagens")
-    Server = Server:CreateSection("Conexão")
-    Developer = Developer:CreateSection("Inspeção e desenvolvimento")
+function State:Rejoin()
+    TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer)
+end
 
-    Movement:CreateSlider("WalkSpeed", "Velocidade do personagem.", 16, 250, 16, function(v) self.Values.WalkSpeed = v; self:ApplyMovement() end)
-    Movement:CreateToggle("Ativar WalkSpeed", "Mantém a velocidade configurada.", false, function(v) self.Toggles.WalkSpeed = v; self:ApplyMovement() end)
-    Movement:CreateSlider("Jump Power", "Força do salto.", 50, 250, 50, function(v) self.Values.JumpPower = v; self:ApplyMovement() end)
-    Movement:CreateToggle("Ativar Jump", "Mantém o salto configurado.", false, function(v) self.Toggles.Jump = v; self:ApplyMovement() end)
-    Flight:CreateSlider("Fly Speed", "Velocidade do voo.", 20, 250, 70, function(v) self.Values.FlySpeed = v end)
-    Flight:CreateToggle("Fly", "WASD, Espaço e Ctrl.", false, function(v) self:SetFly(v) end)
-    Flight:CreateToggle("No Clip", "Desativa a colisão do personagem.", false, function(v) self:SetNoclip(v) end)
-    Flight:CreateButton("Adicionar Click Teleport", function() self:CreateTeleportTool() end)
-
-    Visual:CreateToggle("Player ESP", "Informações dos jogadores.", false, function(v) self:SetESP(v) end)
-    Visual:CreateToggle("Nomes", "Nome no ESP.", true, function(v) self.Toggles.ESPNames = v end)
-    Visual:CreateToggle("Vida", "Vida no ESP.", true, function(v) self.Toggles.ESPHealth = v end)
-    Visual:CreateToggle("Distância", "Distância no ESP.", true, function(v) self.Toggles.ESPDistance = v end)
-    ESPStyle:CreateToggle("Chams", "Destaque através de paredes.", true, function(v) self.Toggles.Chams = v end)
-    ESPStyle:CreateToggle("Cores dos times", "Usa a cor do time de cada jogador.", true, function(v) self.Toggles.TeamColors = v end)
-    ESPStyle:CreateColorPicker("Cor do ESP", "Cor usada quando Cores dos times está desligado.", self.Values.ESPColor, function(v) self.Values.ESPColor = v end)
-    Visual:CreateToggle("Team Check", "Ignora o mesmo time no ESP e na mira.", false, function(v) self.Toggles.TeamCheck = v end)
-    Visual:CreateSlider("Alcance do ESP", "Distância máxima em studs.", 100, 10000, 2000, function(v) self.Values.ESPRange = v end)
-    ESPStyle:CreateSlider("Tamanho do texto", "Tamanho das informações.", 10, 30, 14, function(v) self.Values.ESPTextSize = v end)
-    Environment:CreateToggle("Fullbright", "Clareia o mapa e remove neblina.", false, function(v) self:SetFullbright(v) end)
-    Environment:CreateToggle("Infinite Zoom", "Amplia o limite da câmera.", false, function(v) self.Toggles.InfiniteZoom = v; LocalPlayer.CameraMaxZoomDistance = v and 100000 or self.OriginalZoom end)
-
-    Aim:CreateToggle("Aimbot", "Segure o botão direito para mirar.", false, function(v) self.Toggles.Aimbot = v end)
-    Aim:CreateSlider("FOV", "Raio de captura em pixels.", 30, 600, 180, function(v) self.Values.AimbotFOV = v end)
-    Aim:CreateDropdown("Parte do corpo", "Ponto usado pela mira.", {"Head", "HumanoidRootPart", "UpperTorso"}, "Head", function(v) self.Values.AimPart = v end)
-
-    Chat:CreateInput("Mensagem", "Texto enviado ao chat.", self.Values.ChatMessage, function(v) self.Values.ChatMessage = tostring(v) end)
-    Chat:CreateSlider("Intervalo", "Segundos entre mensagens (mínimo 3).", 3, 60, 5, function(v) self.Values.ChatInterval = v end)
-    Chat:CreateButton("Enviar uma vez", function() self:SendChat() end)
-    Chat:CreateToggle("Envio automático", "Repete usando o intervalo configurado.", false, function(v) self:SetChatLoop(v) end)
-    Chat:CreateLabel("Os filtros e a moderação do Roblox permanecem ativos.")
-
-    Server:CreateButton("Rejoin", function() TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, LocalPlayer) end)
-    Server:CreateButton("Server Hop", function() self:ServerHop() end)
-    Developer:CreateButton("Dex Explorer", function() self:RunExternal("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua", "Dex Explorer") end)
-    Developer:CreateLabel("O Dex só é baixado quando o botão é pressionado.")
-    return true
+function State:RunDex()
+    return self:RunExternal("https://raw.githubusercontent.com/infyiff/backup/main/dex.lua", "Dex Explorer")
 end
 
 function State:Destroy()
@@ -326,7 +267,6 @@ function State:Destroy()
     for name in pairs(self.FeatureConnections) do self:ClearFeature(name) end
     disconnectAll(self.Connections)
     if self.TeleportTool then pcall(self.TeleportTool.Destroy, self.TeleportTool) end
-    if self.UI then pcall(self.UI.Destroy, self.UI) end
     if env[STATE_KEY] == self then env[STATE_KEY] = nil end
     if env.__DEPHUB and env.__DEPHUB.Universal == self then env.__DEPHUB.Universal = nil end
 end
@@ -355,5 +295,4 @@ for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then c
 connect(State.Connections, Players.PlayerRemoving, function(player) State:RemoveESP(player) end)
 connect(State.Connections, LocalPlayer.CharacterAdded, function() task.wait(0.5); State:ApplyMovement(); if State.Toggles.Fly then State:SetFly(true) end end)
 
-if not State:CreateUI() then State:Destroy(); return false end
 return State

@@ -4,7 +4,6 @@ local type = type
 local tostring = tostring
 local ipairs = ipairs
 local pcall = pcall
-local math_floor = math.floor
 
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
@@ -34,9 +33,13 @@ local function cleanupRuntime()
         pcall(oldLoading.Destroy, oldLoading)
         env.__DEPHUB_LOADING_INSTANCE = nil
     end
+    env.__DEPHUB_UI_MODULES = nil
+    env.__DEPHUB_UI_LOADING = nil
     local state = env.__DEPHUB
     if type(state) ~= "table" then return end
-    for _, target in ipairs({state.BloxFruits, state.BloxFruitsUI, state.Universal, state.Updater, state.Runtime, state.Window}) do
+    -- Legacy handles are cleaned once when migrating an already running session.
+    for _, key in ipairs({"BloxFruits", "BloxFruitsUI", "Universal", "Updater", "Runtime", "Window"}) do
+        local target = state[key]
         if type(target) == "table" and type(target.Destroy) == "function" then
             pcall(target.Destroy, target)
         end
@@ -50,14 +53,14 @@ local function cleanupRuntime()
 end
 
 local previousState = env[STATE_KEY]
-if env[EXECUTED_KEY] and type(previousState) == "table" and previousState.status == "success" then
+if env[EXECUTED_KEY] and type(previousState) == "table" and previousState.status == "success" and previousState.Headless == true then
     allowedLog("Status: Loader ja executado com sucesso nesta sessao")
     return
 end
 
 cleanupRuntime()
 env[EXECUTED_KEY] = false
-env[STATE_KEY] = {status = "running", startedAt = os.clock(), Version = VERSION}
+env[STATE_KEY] = {status = "running", startedAt = os.clock(), Version = VERSION, Headless = true}
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
 env.__DEPHUB.Executor = detectExecutor()
@@ -74,10 +77,8 @@ env.__DEPHUB.Loader.MarkFailed = function(reason)
     env[EXECUTED_KEY] = false
 end
 
-local function fail(reason, loading)
+local function fail(reason)
     allowedLog("Falha: " .. tostring(reason))
-    if loading then pcall(loading.Destroy, loading) end
-    env.__DEPHUB_LOADING_INSTANCE = nil
     cleanupRuntime()
     env.__DEPHUB.Loader.MarkFailed(reason)
     return false
@@ -188,54 +189,30 @@ local targets = {
 }
 local target = targets[placeId] or targets[gameId] or {Core = "src/games/universal.lua", Universal = true}
 
-local loading
-local okLoading, Loading = loadModule("src/ui/loading.lua", false)
-if okLoading and type(Loading) == "table" and type(Loading.new) == "function" then
-    env.__DEPHUB_UI_LOADING = Loading
-    local okInstance, instance = pcall(function()
-        return Loading.new({Title = "DEPHUB", Status = "Aguardando jogo carregar...", LogoId = "rbxassetid://79507712997362", DisplayOrder = 10000, OpenDuration = 0.2})
-    end)
-    if okInstance and instance then
-        loading = instance
-        env.__DEPHUB_LOADING_INSTANCE = instance
-        pcall(instance.SetProgress, instance, 0.08, "Aguardando jogo carregar...")
-    end
-end
-
 if not game:IsLoaded() then game.Loaded:Wait() end
-local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:WaitForChild("PlayerGui", 30)
-if not playerGui then return fail("Jogo nao inicializou completamente", loading) end
 task.wait()
-if loading then pcall(loading.SetProgress, loading, 0.22, "Jogo carregado. Preparando modulo...") end
 
 local okCore, coreResult = loadModule(target.Core, false)
-if not okCore then return fail(coreResult, loading) end
-if loading then pcall(loading.SetProgress, loading, 0.72, "Modulo do jogo inicializado...") end
-
-env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and gameId ~= "119048529960596" and coreResult or nil
-
-if target.Universal or gameId ~= "119048529960596" then
-    if type(coreResult) ~= "table" then return fail(coreResult, loading) end
+if not okCore then return fail(coreResult) end
+local isRT3 = target.Core == "src/games/rt3.lua"
+if isRT3 then
+    if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
+elseif type(coreResult) ~= "table" then
+    return fail(coreResult)
 end
 
-if loading then pcall(loading.SetProgress, loading, 0.92, "Finalizando inicializacao...") end
+env.__DEPHUB.Universal = target.Universal and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and coreResult or nil
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
-if loading then
-    task.spawn(function()
-        pcall(loading.Complete, loading, "Inicializacao concluida")
-        env.__DEPHUB_LOADING_INSTANCE = nil
-    end)
-end
 allowedLog(target.Universal and "Status: Script universal carregado com sucesso" or "Status: Jogo compativel carregado com sucesso")
 
 task.defer(function()
-    local ok, updaterModule = loadModule("src/core/updater.lua", true)
+    local ok, updaterModule = loadModule("src/core/updater.lua", false)
     if not ok or type(updaterModule) ~= "table" or type(updaterModule.new) ~= "function" then return end
     local okNew, updater = pcall(function()
-        return updaterModule.new({PlaceId = game.PlaceId, GameId = game.GameId, PollInterval = 15, Countdown = 12, Mode = "serverhop"})
+        return updaterModule.new({PlaceId = game.PlaceId, GameId = game.GameId, PollInterval = 15, Mode = "serverhop"})
     end)
     if okNew and updater then
         env.__DEPHUB.Updater = updater

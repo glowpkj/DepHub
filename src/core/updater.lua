@@ -13,7 +13,6 @@ local HttpService = GetService(game, "HttpService")
 local TeleportService = GetService(game, "TeleportService")
 
 local LocalPlayer = Players.LocalPlayer
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 local MANIFEST_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/update-manifest.json"
 local SERVERS_URL = "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100"
@@ -48,22 +47,6 @@ local function decode(source)
     return false, ok and "JSON invalido" or tostring(result)
 end
 
-local function label(parent, text, size, position, textSize, color, font)
-    local object = Instance.new("TextLabel")
-    object.Size = size
-    object.Position = position
-    object.BackgroundTransparency = 1
-    object.Text = text
-    object.TextColor3 = color
-    object.Font = font or Enum.Font.Gotham
-    object.TextSize = textSize
-    object.TextWrapped = true
-    object.TextXAlignment = Enum.TextXAlignment.Center
-    object.TextYAlignment = Enum.TextYAlignment.Center
-    object.Parent = parent
-    return object
-end
-
 local function buildSet(list)
     local result = {}
     if type(list) ~= "table" then
@@ -86,18 +69,14 @@ function Updater.new(options)
     self.CurrentVersion = options.CurrentVersion and tostring(options.CurrentVersion) or nil
     self.CurrentCommit = options.CurrentCommit and tostring(options.CurrentCommit) or nil
     self.PollInterval = tonumber(options.PollInterval) or 15
-    self.Countdown = tonumber(options.Countdown) or 12
     self.Mode = options.Mode or "serverhop"
     self.StartupGrace = tonumber(options.StartupGrace) or 90
     self.StartedAt = os_clock()
     self.CancelledVersions = {}
     self.RejectedVersions = {}
     self.Destroyed = false
-    self.PromptOpen = false
-    self.PromptVersion = nil
+    self.PendingUpdate = nil
     self.ActionInProgress = false
-    self.ScreenGui = nil
-    self.Connections = {}
     return self
 end
 
@@ -168,126 +147,18 @@ function Updater:ValidateBackendChange(info)
     return #changedTracked > 0
 end
 
-function Updater:DestroyPrompt()
-    for _, connection in self.Connections do
-        if connection and connection.Disconnect then
-            pcall(connection.Disconnect, connection)
-        end
-    end
-    self.Connections = {}
-
-    if self.ScreenGui then
-        pcall(self.ScreenGui.Destroy, self.ScreenGui)
-        self.ScreenGui = nil
-    end
-
-    self.PromptOpen = false
-    self.PromptVersion = nil
-end
-
+-- Without a frontend, detected updates wait for explicit action.
 function Updater:Cancel()
-    if self.ActionInProgress then
-        return
+    if self.ActionInProgress then return end
+    if self.PendingUpdate then
+        self.CancelledVersions[self.PendingUpdate.Version] = true
+        self.PendingUpdate = nil
     end
-
-    if self.PromptVersion then
-        self.CancelledVersions[self.PromptVersion] = true
-    end
-
-    self:DestroyPrompt()
 end
 
-function Updater:CreatePrompt(info)
-    if self.Destroyed or self.PromptOpen or self.CancelledVersions[info.Version] then
-        return
-    end
-
-    self.PromptOpen = true
-    self.PromptVersion = info.Version
-
-    local existing = PlayerGui:FindFirstChild("DepHubUpdatePrompt")
-    if existing then
-        existing:Destroy()
-    end
-
-    local gui = Instance.new("ScreenGui")
-    gui.Name = "DepHubUpdatePrompt"
-    gui.IgnoreGuiInset = true
-    gui.ResetOnSpawn = false
-    gui.DisplayOrder = 10001
-    gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    gui.Parent = PlayerGui
-    self.ScreenGui = gui
-
-    local backdrop = Instance.new("Frame")
-    backdrop.Size = UDim2.fromScale(1, 1)
-    backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    backdrop.BackgroundTransparency = 0.35
-    backdrop.BorderSizePixel = 0
-    backdrop.Parent = gui
-
-    local card = Instance.new("Frame")
-    card.Size = UDim2.fromOffset(440, 240)
-    card.Position = UDim2.fromScale(0.5, 0.5)
-    card.AnchorPoint = Vector2.new(0.5, 0.5)
-    card.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
-    card.BorderSizePixel = 0
-    card.Parent = backdrop
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 12)
-    corner.Parent = card
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(45, 45, 45)
-    stroke.Parent = card
-
-    label(card, "DEPHUB ATUALIZADO", UDim2.new(1, -40, 0, 34), UDim2.fromOffset(20, 20), 19, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBold)
-    label(card, "Uma nova versão do script está disponível.", UDim2.new(1, -40, 0, 28), UDim2.fromOffset(20, 58), 12, Color3.fromRGB(155, 155, 155))
-    label(card, info.Name, UDim2.new(1, -40, 0, 22), UDim2.fromOffset(20, 88), 11, Color3.fromRGB(100, 100, 100), Enum.Font.GothamBold)
-
-    local countdown = label(card, "Atualizando em " .. tostring(self.Countdown) .. "s", UDim2.new(1, -40, 0, 30), UDim2.fromOffset(20, 118), 14, Color3.fromRGB(255, 255, 255), Enum.Font.GothamBold)
-
-    local cancel = Instance.new("TextButton")
-    cancel.Size = UDim2.fromOffset(180, 38)
-    cancel.Position = UDim2.new(0.5, 0, 1, -18)
-    cancel.AnchorPoint = Vector2.new(0.5, 1)
-    cancel.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    cancel.BorderSizePixel = 0
-    cancel.Text = "CANCELAR"
-    cancel.TextColor3 = Color3.fromRGB(190, 190, 190)
-    cancel.Font = Enum.Font.GothamBold
-    cancel.TextSize = 11
-    cancel.AutoButtonColor = false
-    cancel.Parent = card
-
-    local cancelCorner = Instance.new("UICorner")
-    cancelCorner.CornerRadius = UDim.new(0, 8)
-    cancelCorner.Parent = cancel
-
-    self.Connections[#self.Connections + 1] = cancel.MouseButton1Click:Connect(function()
-        self:Cancel()
-    end)
-
-    task.spawn(function()
-        for remaining = self.Countdown, 0, -1 do
-            if self.Destroyed or not self.PromptOpen or self.PromptVersion ~= info.Version then
-                return
-            end
-
-            countdown.Text = remaining > 0 and "Atualizando em " .. tostring(remaining) .. "s" or "Atualizando..."
-
-            if remaining > 0 then
-                task.wait(1)
-            end
-        end
-
-        if self.Destroyed or not self.PromptOpen or self.PromptVersion ~= info.Version then
-            return
-        end
-
-        self:Teleport(info)
-    end)
+function Updater:ApplyPending()
+    if self.Destroyed or self.ActionInProgress or not self.PendingUpdate then return false end
+    return self:Teleport()
 end
 
 function Updater:GetServer()
@@ -320,19 +191,20 @@ function Updater:GetServer()
     return true, candidates[math_random(1, #candidates)]
 end
 
-function Updater:Teleport(info)
-    if self.ActionInProgress then
-        return
+function Updater:Teleport()
+    if self.Destroyed or self.ActionInProgress then
+        return false
     end
 
     self.ActionInProgress = true
-    self:DestroyPrompt()
+    self.PendingUpdate = nil
 
     if self.Mode == "rejoin" then
-        pcall(function()
-            TeleportService:Teleport(self.PlaceId, LocalPlayer)
+        local ok = pcall(function()
+            TeleportService:Teleport(tonumber(self.PlaceId), LocalPlayer)
         end)
-        return
+        if not ok then self.ActionInProgress = false end
+        return ok
     end
 
     local ok, jobId = self:GetServer()
@@ -341,17 +213,19 @@ function Updater:Teleport(info)
             TeleportService:TeleportToPlaceInstance(tonumber(self.PlaceId), jobId, LocalPlayer)
         end)
         if teleported then
-            return
+            return true
         end
     end
 
-    pcall(function()
+    local teleported = pcall(function()
         TeleportService:Teleport(tonumber(self.PlaceId), LocalPlayer)
     end)
+    if not teleported then self.ActionInProgress = false end
+    return teleported
 end
 
 function Updater:Check()
-    if self.Destroyed or self.PromptOpen or self.ActionInProgress then
+    if self.Destroyed or self.PendingUpdate or self.ActionInProgress then
         return
     end
 
@@ -387,7 +261,7 @@ function Updater:Check()
         return
     end
 
-    self:CreatePrompt(info)
+    self.PendingUpdate = info
 end
 
 function Updater:Start()
@@ -418,7 +292,7 @@ function Updater:Destroy()
     end
 
     self.Destroyed = true
-    self:DestroyPrompt()
+    self.PendingUpdate = nil
 end
 
 return Updater

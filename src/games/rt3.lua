@@ -5,7 +5,6 @@ local tostring = tostring
 local type = type
 local print = print
 local warn = warn
-local os_clock = os.clock
 
 local function log(message)
     pcall(print, "[DEPHUB RT3] " .. tostring(message))
@@ -69,60 +68,7 @@ local function loadModule(path)
     return result
 end
 
-local function getLoading()
-    local env = type(getgenv) == "function" and getgenv() or _G
-    return env.__DEPHUB_LOADING_INSTANCE
-end
-
-local function metricColor(value, greenThreshold, yellowThreshold, invert)
-    if value == nil then
-        return Color3.fromRGB(150, 150, 150)
-    end
-
-    if invert then
-        if value <= greenThreshold then
-            return Color3.fromRGB(80, 200, 120)
-        elseif value <= yellowThreshold then
-            return Color3.fromRGB(230, 180, 60)
-        end
-        return Color3.fromRGB(230, 80, 80)
-    end
-
-    if value >= greenThreshold then
-        return Color3.fromRGB(80, 200, 120)
-    elseif value >= yellowThreshold then
-        return Color3.fromRGB(230, 180, 60)
-    end
-    return Color3.fromRGB(230, 80, 80)
-end
-
 log("Inicializando Restaurant Tycoon 3")
-
-local loading = getLoading()
-if not loading then
-    local Loading = loadModule("src/ui/loading.lua")
-    if Loading and type(Loading.new) == "function" then
-        local env = type(getgenv) == "function" and getgenv() or _G
-        env.__DEPHUB_UI_LOADING = Loading
-        local okLoading, instance = pcall(function()
-            return Loading.new({
-                Title = "DEPHUB",
-                Status = "Preparando inicialização...",
-                LogoId = "rbxassetid://79507712997362"
-            })
-        end)
-        if okLoading then
-            loading = instance
-            env.__DEPHUB_LOADING_INSTANCE = instance
-        else
-            logWarn("Falha criando loading: " .. tostring(instance))
-        end
-    end
-end
-
-if loading then
-    pcall(loading.SetProgress, loading, 0.08, "Preparando núcleo...")
-end
 
 local corePaths = {
     "src/core/scheduler.lua",
@@ -142,37 +88,28 @@ local Dashboard = core["src/core/dashboard.lua"]
 local Runtime = core["src/core/runtime.lua"]
 local AntiAFK = core["src/core/anti-afk.lua"]
 
-if loading then
-    pcall(loading.SetProgress, loading, 0.28, "Núcleo carregado...")
-end
-
 if not Scheduler or type(Scheduler.new) ~= "function" then
     logWarn("Scheduler indisponivel. Abortando inicializacao.")
-    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 if not HealthMonitor or type(HealthMonitor.new) ~= "function" then
     logWarn("Health Monitor indisponivel. Abortando inicializacao.")
-    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 if not Dashboard or type(Dashboard.new) ~= "function" then
     logWarn("Dashboard provider indisponivel. Abortando inicializacao.")
-    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 if not Runtime or type(Runtime.new) ~= "function" then
     logWarn("Runtime indisponivel. Abortando inicializacao.")
-    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 if not AntiAFK or type(AntiAFK.Start) ~= "function" then
     logWarn("Anti-AFK indisponivel. Abortando inicializacao.")
-    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
@@ -204,12 +141,23 @@ end)
 
 if not okRuntime or type(runtime) ~= "table" then
     logWarn("Falha criando Runtime: " .. tostring(runtime))
-    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Runtime = runtime
+runtime.Features = {}
+local destroyRuntime = runtime.Destroy
+function runtime:Destroy()
+    if self.Destroyed then return end
+    for _, feature in pairs(self.Features) do
+        local handler = feature.Toggle or feature.Set
+        if type(handler) == "function" then pcall(handler, false) end
+    end
+    self.Features = {}
+    pcall(AntiAFK.Stop)
+    destroyRuntime(self)
+end
 env.__DEPHUB.Scheduler = runtime.Scheduler
 env.__DEPHUB.HealthMonitor = runtime.HealthMonitor
 env.__DEPHUB.Dashboard = runtime.Dashboard
@@ -230,7 +178,6 @@ if not okStart then
     logWarn("Falha iniciando Runtime: " .. tostring(startError))
     AntiAFK.Stop()
     runtime:Destroy()
-    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
@@ -239,12 +186,7 @@ if not okAntiAFK then
     logWarn("Falha iniciando Anti-AFK: " .. tostring(antiAFKError))
 end
 
-if loading then
-    pcall(loading.SetProgress, loading, 0.42, "Runtime e dashboard iniciados...")
-end
-
 local featurePaths = {
-    "src/ui/init.lua",
     "src/games/features/restauranttycoon3/autofarm.lua",
     "src/games/features/restauranttycoon3/instant-cook.lua",
     "src/games/features/restauranttycoon3/drops.lua",
@@ -255,157 +197,47 @@ for _, path in ipairs(featurePaths) do
     modules[path] = loadModule(path)
 end
 
-local Library = modules["src/ui/init.lua"]
 local AutoFarm = modules["src/games/features/restauranttycoon3/autofarm.lua"]
 local InstantCook = modules["src/games/features/restauranttycoon3/instant-cook.lua"]
 local AutoDrop = modules["src/games/features/restauranttycoon3/drops.lua"]
 local AutoFarmFriends = modules["src/games/features/restauranttycoon3/autofarm-friends.lua"]
 
-if loading then
-    pcall(loading.SetProgress, loading, 0.68, "Interface e automações carregadas...")
-end
-
-if not Library or type(Library.new) ~= "function" then
-    logWarn("Biblioteca de UI invalida ou sem Library.new. Abortando inicializacao.")
-    AntiAFK.Stop()
-    runtime:Destroy()
-    if loading then pcall(loading.Destroy, loading) end
-    return false
-end
-
-local okWindow, Window = pcall(function()
-    return Library.new("DepHub", "Restaurant Tycoon 3", "rbxassetid://79507712997362")
-end)
-
-if not okWindow or type(Window) ~= "table" then
-    logWarn("Falha ao criar janela: " .. tostring(Window))
-    AntiAFK.Stop()
-    runtime:Destroy()
-    if loading then pcall(loading.Destroy, loading) end
-    return false
-end
-
-env.__DEPHUB.Window = Window
-
-local okTab, MainTab = pcall(function()
-    local tab = Window:CreateTab("Automação", nil, "Gerenciamento de rotinas automatizadas e telemetria.")
-    return tab:CreateSection("Rotinas do restaurante")
-end)
-
-if not okTab or type(MainTab) ~= "table" then
-    logWarn("Falha ao criar aba principal: " .. tostring(MainTab))
-    pcall(Window.Destroy, Window)
-    AntiAFK.Stop()
-    runtime:Destroy()
-    if loading then pcall(loading.Destroy, loading) end
-    return false
-end
-
 local RegisteredFeatures = 0
 
-local function addToggle(title, description, module)
+local function registerFeature(name, module)
     if not module then
-        logWarn("Feature indisponivel: " .. title)
+        logWarn("Feature indisponivel: " .. name)
         return false
     end
 
     local handler = module.Toggle or module.Set
     if type(handler) ~= "function" then
-        logWarn("Feature sem Toggle/Set: " .. title)
+        logWarn("Feature sem Toggle/Set: " .. name)
         return false
     end
 
-    local ok, err = pcall(function()
-        MainTab:CreateToggle(title, description, false, function(state)
-            local success, executionError = pcall(handler, state)
-            if not success then
-                logWarn("Erro em " .. title .. ": " .. tostring(executionError))
-            end
-        end)
-    end)
-
-    if not ok then
-        logWarn("Falha ao registrar " .. title .. ": " .. tostring(err))
-        return false
-    end
-
+    runtime.Features[name] = module
     RegisteredFeatures = RegisteredFeatures + 1
     return true
 end
 
-addToggle("Auto Farm Geral", "Ativa o atendimento e gerenciamento automático.", AutoFarm)
-addToggle("Cozimento Instantâneo", "Automatiza o processamento das tarefas de cozinha.", InstantCook)
-addToggle("Auto Drop", "Coleta automaticamente os drops disponíveis.", AutoDrop)
-addToggle("Auto Farm Friends", "Automatiza interações permitidas nos tycoons de amigos.", AutoFarmFriends)
+registerFeature("AutoFarm", AutoFarm)
+registerFeature("InstantCook", InstantCook)
+registerFeature("AutoDrop", AutoDrop)
+registerFeature("AutoFarmFriends", AutoFarmFriends)
 
 if RegisteredFeatures == 0 then
     logWarn("Nenhuma feature foi registrada.")
-    pcall(Window.Destroy, Window)
     AntiAFK.Stop()
     runtime:Destroy()
-    if loading then pcall(loading.Destroy, loading) end
     return false
 end
 
-local dashboardData = runtime.Dashboard:Get()
-local lastReleaseVersion = dashboardData and dashboardData.ScriptVersion or nil
-
-local function updateDashboard(data)
-    if not Window or Window.Destroyed or not Window.DashboardStats then
-        return
-    end
-
-    local stats = Window.DashboardStats
-    local fps = data.FPS or 0
-    local ping = data.Ping
-
-    Window.__DEPHUBLastFPS = fps
-
-    if stats.Status then
-        stats.Status:SetValue(data.ScriptVersion or "--")
-    end
-
-    if stats.Version then
-        stats.Version:SetValue(tostring(fps))
-        stats.Version:SetColor(metricColor(fps, 55, 30, false))
-    end
-
-    if stats.Ping then
-        stats.Ping:SetValue(ping and tostring(math.floor(ping + 0.5)) .. " ms" or "--")
-        stats.Ping:SetColor(metricColor(ping, 60, 120, true))
-    end
-end
-
-runtime.Dashboard.OnUpdate = function(data)
-    updateDashboard(data)
-
-    if data.ScriptVersion and data.ScriptVersion ~= lastReleaseVersion then
-        lastReleaseVersion = data.ScriptVersion
-        if data.RecentUpdates then
-            Window:SetReleases(data.RecentUpdates)
-        end
-    elseif data.RecentUpdates then
-        Window:SetReleases(data.RecentUpdates)
-    end
-end
-
-if dashboardData then
-    updateDashboard(dashboardData)
-    if dashboardData.RecentUpdates then
-        Window:SetReleases(dashboardData.RecentUpdates)
-    end
-end
-
 local snapshot = runtime:GetSnapshot()
-dashboardData = snapshot.Dashboard or dashboardData or {}
+local dashboardData = snapshot.Dashboard or {}
 
 log("Dashboard: " .. tostring(dashboardData.GameName or "Unknown") .. " | Ping: " .. tostring(dashboardData.Ping or "Unknown") .. " ms | FPS: " .. tostring(dashboardData.FPS or "Unknown") .. " | Script: " .. tostring(dashboardData.ScriptVersion or "Unknown") .. " | Executor: " .. tostring(dashboardData.Executor or "Unknown"))
 log("Runtime health: " .. tostring(snapshot.Health))
 log("Restaurant Tycoon 3 inicializado com sucesso")
-
-if loading then
-    pcall(loading.Complete, loading, "Inicialização concluída")
-    env.__DEPHUB_LOADING_INSTANCE = nil
-end
 
 return true

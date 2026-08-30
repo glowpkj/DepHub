@@ -113,7 +113,7 @@ function Feature:_commit(changes)
 end
 
 function Feature:Apply(fruit, color, form)
-    if self.Destroyed then return false, "Painel encerrado." end
+    if self.Destroyed then return false, "Módulo encerrado." end
     if self.Busy then return false, "Aguarde a operação atual." end
     form = formIds[form] or form or "Default"
     if color == ORIGINAL or color == "Original" then return self:Restore(fruit, form) end
@@ -128,7 +128,7 @@ function Feature:Apply(fruit, color, form)
         local object, attributes, rule = target.Object, target.Attributes, target.Rule
         local record = self.Records[object] or {Original = table.clone(attributes), Owned = {}, Fruit = fruit, Form = target.Form}
         for key, applied in pairs(record.Owned) do
-            if attributes[key] ~= applied then return false, "As cores mudaram fora do painel. Use Restaurar para liberar o estado anterior e tente novamente." end
+            if attributes[key] ~= applied then return false, "As cores mudaram fora do módulo. Use Restaurar para liberar o estado anterior e tente novamente." end
         end
         local slots = {}
         if rule.ExistingOnly then
@@ -191,39 +191,8 @@ function Feature:Restore(fruit, form)
     if not ok then return false, result end
     for _, item in ipairs(released) do item.Record.Owned[item.Key] = nil end
     self:_prune()
-    if skipped > 0 then return true, "Restaurado o que ainda pertencia ao painel; cores alteradas pelo jogo foram preservadas.", "Warning" end
-    return true, result == 0 and "Nenhuma alteração local pendente para restaurar." or "Cor/skin anterior restaurada; atributos criados pelo painel foram removidos."
-end
-
-function Feature:MountUI(tab, window)
-    local selection = tab:CreateSection("Skins / cores das frutas")
-    local controls = tab:CreateSection("Paleta da fruta")
-    local selected, selectedColor, selectedForm = nil, ORIGINAL, "Normal (Default)"
-    local colors
-    local choices = {"Selecione uma fruta"}
-    for _, name in ipairs(self:GetFruits()) do choices[#choices + 1] = name end
-    local fruitSelector = selection:CreateDropdown("Fruta compatível", "Frutas cadastradas no código.", choices, choices[1], function(name)
-        if self.Destroyed or window.Destroyed then return end
-        selected = fruits[name] and name or nil
-        selectedColor = ORIGINAL
-        colors:SetOptions(selected and self:GetColors(selected) or {}, selected and ORIGINAL or "Selecione a fruta")
-        controls:SetVisible(selected ~= nil)
-    end)
-    selection:CreateLabel("Rumble disponível. Alterações somente ao aplicar; sem ativação automática.")
-    colors = controls:CreateDropdown("Cor / skin", "Paletas disponíveis para a fruta selecionada.", {}, "Selecione a fruta", function(name) selectedColor = name end)
-    local forms = controls:CreateDropdown("Forma", "Normal, transformada ou ambas.", {"Normal (Default)", "Transformada (Shifted)", "Ambas"}, selectedForm, function(name) selectedForm = name end)
-    local function report(ok, message, kind) window:Notify("Cores das frutas", message, 5, kind or (ok and "Success" or "Error")) end
-    local apply = controls:CreateButton("Aplicar cor selecionada", function()
-        if not selected or self.Destroyed or window.Destroyed then return end
-        report(self:Apply(selected, selectedColor, selectedForm))
-    end)
-    local restore = controls:CreateButton("Restaurar todas as formas desta fruta", function()
-        if not selected or self.Destroyed or window.Destroyed then return end
-        report(self:Restore(selected, "Both"))
-    end)
-    controls:CreateLabel("Original = valores existentes antes da primeira alteração, inclusive a skin equipada. Não concede skins na conta.")
-    controls:SetVisible(false)
-    return {Fruit = fruitSelector, Color = colors, Form = forms, Apply = apply, Restore = restore, Controls = controls}
+    if skipped > 0 then return true, "Restaurado o que ainda pertencia ao módulo; cores alteradas pelo jogo foram preservadas.", "Warning" end
+    return true, result == 0 and "Nenhuma alteração local pendente para restaurar." or "Cor/skin anterior restaurada; atributos criados pelo módulo foram removidos."
 end
 
 function Feature:Destroy()
