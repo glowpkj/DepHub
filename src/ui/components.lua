@@ -57,7 +57,8 @@ local function responsiveField(tab, card, title, description, control, rightSpac
         control.Position = stacked and UDim2.fromOffset(13, 63) or UDim2.new(1, -12, 0, 16)
         control.Size = stacked and UDim2.new(1, -26, 0, 30) or UDim2.fromOffset(rightSpace - 38, 30)
         if panel then panel.Position = UDim2.fromOffset(12, collapsed) end
-        tab:_resize(card, collapsed + ((panel and panel.Visible) and extraHeight or 0))
+        local expandedHeight = type(extraHeight) == "function" and extraHeight() or extraHeight
+        tab:_resize(card, collapsed + ((panel and panel.Visible) and expandedHeight or 0))
     end
     local lastWidth
     track(tab, card:GetPropertyChangedSignal("AbsoluteSize"), function()
@@ -209,6 +210,7 @@ function Components.Register(Tab)
         local current = default
         local button = Instance.new("TextButton")
         button.Size, button.Position, button.AnchorPoint, button.BackgroundColor3, button.BorderSizePixel, button.Text, button.TextColor3, button.Font, button.TextSize, button.Parent = UDim2.fromOffset(116, 30), UDim2.new(1, -12, 0, 16), Vector2.new(1, 0), Colors.Surface, 0, tostring(default or "Select"), Colors.Light, Enum.Font.GothamMedium, 10, card
+        button.TextTruncate = Enum.TextTruncate.AtEnd
         corner(button, 6); stroke(button, 0.35)
         local menu = Instance.new("Frame")
         menu.Size, menu.Position, menu.BackgroundColor3, menu.BorderSizePixel, menu.Visible, menu.ZIndex, menu.Parent = UDim2.new(1, -24, 0, #options * 30 + 8), UDim2.fromOffset(12, 62), Colors.Surface, 0, false, 2, card
@@ -217,14 +219,21 @@ function Components.Register(Tab)
         local padding = Instance.new("UIPadding"); padding.PaddingTop, padding.PaddingBottom, padding.PaddingLeft, padding.PaddingRight, padding.Parent = UDim.new(0, 4), UDim.new(0, 4), UDim.new(0, 4), UDim.new(0, 4), menu
         local object = {Frame = card}
         local tab = self
-        local relayout = responsiveField(tab, card, titleLabel, descriptionLabel, button, 154, menu, #options * 30 + 16)
+        local relayout = responsiveField(tab, card, titleLabel, descriptionLabel, button, 154, menu, function() return #options * 30 + 16 end)
         function object:SetValue(newValue, silent) current = newValue; button.Text = tostring(newValue); menu.Visible = false; relayout(); if callback and not silent then task.spawn(callback, newValue) end end
         function object:GetValue() return current end
-        for index, option in ipairs(options) do
-            local choice = Instance.new("TextButton")
-            choice.Size, choice.BackgroundTransparency, choice.Text, choice.TextColor3, choice.Font, choice.TextSize, choice.LayoutOrder, choice.ZIndex, choice.Parent = UDim2.new(1, 0, 0, 28), 1, tostring(option), Colors.Gray, Enum.Font.Gotham, 10, index, 3, menu
-            choice.MouseButton1Click:Connect(function() object:SetValue(option) end)
+        function object:SetOptions(newOptions, newDefault)
+            options = table.clone(newOptions)
+            for _, child in ipairs(menu:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
+            menu.Size = UDim2.new(1, -24, 0, #options * 30 + 8)
+            for index, option in ipairs(options) do
+                local choice = Instance.new("TextButton")
+                choice.Size, choice.BackgroundTransparency, choice.Text, choice.TextColor3, choice.Font, choice.TextSize, choice.LayoutOrder, choice.ZIndex, choice.Parent = UDim2.new(1, 0, 0, 28), 1, tostring(option), Colors.Gray, Enum.Font.Gotham, 10, index, 3, menu
+                choice.MouseButton1Click:Connect(function() object:SetValue(option) end)
+            end
+            self:SetValue(newDefault or options[1] or "Selecione", true)
         end
+        object:SetOptions(options, default)
         button.MouseButton1Click:Connect(function() menu.Visible = not menu.Visible; relayout() end)
         return object
     end

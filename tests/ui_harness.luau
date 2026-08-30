@@ -30,8 +30,11 @@ function UDim2.new(x, ox, y, oy) return {X = UDim.new(x, ox), Y = UDim.new(y, oy
 function UDim2.fromOffset(x, y) return UDim2.new(0, x, 0, y) end
 function UDim2.fromScale(x, y) return UDim2.new(x, 0, y, 0) end
 local Color3 = {}
-function Color3.fromRGB(r, g, b) return {R = r/255, G = g/255, B = b/255} end
-function Color3.new(r, g, b) return {R = r, G = g, B = b} end
+local colorMeta = {__eq = function(a, b) return a.R == b.R and a.G == b.G and a.B == b.B end}
+function Color3.new(r, g, b) return setmetatable({R = r, G = g, B = b, __color = true}, colorMeta) end
+function Color3.fromRGB(r, g, b) return Color3.new(r/255, g/255, b/255) end
+local builtinTypeof = typeof
+local function typeof(value) return type(value) == "table" and value.__color and "Color3" or builtinTypeof(value) end
 local TweenInfo = {new = function(...) return {} end}
 local task = {spawn = function(fn, ...) return fn(...) end, defer = function(fn, ...) return fn(...) end, delay = function() end}
 local events = {InputBegan=true,InputChanged=true,InputEnded=true,MouseEnter=true,MouseLeave=true,MouseButton1Click=true,FocusLost=true,Changed=true}
@@ -71,6 +74,18 @@ function methods:FindFirstChild(name) for _, child in ipairs(self._children) do 
 function methods:WaitForChild(name) return assert(self:FindFirstChild(name), "Missing child " .. name) end
 function methods:FindFirstChildOfClass(class) for _, child in ipairs(self._children) do if child:IsA(class) then return child end end end
 function methods:GetPropertyChangedSignal(key) if not self._signals[key] then self._signals[key] = signal() end; return self._signals[key] end
+function methods:IsDescendantOf(ancestor)
+    local parent = self.Parent
+    while parent do if parent == ancestor then return true end; parent = parent.Parent end
+    return false
+end
+function methods:GetAttributes() if self.FailRead then error("Simulated read failure") end; return table.clone(self._attributes) end
+function methods:GetAttribute(key) return self._attributes[key] end
+function methods:SetAttribute(key, value)
+    if self.FailKey == key then self.FailKey = nil; error("Simulated attribute failure") end
+    self._attributes[key] = value
+    self.WriteCount = (self.WriteCount or 0) + 1
+end
 function methods:Destroy()
     for _, child in ipairs(self:GetChildren()) do child:Destroy() end
     for _, event in pairs(self._signals) do for _, connection in ipairs(event.connections) do connection:Disconnect() end end
@@ -78,7 +93,7 @@ function methods:Destroy()
 end
 local Instance = {}
 function Instance.new(class)
-    return setmetatable({_props={ClassName=class, Name=class, Visible=true, Size=UDim2.fromOffset(0,0), Position=UDim2.fromOffset(0,0)},_children={},_signals={}}, instanceMeta)
+    return setmetatable({_props={ClassName=class, Name=class, Visible=true, Size=UDim2.fromOffset(0,0), Position=UDim2.fromOffset(0,0)},_children={},_signals={},_attributes={}}, instanceMeta)
 end
 local player = Instance.new("Player")
 player.Name, player.DisplayName = "Tester", "Tester"
@@ -92,6 +107,7 @@ function services.TweenService:Create(object, info, props)
 end
 local game = {GetService=function(_, name) return assert(services[name], name) end}
 -- INSERT_MODULES
+-- INSERT_FRUIT_VFX_TESTS
 
 local library = modules.window
 local window = library.new("DepHub", "Universal", "")

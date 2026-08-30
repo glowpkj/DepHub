@@ -74,7 +74,14 @@ function Tab:CreateSection(name)
     list(content, 8)
     local section = setmetatable({Name = name, Frame = frame, WindowRef = self.WindowRef, Elements = {}, Records = {}, NextOrder = 0}, Tab)
     self:_mount(frame, 28)
-    self.Records[#self.Records].Section = section
+    local sectionRecord = self.Records[#self.Records]
+    sectionRecord.Section = section
+    function section:SetVisible(visible)
+        sectionRecord.Enabled = visible == true
+        frame.Visible = visible == true
+        self.WindowRef:_filter()
+        owner:_layout()
+    end
     function section:_layout()
         local height, count = 28, 0
         for _, item in ipairs(self.Records) do
@@ -121,10 +128,10 @@ function Window:_filter()
                 item.Object.Visible = showAll or matches(item.Object)
                 visible = visible or item.Object.Visible
             end
-            object.Visible = visible
+            object.Visible = visible and record.Enabled ~= false
             section:_layout()
         else
-            object.Visible = matches(object)
+            object.Visible = record.Enabled ~= false and matches(object)
         end
         if object.Visible then count = count + 1 end
     end
