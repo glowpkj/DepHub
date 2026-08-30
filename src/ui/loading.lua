@@ -87,7 +87,7 @@ function Loading.new(options)
     local title = Instance.new("TextLabel")
     title.Size = UDim2.new(0.56, -20, 0, 24)
     title.Position = UDim2.new(0.43, 0, 0.35, 0)
-    title.AnchorPoint = Vector2.new(0.5, 0.5)
+    title.AnchorPoint = Vector2.new(0, 0.5)
     title.BackgroundTransparency = 1
     title.Text = options.Title or "DEPHUB"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -100,7 +100,7 @@ function Loading.new(options)
     local status = Instance.new("TextLabel")
     status.Size = UDim2.new(0.56, -20, 0, 38)
     status.Position = UDim2.new(0.43, 0, 0.55, 0)
-    status.AnchorPoint = Vector2.new(0.5, 0.5)
+    status.AnchorPoint = Vector2.new(0, 0.5)
     status.BackgroundTransparency = 1
     status.Text = options.Status or "Inicializando..."
     status.TextColor3 = Color3.fromRGB(161, 151, 158)
@@ -133,8 +133,10 @@ function Loading.new(options)
     fill.Parent = progressContainer
     self.ProgressFill = fill
 
+    local viewport = workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+    local width = math.max(1, math.min(options.Width and viewport.X * options.Width or 480, viewport.X - 32, (viewport.Y - 32) * aspect.AspectRatio))
     tween(mainFrame, options.OpenDuration or 0.45, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
-        Size = UDim2.new(options.Width or 0.42, 0, options.Height or 0.3, 0)
+        Size = UDim2.fromOffset(width, width / aspect.AspectRatio)
     })
 
     self.FloatTween = tween(logo, 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, {
@@ -177,6 +179,7 @@ function Loading:Complete(status)
     if self.Destroyed or self.Completed then
         return
     end
+    if not self.Gui then self.Destroyed = true; return end
 
     self.Completed = true
     self:SetProgress(1, status or "Concluído")

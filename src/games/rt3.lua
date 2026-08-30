@@ -288,7 +288,8 @@ end
 env.__DEPHUB.Window = Window
 
 local okTab, MainTab = pcall(function()
-    return Window:CreateTab("Automação", nil, "Gerenciamento de rotinas automatizadas e telemetria.")
+    local tab = Window:CreateTab("Automação", nil, "Gerenciamento de rotinas automatizadas e telemetria.")
+    return tab:CreateSection("Rotinas do restaurante")
 end)
 
 if not okTab or type(MainTab) ~= "table" then
