@@ -1,10 +1,7 @@
 local game = game
-local task = task
 local type = type
 local tostring = tostring
 local pcall = pcall
-local math_floor = math.floor
-local UDim2_new = UDim2.new
 
 local env = type(getgenv) == "function" and getgenv() or _G
 local compiler = loadstring
@@ -79,23 +76,6 @@ Library.new = function(...)
     local window = originalNew(...)
     if type(Controller) == "table" and type(Controller.Enhance) == "function" then
         window = Controller.Enhance(window) or window
-    end
-    if type(window) == "table" then
-        window.SetOpen = function(self, shouldOpen)
-            if self.Destroyed or not self.Window then return end
-            local visible = shouldOpen == true
-            self.IsHidden = not visible
-            self.Window.Visible = visible
-            if self.ToggleButton then
-                self.ToggleButton.Visible = true
-                if not visible then
-                    self.LastOpenSize = self.Window.Size
-                end
-            end
-        end
-        if window.ToggleButton then
-            window.ToggleButton.Position = UDim2_new(0, 50, 0, 50)
-        end
     end
     return window
 end
