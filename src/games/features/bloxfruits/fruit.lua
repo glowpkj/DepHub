@@ -6,7 +6,6 @@ local ipairs = ipairs
 local tostring = tostring
 local string_lower = string.lower
 local math_floor = math.floor
-local UserInputService = game:GetService("UserInputService")
 
 local GENERIC_NAMES = {Fruit = true, Handle = true, Weld = true, Welded = true, Keep = true, Script = true, LocalScript = true, ToolScript = true, FruitAnimator = true, EatRemote = true}
 local WORLD_NON_ISLANDS = {Camera = true, Characters = true, _WorldOrigin = true, Map = true, Effects = true, Effect = true, Debris = true, Ignore = true, Temp = true, Temporary = true, SpawnLocation = true, Fruit = true}
@@ -250,29 +249,6 @@ function Feature:_startSpectate(record)
     end)
 end
 
-function Feature:_spectateButton(record)
-    local button = Instance.new("TextButton")
-    button.Name = "ViewFruitButton"
-    button.Size = UDim2.new(1, -12, 0, 24)
-    button.Position = UDim2.new(0, 6, 1, -28)
-    button.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-    button.BorderSizePixel = 0
-    button.Text = "SEGURE PARA VER"
-    button.TextColor3 = Color3.fromRGB(255, 255, 255)
-    button.Font = Enum.Font.GothamBold
-    button.TextSize = 10
-    button.Parent = record.Billboard
-    self.Context.Connect(record.Connections, button.InputBegan, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then self:_startSpectate(record) end
-    end)
-    self.Context.Connect(record.Connections, button.InputEnded, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then self:_stopSpectate(record) end
-    end)
-    self.Context.Connect(record.Connections, UserInputService.InputEnded, function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then self:_stopSpectate(record) end
-    end)
-end
-
 function Feature:_update(record)
     if self.State.Destroyed or not record.Label or not record.Label.Parent then return end
     local adornee = self:_adornee(record.Instance)
@@ -310,7 +286,7 @@ function Feature:_create(instance)
     billboard.Adornee = adornee
     billboard.AlwaysOnTop = true
     billboard.MaxDistance = 10000
-    billboard.Size = UDim2.fromOffset(300, 104)
+    billboard.Size = UDim2.fromOffset(300, 70)
     billboard.StudsOffset = Vector3.new(0, 2.8, 0)
     billboard.Parent = adornee
     local label = Instance.new("TextLabel")
@@ -334,7 +310,6 @@ function Feature:_create(instance)
     beam.Parent = self.Context.Workspace
     local record = {Instance = instance, Billboard = billboard, Label = label, Beam = beam, Adornee = adornee, FruitAttachment = nil, RootAttachment = nil, Spectating = false, SpectateThread = nil, PreviousCamera = nil, Connections = {}}
     self.Records[instance] = record
-    self:_spectateButton(record)
     self:_update(record)
     self.Context.Connect(record.Connections, instance.AncestryChanged, function(_, parent)
         if not parent or not self:_isFruit(instance) then self:_remove(instance) end

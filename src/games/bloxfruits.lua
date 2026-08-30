@@ -14,8 +14,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Teams = game:GetService("Teams")
 local Workspace = game:GetService("Workspace")
-local Stats = game:GetService("Stats")
-local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 local Remotes = ReplicatedStorage:FindFirstChild("Remotes")
 local ChangeSetting = Remotes and Remotes:FindFirstChild("ChangeSetting")
@@ -131,29 +129,6 @@ local function loadModule(path, context)
     return true, module
 end
 
-local function loadUILibrary()
-    local okGet, source = pcall(function() return game:HttpGet(BASE_URL .. "src/ui/init.lua?dephubui=" .. tostring(math_floor(os.clock() * 1000000))) end)
-    if not okGet or type(source) ~= "string" or #source == 0 then return false, tostring(source) end
-    local okCompile, chunk = compile(source)
-    if not okCompile then return false, chunk end
-    local okRun, library = pcall(chunk)
-    if not okRun or type(library) ~= "table" or type(library.new) ~= "function" then return false, tostring(library) end
-    return true, library
-end
-
-local function getPing()
-    local ok, value = pcall(function()
-        local network = Stats:FindFirstChild("Network")
-        local serverStats = network and network:FindFirstChild("ServerStatsItem")
-        local ping = serverStats and (serverStats:FindFirstChild("Data Ping") or serverStats:FindFirstChild("Ping"))
-        if not ping then return nil end
-        local raw = ping:GetValueString()
-        local number = tonumber(string.match(raw, "[%d%.]+"))
-        return number and math_floor(number + 0.5) or nil
-    end)
-    return ok and value or nil
-end
-
 local baseContext = {LocalPlayer = LocalPlayer, Players = Players, Workspace = Workspace, Connect = connect, DisconnectAll = disconnectAll, Destroy = destroy, GetRoot = getRoot, GetPlayer = getPlayer, GetHumanoid = getHumanoid, HealthText = healthText, IsProtectionName = isProtectionName, HasProtection = hasProtection, TeamColor = teamColor, ChangeSetting = ChangeSetting}
 local configOk, config = loadModule("src/games/features/bloxfruits/config.lua", baseContext)
 if not configOk then return false end
@@ -181,9 +156,6 @@ local State = {
     OriginalUnbreakableAll = nil,
     UnbreakableCaptured = false,
     CameraShakeDisabled = false,
-    UI = nil,
-    PingThread = nil,
-    PingStat = nil,
     Paths = {IceEffect = IceEffect, LegendarySwordDealer = LegendarySwordDealer, IceEffectPath = "game:GetService(\"ReplicatedStorage\").Effect.Container.Ice1.Waterwalk.ice", LegendarySwordDealerPath = "game:GetService(\"ReplicatedStorage\").NPCs[\"Legendary Sword Dealer\"]"}
 }
 
@@ -292,110 +264,10 @@ function State:_reapplyCharacter(character)
     end)
 end
 
-function State:_stopPingMonitor()
-    local thread = self.PingThread
-    self.PingThread = nil
-    if thread then pcall(task.cancel, thread) end
-end
-
-function State:_startPingMonitor(stat)
-    self:_stopPingMonitor()
-    self.PingStat = stat
-    self.PingThread = task.spawn(function()
-        while not self.Destroyed and self.UI and self.PingStat == stat do
-            local value = getPing()
-            if value then
-                pcall(stat.SetValue, stat, tostring(value) .. " ms")
-            else
-                pcall(stat.SetValue, stat, "--")
-            end
-            task.wait(1)
-        end
-    end)
-end
-
-function State:CreateUI()
-    if self.Destroyed then return false end
-    if self.UI and not self.UI.Destroyed then return true end
-    local okLibrary, Library = loadUILibrary()
-    if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then return false end
-    local okWindow, Window = pcall(Library.new, "DepHub", "Blox Fruits", "rbxassetid://79507712997362")
-    if not okWindow or type(Window) ~= "table" then return false end
-    self.UI = Window
-    env.__DEPHUB.Window = Window
-
-    local okCombat, Combat = pcall(Window.CreateTab, Window, "Combat/PvP", nil, "Combate, movimentação e modificadores de confronto.")
-    local okVisual, Visual = pcall(Window.CreateTab, Window, "Visual/ESP", nil, "Informações visuais, ESP e renderização.")
-    local okUtility, Utility = pcall(Window.CreateTab, Window, "Utility/Misc", nil, "Utilidades, rede e automação de time.")
-    local okSettings, Settings = pcall(Window.CreateTab, Window, "Settings", nil, "Configuração, persistência e versão do DepHub.")
-    if not okCombat or not okVisual or not okUtility or not okSettings then
-        pcall(Window.Destroy, Window)
-        self.UI = nil
-        env.__DEPHUB.Window = nil
-        return false
-    end
-
-    local function addToggle(tab, title, description, name)
-        tab:CreateToggle(title, description, self:GetToggle(name), function(enabled)
-            local ok = self:SetToggle(name, enabled)
-            if not ok then
-                task.defer(function()
-                    if self.UI and self.UI.Notify then self.UI:Notify("DepHub", "Falha ao alterar " .. title, 3, "Error") end
-                end)
-            end
-        end)
-    end
-
-    local Information = Combat:CreateSection("Informações")
-    Information:CreateLabel("SILENT AIM")
-    Information:CreateLabel("Interceptações de metamethod e alteração de remotes de jogos de terceiros não são habilitadas neste framework.")
-    Combat = Combat:CreateSection("Movimento")
-    self.FruitVFXControls = self.Features.FruitVFX:MountUI(Visual, Window)
-    Visual = Visual:CreateSection("Destaques e ESP")
-    Utility = Utility:CreateSection("Utilidades e equipe")
-    Settings = Settings:CreateSection("Preferências da biblioteca")
-    addToggle(Combat, "Unbreakable All", "Aplica o atributo de durabilidade enquanto ativo.", "UnbreakableAll")
-    Combat:CreateSlider("Dash Length", "Define o comprimento do dash.", 1, 100, self.Values.DashLength, function(value)
-        self:SetDashLength(value)
-    end)
-    addToggle(Combat, "Dash Customizer", "Ativa o controle personalizado do dash.", "DashCustomizer")
-    addToggle(Combat, "Flashstep No Cooldown", "Remove o cooldown do Flashstep quando suportado.", "FlashstepNoCooldown")
-
-    addToggle(Visual, "Player ESP", "Exibe informações visuais dos jogadores.", "PlayerESP")
-    addToggle(Visual, "Fruit ESP", "Exibe frutas detectadas no mapa.", "FruitESP")
-
-    local UtilityGrid = Utility:CreateStatGrid()
-    self:_startPingMonitor(UtilityGrid:CreateStat("PING", "--"))
-    addToggle(Utility, "Water Walking", "Permite caminhar sobre a água enquanto ativo.", "WaterWalking")
-    addToggle(Utility, "Auto Join Team", "Entra automaticamente no time configurado.", "AutoJoinTeam")
-    Utility:CreateDivider("PREFERRED TEAM")
-    Utility:CreateButton("Pirates", function() self:SetPreferredTeam("Pirates") end)
-    Utility:CreateButton("Marines", function() self:SetPreferredTeam("Marines") end)
-
-    Settings:CreateLabel("DEPHUB v" .. self.Version)
-    Settings:CreateLabel("Estado: configuração persistente ativa.")
-    Settings:CreateButton("Salvar Configuração", function()
-        local ok = self:SaveConfig()
-        Window:Notify("DepHub", ok and "Configuração salva." or "Falha ao salvar configuração.", 3, ok and "Success" or "Error")
-    end)
-    Settings:CreateButton("Reconstruir Interface", function()
-        local current = self.UI
-        if current then pcall(current.Destroy, current) end
-        self.UI = nil
-        task.defer(function() self:CreateUI() end)
-    end)
-
-    return true
-end
-
 function State:Destroy()
     if self.Destroyed then return end
     self:SaveConfig()
     self.Destroyed = true
-    self:_stopPingMonitor()
-    if self.UI then pcall(self.UI.Destroy, self.UI) end
-    self.UI = nil
-    if env.__DEPHUB and env.__DEPHUB.Window then env.__DEPHUB.Window = nil end
     for name in pairs(self.Toggles) do self.Toggles[name] = false end
     for _, feature in pairs(self.Features or {}) do pcall(feature.Destroy, feature) end
     pcall(config.Destroy, config)
@@ -422,10 +294,6 @@ function State:Start()
     end
     connect(self.Connections, LocalPlayer.CharacterAdded, function(character)
         self:_reapplyCharacter(character)
-        task.defer(function()
-            if self.Destroyed then return end
-            if not self.UI or self.UI.Destroyed then self:CreateUI() end
-        end)
     end)
     return true
 end
@@ -433,10 +301,6 @@ end
 if not LocalPlayer then return false end
 local ok, started = pcall(State.Start, State)
 if not ok or not started then
-    pcall(State.Destroy, State)
-    return false
-end
-if not State:CreateUI() then
     pcall(State.Destroy, State)
     return false
 end
