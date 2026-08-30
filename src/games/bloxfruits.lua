@@ -194,6 +194,7 @@ env.__DEPHUB.BloxFruits = State
 env.__DEPHUB.BloxFruitsPaths = State.Paths
 
 local featurePaths = {PlayerESP = "src/games/features/bloxfruits/playeresp.lua", FruitESP = "src/games/features/bloxfruits/fruit.lua", ObservationHaki = "src/games/features/bloxfruits/observation.lua", UnbreakableAll = "src/games/features/bloxfruits/unbreakable.lua", CameraShake = "src/games/features/bloxfruits/camerashake.lua", DashCustomizer = "src/games/features/bloxfruits/dash.lua", FlashstepNoCooldown = "src/games/features/bloxfruits/flashstep.lua", WaterWalking = "src/games/features/bloxfruits/waterwalking.lua", AutoJoinTeam = "src/games/features/bloxfruits/team.lua"}
+featurePaths.FruitVFX = "src/games/features/bloxfruits/fruitvfx.lua"
 local features = {}
 for name, path in pairs(featurePaths) do
     local ok, feature = loadModule(path, baseContext)
@@ -349,6 +350,7 @@ function State:CreateUI()
     Information:CreateLabel("SILENT AIM")
     Information:CreateLabel("Interceptações de metamethod e alteração de remotes de jogos de terceiros não são habilitadas neste framework.")
     Combat = Combat:CreateSection("Movimento")
+    self.FruitVFXControls = self.Features.FruitVFX:MountUI(Visual, Window)
     Visual = Visual:CreateSection("Destaques e ESP")
     Utility = Utility:CreateSection("Utilidades e equipe")
     Settings = Settings:CreateSection("Preferências da biblioteca")

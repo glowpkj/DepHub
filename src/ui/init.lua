@@ -13,7 +13,7 @@ if type(compiler) ~= "function" then
 end
 
 local function fetch(name)
-    local url = BASE_URL .. name .. ".lua?ui=next2"
+    local url = BASE_URL .. name .. ".lua?ui=fruit-vfx1"
     local ok, result = pcall(function()
         return game:HttpGet(url)
     end)
