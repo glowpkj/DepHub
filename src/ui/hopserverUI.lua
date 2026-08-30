@@ -21,14 +21,14 @@ local LoadingIconId = "rbxassetid://79507712997362"
 
 local Colors = {
 	Black = Color3_fromRGB(0, 0, 0),
-	Background = Color3_fromRGB(5, 5, 5),
-	Card = Color3_fromRGB(16, 16, 16),
+	Background = Color3_fromRGB(15, 14, 18),
+	Card = Color3_fromRGB(29, 27, 33),
 	CardHover = Color3_fromRGB(23, 23, 23),
 	Border = Color3_fromRGB(35, 35, 35),
 	White = Color3_fromRGB(255, 255, 255),
 	Gray = Color3_fromRGB(140, 140, 140),
 	DarkGray = Color3_fromRGB(90, 90, 90),
-	Accent = Color3_fromRGB(90, 140, 255),
+	Accent = Color3_fromRGB(210, 43, 67),
 	Error = Color3_fromRGB(230, 80, 80)
 }
 

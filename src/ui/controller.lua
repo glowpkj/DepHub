@@ -1,622 +1,229 @@
 local Controller = {}
 
-local game = game
-local task = task
-local type = type
-local tostring = tostring
-local pcall = pcall
-local ipairs = ipairs
-local pairs = pairs
-local math_clamp = math.clamp
-local math_max = math.max
-
 local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
+local UIS = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-
 local LocalPlayer = Players.LocalPlayer
 
-local Color3_fromRGB = Color3.fromRGB
-local UDim2_new = UDim2.new
-local UDim2_fromOffset = UDim2.fromOffset
-local UDim_new = UDim.new
-local Vector2_new = Vector2.new
-local Instance_new = Instance.new
-
-local Palette = {
-    Background = Color3_fromRGB(7, 8, 10),
-    BackgroundSoft = Color3_fromRGB(9, 10, 12),
-    Sidebar = Color3_fromRGB(9, 10, 12),
-    Titlebar = Color3_fromRGB(4, 5, 6),
-    Card = Color3_fromRGB(14, 15, 18),
-    CardHover = Color3_fromRGB(20, 21, 25),
-    Active = Color3_fromRGB(31, 33, 38),
-    Border = Color3_fromRGB(39, 41, 47),
-    BorderSoft = Color3_fromRGB(31, 33, 38),
-    White = Color3_fromRGB(245, 245, 247),
-    Text = Color3_fromRGB(214, 215, 220),
-    Muted = Color3_fromRGB(145, 147, 156),
-    Dim = Color3_fromRGB(91, 93, 101),
-    Accent = Color3_fromRGB(112, 126, 255),
-    Success = Color3_fromRGB(82, 203, 117)
+local C = {
+    Base = Color3.fromRGB(15, 14, 18),
+    Top = Color3.fromRGB(20, 18, 23),
+    Side = Color3.fromRGB(22, 20, 25),
+    Card = Color3.fromRGB(29, 27, 33),
+    CardHover = Color3.fromRGB(37, 33, 41),
+    Active = Color3.fromRGB(61, 28, 36),
+    Border = Color3.fromRGB(54, 47, 58),
+    Accent = Color3.fromRGB(210, 43, 67),
+    AccentSoft = Color3.fromRGB(132, 34, 49),
+    White = Color3.fromRGB(248, 245, 247),
+    Text = Color3.fromRGB(216, 208, 214),
+    Muted = Color3.fromRGB(150, 140, 147),
+    Dim = Color3.fromRGB(96, 88, 95),
+    Green = Color3.fromRGB(77, 205, 124)
 }
 
-local TabGlyphs = {
-    Dashboard = "▦",
-    ["Combat/PvP"] = "⚔",
-    ["Visual/ESP"] = "◉",
-    ["Utility/Misc"] = "◆",
-    Settings = "⚙",
-    ["Automação"] = "◆"
+local Glyphs = {
+    Dashboard = "⌂", ["Combat/PvP"] = "◈", ["Visual/ESP"] = "◉",
+    ["Utility/Misc"] = "◆", Settings = "⚙", ["Automação"] = "↻",
+    Movimento = "➤", Visual = "◉", ["Mira"] = "◎", Chat = "◇",
+    Servidor = "◫", Desenvolvedor = "⌘"
 }
 
-local function addConnection(window, connection)
-    if not connection then
-        return connection
-    end
-
-    window.Connections = window.Connections or {}
-    window.Connections[#window.Connections + 1] = connection
-    return connection
+local function corner(object, radius)
+    local value = object:FindFirstChildOfClass("UICorner") or Instance.new("UICorner")
+    value.CornerRadius = UDim.new(0, radius)
+    value.Parent = object
 end
 
-local function applyCorner(instance, radius)
-    local corner = instance:FindFirstChildOfClass("UICorner")
-    if not corner then
-        corner = Instance_new("UICorner")
-        corner.Parent = instance
-    end
-    corner.CornerRadius = UDim_new(0, radius)
-    return corner
+local function stroke(object, color, transparency)
+    local value = object:FindFirstChildOfClass("UIStroke") or Instance.new("UIStroke")
+    value.Color, value.Thickness, value.Transparency, value.Parent = color or C.Border, 1, transparency or 0, object
 end
 
-local function applyStroke(instance, color, transparency, thickness)
-    local stroke = instance:FindFirstChildOfClass("UIStroke")
-    if not stroke then
-        stroke = Instance_new("UIStroke")
-        stroke.Parent = instance
-    end
-    stroke.Color = color
-    stroke.Transparency = transparency
-    stroke.Thickness = thickness or 1
-    return stroke
+local function text(label, size, color, font)
+    if not label or not label:IsA("TextLabel") then return end
+    label.TextSize = size or label.TextSize
+    label.TextColor3 = color or C.Text
+    label.Font = font or Enum.Font.Gotham
 end
 
-local function directChildrenOfClass(parent, className)
-    local result = {}
-    if not parent then
-        return result
-    end
-    for _, child in ipairs(parent:GetChildren()) do
-        if child:IsA(className) then
-            result[#result + 1] = child
-        end
-    end
-    return result
+local function viewport()
+    return Workspace.CurrentCamera and Workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
 end
 
-local function findDirectText(parent, text)
-    if not parent then
-        return nil
-    end
-    for _, child in ipairs(parent:GetChildren()) do
-        if child:IsA("TextLabel") and child.Text == text then
-            return child
-        end
-    end
-    return nil
-end
-
-local function setTextStyle(label, size, color, font, alignment)
-    if not label then
-        return
-    end
-    label.TextSize = size
-    label.TextColor3 = color
-    label.Font = font
-    if alignment then
-        label.TextXAlignment = alignment
-    end
-end
-
-local function getViewport()
-    local camera = Workspace.CurrentCamera
-    if not camera then
-        return Vector2_new(1280, 720)
-    end
-    return camera.ViewportSize
-end
-
-local function applyWindowGeometry(window)
-    if window.Destroyed or not window.Window or not window.Sidebar or not window.Content or not window.TitleBar then
-        return
-    end
-
-    local main = window.Window
-    local viewport = getViewport()
-    local widthScale
-    local heightScale
-
-    if viewport.X <= 620 then
-        widthScale = 0.94
-        heightScale = 0.84
-    elseif viewport.X <= 1000 then
-        widthScale = 0.88
-        heightScale = 0.82
-    else
-        widthScale = 0.72
-        heightScale = 0.78
-    end
-
-    if main.Size.X.Scale ~= 0 and main.Size.Y.Scale ~= 0 then
-        main.Size = UDim2_new(widthScale, 0, heightScale, 0)
-    end
-
-    local estimatedWidth = math_max(viewport.X * widthScale, 500)
-    local sidebarWidth = math_clamp(estimatedWidth * 0.235, 185, 255)
-    local titlebarHeight = 54
-
-    window.TitleBar.Size = UDim2_new(1, 0, 0, titlebarHeight)
-    window.Sidebar.Size = UDim2_new(0, sidebarWidth, 1, -titlebarHeight)
-    window.Sidebar.Position = UDim2_new(0, 0, 0, titlebarHeight)
-    window.Content.Size = UDim2_new(1, -sidebarWidth, 1, -titlebarHeight)
-    window.Content.Position = UDim2_new(0, sidebarWidth, 0, titlebarHeight)
+local function styleGeometry(window)
+    local size = viewport()
+    local mobile = size.X < 720
+    local compact = size.X < 1050
+    local width = mobile and 0.96 or (compact and 0.88 or 0.74)
+    local height = mobile and 0.88 or 0.79
+    window.Window.Size = UDim2.new(width, 0, height, 0)
+    local limit = window.Window:FindFirstChildOfClass("UISizeConstraint")
+    if limit then limit.MinSize = mobile and Vector2.new(350, 300) or Vector2.new(620, 390); limit.MaxSize = Vector2.new(1180, 760) end
+    local sidebarWidth = mobile and 138 or (compact and 172 or 196)
+    local topHeight = mobile and 50 or 58
+    window.TitleBar.Size = UDim2.new(1, 0, 0, topHeight)
+    window.Sidebar.Position, window.Sidebar.Size = UDim2.new(0, 0, 0, topHeight), UDim2.new(0, sidebarWidth, 1, -topHeight)
+    window.Content.Position, window.Content.Size = UDim2.new(0, sidebarWidth, 0, topHeight), UDim2.new(1, -sidebarWidth, 1, -topHeight)
 end
 
 local function styleTitlebar(window)
-    local titlebar = window.TitleBar
-    if not titlebar then
-        return
-    end
-
-    titlebar.BackgroundColor3 = Palette.Titlebar
-
-    local logo
+    local bar = window.TitleBar
+    bar.BackgroundColor3 = C.Top
+    local line = bar:FindFirstChild("HohoAccentLine") or Instance.new("Frame")
+    line.Name, line.Size, line.Position, line.BackgroundColor3, line.BorderSizePixel, line.Parent = "HohoAccentLine", UDim2.new(1, 0, 0, 2), UDim2.new(0, 0, 1, -2), C.Accent, 0, bar
     local labels = {}
-    for _, child in ipairs(titlebar:GetChildren()) do
-        if child:IsA("ImageLabel") and not logo then
-            logo = child
-        elseif child:IsA("TextLabel") then
-            labels[#labels + 1] = child
-        elseif child:IsA("Frame") and child.AbsoluteSize.Y <= 2 then
-            child.BackgroundColor3 = Palette.Border
-        end
+    for _, child in ipairs(bar:GetChildren()) do
+        if child:IsA("TextLabel") then labels[#labels + 1] = child end
+        if child:IsA("ImageLabel") then child.Size, child.Position = UDim2.fromOffset(26, 26), UDim2.new(0, 17, 0.5, -13) end
     end
-
-    if logo then
-        logo.Size = UDim2_fromOffset(28, 28)
-        logo.Position = UDim2_new(0, 18, 0.5, 0)
-        logo.AnchorPoint = Vector2_new(0, 0.5)
-    end
-
-    for _, label in ipairs(labels) do
-        if label.Text == string.upper(window.HubName or "HUB") then
-            label.Position = UDim2_new(0, 58, 0, 0)
-            label.Size = UDim2_new(0, 100, 1, 0)
-            setTextStyle(label, 14, Palette.White, Enum.Font.GothamBold)
-        elseif label.Text == string.upper(window.Subtitle or "GAME SYSTEM") then
-            label.Position = UDim2_new(0, 154, 0, 0)
-            label.Size = UDim2_new(0, 220, 1, 0)
-            setTextStyle(label, 11, Palette.Muted, Enum.Font.GothamMedium)
-        end
-    end
+    if labels[1] then labels[1].Text = "DEPHUB"; labels[1].TextColor3 = C.White; labels[1].Font = Enum.Font.GothamBold; labels[1].TextSize = 15 end
+    if labels[2] then labels[2].TextColor3 = C.Muted; labels[2].Font = Enum.Font.GothamMedium; labels[2].TextSize = 10 end
 end
 
 local function styleSidebar(window)
-    local sidebar = window.Sidebar
-    if not sidebar then
-        return
+    local side = window.Sidebar
+    side.BackgroundColor3 = C.Side
+    local divider = side:FindFirstChild("HohoSideLine") or Instance.new("Frame")
+    divider.Name, divider.Size, divider.Position, divider.BackgroundColor3, divider.BorderSizePixel, divider.Parent = "HohoSideLine", UDim2.new(0, 1, 1, 0), UDim2.new(1, -1, 0, 0), C.Border, 0, side
+    for _, child in ipairs(side:GetChildren()) do
+        if child:IsA("ImageLabel") then child.Size, child.Position = UDim2.fromOffset(44, 44), UDim2.new(0.5, -22, 0, 18) end
+        if child:IsA("TextLabel") then
+            if child.Text == "NAVIGATION" or child.Text == "NAVEGAÇÃO" then child.Text = "PAGES"; text(child, 9, C.Dim, Enum.Font.GothamBold) else text(child, child.TextSize, C.Muted, child.Font) end
+        end
     end
-
-    sidebar.BackgroundColor3 = Palette.Sidebar
-
-    local oldDivider = sidebar:FindFirstChild("DepHubSidebarDivider")
-    if oldDivider then
-        oldDivider:Destroy()
-    end
-
-    local divider = Instance_new("Frame")
-    divider.Name = "DepHubSidebarDivider"
-    divider.Size = UDim2_new(0, 1, 1, 0)
-    divider.Position = UDim2_new(1, -1, 0, 0)
-    divider.BackgroundColor3 = Palette.BorderSoft
-    divider.BorderSizePixel = 0
-    divider.Parent = sidebar
-
-    local directImages = directChildrenOfClass(sidebar, "ImageLabel")
-    local logo = directImages[1]
-    if logo then
-        logo.Size = UDim2_fromOffset(56, 56)
-        logo.Position = UDim2_new(0.5, 0, 0, 22)
-        logo.AnchorPoint = Vector2_new(0.5, 0)
-    end
-
-    local brand = findDirectText(sidebar, string.upper(window.HubName or "HUB"))
-    local subtitle = findDirectText(sidebar, string.upper(window.Subtitle or "GAME SYSTEM"))
-    local navigation = findDirectText(sidebar, "NAVIGATION")
-
-    if brand then
-        brand.Position = UDim2_new(0, 18, 0, 84)
-        brand.Size = UDim2_new(1, -36, 0, 22)
-        setTextStyle(brand, 16, Palette.White, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
-    end
-
-    if subtitle then
-        subtitle.Position = UDim2_new(0, 18, 0, 108)
-        subtitle.Size = UDim2_new(1, -36, 0, 18)
-        setTextStyle(subtitle, 11, Palette.Muted, Enum.Font.GothamMedium, Enum.TextXAlignment.Center)
-    end
-
-    if navigation then
-        navigation.Text = "NAVEGAÇÃO"
-        navigation.Position = UDim2_new(0, 18, 0, 143)
-        navigation.Size = UDim2_new(1, -36, 0, 18)
-        setTextStyle(navigation, 9, Palette.Dim, Enum.Font.GothamBold)
-    end
-
     if window.TabContainer then
-        window.TabContainer.Position = UDim2_new(0, 14, 0, 170)
-        window.TabContainer.Size = UDim2_new(1, -28, 1, -242)
-        window.TabContainer.ScrollBarImageColor3 = Palette.Border
+        window.TabContainer.Position, window.TabContainer.Size = UDim2.new(0, 10, 0, 139), UDim2.new(1, -20, 1, -204)
+        window.TabContainer.ScrollBarThickness = 0
         local layout = window.TabContainer:FindFirstChildOfClass("UIListLayout")
-        if layout then
-            layout.Padding = UDim_new(0, 9)
-        end
+        if layout then layout.Padding = UDim.new(0, 5) end
     end
+end
 
-    for _, child in ipairs(sidebar:GetChildren()) do
-        if child:IsA("Frame") and child ~= divider and child ~= window.TabContainer then
-            local status = child:FindFirstChildOfClass("UICorner")
-            local hasText = child:FindFirstChildOfClass("TextLabel")
-            if status and hasText and child.Size.Y.Offset <= 60 then
-                child.Size = UDim2_new(1, -28, 0, 46)
-                child.Position = UDim2_new(0, 14, 1, -60)
-                child.BackgroundColor3 = Palette.Card
-                applyCorner(child, 9)
-                applyStroke(child, Palette.Border, 0.35, 1)
-                local labels = directChildrenOfClass(child, "TextLabel")
-                for _, label in ipairs(labels) do
-                    setTextStyle(label, 11, Palette.Muted, Enum.Font.GothamMedium)
-                end
-            end
-        end
-    end
+local function stylePage(tab)
+    if not tab.Page then return end
+    tab.Page.ScrollBarThickness, tab.Page.ScrollBarImageColor3 = 3, C.AccentSoft
+    local padding = tab.Page:FindFirstChildOfClass("UIPadding")
+    if padding then padding.PaddingLeft, padding.PaddingRight, padding.PaddingTop, padding.PaddingBottom = UDim.new(0, 20), UDim.new(0, 20), UDim.new(0, 18), UDim.new(0, 20) end
+    local layout = tab.Page:FindFirstChildOfClass("UIListLayout")
+    if layout then layout.Padding = UDim.new(0, 8) end
+    if tab.TitleLabel then text(tab.TitleLabel, 22, C.White, Enum.Font.GothamBold) end
+    if tab.DescriptionLabel then text(tab.DescriptionLabel, 11, C.Muted, Enum.Font.Gotham) end
 end
 
 local function styleTab(window, tab)
-    if not tab or not tab.Button then
-        return
-    end
-
+    if not tab or not tab.Button then return end
     local button = tab.Button
-    button.Size = UDim2_new(1, 0, 0, 48)
-    button.BackgroundColor3 = Palette.Active
-    applyCorner(button, 8)
-
-    if tab.Indicator then
-        tab.Indicator.Size = UDim2_fromOffset(3, 24)
-        tab.Indicator.Position = UDim2_new(0, 0, 0.5, 0)
-        tab.Indicator.BackgroundColor3 = Palette.White
+    button.Size, button.BackgroundColor3 = UDim2.new(1, 0, 0, 38), C.Active
+    corner(button, 6)
+    if tab.Indicator then tab.Indicator.Size, tab.Indicator.Position, tab.Indicator.BackgroundColor3 = UDim2.fromOffset(3, 20), UDim2.new(0, 0, 0.5, 0), C.Accent end
+    if tab.Label then tab.Label.Text, tab.Label.Position, tab.Label.Size = tab.Name, UDim2.new(0, 36, 0, 0), UDim2.new(1, -42, 1, 0); text(tab.Label, 11, C.Muted, Enum.Font.GothamMedium) end
+    if tab.IconLabel then tab.IconLabel.Size, tab.IconLabel.Position, tab.IconLabel.ImageColor3 = UDim2.fromOffset(15, 15), UDim2.new(0, 13, 0.5, -7), C.Muted else
+        local glyph = button:FindFirstChild("HohoGlyph") or Instance.new("TextLabel")
+        glyph.Name, glyph.Size, glyph.Position, glyph.BackgroundTransparency, glyph.TextXAlignment, glyph.Font, glyph.TextSize, glyph.Parent = "HohoGlyph", UDim2.fromOffset(20, 20), UDim2.new(0, 10, 0.5, -10), 1, Enum.TextXAlignment.Center, Enum.Font.GothamBold, 13, button
+        glyph.Text, glyph.TextColor3 = Glyphs[tab.Name] or "•", C.Muted
     end
-
-    if tab.Label then
-        tab.Label.Text = tab.Name
-        tab.Label.Position = UDim2_new(0, 44, 0, 0)
-        tab.Label.Size = UDim2_new(1, -54, 1, 0)
-        setTextStyle(tab.Label, 13, Palette.Muted, Enum.Font.GothamMedium)
-    end
-
-    if tab.IconLabel then
-        tab.IconLabel.Size = UDim2_fromOffset(18, 18)
-        tab.IconLabel.Position = UDim2_new(0, 16, 0.5, 0)
-        tab.IconLabel.ImageColor3 = Palette.Muted
-    else
-        local glyph = button:FindFirstChild("DepHubTabGlyph")
-        if not glyph then
-            glyph = Instance_new("TextLabel")
-            glyph.Name = "DepHubTabGlyph"
-            glyph.BackgroundTransparency = 1
-            glyph.Size = UDim2_fromOffset(24, 24)
-            glyph.Position = UDim2_new(0, 12, 0.5, 0)
-            glyph.AnchorPoint = Vector2_new(0, 0.5)
-            glyph.TextXAlignment = Enum.TextXAlignment.Center
-            glyph.TextYAlignment = Enum.TextYAlignment.Center
-            glyph.Font = Enum.Font.GothamMedium
-            glyph.TextSize = 15
-            glyph.Parent = button
-        end
-        glyph.Text = TabGlyphs[tab.Name] or "◇"
-        glyph.TextColor3 = window.CurrentTab == tab.Name and Palette.White or Palette.Muted
-    end
-
-    if tab.Page then
-        tab.Page.ScrollBarImageColor3 = Palette.Border
-        local padding = tab.Page:FindFirstChildOfClass("UIPadding")
-        if padding then
-            padding.PaddingLeft = UDim_new(0, 28)
-            padding.PaddingRight = UDim_new(0, 28)
-            padding.PaddingTop = UDim_new(0, 28)
-            padding.PaddingBottom = UDim_new(0, 28)
-        end
-
-        if tab.TitleLabel then
-            setTextStyle(tab.TitleLabel, 26, Palette.White, Enum.Font.GothamBold)
-        end
-
-        if tab.DescriptionLabel then
-            setTextStyle(tab.DescriptionLabel, 12, Palette.Muted, Enum.Font.Gotham)
-        end
-    end
+    stylePage(tab)
 end
 
-local function styleStatCard(stat, success)
-    if not stat or not stat.Card then
-        return
-    end
-
-    local card = stat.Card
-    card.BackgroundColor3 = Palette.Card
-    applyCorner(card, 9)
-    applyStroke(card, Palette.Border, 0.32, 1)
-
-    local labels = directChildrenOfClass(card, "TextLabel")
-    local title = labels[1]
-    local value = labels[2]
-
-    if title then
-        title.Size = UDim2_new(1, -20, 0, 18)
-        title.Position = UDim2_new(0, 10, 0, 13)
-        setTextStyle(title, 10, Palette.Muted, Enum.Font.GothamMedium, Enum.TextXAlignment.Center)
-    end
-
-    if value then
-        value.Size = UDim2_new(1, -20, 0, 30)
-        value.Position = UDim2_new(0, 10, 0, 39)
-        setTextStyle(value, 17, success and Palette.Success or Palette.White, Enum.Font.GothamBold, Enum.TextXAlignment.Center)
-    end
-end
-
-local function styleDashboard(window)
-    local stats = window.DashboardStats
-    if not stats or not stats.Player or not stats.Player.Card then
-        return
-    end
-
-    local grid = stats.Player.Card.Parent
-    if grid and grid:IsA("Frame") then
-        grid.Size = UDim2_new(1, 0, 0, 96)
-        local layout = grid:FindFirstChildOfClass("UIGridLayout")
-        if layout then
-            layout.CellSize = UDim2_new(0.25, -8, 0, 94)
-            layout.CellPadding = UDim2_new(0, 10, 0, 0)
-        end
-    end
-
-    styleStatCard(stats.Player, false)
-    styleStatCard(stats.Status, true)
-    styleStatCard(stats.Version, false)
-    styleStatCard(stats.Ping, false)
-
-    if stats.Player.Card and not stats.Player.Card:FindFirstChild("DepHubAvatar") then
-        local avatar = Instance_new("ImageLabel")
-        avatar.Name = "DepHubAvatar"
-        avatar.Size = UDim2_fromOffset(32, 32)
-        avatar.Position = UDim2_new(0, 12, 0.5, 8)
-        avatar.AnchorPoint = Vector2_new(0, 0.5)
-        avatar.BackgroundTransparency = 1
-        avatar.ScaleType = Enum.ScaleType.Crop
-        avatar.Parent = stats.Player.Card
-        applyCorner(avatar, 100)
-
-        local labels = directChildrenOfClass(stats.Player.Card, "TextLabel")
-        if labels[2] then
-            labels[2].Position = UDim2_new(0, 48, 0, 39)
-            labels[2].Size = UDim2_new(1, -58, 0, 30)
-            labels[2].TextXAlignment = Enum.TextXAlignment.Left
-        end
-
-        task.spawn(function()
-            local ok, image = pcall(function()
-                return Players:GetUserThumbnailAsync(
-                    LocalPlayer.UserId,
-                    Enum.ThumbnailType.HeadShot,
-                    Enum.ThumbnailSize.Size100x100
-                )
-            end)
-            if ok and image and avatar.Parent and not window.Destroyed then
-                avatar.Image = image
-            end
-        end)
-    end
-end
-
-local function styleReleases(window)
-    local holder = window.ReleasesHolder
-    if not holder then
-        return
-    end
-
-    for _, child in ipairs(holder:GetChildren()) do
+local function styleCards(tab)
+    if not tab or not tab.Page then return end
+    for _, child in ipairs(tab.Page:GetChildren()) do
         if child:IsA("Frame") then
-            child.BackgroundColor3 = Palette.Card
-            applyCorner(child, 9)
-            applyStroke(child, Palette.Border, 0.32, 1)
-
-            for _, nested in ipairs(child:GetChildren()) do
-                if nested:IsA("Frame") and nested.Size.X.Offset <= 4 and nested.Size.Y.Offset > 0 then
-                    nested.BackgroundColor3 = Palette.Accent
-                    nested.BackgroundTransparency = 0.1
-                    nested.Size = UDim2_new(0, 3, 1, -20)
-                    nested.Position = UDim2_new(0, 0, 0, 10)
-                elseif nested:IsA("TextLabel") then
-                    setTextStyle(nested, 14, Palette.White, Enum.Font.GothamBold)
-                end
-            end
-
+            child.BackgroundColor3 = C.Card
+            corner(child, 7)
+            stroke(child, C.Border, 0.25)
             for _, descendant in ipairs(child:GetDescendants()) do
-                if descendant:IsA("TextLabel") and descendant.Parent ~= child then
-                    setTextStyle(descendant, 12, Palette.Text, Enum.Font.Gotham)
+                if descendant:IsA("TextLabel") then
+                    if descendant.Font == Enum.Font.GothamBold then text(descendant, descendant.TextSize, C.White, descendant.Font) else text(descendant, descendant.TextSize, C.Muted, descendant.Font) end
+                elseif descendant:IsA("TextButton") and descendant.BackgroundTransparency < 1 then
+                    descendant.BackgroundColor3 = C.Active
                 end
             end
         end
     end
 end
 
-local function styleContent(window)
-    if not window.Content then
-        return
-    end
-
-    window.Content.BackgroundColor3 = Palette.Background
-
-    local gradient = window.Content:FindFirstChild("DepHubContentGradient")
-    if not gradient then
-        gradient = Instance_new("UIGradient")
-        gradient.Name = "DepHubContentGradient"
-        gradient.Rotation = 90
-        gradient.Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Palette.BackgroundSoft),
-            ColorSequenceKeypoint.new(1, Palette.Background)
-        })
-        gradient.Parent = window.Content
-    end
-end
-
-local function styleToggle(window)
-    local toggle = window.ToggleButton
-    if not toggle or not toggle:IsA("GuiObject") then
-        return
-    end
-
-    toggle.Size = UDim2_fromOffset(54, 54)
-    toggle.Position = UDim2_fromOffset(22, 22)
-    toggle.AnchorPoint = Vector2_new(0, 0)
-    toggle.BackgroundColor3 = Palette.Titlebar
-    toggle.Visible = true
-    applyCorner(toggle, 100)
-    applyStroke(toggle, Palette.Border, 0.15, 1)
-
-    local logo = toggle:FindFirstChildOfClass("ImageLabel")
-    if logo then
-        logo.Size = UDim2_fromOffset(28, 28)
-        logo.Position = UDim2_new(0.5, 0, 0.5, 0)
-        logo.AnchorPoint = Vector2_new(0.5, 0.5)
-    end
-end
-
-local function refreshTabState(window)
+local function updateTabState(window)
     for _, tab in ipairs(window.Tabs or {}) do
         local active = window.CurrentTab == tab.Name
-        if tab.Label then
-            tab.Label.TextColor3 = active and Palette.White or Palette.Muted
-        end
-        if tab.IconLabel then
-            tab.IconLabel.ImageColor3 = active and Palette.White or Palette.Muted
-        end
-        local glyph = tab.Button and tab.Button:FindFirstChild("DepHubTabGlyph")
-        if glyph then
-            glyph.TextColor3 = active and Palette.White or Palette.Muted
+        if tab.Label then tab.Label.TextColor3 = active and C.White or C.Muted end
+        if tab.IconLabel then tab.IconLabel.ImageColor3 = active and C.Accent or C.Muted end
+        local glyph = tab.Button and tab.Button:FindFirstChild("HohoGlyph")
+        if glyph then glyph.TextColor3 = active and C.Accent or C.Muted end
+    end
+end
+
+local function installSearch(window)
+    if window.__HohoSearch or not window.TitleBar then return end
+    window.__HohoSearch = true
+    local holder = Instance.new("Frame")
+    holder.Name, holder.Size, holder.Position, holder.AnchorPoint, holder.BackgroundColor3, holder.BorderSizePixel, holder.Parent = "FeatureSearch", UDim2.fromOffset(210, 32), UDim2.new(0.72, 0, 0.5, 0), Vector2.new(0.5, 0.5), C.Card, 0, window.TitleBar
+    corner(holder, 6); stroke(holder, C.Border, 0.2)
+    local icon = Instance.new("TextLabel")
+    icon.Size, icon.Position, icon.BackgroundTransparency, icon.Text, icon.TextColor3, icon.Font, icon.TextSize, icon.Parent = UDim2.fromOffset(24, 32), UDim2.new(0, 6, 0, 0), 1, "⌕", C.Muted, Enum.Font.GothamBold, 15, holder
+    local box = Instance.new("TextBox")
+    box.Size, box.Position, box.BackgroundTransparency, box.Text, box.PlaceholderText, box.PlaceholderColor3, box.TextColor3, box.Font, box.TextSize, box.ClearTextOnFocus, box.Parent = UDim2.new(1, -38, 1, 0), UDim2.new(0, 32, 0, 0), 1, "", "Search features...", C.Dim, C.Text, Enum.Font.Gotham, 11, false, holder
+    local function filter()
+        local query = string.lower(box.Text)
+        local tab = window.TabButtons and window.TabButtons[window.CurrentTab]
+        if not tab or not tab.Page then return end
+        for _, child in ipairs(tab.Page:GetChildren()) do
+            if child:IsA("GuiObject") and child ~= tab.TitleLabel and child ~= tab.DescriptionLabel then
+                local haystack = ""
+                for _, item in ipairs(child:GetDescendants()) do if item:IsA("TextLabel") or item:IsA("TextButton") then haystack = haystack .. " " .. item.Text end end
+                child.Visible = query == "" or string.find(string.lower(haystack), query, 1, true) ~= nil
+            end
         end
     end
+    box:GetPropertyChangedSignal("Text"):Connect(filter)
 end
 
 local function styleAll(window)
-    if not window or window.Destroyed then
-        return
-    end
-
-    if window.Window then
-        window.Window.BackgroundColor3 = Palette.Background
-        applyCorner(window.Window, 10)
-        applyStroke(window.Window, Palette.Border, 0.1, 1)
-    end
-
-    applyWindowGeometry(window)
-    styleTitlebar(window)
-    styleSidebar(window)
-    styleContent(window)
-    styleToggle(window)
-
-    for _, tab in ipairs(window.Tabs or {}) do
-        styleTab(window, tab)
-    end
-
-    styleDashboard(window)
-    styleReleases(window)
-    refreshTabState(window)
+    if not window or window.Destroyed or not window.Window then return end
+    window.Window.BackgroundColor3 = C.Base
+    corner(window.Window, 8); stroke(window.Window, C.Border, 0.05)
+    styleGeometry(window); styleTitlebar(window); styleSidebar(window); installSearch(window)
+    if window.Content then window.Content.BackgroundColor3 = C.Base end
+    for _, tab in ipairs(window.Tabs or {}) do styleTab(window, tab); styleCards(tab) end
+    updateTabState(window)
+    if window.ToggleButton then window.ToggleButton.BackgroundColor3 = C.Top; window.ToggleButton.Size = UDim2.fromOffset(48, 48); corner(window.ToggleButton, 8); stroke(window.ToggleButton, C.Accent, 0.1) end
 end
 
-local function patchLifecycle(window)
-    if window.__DEPHUBVisualPatched then
-        return
-    end
-
-    window.__DEPHUBVisualPatched = true
-
-    local originalCreateTab = window.CreateTab
-    local originalSelectTab = window.SelectTab
-    local originalSetReleases = window.SetReleases
-    local originalDestroy = window.Destroy
-
+local function patch(window)
+    if window.__HohoPatched then return end
+    window.__HohoPatched = true
+    local createTab, selectTab, releases, destroy = window.CreateTab, window.SelectTab, window.SetReleases, window.Destroy
     window.CreateTab = function(self, ...)
-        local tab = originalCreateTab(self, ...)
+        local tab = createTab(self, ...)
         styleTab(self, tab)
-        task.defer(function()
-            styleAll(self)
-        end)
+        task.defer(function() styleCards(tab); styleAll(self) end)
         return tab
     end
-
     window.SelectTab = function(self, ...)
-        local result = originalSelectTab(self, ...)
-        refreshTabState(self)
-        task.defer(function()
-            refreshTabState(self)
-        end)
+        local result = selectTab(self, ...)
+        updateTabState(self)
+        task.defer(function() updateTabState(self) end)
         return result
     end
-
     window.SetReleases = function(self, ...)
-        local result = originalSetReleases(self, ...)
-        styleReleases(self)
+        local result = releases(self, ...)
+        styleCards(self.DashboardTab)
         return result
     end
-
     window.Destroy = function(self, ...)
-        if self.Destroyed then
-            return
-        end
+        if self.Destroyed then return end
         self.Destroyed = true
-        return originalDestroy(self, ...)
+        return destroy(self, ...)
     end
-end
-
-local function bindResponsive(window)
-    if window.__DEPHUBVisualResponsiveBound then
-        return
-    end
-
-    window.__DEPHUBVisualResponsiveBound = true
-
     local camera = Workspace.CurrentCamera
-    if camera then
-        addConnection(window, camera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-            if not window.Destroyed then
-                applyWindowGeometry(window)
-            end
-        end))
-    end
+    if camera then window.Connections[#window.Connections + 1] = camera:GetPropertyChangedSignal("ViewportSize"):Connect(function() if not window.Destroyed then styleGeometry(window) end end) end
 end
 
 function Controller.Enhance(window)
-    if not window or window.Destroyed then
-        return window
-    end
-
-    patchLifecycle(window)
-    bindResponsive(window)
+    if not window then return window end
+    patch(window)
     styleAll(window)
-
     return window
 end
 
