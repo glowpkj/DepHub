@@ -9,6 +9,14 @@ if (!luau) throw new Error('Usage: node tests/run_backend_tests.js /path/to/luau
 const files = ['DepHub.lua', 'src/games/bloxfruits.lua', 'src/games/universal.lua',
   'src/games/rt3.lua', 'src/core/runtime.lua', 'src/core/updater.lua',
   'src/games/features/bloxfruits/fruitvfx.lua'];
+const manifestConfig = JSON.parse(fs.readFileSync(path.join(root, '.github/dephub-games.json'), 'utf8'));
+for (const game of Object.values(manifestConfig)) {
+  for (const file of game.files) {
+    if (file.startsWith('src/ui/') || !fs.existsSync(path.join(root, file))) {
+      throw new Error('Invalid tracked manifest file: ' + file);
+    }
+  }
+}
 function quote(value) {
   let eq = '=';
   while (value.includes(']' + eq + ']')) eq += '=';

@@ -1,31 +1,4 @@
 {
-  "119048529960596": {
-    "name": "Restaurant Tycoon 3",
-    "files": [
-      "DepHub.lua",
-      "src/version.txt",
-      "src/core/anti-afk.lua",
-      "src/core/dashboard.lua",
-      "src/core/health-monitor.lua",
-      "src/core/runtime.lua",
-      "src/core/scheduler.lua",
-      "src/core/updater.lua",
-      "src/games/rt3.lua",
-      "src/games/features/autofarm.lua",
-      "src/games/features/instant-cook.lua",
-      "src/games/features/drops.lua",
-      "src/games/features/autofarm-friends.lua",
-      "src/games/updates/119048529960596.txt",
-      "src/ui/init.lua",
-      "src/ui/utils.lua",
-      "src/ui/responsive.lua",
-      "src/ui/watchdog.lua",
-      "src/ui/components.lua",
-      "src/ui/window.lua",
-      "src/ui/controller.lua",
-      "src/ui/loading.lua"
-    ]
-  },
   "994732206": {
     "name": "Blox Fruits Sea 2",
     "files": [
@@ -42,15 +15,26 @@
       "src/games/features/bloxfruits/waterwalking.lua",
       "src/games/features/bloxfruits/config.lua",
       "src/games/features/bloxfruits/team.lua",
-      "src/games/updates/994732206.txt",
-      "src/ui/init.lua",
-      "src/ui/utils.lua",
-      "src/ui/responsive.lua",
-      "src/ui/watchdog.lua",
-      "src/ui/components.lua",
-      "src/ui/window.lua",
-      "src/ui/controller.lua",
-      "src/ui/loading.lua"
+      "src/games/updates/994732206.txt"
+    ]
+  },
+  "119048529960596": {
+    "name": "Restaurant Tycoon 3",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/anti-afk.lua",
+      "src/core/dashboard.lua",
+      "src/core/health-monitor.lua",
+      "src/core/runtime.lua",
+      "src/core/scheduler.lua",
+      "src/core/updater.lua",
+      "src/games/rt3.lua",
+      "src/games/features/restauranttycoon3/autofarm.lua",
+      "src/games/features/restauranttycoon3/instant-cook.lua",
+      "src/games/features/restauranttycoon3/drops.lua",
+      "src/games/features/restauranttycoon3/autofarm-friends.lua",
+      "src/games/updates/119048529960596.txt"
     ]
   },
   "85211729168715": {
@@ -69,15 +53,7 @@
       "src/games/features/bloxfruits/waterwalking.lua",
       "src/games/features/bloxfruits/config.lua",
       "src/games/features/bloxfruits/team.lua",
-      "src/games/updates/85211729168715.txt",
-      "src/ui/init.lua",
-      "src/ui/utils.lua",
-      "src/ui/responsive.lua",
-      "src/ui/watchdog.lua",
-      "src/ui/components.lua",
-      "src/ui/window.lua",
-      "src/ui/controller.lua",
-      "src/ui/loading.lua"
+      "src/games/updates/85211729168715.txt"
     ]
   }
 }
