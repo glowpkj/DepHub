@@ -44,26 +44,38 @@ function Loading.new(options)
     mainFrame.Size = UDim2.new(0, 0, 0, 0)
     mainFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
     mainFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    mainFrame.BackgroundColor3 = Color3.fromRGB(20, 18, 23)
     mainFrame.BorderSizePixel = 0
     mainFrame.ClipsDescendants = true
     mainFrame.Parent = screenGui
     self.MainFrame = mainFrame
 
     local aspect = Instance.new("UIAspectRatioConstraint")
-    aspect.AspectRatio = options.AspectRatio or 1.45
+    aspect.AspectRatio = options.AspectRatio or 1.9
     aspect.AspectType = Enum.AspectType.ScaleWithParentSize
     aspect.DominantAxis = Enum.DominantAxis.Width
     aspect.Parent = mainFrame
 
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 20)
+    corner.CornerRadius = UDim.new(0, 9)
     corner.Parent = mainFrame
+
+    local border = Instance.new("UIStroke")
+    border.Color = Color3.fromRGB(72, 62, 76)
+    border.Thickness = 1
+    border.Transparency = 0.1
+    border.Parent = mainFrame
+
+    local accent = Instance.new("Frame")
+    accent.Size = UDim2.new(1, 0, 0, 2)
+    accent.BackgroundColor3 = Color3.fromRGB(210, 43, 67)
+    accent.BorderSizePixel = 0
+    accent.Parent = mainFrame
 
     local logo = Instance.new("ImageLabel")
     logo.Name = "Logo"
-    logo.Size = UDim2.fromOffset(options.LogoSize or 110, options.LogoSize or 110)
-    logo.Position = UDim2.new(0.5, 0, 0.42, 0)
+    logo.Size = UDim2.fromOffset(options.LogoSize or 76, options.LogoSize or 76)
+    logo.Position = UDim2.new(0.24, 0, 0.48, 0)
     logo.AnchorPoint = Vector2.new(0.5, 0.5)
     logo.BackgroundTransparency = 1
     logo.Image = options.LogoId or "rbxassetid://79507712997362"
@@ -73,35 +85,38 @@ function Loading.new(options)
     self.Logo = logo
 
     local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -40, 0, 24)
-    title.Position = UDim2.new(0.5, 0, 0.66, 0)
+    title.Size = UDim2.new(0.56, -20, 0, 24)
+    title.Position = UDim2.new(0.43, 0, 0.35, 0)
     title.AnchorPoint = Vector2.new(0.5, 0.5)
     title.BackgroundTransparency = 1
     title.Text = options.Title or "DEPHUB"
     title.TextColor3 = Color3.fromRGB(255, 255, 255)
     title.Font = Enum.Font.GothamBold
-    title.TextSize = 14
+    title.TextSize = 17
+    title.TextXAlignment = Enum.TextXAlignment.Left
     title.Parent = mainFrame
     self.TitleLabel = title
 
     local status = Instance.new("TextLabel")
-    status.Size = UDim2.new(1, -40, 0, 22)
-    status.Position = UDim2.new(0.5, 0, 0.75, 0)
+    status.Size = UDim2.new(0.56, -20, 0, 38)
+    status.Position = UDim2.new(0.43, 0, 0.55, 0)
     status.AnchorPoint = Vector2.new(0.5, 0.5)
     status.BackgroundTransparency = 1
     status.Text = options.Status or "Inicializando..."
-    status.TextColor3 = Color3.fromRGB(150, 150, 150)
+    status.TextColor3 = Color3.fromRGB(161, 151, 158)
     status.Font = Enum.Font.Gotham
     status.TextSize = 11
     status.TextWrapped = true
+    status.TextXAlignment = Enum.TextXAlignment.Left
     status.Parent = mainFrame
     self.StatusLabel = status
 
     local progressContainer = Instance.new("Frame")
     progressContainer.Name = "ProgressContainer"
-    progressContainer.Size = UDim2.new(1, 0, 0, 7)
-    progressContainer.Position = UDim2.new(0, 0, 1, -7)
-    progressContainer.BackgroundTransparency = 1
+    progressContainer.Size = UDim2.new(1, -28, 0, 4)
+    progressContainer.Position = UDim2.new(0, 14, 1, -18)
+    progressContainer.BackgroundColor3 = Color3.fromRGB(54, 47, 58)
+    progressContainer.BackgroundTransparency = 0
     progressContainer.BorderSizePixel = 0
     progressContainer.ClipsDescendants = true
     progressContainer.Parent = mainFrame
@@ -113,17 +128,17 @@ function Loading.new(options)
     local fill = Instance.new("Frame")
     fill.Name = "ProgressFill"
     fill.Size = UDim2.new(0, 0, 1, 0)
-    fill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    fill.BackgroundColor3 = Color3.fromRGB(210, 43, 67)
     fill.BorderSizePixel = 0
     fill.Parent = progressContainer
     self.ProgressFill = fill
 
     tween(mainFrame, options.OpenDuration or 0.45, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out, {
-        Size = UDim2.new(options.Width or 0.38, 0, options.Height or 0.42, 0)
+        Size = UDim2.new(options.Width or 0.42, 0, options.Height or 0.3, 0)
     })
 
     self.FloatTween = tween(logo, 1.4, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, {
-        Position = UDim2.new(0.5, 0, 0.38, 0)
+        Position = UDim2.new(0.24, 0, 0.44, 0)
     }, -1, true)
 
     self.RotateTween = tween(logo, 2.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, {
