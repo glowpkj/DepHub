@@ -16,7 +16,7 @@ local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
 
 local function allowedLog(message)
-    pcall(print, "[DEPHUB] " .. tostring(message))
+    pcall(print, tostring(message))
 end
 
 local function detectExecutor()
@@ -36,13 +36,14 @@ local function cleanupRuntime()
     end
     local state = env.__DEPHUB
     if type(state) ~= "table" then return end
-    for _, target in ipairs({state.BloxFruits, state.BloxFruitsUI, state.Updater, state.Runtime, state.Window}) do
+    for _, target in ipairs({state.BloxFruits, state.BloxFruitsUI, state.Universal, state.Updater, state.Runtime, state.Window}) do
         if type(target) == "table" and type(target.Destroy) == "function" then
             pcall(target.Destroy, target)
         end
     end
     state.BloxFruits = nil
     state.BloxFruitsUI = nil
+    state.Universal = nil
     state.Updater = nil
     state.Runtime = nil
     state.Window = nil
@@ -50,7 +51,7 @@ end
 
 local previousState = env[STATE_KEY]
 if env[EXECUTED_KEY] and type(previousState) == "table" and previousState.status == "success" then
-    allowedLog("Loader ja foi executado com sucesso nesta sessao.")
+    allowedLog("Status: Loader ja executado com sucesso nesta sessao")
     return
 end
 
@@ -157,19 +158,22 @@ local function compile(source)
 end
 
 local function loadModule(path, useCache)
-    allowedLog("Carregando: " .. path)
     local okSource, source = httpGet(path, useCache)
     if not okSource then return false, source end
     local okCompile, chunk = compile(source)
     if not okCompile then return false, chunk end
     local okRun, result = pcall(chunk)
     if not okRun then return false, tostring(result) end
-    allowedLog("Carregado: " .. path)
     return true, result
 end
 
 allowedLog("Iniciando loader v" .. VERSION)
 allowedLog("Executor detectado: " .. tostring(env.__DEPHUB.Executor))
+
+local gameId = tostring(game.GameId)
+local placeId = tostring(game.PlaceId)
+allowedLog("PlaceId: " .. placeId)
+allowedLog("GameId: " .. gameId)
 
 local okVersion, remoteVersion = httpGet("src/version.txt", false)
 if okVersion then
@@ -177,17 +181,14 @@ if okVersion then
     env.__DEPHUB.RemoteVersion = remoteVersion
 end
 
-local gameId = tostring(game.GameId)
-local placeId = tostring(game.PlaceId)
 local targets = {
     ["994732206"] = {Core = "src/games/bloxfruits.lua"},
     ["85211729168715"] = {Core = "src/games/bloxfruits.lua"},
     ["119048529960596"] = {Core = "src/games/rt3.lua"}
 }
-local target = targets[placeId] or targets[gameId]
+local target = targets[placeId] or targets[gameId] or {Core = "src/games/universal.lua", Universal = true}
 
 local loading
-allowedLog("Carregando loading screen")
 local okLoading, Loading = loadModule("src/ui/loading.lua", false)
 if okLoading and type(Loading) == "table" and type(Loading.new) == "function" then
     env.__DEPHUB_UI_LOADING = Loading
@@ -198,8 +199,6 @@ if okLoading and type(Loading) == "table" and type(Loading.new) == "function" th
         loading = instance
         env.__DEPHUB_LOADING_INSTANCE = instance
         pcall(instance.SetProgress, instance, 0.08, "Aguardando jogo carregar...")
-    else
-        allowedLog("Loading screen nao pode ser criada: " .. tostring(instance))
     end
 end
 
@@ -207,23 +206,16 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 local playerGui = localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:WaitForChild("PlayerGui", 30)
 if not playerGui then return fail("Jogo nao inicializou completamente", loading) end
 task.wait()
-allowedLog("Executor: " .. env.__DEPHUB.Executor)
-allowedLog("PlaceId: " .. placeId)
-allowedLog("GameId: " .. gameId)
-allowedLog("Versao local: " .. VERSION .. " | Versao remota: " .. tostring(env.__DEPHUB.RemoteVersion or VERSION))
-allowedLog("Alvo: " .. tostring(target and target.Core or "nenhum"))
-
-if not target then return fail("Jogo nao suportado", loading) end
 if loading then pcall(loading.SetProgress, loading, 0.22, "Jogo carregado. Preparando modulo...") end
 
-allowedLog("Iniciando modulo do jogo")
 local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then return fail(coreResult, loading) end
 if loading then pcall(loading.SetProgress, loading, 0.72, "Modulo do jogo inicializado...") end
 
-env.__DEPHUB.BloxFruits = gameId ~= "119048529960596" and coreResult or nil
+env.__DEPHUB.Universal = target.Universal and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and gameId ~= "119048529960596" and coreResult or nil
 
-if gameId ~= "119048529960596" then
+if target.Universal or gameId ~= "119048529960596" then
     if type(coreResult) ~= "table" then return fail(coreResult, loading) end
 end
 
@@ -237,7 +229,7 @@ if loading then
         env.__DEPHUB_LOADING_INSTANCE = nil
     end)
 end
-allowedLog("DepHub carregado com sucesso na versao " .. VERSION)
+allowedLog(target.Universal and "Status: Script universal carregado com sucesso" or "Status: Jogo compativel carregado com sucesso")
 
 task.defer(function()
     local ok, updaterModule = loadModule("src/core/updater.lua", true)
