@@ -6,14 +6,14 @@ local pcall = pcall
 local env = type(getgenv) == "function" and getgenv() or _G
 local compiler = loadstring
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/ui/"
-local MODULES = {"utils", "responsive", "watchdog", "components", "window", "controller"}
+local MODULES = {"utils", "components", "window"}
 
 if type(compiler) ~= "function" then
     return nil
 end
 
 local function fetch(name)
-    local url = BASE_URL .. name .. ".lua"
+    local url = BASE_URL .. name .. ".lua?ui=next2"
     local ok, result = pcall(function()
         return game:HttpGet(url)
     end)
@@ -62,22 +62,12 @@ for _, name in ipairs(MODULES) do
 end
 
 local Library = env.__DEPHUB_UI_MODULES.window
-local Controller = env.__DEPHUB_UI_MODULES.controller
 local Loading = env.__DEPHUB_UI_LOADING
 restore()
 env.__DEPHUB_UI_LOADING = Loading
 
 if type(Library) ~= "table" or type(Library.new) ~= "function" then
     return nil
-end
-
-local originalNew = Library.new
-Library.new = function(...)
-    local window = originalNew(...)
-    if type(Controller) == "table" and type(Controller.Enhance) == "function" then
-        window = Controller.Enhance(window) or window
-    end
-    return window
 end
 
 if type(Loading) == "table" then

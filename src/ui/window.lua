@@ -1,1023 +1,330 @@
-local Window = {}
-Window.__index = Window
-
-local Tab = {}
-Tab.__index = Tab
-
-local Library = {}
-Library.__index = Library
-
 local Utils = require(script.Parent.utils)
-local Responsive = require(script.Parent.responsive)
-local Watchdog = require(script.Parent.watchdog)
 local Components = require(script.Parent.components)
-
+local C, UIS = Utils.Colors, Utils.UserInputService
+local Window, Tab, Library = {}, {}, {}
+Window.__index, Tab.__index = Window, Tab
 Components.Register(Tab)
 
-local Colors = Utils.Colors
-local Tween = Utils.Tween
-local ApplyCorner = Utils.ApplyCorner
-local ApplyStroke = Utils.ApplyStroke
-local ApplyConstraint = Utils.ApplyConstraint
-local CreateLogo = Utils.CreateLogo
-local MakeDraggable = Utils.MakeDraggable
-local GetInputPosition = Utils.GetInputPosition
-local IsPrimaryInput = Utils.IsPrimaryInput
-local UserInputService = Utils.UserInputService
-local LocalPlayer = Utils.LocalPlayer
-local PlayerGui = Utils.PlayerGui
-local Camera = Utils.Camera
-local EasingQuint = Utils.EasingQuint
-local EasingQuad = Utils.EasingQuad
-local DirectionOut = Utils.DirectionOut
-local DirectionIn = Utils.DirectionIn
-
-local CreateText = Responsive.CreateText
-local ComputeScaleFactor = Responsive.ComputeScaleFactor
-local RefreshAllTexts = Responsive.RefreshAllTexts
-
-local Instance_new = Instance.new
-local UDim2_new = UDim2.new
-local UDim2_fromOffset = UDim2.fromOffset
-local UDim_new = UDim.new
-local Vector2_new = Vector2.new
-local ColorSequence_new = ColorSequence.new
-local ColorSequenceKeypoint_new = ColorSequenceKeypoint.new
-local NumberSequence_new = NumberSequence.new
-local NumberSequenceKeypoint_new = NumberSequenceKeypoint.new
-local math_clamp = math.clamp
-local string_upper = string.upper
-
-function Window:SetOpen(ShouldOpen)
-	local Self = self
-
-	if Self.ToggleButton then
-		Self.ToggleButton.Visible = true
-	end
-
-	if ShouldOpen then
-		if not Self.Window or Self.IsHidden == false then
-			return
-		end
-
-		Self.IsHidden = false
-		Self.Window.Visible = true
-
-		local ReopenSize = Self.Window.Size
-		Self.Window.Size = UDim2_fromOffset(0, 0)
-
-		Tween(Self.Window, 0.32, EasingQuint, DirectionOut, {
-			Size = ReopenSize
-		})
-
-		task.delay(0.1, function()
-			if Self.Window and Self.Window.AbsoluteSize.X > 0 then
-				RefreshAllTexts(ComputeScaleFactor(Self.Window.AbsoluteSize.X))
-			end
-		end)
-	else
-		Self.IsHidden = true
-
-		local ClosingSize = Self.Window.Size
-		Self.LastOpenSize = ClosingSize
-
-		local ClosingTween = Tween(Self.Window, 0.22, EasingQuint, DirectionIn, {
-			Size = UDim2_fromOffset(0, 0)
-		})
-
-		ClosingTween.Completed:Connect(function()
-			Self.Window.Visible = false
-			Self.Window.Size = ClosingSize
-		end)
-	end
+local function create(class, parent, properties)
+    local object = Instance.new(class)
+    for key, value in pairs(properties or {}) do object[key] = value end
+    object.Parent = parent
+    return object
 end
 
-function Window:Notify(Title, Text, Duration, NotifyType)
-	local Self = self
-	Duration = Duration or 4
-
-	local TypeColors = {
-		Info = Colors.Accent,
-		Success = Colors.Success,
-		Warning = Colors.Warning,
-		Error = Colors.Error
-	}
-
-	local StripColor = TypeColors[NotifyType or "Info"] or Colors.Accent
-
-	Self.NotifyCount = Self.NotifyCount + 1
-	local Order = Self.NotifyCount
-
-	local Toast = Instance_new("Frame")
-	Toast.Size = UDim2_new(1, 0, 0, 64)
-	Toast.BackgroundColor3 = Colors.Card
-	Toast.BorderSizePixel = 0
-	Toast.ClipsDescendants = true
-	Toast.LayoutOrder = Order
-	Toast.Position = UDim2_new(1.4, 0, 0, 0)
-	Toast.Parent = Self.NotificationContainer
-
-	ApplyCorner(Toast, 9)
-	ApplyStroke(Toast, Colors.Border, 1, 0.3)
-
-	local Strip = Instance_new("Frame")
-	Strip.Size = UDim2_new(0, 3, 1, -16)
-	Strip.Position = UDim2_new(0, 8, 0.5, 0)
-	Strip.AnchorPoint = Vector2_new(0, 0.5)
-	Strip.BackgroundColor3 = StripColor
-	Strip.BorderSizePixel = 0
-	Strip.Parent = Toast
-	ApplyCorner(Strip, 100)
-
-	CreateText(
-		Toast,
-		Title or "",
-		UDim2_new(1, -32, 0, 20),
-		UDim2_new(0, 20, 0, 10),
-		13,
-		Colors.White,
-		Enum.Font.GothamBold
-	)
-
-	CreateText(
-		Toast,
-		Text or "",
-		UDim2_new(1, -32, 0, 32),
-		UDim2_new(0, 20, 0, 30),
-		11,
-		Colors.Gray,
-		Enum.Font.Gotham
-	)
-
-	Tween(Toast, 0.32, EasingQuint, DirectionOut, {
-		Position = UDim2_new(0, 0, 0, 0)
-	})
-
-	task.delay(Duration, function()
-		if Toast and Toast.Parent then
-			local OutTween = Tween(Toast, 0.28, EasingQuint, DirectionIn, {
-				Position = UDim2_new(1.4, 0, 0, 0)
-			})
-
-			OutTween.Completed:Connect(function()
-				Toast:Destroy()
-			end)
-		end
-	end)
-
-	return Toast
+local function text(parent, value, size, color, bold)
+    return create("TextLabel", parent, {BackgroundTransparency = 1, Text = value or "", TextSize = size or 12, TextColor3 = color or C.Light, Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center, TextTruncate = Enum.TextTruncate.AtEnd})
 end
 
-function Window:CreateTab(TabName, IconId, Description)
-	local Self = self
-
-	if TabName ~= "Dashboard" and not Self.DashboardCreated then
-		Self:CreateDashboard()
-	end
-
-	if not Self.Rebuilding then
-		Self.TabDefinitions[#Self.TabDefinitions + 1] = {
-			Name = TabName,
-			IconId = IconId,
-			Description = Description
-		}
-	end
-
-	local NewTab = setmetatable({}, Tab)
-
-	NewTab.Name = TabName
-	NewTab.WindowRef = Self
-	NewTab.Elements = {}
-	NewTab.IconId = IconId
-	NewTab.Description = Description
-
-	local Order = #Self.Tabs + 1
-
-	local Page = Instance_new("ScrollingFrame")
-	Page.Name = TabName .. "Page"
-	Page.Size = UDim2_new(1, 0, 1, 0)
-	Page.BackgroundTransparency = 1
-	Page.BorderSizePixel = 0
-	Page.ScrollBarThickness = 2
-	Page.ScrollBarImageColor3 = Colors.BorderLight
-	Page.CanvasSize = UDim2_new(0, 0, 0, 0)
-	Page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-	Page.Visible = false
-	Page.Parent = Self.Content
-	NewTab.Page = Page
-
-	local Padding = Instance_new("UIPadding")
-	Padding.PaddingLeft = UDim_new(0, 22)
-	Padding.PaddingRight = UDim_new(0, 22)
-	Padding.PaddingTop = UDim_new(0, 22)
-	Padding.PaddingBottom = UDim_new(0, 22)
-	Padding.Parent = Page
-
-	local Layout = Instance_new("UIListLayout")
-	Layout.SortOrder = Enum.SortOrder.LayoutOrder
-	Layout.Padding = UDim_new(0, 10)
-	Layout.Parent = Page
-
-	local TitleLabel = CreateText(
-		Page,
-		TabName,
-		UDim2_new(1, 0, 0, 32),
-		UDim2_new(0, 0, 0, 0),
-		24,
-		Colors.White,
-		Enum.Font.GothamBold
-	)
-	TitleLabel.LayoutOrder = 1
-	NewTab.TitleLabel = TitleLabel
-
-	local DescriptionLabel = CreateText(
-		Page,
-		Description or "",
-		UDim2_new(1, 0, 0, 25),
-		UDim2_new(0, 0, 0, 0),
-		12,
-		Colors.Gray,
-		Enum.Font.Gotham
-	)
-	DescriptionLabel.LayoutOrder = 2
-	NewTab.DescriptionLabel = DescriptionLabel
-	NewTab.NextOrder = 3
-
-	local Button = Instance_new("TextButton")
-	Button.Name = TabName .. "Tab"
-	Button.Size = UDim2_new(1, 0, 0, 39)
-	Button.BackgroundTransparency = 1
-	Button.BackgroundColor3 = Colors.Active
-	Button.BorderSizePixel = 0
-	Button.Text = ""
-	Button.AutoButtonColor = false
-	Button.LayoutOrder = Order
-	Button.Parent = Self.TabContainer
-
-	ApplyCorner(Button, 8)
-
-	local Indicator = Instance_new("Frame")
-	Indicator.Size = UDim2_fromOffset(3, 19)
-	Indicator.Position = UDim2_new(0, 0, 0.5, 0)
-	Indicator.AnchorPoint = Vector2_new(0, 0.5)
-	Indicator.BackgroundColor3 = Colors.White
-	Indicator.BackgroundTransparency = 1
-	Indicator.BorderSizePixel = 0
-	Indicator.Parent = Button
-	ApplyCorner(Indicator, 100)
-
-	local IconLabel
-	local LabelOffset = 15
-
-	if IconId then
-		IconLabel = Instance_new("ImageLabel")
-		IconLabel.Size = UDim2_fromOffset(16, 16)
-		IconLabel.Position = UDim2_new(0, 14, 0.5, 0)
-		IconLabel.AnchorPoint = Vector2_new(0, 0.5)
-		IconLabel.BackgroundTransparency = 1
-		IconLabel.Image = IconId
-		IconLabel.ImageColor3 = Colors.Gray
-		IconLabel.ScaleType = Enum.ScaleType.Fit
-		IconLabel.Parent = Button
-		LabelOffset = 38
-	end
-
-	local Label = CreateText(
-		Button,
-		string_upper(TabName),
-		UDim2_new(1, -LabelOffset - 10, 1, 0),
-		UDim2_new(0, LabelOffset, 0, 0),
-		11,
-		Colors.Gray,
-		Enum.Font.GothamBold
-	)
-
-	NewTab.Button = Button
-	NewTab.Label = Label
-	NewTab.Indicator = Indicator
-	NewTab.IconLabel = IconLabel
-
-	Self.TabButtons[TabName] = NewTab
-	Self.Tabs[#Self.Tabs + 1] = NewTab
-
-	Button.MouseEnter:Connect(function()
-		if Self.CurrentTab ~= TabName then
-			Tween(Button, 0.16, EasingQuint, DirectionOut, {
-				BackgroundTransparency = 0.65
-			})
-
-			Tween(Label, 0.16, EasingQuint, DirectionOut, {
-				TextColor3 = Colors.Light
-			})
-
-			if IconLabel then
-				Tween(IconLabel, 0.16, EasingQuint, DirectionOut, {
-					ImageColor3 = Colors.Light
-				})
-			end
-		end
-	end)
-
-	Button.MouseLeave:Connect(function()
-		if Self.CurrentTab ~= TabName then
-			Tween(Button, 0.16, EasingQuint, DirectionOut, {
-				BackgroundTransparency = 1
-			})
-
-			Tween(Label, 0.16, EasingQuint, DirectionOut, {
-				TextColor3 = Colors.Gray
-			})
-
-			if IconLabel then
-				Tween(IconLabel, 0.16, EasingQuint, DirectionOut, {
-					ImageColor3 = Colors.Gray
-				})
-			end
-		end
-	end)
-
-	Button.MouseButton1Down:Connect(function()
-		Tween(Button, 0.08, EasingQuad, DirectionOut, {
-			BackgroundColor3 = Colors.ActiveHover
-		})
-	end)
-
-	Button.MouseButton1Click:Connect(function()
-		Self:SelectTab(TabName)
-	end)
-
-	if Order == 1 and not Self.Rebuilding then
-		task.defer(function()
-			Self:SelectTab(TabName)
-		end)
-	end
-
-	return NewTab
+local function list(parent, gap, direction)
+    return create("UIListLayout", parent, {Padding = UDim.new(0, gap or 8), FillDirection = direction or Enum.FillDirection.Vertical, SortOrder = Enum.SortOrder.LayoutOrder})
 end
 
-function Window:SelectTab(TabName)
-	local Self = self
-
-	if Self.Switching or Self.CurrentTab == TabName then
-		return
-	end
-
-	local TargetTab = Self.TabButtons[TabName]
-	if not TargetTab then
-		return
-	end
-
-	Self.Switching = true
-
-	local OldTabName = Self.CurrentTab
-	local OldTab = OldTabName and Self.TabButtons[OldTabName]
-	local NewPage = TargetTab.Page
-
-	if OldTab then
-		local OldPage = OldTab.Page
-		local OldTween = Tween(OldPage, 0.14, EasingQuint, DirectionIn, {
-			Position = UDim2_new(0, -18, 0, 0)
-		})
-
-		OldTween.Completed:Wait()
-		OldPage.Visible = false
-		OldPage.Position = UDim2_new(0, 0, 0, 0)
-	end
-
-	NewPage.Position = UDim2_new(0, 18, 0, 0)
-	NewPage.Visible = true
-
-	Tween(NewPage, 0.28, EasingQuint, DirectionOut, {
-		Position = UDim2_new(0, 0, 0, 0)
-	})
-
-	for _, TabData in Self.Tabs do
-		local Active = TabData.Name == TabName
-
-		Tween(TabData.Button, 0.18, EasingQuint, DirectionOut, {
-			BackgroundTransparency = Active and 0 or 1
-		})
-
-		Tween(TabData.Label, 0.18, EasingQuint, DirectionOut, {
-			TextColor3 = Active and Colors.White or Colors.Gray
-		})
-
-		Tween(TabData.Indicator, 0.18, EasingQuint, DirectionOut, {
-			BackgroundTransparency = Active and 0 or 1
-		})
-
-		if TabData.IconLabel then
-			Tween(TabData.IconLabel, 0.18, EasingQuint, DirectionOut, {
-				ImageColor3 = Active and Colors.White or Colors.Gray
-			})
-		end
-	end
-
-	Self.CurrentTab = TabName
-	Self.CurrentTabName = TabName
-
-	task.wait(0.12)
-
-	Self.Switching = false
+local function rounded(object, radius, border)
+    Utils.ApplyCorner(object, radius or 8)
+    if border then Utils.ApplyStroke(object, C.Border, 1, 0.2) end
+    return object
 end
 
-function Window:CreateDashboard(WelcomeTitle, WelcomeText)
-	local Self = self
-
-	if Self.DashboardCreated and Self.DashboardTab then
-		return Self.DashboardTab
-	end
-
-	Self.DashboardCreated = true
-
-	local DashTab = Self:CreateTab("Dashboard", nil, WelcomeText or "Bem-vindo de volta.")
-	Self.DashboardTab = DashTab
-
-	if WelcomeTitle then
-		DashTab.TitleLabel.Text = WelcomeTitle
-	end
-
-	local Grid = DashTab:CreateStatGrid()
-	local StatPlayer = Grid:CreateStat("JOGADOR", "@" .. LocalPlayer.Name)
-	local StatStatus = Grid:CreateStat("STATUS", "ONLINE")
-	local StatVersion = Grid:CreateStat("VERSÃO", "--")
-	local StatPing = Grid:CreateStat("PING", "--")
-
-	Self.DashboardStats = {
-		Player = StatPlayer,
-		Status = StatStatus,
-		Version = StatVersion,
-		Ping = StatPing
-	}
-
-	DashTab:CreateDivider("ÚLTIMAS ATUALIZAÇÕES")
-
-	local ReleasesHolder = Instance_new("Frame")
-	ReleasesHolder.Name = "ReleasesHolder"
-	ReleasesHolder.Size = UDim2_new(1, 0, 0, 0)
-	ReleasesHolder.AutomaticSize = Enum.AutomaticSize.Y
-	ReleasesHolder.BackgroundTransparency = 1
-	ReleasesHolder.LayoutOrder = DashTab.NextOrder
-	ReleasesHolder.Parent = DashTab.Page
-	DashTab.NextOrder = DashTab.NextOrder + 1
-
-	local ReleasesLayout = Instance_new("UIListLayout")
-	ReleasesLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	ReleasesLayout.Padding = UDim_new(0, 10)
-	ReleasesLayout.Parent = ReleasesHolder
-
-	local EmptyLabel = CreateText(
-		ReleasesHolder,
-		"Nenhuma atualização publicada ainda.",
-		UDim2_new(1, 0, 0, 20),
-		UDim2_new(0, 0, 0, 0),
-		11,
-		Colors.DarkGray,
-		Enum.Font.Gotham
-	)
-	EmptyLabel.LayoutOrder = 1
-
-	Self.ReleasesHolder = ReleasesHolder
-	Self.ReleasesEmptyLabel = EmptyLabel
-
-	return DashTab
+local function connect(window, signal, callback)
+    local connection = signal:Connect(callback)
+    window.Connections[#window.Connections + 1] = connection
+    return connection
 end
 
-function Window:SetReleases(Changelog)
-	local Self = self
+local function viewport()
+    return workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280, 720)
+end
 
-	if not Self.DashboardCreated then
-		Self:CreateDashboard()
-	end
+function Tab:_mount(object, height, fullWidth)
+    self.NextOrder = self.NextOrder + 1
+    object.LayoutOrder = self.NextOrder
+    local record = {Object = object, Height = height, FullWidth = fullWidth == true, Order = self.NextOrder}
+    self.Elements[#self.Elements + 1] = object
+    self.Records[#self.Records + 1] = record
+    self:_layout()
+    if self.WindowRef.SearchBox and self.WindowRef.SearchBox.Text ~= "" then self.WindowRef:_filter() end
+end
 
-	local Holder = Self.ReleasesHolder
-	if not Holder then
-		return
-	end
+function Tab:_layout()
+    local single = self.WindowRef.Compact
+    local heights = {0, 0}
+    self.RightColumn.Visible = not single
+    self.LeftColumn.Size = UDim2.new(single and 1 or 0.5, single and 0 or -6, 0, 0)
+    self.RightColumn.Size = UDim2.new(0.5, -6, 0, 0)
+    for _, record in ipairs(self.Records) do
+        if record.FullWidth then
+            record.Object.Parent = self.Banners
+        else
+            record.Column = record.Column or (heights[1] <= heights[2] and 1 or 2)
+            local column = single and 1 or record.Column
+            record.Object.Parent = column == 1 and self.LeftColumn or self.RightColumn
+            if record.Object.Visible then heights[column] = heights[column] + record.Height + 8 end
+        end
+    end
+    self.Banners.Visible = #self.Banners:GetChildren() > 1
+end
 
-	for _, Child in Holder:GetChildren() do
-		if not Child:IsA("UIListLayout") then
-			Child:Destroy()
-		end
-	end
+function Tab:CreateSection(name)
+    local owner = self
+    local frame = create("Frame", nil, {Name = "Section_" .. name, Size = UDim2.new(1, 0, 0, 28), BackgroundTransparency = 1})
+    local title = text(frame, string.upper(name), 9, C.Gray, true)
+    title.Size = UDim2.new(1, 0, 0, 23)
+    local content = create("Frame", frame, {Name = "Controls", Position = UDim2.fromOffset(0, 28), Size = UDim2.new(1, 0, 0, 0), BackgroundTransparency = 1, AutomaticSize = Enum.AutomaticSize.Y})
+    list(content, 8)
+    local section = setmetatable({Name = name, Frame = frame, WindowRef = self.WindowRef, Elements = {}, Records = {}, NextOrder = 0}, Tab)
+    self:_mount(frame, 28)
+    self.Records[#self.Records].Section = section
+    function section:_layout()
+        local height, count = 28, 0
+        for _, item in ipairs(self.Records) do
+            if item.Object.Visible then height += item.Height + 8; count += 1 end
+        end
+        owner:_resize(frame, count > 0 and height - 8 or 28)
+    end
+    function section:_mount(object, height)
+        self.NextOrder += 1
+        object.Parent, object.LayoutOrder = content, self.NextOrder
+        self.Elements[#self.Elements + 1] = object
+        self.Records[#self.Records + 1] = {Object = object, Height = height}
+        self:_layout()
+    end
+    return section
+end
 
-	if not Changelog or #Changelog == 0 then
-		local EmptyLabel = CreateText(
-			Holder,
-			"Nenhuma atualização publicada ainda.",
-			UDim2_new(1, 0, 0, 20),
-			UDim2_new(0, 0, 0, 0),
-			11,
-			Colors.DarkGray,
-			Enum.Font.Gotham
-		)
-		EmptyLabel.LayoutOrder = 1
-		return
-	end
+function Tab:_resize(object, height)
+    object.Size = UDim2.new(1, 0, 0, height)
+    for _, record in ipairs(self.Records) do if record.Object == object then record.Height = height; break end end
+    self:_layout()
+end
 
-	if Self.DashboardStats and Self.DashboardStats.Version and Changelog[1] then
-		Self.DashboardStats.Version:SetValue(Changelog[1].Version or "--")
-	end
+function Window:_filter()
+    local tab = self.TabButtons[self.CurrentTab]
+    if not tab then return end
+    local query = string.lower(self.SearchBox.Text)
+    local function matches(object)
+        local parts = {}
+        if object:IsA("TextLabel") then parts[#parts + 1] = object.Text end
+        for _, item in ipairs(object:GetDescendants()) do
+            if item:IsA("TextLabel") or item:IsA("TextButton") then parts[#parts + 1] = item.Text end
+        end
+        return query == "" or string.find(string.lower(table.concat(parts, " ")), query, 1, true) ~= nil
+    end
+    local count = 0
+    for _, record in ipairs(tab.Records) do
+        local object = record.Object
+        local section = record.Section
+        if section then
+            local showAll = query == "" or string.find(string.lower(section.Name), query, 1, true) ~= nil
+            local visible = false
+            for _, item in ipairs(section.Records) do
+                item.Object.Visible = showAll or matches(item.Object)
+                visible = visible or item.Object.Visible
+            end
+            object.Visible = visible
+            section:_layout()
+        else
+            object.Visible = matches(object)
+        end
+        if object.Visible then count = count + 1 end
+    end
+    self.EmptySearch.Visible = query ~= "" and count == 0
+    tab:_layout()
+end
 
-	for Index, Entry in Changelog do
-		local Card = Instance_new("Frame")
-		Card.Size = UDim2_new(1, 0, 0, 0)
-		Card.AutomaticSize = Enum.AutomaticSize.Y
-		Card.BackgroundColor3 = Colors.Card
-		Card.BorderSizePixel = 0
-		Card.LayoutOrder = Index
-		Card.Parent = Holder
+function Window:_responsive()
+    if self.Destroyed then return end
+    local screen = viewport()
+    local width, height = math.min(1040, screen.X - 24), math.min(710, screen.Y - 24)
+    width, height = math.max(1, width), math.max(1, height)
+    self.Compact = width < 700
+    self.Window.Size = UDim2.fromOffset(width, height)
+    self.ModuleTag.Visible = width >= 550
+    self.FooterHint.Visible = width >= 500
+    self.SearchHolder.Size = UDim2.new(self.Compact and 1 or 0, self.Compact and 0 or 232, 0, 34)
+    self.SearchHolder.Position = self.Compact and UDim2.fromOffset(0, 61) or UDim2.new(1, -232, 0, 12)
+    self.PageHeading.Size = UDim2.new(1, 0, 0, self.Compact and 107 or 72)
+    self.PageTitle.Size = UDim2.new(self.Compact and 1 or 0.55, 0, 0, 26)
+    self.PageDescription.Size = UDim2.new(self.Compact and 1 or 0.65, self.Compact and 0 or -100, 0, 22)
+    local top = self.Compact and 107 or 72
+    self.Pages.Position, self.Pages.Size = UDim2.fromOffset(0, top), UDim2.new(1, 0, 1, -top)
+    for _, tab in ipairs(self.Tabs) do tab:_layout() end
+    self:_clampPosition()
+end
 
-		ApplyCorner(Card, 9)
-		ApplyStroke(Card, Colors.Border, 1, 0.35)
+function Window:_clampPosition()
+    local screen = viewport()
+    local width, height = self.Window.Size.X.Offset, self.Window.Size.Y.Offset
+    local x = screen.X * self.Window.Position.X.Scale + self.Window.Position.X.Offset
+    local y = screen.Y * self.Window.Position.Y.Scale + self.Window.Position.Y.Offset
+    x = math.clamp(x, width / 2, math.max(width / 2, screen.X - width / 2))
+    y = math.clamp(y, height / 2, math.max(height / 2, screen.Y - height / 2))
+    self.Window.Position = UDim2.fromOffset(x, y)
+end
 
-		local Accent = Instance_new("Frame")
-		Accent.Size = UDim2_fromOffset(2, 22)
-		Accent.Position = UDim2_new(0, 0, 0, 14)
-		Accent.BackgroundColor3 = Colors.Accent
-		Accent.BackgroundTransparency = 0.35
-		Accent.BorderSizePixel = 0
-		Accent.Parent = Card
-		ApplyCorner(Accent, 100)
+function Window:SetOpen(open)
+    if self.Destroyed then return end
+    self.IsHidden = not open
+    self.Window.Visible = open == true
+    self.ToggleButton.Visible = not open
+end
 
-		local HeaderText = CreateText(
-			Card,
-			(Entry.Version or "") .. "   •   " .. (Entry.Date or ""),
-			UDim2_new(1, -28, 0, 22),
-			UDim2_new(0, 14, 0, 10),
-			14,
-			Colors.White,
-			Enum.Font.GothamBold
-		)
+function Window:SelectTab(name)
+    if self.Destroyed then return end
+    local chosen = self.TabButtons[name]
+    if not chosen then return end
+    for _, tab in ipairs(self.Tabs) do
+        local active = tab == chosen
+        tab.Page.Visible = active
+        tab.Button.BackgroundColor3 = active and C.Active or C.Sidebar
+        tab.Label.TextColor3 = active and C.White or C.Gray
+        tab.Indicator.Visible = active
+    end
+    self.CurrentTab, self.CurrentTabName = name, name
+    self.PageTitle.Text = name == "Dashboard" and "Visão geral" or name
+    self.PageDescription.Text = chosen.Description or ""
+    self.SearchBox.Text = ""
+    self:_filter()
+end
 
-		local ChangesHolder = Instance_new("Frame")
-		ChangesHolder.Size = UDim2_new(1, -28, 0, 0)
-		ChangesHolder.AutomaticSize = Enum.AutomaticSize.Y
-		ChangesHolder.Position = UDim2_new(0, 14, 0, 36)
-		ChangesHolder.BackgroundTransparency = 1
-		ChangesHolder.Parent = Card
+function Window:CreateTab(name, icon, description)
+    if self.TabButtons[name] then return self.TabButtons[name] end
+    local tab = setmetatable({Name = name, Description = description, WindowRef = self, Elements = {}, Records = {}, NextOrder = 0}, Tab)
+    tab.Page = create("ScrollingFrame", self.Pages, {Name = name .. "Page", Size = UDim2.fromScale(1, 1), BackgroundTransparency = 1, BorderSizePixel = 0, CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.Y, ScrollingDirection = Enum.ScrollingDirection.Y, ScrollBarThickness = 3, ScrollBarImageColor3 = C.Accent, Visible = false})
+    create("UIPadding", tab.Page, {PaddingRight = UDim.new(0, 7), PaddingBottom = UDim.new(0, 16), PaddingTop = UDim.new(0, 2)})
+    list(tab.Page, 12)
+    tab.Banners = create("Frame", tab.Page, {Name = "Overview", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 0})
+    list(tab.Banners, 8)
+    local columns = create("Frame", tab.Page, {Name = "ResponsiveColumns", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1})
+    list(columns, 12, Enum.FillDirection.Horizontal)
+    tab.LeftColumn = create("Frame", columns, {Name = "Left", Size = UDim2.new(0.5, -6, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 1})
+    tab.RightColumn = create("Frame", columns, {Name = "Right", Size = UDim2.new(0.5, -6, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundTransparency = 1, LayoutOrder = 2})
+    list(tab.LeftColumn, 8); list(tab.RightColumn, 8)
+    tab.Button = rounded(create("TextButton", self.TabContainer, {Name = name .. "Tab", Size = UDim2.fromOffset(math.max(104, math.min(176, #name * 7 + 34)), 37), BackgroundColor3 = C.Sidebar, BorderSizePixel = 0, Text = "", AutoButtonColor = false, LayoutOrder = #self.Tabs + 1}), 6)
+    tab.Label = text(tab.Button, name == "Dashboard" and "Início" or name, 11, C.Gray, true)
+    tab.Label.Size, tab.Label.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+    tab.Indicator = create("Frame", tab.Button, {Size = UDim2.new(1, -26, 0, 2), Position = UDim2.new(0, 13, 1, -2), BackgroundColor3 = C.Accent, BorderSizePixel = 0, Visible = false})
+    self.Tabs[#self.Tabs + 1], self.TabButtons[name] = tab, tab
+    connect(self, tab.Button.MouseButton1Click, function() self:SelectTab(name) end)
+    tab:_layout()
+    if not self.CurrentTab then self:SelectTab(name) end
+    return tab
+end
 
-		local ChangesLayout = Instance_new("UIListLayout")
-		ChangesLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		ChangesLayout.Padding = UDim_new(0, 2)
-		ChangesLayout.Parent = ChangesHolder
+function Window:CreateDashboard(title, description)
+    if self.DashboardTab then return self.DashboardTab end
+    self.DashboardCreated = true
+    local tab = self:CreateTab("Dashboard", nil, description or "Seu painel de controle. Tudo organizado em um só lugar.")
+    self.DashboardTab = tab
+    local banner = rounded(create("Frame", nil, {Name = "WelcomeBanner", Size = UDim2.new(1, 0, 0, 95), BackgroundColor3 = C.Active, BorderSizePixel = 0}), 8, true)
+    local heading = text(banner, title or ("Olá, " .. Utils.LocalPlayer.DisplayName), 20, C.White, true)
+    heading.Size, heading.Position = UDim2.new(1, -34, 0, 30), UDim2.fromOffset(17, 16)
+    local sub = text(banner, "Selecione uma categoria acima para acessar seus recursos.", 11, C.Light)
+    sub.Size, sub.Position = UDim2.new(1, -34, 0, 28), UDim2.fromOffset(17, 48)
+    sub.TextWrapped = true
+    tab:_mount(banner, 95, true)
+    local grid = tab:CreateStatGrid()
+    self.DashboardStats = {Player = grid:CreateStat("Jogador", "@" .. Utils.LocalPlayer.Name), Status = grid:CreateStat("Status", "ONLINE"), Version = grid:CreateStat("Versão", "--"), Ping = grid:CreateStat("Ping", "--")}
+    grid.Frame.Size = UDim2.new(1, 0, 0, 148)
+    local releases = rounded(create("Frame", nil, {Name = "ReleasePanel", Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, BackgroundColor3 = C.Card, BorderSizePixel = 0}), 8, true)
+    create("UIPadding", releases, {PaddingLeft = UDim.new(0, 14), PaddingRight = UDim.new(0, 14), PaddingTop = UDim.new(0, 12), PaddingBottom = UDim.new(0, 12)})
+    list(releases, 8)
+    self.ReleasesHolder = releases
+    tab:_mount(releases, 120, true)
+    self:SetReleases({})
+    return tab
+end
 
-		local BottomPadding = Instance_new("Frame")
-		BottomPadding.Size = UDim2_new(1, 0, 0, 12)
-		BottomPadding.BackgroundTransparency = 1
-		BottomPadding.LayoutOrder = 999
-		BottomPadding.Parent = Card
+function Window:SetReleases(changelog)
+    if not self.DashboardTab then self:CreateDashboard() end
+    for _, child in ipairs(self.ReleasesHolder:GetChildren()) do if child:IsA("GuiObject") then child:Destroy() end end
+    local heading = text(self.ReleasesHolder, "ATUALIZAÇÕES", 9, C.Gray, true)
+    heading.Size, heading.LayoutOrder = UDim2.new(1, 0, 0, 20), 0
+    if not changelog or #changelog == 0 then
+        local empty = text(self.ReleasesHolder, "Nenhuma atualização publicada ainda.", 11, C.DarkGray)
+        empty.Size, empty.LayoutOrder = UDim2.new(1, 0, 0, 24), 1
+        return
+    end
+    self.DashboardStats.Version:SetValue(changelog[1].Version or "--")
+    local order = 1
+    for _, entry in ipairs(changelog) do
+        local version = text(self.ReleasesHolder, tostring(entry.Version or "") .. "   ·   " .. tostring(entry.Date or ""), 12, C.White, true)
+        version.Size, version.LayoutOrder = UDim2.new(1, 0, 0, 23), order; order += 1
+        for _, change in ipairs(entry.Changes or {}) do
+            local line = text(self.ReleasesHolder, "•  " .. tostring(change), 11, C.Gray)
+            line.Size, line.AutomaticSize, line.TextWrapped, line.LayoutOrder = UDim2.new(1, 0, 0, 20), Enum.AutomaticSize.Y, true, order; order += 1
+        end
+    end
+end
 
-		if Entry.Changes then
-			for LineIndex, Line in Entry.Changes do
-				local LineLabel = CreateText(
-					ChangesHolder,
-					"•  " .. tostring(Line),
-					UDim2_new(1, 0, 0, 16),
-					UDim2_new(0, 0, 0, 0),
-					12,
-					Colors.Gray,
-					Enum.Font.Gotham
-				)
-				LineLabel.LayoutOrder = LineIndex
-			end
-		end
-	end
+function Window:Notify(title, message, duration, kind)
+    if self.Destroyed then return end
+    self.NotifyCount += 1
+    local toast = rounded(create("Frame", self.NotificationContainer, {Size = UDim2.new(1, 0, 0, 78), BackgroundColor3 = C.Sidebar, BorderSizePixel = 0, LayoutOrder = self.NotifyCount}), 8, true)
+    local color = ({Success = C.Success, Error = C.Error, Warning = C.Warning})[kind] or C.Accent
+    create("Frame", toast, {Size = UDim2.new(0, 3, 1, -20), Position = UDim2.fromOffset(0, 10), BackgroundColor3 = color, BorderSizePixel = 0})
+    local heading = text(toast, title, 12, C.White, true)
+    heading.Size, heading.Position = UDim2.new(1, -28, 0, 22), UDim2.fromOffset(14, 8)
+    local body = text(toast, message, 11, C.Gray)
+    body.Size, body.Position, body.TextWrapped = UDim2.new(1, -28, 0, 38), UDim2.fromOffset(14, 30), true
+    task.delay(duration or 4, function() if toast.Parent then toast:Destroy() end end)
+    return toast
 end
 
 function Window:Destroy()
-	local Self = self
-
-	Watchdog.Stop(Self)
-
-	for _, Connection in Self.Connections do
-		if Connection and Connection.Disconnect then
-			Connection:Disconnect()
-		end
-	end
-
-	Self.Connections = {}
-
-	if Self.Window then
-		local ClosingTween = Tween(Self.Window, 0.22, EasingQuint, DirectionIn, {
-			Size = UDim2_fromOffset(0, 0)
-		})
-
-		ClosingTween.Completed:Connect(function()
-			if Self.ScreenGui then
-				Self.ScreenGui:Destroy()
-				Self.ScreenGui = nil
-			end
-		end)
-	elseif Self.ScreenGui then
-		Self.ScreenGui:Destroy()
-		Self.ScreenGui = nil
-	end
+    if self.Destroyed then return end
+    self.Destroyed = true
+    for _, connection in ipairs(self.Connections) do connection:Disconnect() end
+    self.Connections = {}
+    if self.CameraConnection then self.CameraConnection:Disconnect() end
+    if self.ScreenGui then self.ScreenGui:Destroy() end
+    self.ScreenGui = nil
 end
 
-function Library.new(HubName, Subtitle, LogoId)
-	local Self = setmetatable({}, Window)
-
-	Self.Connections = {}
-	Self.Tabs = {}
-	Self.TabButtons = {}
-	Self.TabDefinitions = {}
-	Self.CurrentTab = nil
-	Self.CurrentTabName = nil
-	Self.Switching = false
-	Self.IsHidden = false
-	Self.DashboardCreated = false
-	Self.NotifyCount = 0
-	Self.LogoId = LogoId or Utils.DefaultLogoId
-	Self.HubName = HubName
-	Self.Subtitle = Subtitle
-
-	Self.Destroyed = false
-	Self.WatchdogRunning = false
-	Self.Rebuilding = false
-
-	local function BuildCoreUI()
-		if Self.ScreenGui then
-			Self.ScreenGui:Destroy()
-			Self.ScreenGui = nil
-		end
-
-		local ScreenGui = Instance_new("ScreenGui")
-		ScreenGui.Name = "DepHubLibraryGui"
-		ScreenGui.ResetOnSpawn = false
-		ScreenGui.IgnoreGuiInset = true
-		ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-		ScreenGui.DisplayOrder = 999
-		ScreenGui.Parent = PlayerGui
-		Self.ScreenGui = ScreenGui
-
-		local MainWindow = Instance_new("Frame")
-		MainWindow.Name = "Window"
-		MainWindow.Size = UDim2_new(0.68, 0, 0.72, 0)
-		MainWindow.Position = UDim2_new(0.5, 0, 0.5, 0)
-		MainWindow.AnchorPoint = Vector2_new(0.5, 0.5)
-		MainWindow.BackgroundColor3 = Colors.Background
-		MainWindow.BorderSizePixel = 0
-		MainWindow.ClipsDescendants = true
-		MainWindow.Parent = ScreenGui
-		Self.Window = MainWindow
-
-		ApplyConstraint(MainWindow, Vector2_new(500, 320), Vector2_new(1800, 1200))
-		ApplyCorner(MainWindow, 10)
-		ApplyStroke(MainWindow, Colors.Border, 1, 0.15)
-
-		local Sheen = Instance_new("Frame")
-		Sheen.BackgroundColor3 = Colors.White
-		Sheen.BackgroundTransparency = 1
-		Sheen.BorderSizePixel = 0
-		Sheen.Size = UDim2_new(1, 0, 0, 140)
-		Sheen.ZIndex = 0
-		Sheen.Parent = MainWindow
-
-		local SheenGradient = Instance_new("UIGradient")
-		SheenGradient.Rotation = 90
-		SheenGradient.Color = ColorSequence_new(Colors.White)
-		SheenGradient.Transparency = NumberSequence_new({
-			NumberSequenceKeypoint_new(0, 0.94),
-			NumberSequenceKeypoint_new(1, 1)
-		})
-		SheenGradient.Parent = Sheen
-
-		local TitleBar = Instance_new("Frame")
-		TitleBar.Name = "TitleBar"
-		TitleBar.Size = UDim2_new(1, 0, 0, 44)
-		TitleBar.BackgroundColor3 = Colors.Black
-		TitleBar.BorderSizePixel = 0
-		TitleBar.Parent = MainWindow
-		Self.TitleBar = TitleBar
-
-		local TitleLine = Instance_new("Frame")
-		TitleLine.Size = UDim2_new(1, 0, 0, 1)
-		TitleLine.Position = UDim2_new(0, 0, 1, -1)
-		TitleLine.BackgroundColor3 = Colors.Border
-		TitleLine.BorderSizePixel = 0
-		TitleLine.Parent = TitleBar
-
-		CreateLogo(TitleBar, Self.LogoId, UDim2_fromOffset(24, 24), UDim2_new(0, 14, 0.5, 0), Vector2_new(0, 0.5))
-
-		local TitleLabel = CreateText(
-			TitleBar,
-			string_upper(Self.HubName or "HUB"),
-			UDim2_new(0, 160, 1, 0),
-			UDim2_new(0, 48, 0, 0),
-			14,
-			Colors.White,
-			Enum.Font.GothamBold
-		)
-
-		local SubtitleLabel = CreateText(
-			TitleBar,
-			string_upper(Self.Subtitle or "GAME SYSTEM"),
-			UDim2_new(0, 160, 1, 0),
-			UDim2_new(0, 118, 0, 0),
-			10,
-			Colors.DarkGray,
-			Enum.Font.GothamMedium
-		)
-
-		local Sidebar = Instance_new("Frame")
-		Sidebar.Name = "Sidebar"
-		Sidebar.Size = UDim2_new(0.22, 0, 1, -44)
-		Sidebar.Position = UDim2_new(0, 0, 0, 44)
-		Sidebar.BackgroundColor3 = Colors.Sidebar
-		Sidebar.BorderSizePixel = 0
-		Sidebar.Parent = MainWindow
-		Self.Sidebar = Sidebar
-
-		local SidebarSizeConstraint = Instance_new("UISizeConstraint")
-		SidebarSizeConstraint.MinSize = Vector2_new(140, 0)
-		SidebarSizeConstraint.MaxSize = Vector2_new(220, math.huge)
-		SidebarSizeConstraint.Parent = Sidebar
-
-		local function RecalculateResponsiveLayout()
-			local Width = MainWindow.AbsoluteSize.X
-			if Width <= 0 then
-				return
-			end
-			RefreshAllTexts(ComputeScaleFactor(Width))
-		end
-
-		Self.Connections[#Self.Connections + 1] = MainWindow:GetPropertyChangedSignal("AbsoluteSize"):Connect(RecalculateResponsiveLayout)
-
-		CreateLogo(Sidebar, Self.LogoId, UDim2_fromOffset(44, 44), UDim2_new(0.5, 0, 0, 22), Vector2_new(0.5, 0))
-
-		local Brand = CreateText(
-			Sidebar,
-			string_upper(Self.HubName or "HUB"),
-			UDim2_new(1, -30, 0, 22),
-			UDim2_new(0, 15, 0, 70),
-			16,
-			Colors.White,
-			Enum.Font.GothamBold,
-			Enum.TextXAlignment.Center
-		)
-
-		local BrandSubtitle = CreateText(
-			Sidebar,
-			string_upper(Self.Subtitle or "GAME SYSTEM"),
-			UDim2_new(1, -30, 0, 16),
-			UDim2_new(0, 15, 0, 91),
-			10,
-			Colors.DarkGray,
-			Enum.Font.GothamMedium,
-			Enum.TextXAlignment.Center
-		)
-
-		local NavigationTitle = CreateText(
-			Sidebar,
-			"NAVIGATION",
-			UDim2_new(1, -28, 0, 18),
-			UDim2_new(0, 14, 0, 124),
-			10,
-			Colors.DarkGray,
-			Enum.Font.GothamBold
-		)
-
-		local TabContainer = Instance_new("ScrollingFrame")
-		TabContainer.Name = "Navigation"
-		TabContainer.Size = UDim2_new(1, -24, 1, -206)
-		TabContainer.Position = UDim2_new(0, 12, 0, 148)
-		TabContainer.BackgroundTransparency = 1
-		TabContainer.BorderSizePixel = 0
-		TabContainer.ScrollBarThickness = 2
-		TabContainer.ScrollBarImageColor3 = Colors.BorderLight
-		TabContainer.CanvasSize = UDim2_new(0, 0, 0, 0)
-		TabContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
-		TabContainer.Parent = Sidebar
-		Self.TabContainer = TabContainer
-
-		local TabLayout = Instance_new("UIListLayout")
-		TabLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		TabLayout.Padding = UDim_new(0, 5)
-		TabLayout.Parent = TabContainer
-
-		local UserBox = Instance_new("Frame")
-		UserBox.Size = UDim2_new(1, -24, 0, 42)
-		UserBox.Position = UDim2_new(0, 12, 1, -54)
-		UserBox.BackgroundColor3 = Colors.Card
-		UserBox.BorderSizePixel = 0
-		UserBox.Parent = Sidebar
-
-		ApplyCorner(UserBox, 8)
-		ApplyStroke(UserBox, Colors.Border, 1, 0.35)
-
-		local UserStatus = Instance_new("Frame")
-		UserStatus.Size = UDim2_fromOffset(7, 7)
-		UserStatus.Position = UDim2_new(0, 11, 0.5, 0)
-		UserStatus.AnchorPoint = Vector2_new(0, 0.5)
-		UserStatus.BackgroundColor3 = Colors.Success
-		UserStatus.BorderSizePixel = 0
-		UserStatus.Parent = UserBox
-		ApplyCorner(UserStatus, 100)
-
-		local UserName = CreateText(
-			UserBox,
-			"@" .. LocalPlayer.Name,
-			UDim2_new(1, -32, 1, 0),
-			UDim2_new(0, 27, 0, 0),
-			12,
-			Colors.Gray,
-			Enum.Font.GothamMedium
-		)
-
-		local Content = Instance_new("Frame")
-		Content.Name = "Content"
-		Content.Size = UDim2_new(0.78, 0, 1, -44)
-		Content.Position = UDim2_new(0.22, 0, 0, 44)
-		Content.BackgroundColor3 = Colors.Background
-		Content.BorderSizePixel = 0
-		Content.ClipsDescendants = true
-		Content.Parent = MainWindow
-		Self.Content = Content
-
-		Self.Connections[#Self.Connections + 1] = Sidebar:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
-			Content.Size = UDim2_new(1, -Sidebar.AbsoluteSize.X, 1, -44)
-			Content.Position = UDim2_new(0, Sidebar.AbsoluteSize.X, 0, 44)
-		end)
-
-		local NotificationContainer = Instance_new("Frame")
-		NotificationContainer.Name = "Notifications"
-		NotificationContainer.Size = UDim2_new(0, 300, 1, -40)
-		NotificationContainer.Position = UDim2_new(1, -320, 0, 20)
-		NotificationContainer.BackgroundTransparency = 1
-		NotificationContainer.ZIndex = 100
-		NotificationContainer.Parent = ScreenGui
-		Self.NotificationContainer = NotificationContainer
-
-		local NotifyConstraint = Instance_new("UISizeConstraint")
-		NotifyConstraint.MinSize = Vector2_new(240, 0)
-		NotifyConstraint.MaxSize = Vector2_new(340, math.huge)
-		NotifyConstraint.Parent = NotificationContainer
-
-		local NotifyLayout = Instance_new("UIListLayout")
-		NotifyLayout.SortOrder = Enum.SortOrder.LayoutOrder
-		NotifyLayout.VerticalAlignment = Enum.VerticalAlignment.Top
-		NotifyLayout.Padding = UDim_new(0, 8)
-		NotifyLayout.Parent = NotificationContainer
-
-		local DragConnections = MakeDraggable(TitleBar, MainWindow)
-		for _, Connection in DragConnections do
-			Self.Connections[#Self.Connections + 1] = Connection
-		end
-
-		local function CreateResizeHandle(Size, Position, Anchor, Axis)
-			local Handle = Instance_new("TextButton")
-			Handle.Size = Size
-			Handle.Position = Position
-			Handle.AnchorPoint = Anchor
-			Handle.BackgroundTransparency = 1
-			Handle.Text = ""
-			Handle.AutoButtonColor = false
-			Handle.ZIndex = 50
-			Handle.Parent = MainWindow
-
-			local Resizing = false
-			local ResizeStart
-			local ResizeStartSize
-
-			Handle.InputBegan:Connect(function(Input)
-				if IsPrimaryInput(Input) then
-					Resizing = true
-					ResizeStart = GetInputPosition(Input)
-					ResizeStartSize = MainWindow.AbsoluteSize
-
-					local ChangedConnection
-					ChangedConnection = Input.Changed:Connect(function()
-						if Input.UserInputState == Enum.UserInputState.End then
-							Resizing = false
-							if ChangedConnection then
-								ChangedConnection:Disconnect()
-							end
-						end
-					end)
-				end
-			end)
-
-			Self.Connections[#Self.Connections + 1] = UserInputService.InputChanged:Connect(function(Input)
-				if not Resizing then
-					return
-				end
-
-				if Input.UserInputType ~= Enum.UserInputType.MouseMovement
-					and Input.UserInputType ~= Enum.UserInputType.Touch then
-					return
-				end
-
-				local Delta = GetInputPosition(Input) - ResizeStart
-				local Width = ResizeStartSize.X
-				local Height = ResizeStartSize.Y
-
-				if Axis == "Right" or Axis == "Corner" then
-					Width = ResizeStartSize.X + Delta.X
-				end
-
-				if Axis == "Bottom" or Axis == "Corner" then
-					Height = ResizeStartSize.Y + Delta.Y
-				end
-
-				local ViewportSize = Camera.ViewportSize
-				Width = math_clamp(Width, 500, ViewportSize.X)
-				Height = math_clamp(Height, 320, ViewportSize.Y)
-
-				MainWindow.Size = UDim2_fromOffset(Width, Height)
-			end)
-
-			return Handle
-		end
-
-		CreateResizeHandle(UDim2_fromOffset(8, 120), UDim2_new(1, -4, 0.5, 0), Vector2_new(0.5, 0.5), "Right")
-		CreateResizeHandle(UDim2_new(1, -120, 0, 8), UDim2_new(0.5, 0, 1, -4), Vector2_new(0.5, 0.5), "Bottom")
-		CreateResizeHandle(UDim2_fromOffset(18, 18), UDim2_new(1, -4, 1, -4), Vector2_new(0.5, 0.5), "Corner")
-
-		local ToggleButton = Instance_new("TextButton")
-		ToggleButton.Name = "DepHubToggle"
-		ToggleButton.Size = UDim2_fromOffset(56, 56)
-		ToggleButton.Position = UDim2_new(0, 16, 1, -80)
-		ToggleButton.AnchorPoint = Vector2_new(0, 1)
-		ToggleButton.BackgroundColor3 = Colors.Black
-		ToggleButton.BorderSizePixel = 0
-		ToggleButton.AutoButtonColor = false
-		ToggleButton.Text = ""
-		ToggleButton.Visible = true
-		ToggleButton.ZIndex = 200
-		ToggleButton.Parent = ScreenGui
-		Self.ToggleButton = ToggleButton
-
-		ApplyCorner(ToggleButton, 100)
-		local ToggleButtonStroke = ApplyStroke(ToggleButton, Colors.Border, 1, 0.15)
-
-		CreateLogo(ToggleButton, Self.LogoId, UDim2_fromOffset(28, 28), UDim2_new(0.5, 0, 0.5, 0), Vector2_new(0.5, 0.5))
-
-		ToggleButton.MouseEnter:Connect(function()
-			Tween(ToggleButton, 0.16, EasingQuint, DirectionOut, {
-				BackgroundColor3 = Colors.Active
-			})
-		end)
-
-		ToggleButton.MouseLeave:Connect(function()
-			Tween(ToggleButton, 0.16, EasingQuint, DirectionOut, {
-				BackgroundColor3 = Colors.Black
-			})
-		end)
-
-		local ToggleDragConnections = MakeDraggable(ToggleButton, ToggleButton)
-		for _, Connection in ToggleDragConnections do
-			Self.Connections[#Self.Connections + 1] = Connection
-		end
-
-		local ToggleDragDistance = 0
-		local ToggleDragStartPosition = nil
-
-		ToggleButton.InputBegan:Connect(function(Input)
-			if IsPrimaryInput(Input) then
-				ToggleDragStartPosition = GetInputPosition(Input)
-				ToggleDragDistance = 0
-			end
-		end)
-
-		Self.Connections[#Self.Connections + 1] = UserInputService.InputChanged:Connect(function(Input)
-			if ToggleDragStartPosition and (Input.UserInputType == Enum.UserInputType.MouseMovement or Input.UserInputType == Enum.UserInputType.Touch) then
-				local Current = GetInputPosition(Input)
-				ToggleDragDistance = (Current - ToggleDragStartPosition).Magnitude
-			end
-		end)
-
-		ToggleButton.MouseButton1Click:Connect(function()
-			if ToggleDragDistance < 6 then
-				Self:SetOpen(Self.IsHidden)
-			end
-		end)
-
-		local OriginalSize = MainWindow.Size
-		local ViewportWidth = Camera.ViewportSize.X
-		local EstimatedWindowWidth = math_clamp(ViewportWidth * OriginalSize.X.Scale, 500, 1800)
-		RefreshAllTexts(ComputeScaleFactor(EstimatedWindowWidth))
-
-		MainWindow.Size = UDim2_fromOffset(0, 0)
-
-		local OpenTween = Tween(MainWindow, 0.5, EasingQuint, DirectionOut, {
-			Size = OriginalSize
-		})
-
-		OpenTween.Completed:Connect(function()
-			if MainWindow.AbsoluteSize.X > 0 then
-				RefreshAllTexts(ComputeScaleFactor(MainWindow.AbsoluteSize.X))
-			end
-		end)
-	end
-
-	BuildCoreUI()
-	Watchdog.Start(Self, BuildCoreUI)
-
-	Library.__index = Window
-	_G.DepHubLib = Library
-
-	return Self
+function Library.new(hubName, subtitle, logoId)
+    local self = setmetatable({Connections = {}, Tabs = {}, TabButtons = {}, Destroyed = false, IsHidden = false, Compact = false, NotifyCount = 0, HubName = hubName or "DepHub", Subtitle = subtitle or "Universal"}, Window)
+    self.ScreenGui = create("ScreenGui", Utils.PlayerGui, {Name = "DepHubNextUI", ResetOnSpawn = false, IgnoreGuiInset = true, DisplayOrder = 999, ZIndexBehavior = Enum.ZIndexBehavior.Sibling})
+    self.Window = rounded(create("Frame", self.ScreenGui, {Name = "Workspace", Position = UDim2.fromScale(0.5, 0.5), AnchorPoint = Vector2.new(0.5, 0.5), BackgroundColor3 = C.Background, BorderSizePixel = 0, ClipsDescendants = true}), 10, true)
+    self.TitleBar = create("Frame", self.Window, {Name = "Header", Size = UDim2.new(1, 0, 0, 64), BackgroundColor3 = C.Sidebar, BorderSizePixel = 0})
+    local mark = rounded(create("Frame", self.TitleBar, {Size = UDim2.fromOffset(36, 36), Position = UDim2.fromOffset(18, 14), BackgroundColor3 = C.Accent, BorderSizePixel = 0}), 8)
+    local monogram = text(mark, "D", 22, C.White, true); monogram.Size, monogram.TextXAlignment = UDim2.fromScale(1, 1), Enum.TextXAlignment.Center
+    local brand = text(self.TitleBar, "DEPHUB", 15, C.White, true); brand.Size, brand.Position = UDim2.fromOffset(142, 24), UDim2.fromOffset(66, 11)
+    local byline = text(self.TitleBar, "CONTROL CENTER", 8, C.DarkGray, true); byline.Size, byline.Position = UDim2.fromOffset(142, 17), UDim2.fromOffset(66, 35)
+    self.ModuleTag = rounded(create("TextLabel", self.TitleBar, {Size = UDim2.fromOffset(150, 27), Position = UDim2.fromOffset(217, 19), BackgroundColor3 = C.Surface, BorderSizePixel = 0, Text = subtitle or "Universal", TextColor3 = C.Gray, Font = Enum.Font.GothamMedium, TextSize = 10}), 5)
+    local minimize = rounded(create("TextButton", self.TitleBar, {Size = UDim2.fromOffset(34, 32), Position = UDim2.new(1, -52, 0, 16), BackgroundColor3 = C.Surface, BorderSizePixel = 0, Text = "−", TextColor3 = C.Gray, Font = Enum.Font.GothamBold, TextSize = 18}), 6)
+    connect(self, minimize.MouseButton1Click, function() self:SetOpen(false) end)
+    for _, connection in ipairs(Utils.MakeDraggable(self.TitleBar, self.Window, nil, function() self:_clampPosition() end)) do self.Connections[#self.Connections + 1] = connection end
+    self.TabContainer = create("ScrollingFrame", self.Window, {Name = "CategoryRail", Position = UDim2.fromOffset(18, 72), Size = UDim2.new(1, -36, 0, 45), BackgroundTransparency = 1, BorderSizePixel = 0, CanvasSize = UDim2.fromOffset(0, 0), AutomaticCanvasSize = Enum.AutomaticSize.X, ScrollBarThickness = 2, ScrollBarImageColor3 = C.Border, ScrollingDirection = Enum.ScrollingDirection.X})
+    list(self.TabContainer, 6, Enum.FillDirection.Horizontal)
+    create("Frame", self.Window, {Size = UDim2.new(1, -36, 0, 1), Position = UDim2.fromOffset(18, 122), BackgroundColor3 = C.Border, BorderSizePixel = 0})
+    self.Content = create("Frame", self.Window, {Name = "Content", Position = UDim2.fromOffset(18, 129), Size = UDim2.new(1, -36, 1, -163), BackgroundTransparency = 1})
+    self.PageHeading = create("Frame", self.Content, {Name = "PageHeading", BackgroundTransparency = 1})
+    self.PageTitle = text(self.PageHeading, "Visão geral", 22, C.White, true); self.PageTitle.Position = UDim2.fromOffset(0, 5)
+    self.PageDescription = text(self.PageHeading, "", 10, C.Gray); self.PageDescription.Position = UDim2.fromOffset(0, 33)
+    self.SearchHolder = rounded(create("Frame", self.PageHeading, {Name = "Search", BackgroundColor3 = C.Surface, BorderSizePixel = 0}), 7, true)
+    local searchIcon = text(self.SearchHolder, "⌕", 20, C.Gray, true); searchIcon.Size, searchIcon.Position, searchIcon.TextXAlignment = UDim2.fromOffset(30, 34), UDim2.fromOffset(3, 0), Enum.TextXAlignment.Center
+    self.SearchBox = create("TextBox", self.SearchHolder, {Size = UDim2.new(1, -43, 1, 0), Position = UDim2.fromOffset(34, 0), BackgroundTransparency = 1, Text = "", PlaceholderText = "Buscar nesta página...", PlaceholderColor3 = C.DarkGray, TextColor3 = C.White, Font = Enum.Font.Gotham, TextSize = 11, ClearTextOnFocus = false, TextXAlignment = Enum.TextXAlignment.Left})
+    self.Pages = create("Frame", self.Content, {Name = "Pages", BackgroundTransparency = 1})
+    self.EmptySearch = text(self.Pages, "Nenhum recurso encontrado. Tente outro termo.", 12, C.Gray); self.EmptySearch.Size, self.EmptySearch.Visible, self.EmptySearch.TextXAlignment = UDim2.new(1, 0, 0, 80), false, Enum.TextXAlignment.Center
+    local footer = create("Frame", self.Window, {Size = UDim2.new(1, -36, 0, 28), Position = UDim2.new(0, 18, 1, -29), BackgroundTransparency = 1})
+    local status = text(footer, "●  " .. (subtitle or "Universal") .. "  /  @" .. Utils.LocalPlayer.Name, 9, C.Gray); status.Size = UDim2.new(0.7, 0, 1, 0)
+    self.FooterHint = text(footer, "Right Ctrl  ·  ocultar", 9, C.DarkGray); self.FooterHint.Size, self.FooterHint.Position, self.FooterHint.TextXAlignment = UDim2.new(0.3, 0, 1, 0), UDim2.fromScale(0.7, 0), Enum.TextXAlignment.Right
+    self.ToggleButton = rounded(create("TextButton", self.ScreenGui, {Name = "Reopen", Size = UDim2.fromOffset(48, 48), Position = UDim2.fromOffset(16, 100), BackgroundColor3 = C.Accent, BorderSizePixel = 0, Text = "D", TextColor3 = C.White, Font = Enum.Font.GothamBold, TextSize = 24, Visible = false}), 10, true)
+    connect(self, self.ToggleButton.MouseButton1Click, function() self:SetOpen(true) end)
+    self.NotificationContainer = create("Frame", self.ScreenGui, {Size = UDim2.new(0.85, 0, 1, -36), Position = UDim2.new(1, -18, 0, 18), AnchorPoint = Vector2.new(1, 0), BackgroundTransparency = 1})
+    create("UISizeConstraint", self.NotificationContainer, {MaxSize = Vector2.new(320, 10000)})
+    list(self.NotificationContainer, 8)
+    connect(self, UIS.InputBegan, function(input, processed) if not processed and input.KeyCode == Enum.KeyCode.RightControl then self:SetOpen(self.IsHidden) end end)
+    connect(self, self.SearchBox:GetPropertyChangedSignal("Text"), function() self:_filter() end)
+    local function bindCamera()
+        if self.CameraConnection then self.CameraConnection:Disconnect() end
+        if workspace.CurrentCamera then self.CameraConnection = workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function() self:_responsive() end) end
+        self:_responsive()
+    end
+    connect(self, workspace:GetPropertyChangedSignal("CurrentCamera"), bindCamera)
+    bindCamera()
+    self:CreateDashboard()
+    return self
 end
 
 return Library
