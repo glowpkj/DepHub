@@ -1,33 +1,16 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-16T19:35:00Z",
-  "commit": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
+  "generatedAt": "2026-08-30T22:03:19.509680+00:00",
+  "commit": "c52768d8d8dd52a91a44ba3c26e6cee67f9435bb",
+  "version": "0.0.3",
   "games": {
-    "119048529960596": {
-      "name": "Restaurant Tycoon 3",
-      "version": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
-      "commit": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
-      "files": [
-        "DepHub.lua",
-        "src/core/anti-afk.lua",
-        "src/core/dashboard.lua",
-        "src/core/health-monitor.lua",
-        "src/core/runtime.lua",
-        "src/core/scheduler.lua",
-        "src/core/updater.lua",
-        "src/games/rt3.lua",
-        "src/games/features/autofarm.lua",
-        "src/games/features/instant-cook.lua",
-        "src/games/features/drops.lua",
-        "src/games/features/autofarm-friends.lua"
-      ]
-    },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
-      "commit": "837ac2757e53e39f59d4f8302f4020e7c119b48a",
+      "version": "972d744709f7e0cbb16f6a21b4a678cb41fdb4b6040d0ca0fc009c902e3e9cc0",
+      "commit": "c52768d8d8dd52a91a44ba3c26e6cee67f9435bb",
       "files": [
         "DepHub.lua",
+        "src/version.txt",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/playeresp.lua",
         "src/games/features/bloxfruits/fruit.lua",
@@ -36,44 +19,89 @@
         "src/games/features/bloxfruits/camerashake.lua",
         "src/games/features/bloxfruits/dash.lua",
         "src/games/features/bloxfruits/flashstep.lua",
-        "src/games/features/bloxfruits/waterwalking.lua"
+        "src/games/features/bloxfruits/waterwalking.lua",
+        "src/games/features/bloxfruits/config.lua",
+        "src/games/features/bloxfruits/team.lua",
+        "src/games/updates/994732206.txt"
+      ]
+    },
+    "119048529960596": {
+      "name": "Restaurant Tycoon 3",
+      "version": "eeec0c5344a7c01bc276db214c86170646ab123c2638c44004f418e540457a51",
+      "commit": "c52768d8d8dd52a91a44ba3c26e6cee67f9435bb",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/anti-afk.lua",
+        "src/core/dashboard.lua",
+        "src/core/health-monitor.lua",
+        "src/core/runtime.lua",
+        "src/core/scheduler.lua",
+        "src/core/updater.lua",
+        "src/games/rt3.lua",
+        "src/games/features/restauranttycoon3/autofarm.lua",
+        "src/games/features/restauranttycoon3/instant-cook.lua",
+        "src/games/features/restauranttycoon3/drops.lua",
+        "src/games/features/restauranttycoon3/autofarm-friends.lua",
+        "src/games/updates/119048529960596.txt"
+      ]
+    },
+    "85211729168715": {
+      "name": "Blox Fruits Sea 1",
+      "version": "82788089d2937e499467663f7604d06cf0c8aa613c14719b469b3863e6569505",
+      "commit": "c52768d8d8dd52a91a44ba3c26e6cee67f9435bb",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/games/bloxfruits.lua",
+        "src/games/features/bloxfruits/playeresp.lua",
+        "src/games/features/bloxfruits/fruit.lua",
+        "src/games/features/bloxfruits/observation.lua",
+        "src/games/features/bloxfruits/unbreakable.lua",
+        "src/games/features/bloxfruits/camerashake.lua",
+        "src/games/features/bloxfruits/dash.lua",
+        "src/games/features/bloxfruits/flashstep.lua",
+        "src/games/features/bloxfruits/waterwalking.lua",
+        "src/games/features/bloxfruits/config.lua",
+        "src/games/features/bloxfruits/team.lua",
+        "src/games/updates/85211729168715.txt"
       ]
     }
   },
   "recentUpdates": [
     {
-      "Version": "837ac27",
-      "Date": "2026-08-16T19:35:00Z",
+      "Version": "623a97a",
+      "Date": "2026-08-30T19:02:00-03:00",
       "Changes": [
-        "feat: modular Blox Fruits movement and combat attribute features"
+        "refactor: remove frontend and preserve headless game backends"
       ]
     },
     {
-      "Version": "a593cdd",
-      "Date": "2026-08-16T18:50:05Z",
+      "Version": "a1a54a3",
+      "Date": "2026-08-30T18:38:12-03:00",
       "Changes": [
-        "refactor: isolate Blox Fruits features"
+        "feat(bloxfruits): add reversible Rumble VFX palettes and fruit selector"
       ]
     },
     {
-      "Version": "b328690",
-      "Date": "2026-08-16T17:46:31Z",
+      "Version": "1d296db",
+      "Date": "2026-08-30T18:09:01-03:00",
       "Changes": [
-        "feat: improve Blox Fruits player and dropped fruit ESP"
+        "feat(ui): replace legacy frontend with responsive section workspace"
       ]
     },
     {
-      "Version": "d22ac28",
-      "Date": "2026-08-16T17:19:09Z",
+      "Version": "e9ad62d",
+      "Date": "2026-08-30T12:35:50-03:00",
       "Changes": [
-        "perf: prefetch modules during startup gate and harden cleanup"
+        "feat(loader): add universal fallback and trim logs"
       ]
     },
     {
-      "Version": "af98966",
-      "Date": "2026-08-16T17:18:10Z",
+      "Version": "c58c2f3",
+      "Date": "2026-08-26T17:56:40-03:00",
       "Changes": [
-        "fix: preserve RT3 loader result contract"
+        "Bump DepHub version to 0.0.3"
       ]
     }
   ]
