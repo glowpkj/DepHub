@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-31T23:47:57.770346+00:00",
-  "commit": "3fe062dee15c19d3a37c147f6cd26fbadf61e079",
+  "generatedAt": "2026-08-31T23:48:15.519823+00:00",
+  "commit": "3d15949e86397d3f36b57adaa8f26ba9c208474a",
   "version": "0.0.3",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "efad914b92a8d4ad116e9641ba0be2dfe5c5383d4a84063fa866fdb0e3848408",
-      "commit": "3fe062dee15c19d3a37c147f6cd26fbadf61e079",
+      "commit": "3d15949e86397d3f36b57adaa8f26ba9c208474a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "e81393a5de834536dfd04993955cebf63fbc8c12579fd50a80afcbb10a0a243b",
-      "commit": "3fe062dee15c19d3a37c147f6cd26fbadf61e079",
+      "commit": "3d15949e86397d3f36b57adaa8f26ba9c208474a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "3b9954aecf6edff71c69f32b048ac53f15146ffb5dd09280d0f771b9ecf7ab47",
-      "commit": "3fe062dee15c19d3a37c147f6cd26fbadf61e079",
+      "commit": "3d15949e86397d3f36b57adaa8f26ba9c208474a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
