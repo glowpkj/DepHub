@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-31T23:48:49.119227+00:00",
-  "commit": "60ee5f3a0cb24e84ac59340e90c42ff9e8877842",
+  "generatedAt": "2026-08-31T23:49:52.247363+00:00",
+  "commit": "28e8b0e09db2cb603282959ddd251720c1a29bfc",
   "version": "0.0.3",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "efad914b92a8d4ad116e9641ba0be2dfe5c5383d4a84063fa866fdb0e3848408",
-      "commit": "60ee5f3a0cb24e84ac59340e90c42ff9e8877842",
+      "version": "2753941a4dfd090fb8215ba918afe1d57f8c4b21e5c108fa15d16c4c45215ef5",
+      "commit": "28e8b0e09db2cb603282959ddd251720c1a29bfc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -34,8 +34,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "e81393a5de834536dfd04993955cebf63fbc8c12579fd50a80afcbb10a0a243b",
-      "commit": "60ee5f3a0cb24e84ac59340e90c42ff9e8877842",
+      "version": "5de847968c5e45ea1acaa3f0edae5af9b902100fd4c841f22c6b881a63fef6b5",
+      "commit": "28e8b0e09db2cb603282959ddd251720c1a29bfc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -62,8 +62,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "3b9954aecf6edff71c69f32b048ac53f15146ffb5dd09280d0f771b9ecf7ab47",
-      "commit": "60ee5f3a0cb24e84ac59340e90c42ff9e8877842",
+      "version": "db61206402a402be128cdfee1c3bdc18a938068f2fd0f5b76f6ee4a74cd81c59",
+      "commit": "28e8b0e09db2cb603282959ddd251720c1a29bfc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,6 +91,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "28e8b0e",
+      "Date": "2026-08-31T20:49:43-03:00",
+      "Changes": [
+        "feat(tsb): wire backend and dedicated frontend"
+      ]
+    },
+    {
       "Version": "e214437",
       "Date": "2026-08-31T17:58:58-03:00",
       "Changes": [
@@ -116,13 +123,6 @@
       "Date": "2026-08-30T18:09:01-03:00",
       "Changes": [
         "feat(ui): replace legacy frontend with responsive section workspace"
-      ]
-    },
-    {
-      "Version": "e9ad62d",
-      "Date": "2026-08-30T12:35:50-03:00",
-      "Changes": [
-        "feat(loader): add universal fallback and trim logs"
       ]
     }
   ]
