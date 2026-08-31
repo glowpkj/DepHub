@@ -1,0 +1,1 @@
+0.0.1 | TSB compact frontend and auto block foundation
