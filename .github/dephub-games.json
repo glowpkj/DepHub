@@ -85,7 +85,8 @@
       "src/core/updater.lua",
       "src/games/tsb.lua",
       "src/games/features/tsb/autoblock.lua",
-      "src/games/features/tsb/frontend.lua"
+      "src/games/features/tsb/frontend.lua",
+      "src/games/updates/3808081382.txt"
     ]
   }
 }
