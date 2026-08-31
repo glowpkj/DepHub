@@ -76,5 +76,16 @@
       "library/content/common.lua",
       "library/content/bloxfruits.lua"
     ]
+  },
+  "3808081382": {
+    "name": "The Strongest Battlegrounds",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/updater.lua",
+      "src/games/tsb.lua",
+      "src/games/features/tsb/autoblock.lua",
+      "src/games/features/tsb/frontend.lua"
+    ]
   }
 }
