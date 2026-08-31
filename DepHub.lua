@@ -9,7 +9,7 @@ local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.3"
+local VERSION = "0.0.4"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -33,35 +33,63 @@ local function cleanupRuntime()
         pcall(oldLoading.Destroy, oldLoading)
         env.__DEPHUB_LOADING_INSTANCE = nil
     end
+
     env.__DEPHUB_UI_MODULES = nil
     env.__DEPHUB_UI_LOADING = nil
+
     local state = env.__DEPHUB
     if type(state) ~= "table" then return end
-    -- Legacy handles are cleaned once when migrating an already running session.
-    for _, key in ipairs({"Frontend", "BloxFruits", "BloxFruitsUI", "Universal", "Updater", "Runtime", "Window"}) do
+
+    for _, key in ipairs({
+        "Frontend",
+        "BloxFruits",
+        "BloxFruitsUI",
+        "TSB",
+        "TSBUI",
+        "Universal",
+        "Updater",
+        "Runtime",
+        "Window"
+    }) do
         local target = state[key]
         if type(target) == "table" and type(target.Destroy) == "function" then
             pcall(target.Destroy, target)
         end
     end
+
     state.BloxFruits = nil
     state.BloxFruitsUI = nil
+    state.TSB = nil
+    state.TSBUI = nil
     state.Universal = nil
     state.Updater = nil
     state.Runtime = nil
     state.Window = nil
     state.Frontend = nil
+
+    env.__DEPHUB_TSB = nil
+    env.__DEPHUB_TSB_FRONTEND = nil
 end
 
 local previousState = env[STATE_KEY]
-if env[EXECUTED_KEY] and type(previousState) == "table" and previousState.status == "success" and previousState.Frontend == "library-1" then
+if env[EXECUTED_KEY]
+    and type(previousState) == "table"
+    and previousState.status == "success"
+    and previousState.Frontend == "library-1" then
+
     allowedLog("Status: Loader ja executado com sucesso nesta sessao")
     return
 end
 
 cleanupRuntime()
 env[EXECUTED_KEY] = false
-env[STATE_KEY] = {status = "running", startedAt = os.clock(), Version = VERSION, Frontend = "library-1"}
+env[STATE_KEY] = {
+    status = "running",
+    startedAt = os.clock(),
+    Version = VERSION,
+    Frontend = "library-1"
+}
+
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
 env.__DEPHUB.Executor = detectExecutor()
@@ -94,11 +122,20 @@ local function performRequest(url)
 
     for _, requestFunction in ipairs(requestFunctions) do
         if requestFunction then
-            local ok, response = pcall(requestFunction, {Url = url, Method = "GET"})
+            local ok, response = pcall(requestFunction, {
+                Url = url,
+                Method = "GET"
+            })
+
             if ok and type(response) == "table" then
                 local body = response.Body or response.body
                 local status = tonumber(response.StatusCode or response.status_code or 200) or 200
-                if status >= 200 and status < 400 and type(body) == "string" and #body > 0 then
+
+                if status >= 200
+                    and status < 400
+                    and type(body) == "string"
+                    and #body > 0 then
+
                     return true, body
                 end
             end
@@ -123,7 +160,10 @@ local function httpGet(path, useCache)
         env[CACHE_KEY] = cache
     end
 
-    if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then
+    if useCache ~= false
+        and type(cache[path]) == "string"
+        and #cache[path] > 0 then
+
         return true, cache[path]
     end
 
@@ -144,8 +184,10 @@ local function compareVersions(localVersion, remoteVersion)
         local a, b, c = tostring(value or "0.0.0"):match("^(%d+)%.(%d+)%.(%d+)")
         return tonumber(a) or 0, tonumber(b) or 0, tonumber(c) or 0
     end
+
     local la, lb, lc = parts(localVersion)
     local ra, rb, rc = parts(remoteVersion)
+
     if ra ~= la then return ra > la and 1 or -1 end
     if rb ~= lb then return rb > lb and 1 or -1 end
     if rc ~= lc then return rc > lc and 1 or -1 end
@@ -153,19 +195,34 @@ local function compareVersions(localVersion, remoteVersion)
 end
 
 local function compile(source)
-    if type(loadstring) ~= "function" then return false, "loadstring indisponivel" end
+    if type(loadstring) ~= "function" then
+        return false, "loadstring indisponivel"
+    end
+
     local ok, chunk, compileError = pcall(loadstring, source)
-    if not ok or type(chunk) ~= "function" then return false, tostring(compileError or chunk) end
+    if not ok or type(chunk) ~= "function" then
+        return false, tostring(compileError or chunk)
+    end
+
     return true, chunk
 end
 
 local function loadModule(path, useCache)
     local okSource, source = httpGet(path, useCache)
-    if not okSource then return false, source end
+    if not okSource then
+        return false, source
+    end
+
     local okCompile, chunk = compile(source)
-    if not okCompile then return false, chunk end
+    if not okCompile then
+        return false, chunk
+    end
+
     local okRun, result = pcall(chunk)
-    if not okRun then return false, tostring(result) end
+    if not okRun then
+        return false, tostring(result)
+    end
+
     return true, result
 end
 
@@ -174,6 +231,7 @@ allowedLog("Executor detectado: " .. tostring(env.__DEPHUB.Executor))
 
 local gameId = tostring(game.GameId)
 local placeId = tostring(game.PlaceId)
+
 allowedLog("PlaceId: " .. placeId)
 allowedLog("GameId: " .. gameId)
 
@@ -184,53 +242,144 @@ if okVersion then
 end
 
 local targets = {
-    ["994732206"] = {Core = "src/games/bloxfruits.lua"},
-    ["85211729168715"] = {Core = "src/games/bloxfruits.lua"},
-    ["119048529960596"] = {Core = "src/games/rt3.lua"}
+    ["994732206"] = {
+        Core = "src/games/bloxfruits.lua"
+    },
+    ["85211729168715"] = {
+        Core = "src/games/bloxfruits.lua"
+    },
+    ["119048529960596"] = {
+        Core = "src/games/rt3.lua"
+    },
+    ["10449761463"] = {
+        Core = "src/games/tsb.lua",
+        Frontend = "src/games/features/tsb/frontend.lua",
+        TSB = true
+    },
+    ["3808081382"] = {
+        Core = "src/games/tsb.lua",
+        Frontend = "src/games/features/tsb/frontend.lua",
+        TSB = true
+    }
 }
-local target = targets[placeId] or targets[gameId] or {Core = "src/games/universal.lua", Universal = true}
 
-if not game:IsLoaded() then game.Loaded:Wait() end
+local target = targets[placeId]
+    or targets[gameId]
+    or {
+        Core = "src/games/universal.lua",
+        Universal = true
+    }
+
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
 task.wait()
 
 local okCore, coreResult = loadModule(target.Core, false)
-if not okCore then return fail(coreResult) end
+if not okCore then
+    return fail(coreResult)
+end
+
 local isRT3 = target.Core == "src/games/rt3.lua"
+local isTSB = target.TSB == true
+
 if isRT3 then
-    if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
+    if coreResult ~= true then
+        return fail("Modulo RT3 nao inicializou")
+    end
 elseif type(coreResult) ~= "table" then
     return fail(coreResult)
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and coreResult or nil
+env.__DEPHUB.TSB = isTSB and coreResult or nil
 
-local mode = target.Universal and "Universal" or (isRT3 and "RT3" or "BloxFruits")
-local backend = isRT3 and env.__DEPHUB.Runtime or coreResult
-local subtitles = {Universal = "UNIVERSAL", BloxFruits = "BLOX FRUITS", RT3 = "RESTAURANT TYCOON 3"}
-local okLibrary, Library = loadModule("library/init.lua", false)
-if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then
-    return fail(okLibrary and "Library inválida" or Library)
+local mode
+local backend
+
+if target.Universal then
+    mode = "Universal"
+    backend = coreResult
+elseif isRT3 then
+    mode = "RT3"
+    backend = env.__DEPHUB.Runtime
+elseif isTSB then
+    mode = "TSB"
+    backend = coreResult
+else
+    mode = "BloxFruits"
+    backend = coreResult
 end
-local okFrontend, frontend = pcall(Library.new, {
-    Mode = mode,
-    Backend = backend,
-    Title = "DEPHUB",
-    Subtitle = subtitles[mode]
-})
-if not okFrontend or type(frontend) ~= "table" then return fail(frontend) end
-env.__DEPHUB.Frontend = frontend
+
+if isTSB then
+    env[STATE_KEY].Frontend = "tsb-compact-1"
+
+    local okFrontend, frontend = loadModule(target.Frontend, false)
+    if not okFrontend or type(frontend) ~= "table" then
+        return fail(okFrontend and "Frontend TSB invalido" or frontend)
+    end
+
+    env.__DEPHUB.TSBUI = frontend
+    env.__DEPHUB.Frontend = frontend
+else
+    local subtitles = {
+        Universal = "UNIVERSAL",
+        BloxFruits = "BLOX FRUITS",
+        RT3 = "RESTAURANT TYCOON 3"
+    }
+
+    local okLibrary, Library = loadModule("library/init.lua", false)
+    if not okLibrary
+        or type(Library) ~= "table"
+        or type(Library.new) ~= "function" then
+
+        return fail(okLibrary and "Library inválida" or Library)
+    end
+
+    local okFrontend, frontend = pcall(Library.new, {
+        Mode = mode,
+        Backend = backend,
+        Title = "DEPHUB",
+        Subtitle = subtitles[mode]
+    })
+
+    if not okFrontend or type(frontend) ~= "table" then
+        return fail(frontend)
+    end
+
+    env.__DEPHUB.Frontend = frontend
+end
+
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
-allowedLog(target.Universal and "Status: Script universal carregado com sucesso" or "Status: Jogo compativel carregado com sucesso")
+
+allowedLog(
+    target.Universal
+        and "Status: Script universal carregado com sucesso"
+        or "Status: Jogo compativel carregado com sucesso"
+)
 
 task.defer(function()
     local ok, updaterModule = loadModule("src/core/updater.lua", false)
-    if not ok or type(updaterModule) ~= "table" or type(updaterModule.new) ~= "function" then return end
+    if not ok
+        or type(updaterModule) ~= "table"
+        or type(updaterModule.new) ~= "function" then
+
+        return
+    end
+
     local okNew, updater = pcall(function()
-        return updaterModule.new({PlaceId = game.PlaceId, GameId = game.GameId, PollInterval = 15, Mode = "serverhop"})
+        return updaterModule.new({
+            PlaceId = game.PlaceId,
+            GameId = game.GameId,
+            PollInterval = 15,
+            Mode = "serverhop"
+        })
     end)
+
     if okNew and updater then
         env.__DEPHUB.Updater = updater
         pcall(updater.Start, updater)
