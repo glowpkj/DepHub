@@ -45,7 +45,7 @@ local State = {
     Destroyed = false, Connections = {}, FeatureConnections = {}, ESPObjects = {}, Keys = {},
     Values = {WalkSpeed = 16, JumpPower = 50, FlySpeed = 70, ESPRange = 2000, ESPTextSize = 14, ESPColor = Color3.fromRGB(90, 170, 255), AimbotFOV = 180, AimPart = "Head", ChatMessage = "DepHub Universal", ChatInterval = 5},
     Toggles = {WalkSpeed = false, Jump = false, Fly = false, Noclip = false, ESP = false, ESPNames = true, ESPDistance = true, ESPHealth = true, TeamCheck = false, TeamColors = true, Chams = true, Fullbright = false, InfiniteZoom = false, Aimbot = false, ChatLoop = false},
-    TeleportTool = nil, FlyVelocity = nil, FlyGyro = nil, OriginalCollisions = {}, OriginalLighting = nil, OriginalZoom = LocalPlayer.CameraMaxZoomDistance
+    TeleportTool = nil, FlyVelocity = nil, FlyGyro = nil, OriginalCollisions = {}, OriginalLighting = nil, OriginalMovement = {}, OriginalZoom = LocalPlayer.CameraMaxZoomDistance
 }
 env[STATE_KEY] = State
 env.__DEPHUB = env.__DEPHUB or {}
@@ -65,8 +65,29 @@ end
 function State:ApplyMovement()
     local _, humanoid = characterParts()
     if not humanoid then return end
+    local original = self.OriginalMovement[humanoid]
+    if not original then
+        original = {WalkSpeed=humanoid.WalkSpeed, JumpPower=humanoid.JumpPower, UseJumpPower=humanoid.UseJumpPower}
+        self.OriginalMovement[humanoid] = original
+    end
     if self.Toggles.WalkSpeed then humanoid.WalkSpeed = self.Values.WalkSpeed end
     if self.Toggles.Jump then humanoid.UseJumpPower = true; humanoid.JumpPower = self.Values.JumpPower end
+end
+
+function State:SetWalkSpeedEnabled(enabled)
+    self.Toggles.WalkSpeed = enabled == true
+    local _, humanoid = characterParts()
+    if self.Toggles.WalkSpeed then return self:ApplyMovement() end
+    local original = humanoid and self.OriginalMovement[humanoid]
+    if original then humanoid.WalkSpeed = original.WalkSpeed end
+end
+
+function State:SetJumpEnabled(enabled)
+    self.Toggles.Jump = enabled == true
+    local _, humanoid = characterParts()
+    if self.Toggles.Jump then return self:ApplyMovement() end
+    local original = humanoid and self.OriginalMovement[humanoid]
+    if original then humanoid.JumpPower, humanoid.UseJumpPower = original.JumpPower, original.UseJumpPower end
 end
 
 function State:SetNoclip(enabled)
@@ -224,7 +245,9 @@ function State:SendChat()
 end
 
 function State:SetChatLoop(enabled)
-    self.Toggles.ChatLoop = enabled == true
+    enabled = enabled == true
+    if self.Toggles.ChatLoop == enabled then return end
+    self.Toggles.ChatLoop = enabled
     if enabled then task.spawn(function() while not self.Destroyed and self.Toggles.ChatLoop do self:SendChat(); task.wait(math.max(3, self.Values.ChatInterval)) end end) end
 end
 
@@ -232,7 +255,7 @@ function State:ServerHop()
     local ok, body = pcall(function() return game:HttpGet("https://games.roblox.com/v1/games/" .. tostring(game.PlaceId) .. "/servers/Public?sortOrder=Asc&limit=100") end)
     if not ok then return self:Notify("Não foi possível consultar os servidores.", "Error") end
     local decoded, data = pcall(HttpService.JSONDecode, HttpService, body)
-    if decoded then for _, server in ipairs(data.data or {}) do if server.id ~= game.JobId and tonumber(server.playing) < tonumber(server.maxPlayers) then TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer); return end end end
+    if decoded then for _, server in ipairs(data.data or {}) do local playing,maxPlayers=tonumber(server.playing),tonumber(server.maxPlayers); if server.id ~= game.JobId and playing and maxPlayers and playing < maxPlayers then TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer); return end end end
     self:Notify("Nenhum servidor disponível foi encontrado.", "Error")
 end
 
@@ -262,6 +285,10 @@ function State:Destroy()
     if self.Destroyed then return end
     self.Destroyed, self.Toggles.ChatLoop = true, false
     self:StopFly(); self:SetNoclip(false); self:SetESP(false); self:SetFullbright(false)
+    for humanoid, original in pairs(self.OriginalMovement) do
+        if humanoid and humanoid.Parent then humanoid.WalkSpeed, humanoid.JumpPower, humanoid.UseJumpPower = original.WalkSpeed, original.JumpPower, original.UseJumpPower end
+    end
+    self.OriginalMovement = {}
     LocalPlayer.CameraMaxZoomDistance = self.OriginalZoom
     for player in pairs(self.ESPObjects) do self:RemoveESP(player) end
     for name in pairs(self.FeatureConnections) do self:ClearFeature(name) end

@@ -15,7 +15,14 @@
       "src/games/features/bloxfruits/waterwalking.lua",
       "src/games/features/bloxfruits/config.lua",
       "src/games/features/bloxfruits/team.lua",
-      "src/games/updates/994732206.txt"
+      "src/games/updates/994732206.txt",
+      "library/init.lua",
+      "library/theme.lua",
+      "library/utils.lua",
+      "library/components.lua",
+      "library/window.lua",
+      "library/content/common.lua",
+      "library/content/bloxfruits.lua"
     ]
   },
   "119048529960596": {
@@ -34,7 +41,14 @@
       "src/games/features/restauranttycoon3/instant-cook.lua",
       "src/games/features/restauranttycoon3/drops.lua",
       "src/games/features/restauranttycoon3/autofarm-friends.lua",
-      "src/games/updates/119048529960596.txt"
+      "src/games/updates/119048529960596.txt",
+      "library/init.lua",
+      "library/theme.lua",
+      "library/utils.lua",
+      "library/components.lua",
+      "library/window.lua",
+      "library/content/common.lua",
+      "library/content/rt3.lua"
     ]
   },
   "85211729168715": {
@@ -53,7 +67,14 @@
       "src/games/features/bloxfruits/waterwalking.lua",
       "src/games/features/bloxfruits/config.lua",
       "src/games/features/bloxfruits/team.lua",
-      "src/games/updates/85211729168715.txt"
+      "src/games/updates/85211729168715.txt",
+      "library/init.lua",
+      "library/theme.lua",
+      "library/utils.lua",
+      "library/components.lua",
+      "library/window.lua",
+      "library/content/common.lua",
+      "library/content/bloxfruits.lua"
     ]
   }
 }

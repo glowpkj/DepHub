@@ -38,7 +38,7 @@ local function cleanupRuntime()
     local state = env.__DEPHUB
     if type(state) ~= "table" then return end
     -- Legacy handles are cleaned once when migrating an already running session.
-    for _, key in ipairs({"BloxFruits", "BloxFruitsUI", "Universal", "Updater", "Runtime", "Window"}) do
+    for _, key in ipairs({"Frontend", "BloxFruits", "BloxFruitsUI", "Universal", "Updater", "Runtime", "Window"}) do
         local target = state[key]
         if type(target) == "table" and type(target.Destroy) == "function" then
             pcall(target.Destroy, target)
@@ -50,17 +50,18 @@ local function cleanupRuntime()
     state.Updater = nil
     state.Runtime = nil
     state.Window = nil
+    state.Frontend = nil
 end
 
 local previousState = env[STATE_KEY]
-if env[EXECUTED_KEY] and type(previousState) == "table" and previousState.status == "success" and previousState.Headless == true then
+if env[EXECUTED_KEY] and type(previousState) == "table" and previousState.status == "success" and previousState.Frontend == "library-1" then
     allowedLog("Status: Loader ja executado com sucesso nesta sessao")
     return
 end
 
 cleanupRuntime()
 env[EXECUTED_KEY] = false
-env[STATE_KEY] = {status = "running", startedAt = os.clock(), Version = VERSION, Headless = true}
+env[STATE_KEY] = {status = "running", startedAt = os.clock(), Version = VERSION, Frontend = "library-1"}
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
 env.__DEPHUB.Executor = detectExecutor()
@@ -203,6 +204,22 @@ end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
 env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and coreResult or nil
+
+local mode = target.Universal and "Universal" or (isRT3 and "RT3" or "BloxFruits")
+local backend = isRT3 and env.__DEPHUB.Runtime or coreResult
+local subtitles = {Universal = "UNIVERSAL", BloxFruits = "BLOX FRUITS", RT3 = "RESTAURANT TYCOON 3"}
+local okLibrary, Library = loadModule("library/init.lua", false)
+if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then
+    return fail(okLibrary and "Library inválida" or Library)
+end
+local okFrontend, frontend = pcall(Library.new, {
+    Mode = mode,
+    Backend = backend,
+    Title = "DEPHUB",
+    Subtitle = subtitles[mode]
+})
+if not okFrontend or type(frontend) ~= "table" then return fail(frontend) end
+env.__DEPHUB.Frontend = frontend
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
