@@ -12,22 +12,29 @@ do
         ctx.Responses["src/version.txt"] = "0.0.3"
         local result = case[3] == "rt3" and true or {}
         ctx:Provide("src/games/" .. case[3] .. ".lua", result)
+        local frontend = {Destroy=function(self) self.Destroyed=true end}
+        ctx:Provide("library/init.lua", {new=function(options)
+            frontend.Options=options
+            return frontend
+        end})
         ctx:Provide("src/core/updater.lua", {new=function()
             return {Start=function(self) self.Started = true end}
         end})
         ctx.State.__DEPHUB_SOURCE_CACHE = {["src/core/updater.lua"]='error("stale updater")'}
         check(ctx:Run("DepHub.lua") == true, "loader succeeds for route " .. case[3])
-        check(ctx.State.__DEPHUB_LOADER_STATE.Headless == true, "successful loader marks headless session")
+        check(ctx.State.__DEPHUB_LOADER_STATE.Frontend == "library-1", "successful loader marks current library session")
+        check(ctx.State.__DEPHUB.Frontend == frontend, "loader stores the new frontend")
+        check(frontend.Options.Mode == (case[3] == "rt3" and "RT3" or case[3] == "bloxfruits" and "BloxFruits" or "Universal"), "loader passes the correct content mode")
         check(#ctx.Logs == 5, "loader emits exactly five startup/status lines")
         check(ctx.Logs[1] == "Iniciando loader v0.0.3" and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
         check(ctx.Logs[3] == "PlaceId: " .. case[1] and ctx.Logs[4] == "GameId: " .. case[2], "game identity logs preserved")
         check(ctx.Logs[5] == (case[4] and "Status: Script universal carregado com sucesso" or "Status: Jogo compativel carregado com sucesso"), "final route status preserved")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
-        check(ctx.State.__DEPHUB.Updater.Started, "headless updater still starts using fresh code")
+        check(ctx.State.__DEPHUB.Updater.Started, "updater still starts using fresh code")
         local requestCount = #ctx.Requests
         ctx:Run("DepHub.lua")
-        check(#ctx.Requests == requestCount, "duplicate headless execution does not reload modules")
+        check(#ctx.Requests == requestCount, "duplicate library execution does not reload modules")
     end
     for _, name in ipairs({"bloxfruits", "universal", "rt3"}) do
         local ctx = sandbox(name == "rt3" and 119048529960596 or name == "bloxfruits" and 994732206 or 1, 2)
@@ -35,10 +42,16 @@ do
         ctx:Provide("src/games/" .. name .. ".lua", false)
         check(ctx:Run("DepHub.lua") == false and ctx.State.__DEPHUB_LOADER_STATE.status == "failed", "failed " .. name .. " cannot report loader success")
     end
+    local libraryFailure = sandbox()
+    local backend = {Destroyed=false, Destroy=function(self) self.Destroyed=true end}
+    libraryFailure.Responses["src/version.txt"] = "0.0.3"
+    libraryFailure:Provide("src/games/universal.lua", backend)
+    libraryFailure:Provide("library/init.lua", false)
+    check(libraryFailure:Run("DepHub.lua") == false and backend.Destroyed, "invalid library fails loader and cleans initialized backend")
     local ctx = sandbox()
     local removed = {}
     local function old(name) return {Destroy=function() removed[name] = true end} end
-    ctx.State.__DEPHUB = {Universal=old("Universal"), Updater=old("Updater"), Runtime=old("Runtime"), Window=old("Window")}
+    ctx.State.__DEPHUB = {Frontend=old("Frontend"), Universal=old("Universal"), Updater=old("Updater"), Runtime=old("Runtime"), Window=old("Window")}
     ctx.State.__DEPHUB_LOADING_INSTANCE = old("Loading")
     ctx.State.__DEPHUB_UI_MODULES = {old=true}
     ctx.State.__DEPHUB_UI_LOADING = {}
@@ -46,8 +59,9 @@ do
     ctx.State.__DEPHUB_LOADER_STATE = {status="success"}
     ctx.Responses["src/version.txt"] = "0.0.3"
     ctx:Provide("src/games/universal.lua", {})
+    ctx:Provide("library/init.lua", {new=function() return {} end})
     check(ctx:Run("DepHub.lua") == true, "old UI session migrates without duplicate-success guard blocking it")
-    check(removed.Loading and removed.Universal and removed.Updater and removed.Runtime and removed.Window, "migration destroys legacy handles despite missing Blox Fruits keys")
+    check(removed.Loading and removed.Frontend and removed.Universal and removed.Updater and removed.Runtime and removed.Window, "migration destroys legacy handles despite missing Blox Fruits keys")
     check(ctx.State.__DEPHUB_UI_MODULES == nil and ctx.State.__DEPHUB_UI_LOADING == nil and ctx.State.__DEPHUB.Window == nil, "legacy frontend handles cleared")
 end
 
@@ -55,6 +69,17 @@ do
     local ctx = sandbox()
     local universal = ctx:Run("src/games/universal.lua")
     check(type(universal) == "table" and universal.UI == nil and #ctx.Requests == 0, "actual Universal starts without UI, PlayerGui, or downloads")
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    local humanoid = Instance.new("Humanoid"); humanoid.WalkSpeed, humanoid.JumpPower, humanoid.UseJumpPower, humanoid.Parent = 18, 55, false, character
+    ctx.Player.Character = character
+    universal.Values.WalkSpeed = 90; universal:SetWalkSpeedEnabled(true)
+    check(humanoid.WalkSpeed == 90, "Universal WalkSpeed setter applies configured value")
+    universal:SetWalkSpeedEnabled(false)
+    check(humanoid.WalkSpeed == 18, "disabling WalkSpeed restores actual previous value")
+    universal.Values.JumpPower = 120; universal:SetJumpEnabled(true)
+    check(humanoid.JumpPower == 120 and humanoid.UseJumpPower, "Universal jump setter applies configured value")
+    universal:SetJumpEnabled(false)
+    check(humanoid.JumpPower == 55 and not humanoid.UseJumpPower, "disabling jump restores actual previous values")
     universal:SetInfiniteZoom(true)
     check(ctx.Player.CameraMaxZoomDistance == 100000, "zoom action preserved outside UI callbacks")
     universal:SetInfiniteZoom(false)

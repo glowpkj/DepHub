@@ -8,6 +8,7 @@ on:
       - "DepHub.lua"
       - "src/core/**"
       - "src/games/**"
+      - "library/**"
       - "src/version.txt"
       - ".github/dephub-games.json"
 

@@ -28,14 +28,14 @@ function luaFiles(dir) {
     return entry.isDirectory() ? luaFiles(file) : file.endsWith('.lua') ? [file] : [];
   });
 }
-// Fail on dangling frontend dependencies, even in modules not run by smoke tests.
+// Fail on dangling dependencies on the retired frontend directory.
 if (fs.existsSync(path.join(root, 'src/ui')) && fs.readdirSync(path.join(root, 'src/ui')).length) {
   throw new Error('Legacy UI directory still contains files');
 }
 for (const file of [path.join(root, 'DepHub.lua'), ...luaFiles(path.join(root, 'src'))]) {
   const source = fs.readFileSync(file, 'utf8');
-  if (/src\/ui\/|CreateUI|MountUI|CreateTab|CreateSection|CreatePrompt|Instance\.new\(["'](?:ScreenGui|TextButton|TextBox|Frame)["']\)/.test(source)) {
-    throw new Error('Frontend code remains in ' + file);
+  if (/src\/ui\/|CreateUI|MountUI|CreatePrompt/.test(source)) {
+    throw new Error('Retired frontend dependency remains in ' + file);
   }
 }
 const sources = 'local sources = {\n' + files.map(file =>

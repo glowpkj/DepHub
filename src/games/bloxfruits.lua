@@ -280,7 +280,6 @@ end
 function State:Start()
     if self.Destroyed or self.Started then return false end
     self.Started = true
-    self.Features.CameraShake:Debug()
     if self.Toggles.ObservationHaki then self.Features.ObservationHaki:Enable() end
     for _, name in ipairs({"PlayerESP", "FruitESP", "UnbreakableAll", "DashCustomizer", "FlashstepNoCooldown", "WaterWalking"}) do
         if self.Toggles[name] then
