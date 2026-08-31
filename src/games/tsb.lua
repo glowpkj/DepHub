@@ -71,7 +71,7 @@ local State = {
         M1Catch = false
     },
     Values = {
-        NormalRange = 30,
+        NormalRange = 12,
         SpecialRange = 50,
         SkillRange = 50,
         SkillHold = 1.2
