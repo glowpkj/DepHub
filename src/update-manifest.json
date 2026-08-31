@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-31T23:50:06.326056+00:00",
-  "commit": "9385692313b0fb6d6763d9e0105ca997d9686fc5",
+  "generatedAt": "2026-08-31T23:50:19.505201+00:00",
+  "commit": "755494200be51798d981d5b914745cb58bdd1fe7",
   "version": "0.0.4",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "9385692313b0fb6d6763d9e0105ca997d9686fc5",
+      "commit": "755494200be51798d981d5b914745cb58bdd1fe7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "9385692313b0fb6d6763d9e0105ca997d9686fc5",
+      "commit": "755494200be51798d981d5b914745cb58bdd1fe7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "9385692313b0fb6d6763d9e0105ca997d9686fc5",
+      "commit": "755494200be51798d981d5b914745cb58bdd1fe7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -87,6 +87,19 @@
         "library/content/common.lua",
         "library/content/bloxfruits.lua"
       ]
+    },
+    "3808081382": {
+      "name": "The Strongest Battlegrounds",
+      "version": "b961c80504efd76c25d07e0786fca30d5ee4f63b8f340b5cb04e89588796fd38",
+      "commit": "755494200be51798d981d5b914745cb58bdd1fe7",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/updater.lua",
+        "src/games/tsb.lua",
+        "src/games/features/tsb/autoblock.lua",
+        "src/games/features/tsb/frontend.lua"
+      ]
     }
   },
   "recentUpdates": [
@@ -105,24 +118,24 @@
       ]
     },
     {
-      "Version": "e214437",
-      "Date": "2026-08-31T17:58:58-03:00",
+      "Version": "60ee5f3",
+      "Date": "2026-08-31T20:48:41-03:00",
       "Changes": [
-        "feat: modularize and integrate DepHub library frontend"
+        "feat(tsb): add compact game frontend"
       ]
     },
     {
-      "Version": "623a97a",
-      "Date": "2026-08-30T19:02:00-03:00",
+      "Version": "3d15949",
+      "Date": "2026-08-31T20:48:07-03:00",
       "Changes": [
-        "refactor: remove frontend and preserve headless game backends"
+        "feat(tsb): add game backend"
       ]
     },
     {
-      "Version": "a1a54a3",
-      "Date": "2026-08-30T18:38:12-03:00",
+      "Version": "3fe062d",
+      "Date": "2026-08-31T20:47:48-03:00",
       "Changes": [
-        "feat(bloxfruits): add reversible Rumble VFX palettes and fruit selector"
+        "feat(tsb): add auto block backend"
       ]
     }
   ]
