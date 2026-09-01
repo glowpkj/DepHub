@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T21:15:47.902229+00:00",
-  "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
+  "generatedAt": "2026-09-01T21:15:59.313827+00:00",
+  "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
   "version": "0.0.4",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
+      "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
+      "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
+      "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -90,8 +90,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "35cdcec4714e452cdcbf3958f1e7ac1bb0b5f16b75cab36d4e35a3c3683b975c",
-      "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
+      "version": "aca754155da64721972d89bf6fa91108f6f9103f3bd4afe1700ada1a626b9616",
+      "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,6 +104,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "4de7f3c",
+      "Date": "2026-09-01T18:15:50-03:00",
+      "Changes": [
+        "feat(tsb): expose detection box controls"
+      ]
+    },
     {
       "Version": "f1505f8",
       "Date": "2026-09-01T18:15:35-03:00",
@@ -130,13 +137,6 @@
       "Date": "2026-08-31T20:49:58-03:00",
       "Changes": [
         "chore: bump DepHub version for TSB support"
-      ]
-    },
-    {
-      "Version": "28e8b0e",
-      "Date": "2026-08-31T20:49:43-03:00",
-      "Changes": [
-        "feat(tsb): wire backend and dedicated frontend"
       ]
     }
   ]
