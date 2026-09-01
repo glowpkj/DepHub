@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T21:37:16.719919+00:00",
-  "commit": "1a6243805785298c255255bf88dfa1a7299ced8f",
+  "generatedAt": "2026-09-01T21:37:43.026753+00:00",
+  "commit": "238a5c9a319dca57cdb46bc2b9838b6f93a23e4d",
   "version": "0.0.4",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "1a6243805785298c255255bf88dfa1a7299ced8f",
+      "commit": "238a5c9a319dca57cdb46bc2b9838b6f93a23e4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "1a6243805785298c255255bf88dfa1a7299ced8f",
+      "commit": "238a5c9a319dca57cdb46bc2b9838b6f93a23e4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "1a6243805785298c255255bf88dfa1a7299ced8f",
+      "commit": "238a5c9a319dca57cdb46bc2b9838b6f93a23e4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -90,8 +90,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "0b7ba9ed25a9e50005f50aa8b9279053ef2fd8c6540912ab8bc91059fa0bca18",
-      "commit": "1a6243805785298c255255bf88dfa1a7299ced8f",
+      "version": "20567a63f64fe2b953c9e0c83a47390bf9083ee50d20451d906e7757988ee8f3",
+      "commit": "238a5c9a319dca57cdb46bc2b9838b6f93a23e4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,6 +104,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "238a5c9",
+      "Date": "2026-09-01T18:37:27-03:00",
+      "Changes": [
+        "feat(tsb): expose autoblock diagnostics"
+      ]
+    },
     {
       "Version": "1a62438",
       "Date": "2026-09-01T18:37:05-03:00",
@@ -130,13 +137,6 @@
       "Date": "2026-09-01T18:24:52-03:00",
       "Changes": [
         "refactor(tsb): make block modes independently activatable"
-      ]
-    },
-    {
-      "Version": "3a8b351",
-      "Date": "2026-09-01T18:24:23-03:00",
-      "Changes": [
-        "feat(tsb): gate dash and skill blocking"
       ]
     }
   ]
