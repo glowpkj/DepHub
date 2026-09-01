@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T21:38:26.362814+00:00",
-  "commit": "9642b315c21f0e655d34130a7a93eb212f392950",
+  "generatedAt": "2026-09-01T23:54:33.700395+00:00",
+  "commit": "85fd6aa34cca9acb0061c205cf05b232119d6be4",
   "version": "0.0.4",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "9642b315c21f0e655d34130a7a93eb212f392950",
+      "commit": "85fd6aa34cca9acb0061c205cf05b232119d6be4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "9642b315c21f0e655d34130a7a93eb212f392950",
+      "commit": "85fd6aa34cca9acb0061c205cf05b232119d6be4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "9642b315c21f0e655d34130a7a93eb212f392950",
+      "commit": "85fd6aa34cca9acb0061c205cf05b232119d6be4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,7 +91,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "088201c48749811c34483579754734c90a00b539b446bf2085ae09c815c006d7",
-      "commit": "9642b315c21f0e655d34130a7a93eb212f392950",
+      "commit": "85fd6aa34cca9acb0061c205cf05b232119d6be4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
