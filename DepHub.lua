@@ -9,7 +9,7 @@ local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.4"
+local VERSION = "0.0.5"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -46,6 +46,8 @@ local function cleanupRuntime()
         "BloxFruitsUI",
         "TSB",
         "TSBUI",
+        "ViolenceDistrict",
+        "ViolenceDistrictUI",
         "Universal",
         "Updater",
         "Runtime",
@@ -61,6 +63,8 @@ local function cleanupRuntime()
     state.BloxFruitsUI = nil
     state.TSB = nil
     state.TSBUI = nil
+    state.ViolenceDistrict = nil
+    state.ViolenceDistrictUI = nil
     state.Universal = nil
     state.Updater = nil
     state.Runtime = nil
@@ -69,6 +73,8 @@ local function cleanupRuntime()
 
     env.__DEPHUB_TSB = nil
     env.__DEPHUB_TSB_FRONTEND = nil
+    env.__DEPHUB_VD = nil
+    env.__DEPHUB_VD_FRONTEND = nil
 end
 
 local previousState = env[STATE_KEY]
@@ -260,6 +266,16 @@ local targets = {
         Core = "src/games/tsb.lua",
         Frontend = "src/games/features/tsb/frontend.lua",
         TSB = true
+    },
+    ["93978595733734"] = {
+        Core = "src/games/violencedistrict.lua",
+        Frontend = "src/games/features/violencedistrict/frontend.lua",
+        ViolenceDistrict = true
+    },
+    ["6739698191"] = {
+        Core = "src/games/violencedistrict.lua",
+        Frontend = "src/games/features/violencedistrict/frontend.lua",
+        ViolenceDistrict = true
     }
 }
 
@@ -283,6 +299,7 @@ end
 
 local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
+local isVD = target.ViolenceDistrict == true
 
 if isRT3 then
     if coreResult ~= true then
@@ -293,8 +310,9 @@ elseif type(coreResult) ~= "table" then
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
+env.__DEPHUB.ViolenceDistrict = isVD and coreResult or nil
 
 local mode
 local backend
@@ -307,6 +325,9 @@ elseif isRT3 then
     backend = env.__DEPHUB.Runtime
 elseif isTSB then
     mode = "TSB"
+    backend = coreResult
+elseif isVD then
+    mode = "ViolenceDistrict"
     backend = coreResult
 else
     mode = "BloxFruits"
@@ -322,6 +343,16 @@ if isTSB then
     end
 
     env.__DEPHUB.TSBUI = frontend
+    env.__DEPHUB.Frontend = frontend
+elseif isVD then
+    env[STATE_KEY].Frontend = "vd-compact-1"
+
+    local okFrontend, frontend = loadModule(target.Frontend, false)
+    if not okFrontend or type(frontend) ~= "table" then
+        return fail(okFrontend and "Frontend Violence District invalido" or frontend)
+    end
+
+    env.__DEPHUB.ViolenceDistrictUI = frontend
     env.__DEPHUB.Frontend = frontend
 else
     local subtitles = {
