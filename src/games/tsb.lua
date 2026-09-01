@@ -29,16 +29,23 @@ local function loadFeature(path,context)
     return true,feature
 end
 local State={Started=false,Destroyed=false,Version=VERSION,Features={},Toggles={AutoBlock=false,M1AfterBlock=false,M1Catch=false,DashBlock=false,SkillBlock=false,ShowDetectionBox=false},Values={NormalRange=12,SpecialRange=50,SkillRange=50,SkillHold=1.2,DetectionBoxSize=12}}
-local context={Players=Players,RunService=RunService,VirtualInputManager=VirtualInputManager,Workspace=Workspace,LocalPlayer=LocalPlayer,NormalRange=State.Values.NormalRange,SpecialRange=State.Values.SpecialRange,SkillRange=State.Values.SkillRange,SkillHold=State.Values.SkillHold,DetectionBoxSize=State.Values.DetectionBoxSize,M1AfterBlock=false,M1Catch=false,DashBlock=false,SkillBlock=false,ShowDetectionBox=false}
+local context={Players=Players,RunService=RunService,VirtualInputManager=VirtualInputManager,Workspace=Workspace,LocalPlayer=LocalPlayer,NormalRange=12,SpecialRange=50,SkillRange=50,SkillHold=1.2,DetectionBoxSize=12,M1Block=false,M1AfterBlock=false,M1Catch=false,DashBlock=false,SkillBlock=false,ShowDetectionBox=false}
 local okAutoBlock,AutoBlock=loadFeature("src/games/features/tsb/autoblock.lua",context)
 if not okAutoBlock then return false end
 State.Features.AutoBlock=AutoBlock
 env[STATE_KEY]=State env.__DEPHUB=env.__DEPHUB or {} env.__DEPHUB.TSB=State
-function State:SetAutoBlock(v) if self.Destroyed then return false end v=v==true if self.Toggles.AutoBlock==v then return true end local f=self.Features.AutoBlock if not f then return false end local ok=v and f:Enable() or f:Disable() if ok==false then return false end self.Toggles.AutoBlock=v return true end
+local function syncRuntime(self)
+    local f=self.Features.AutoBlock if not f then return false end
+    local shouldRun=self.Toggles.AutoBlock or self.Toggles.DashBlock or self.Toggles.SkillBlock
+    if shouldRun and not f.Enabled then return f:Enable()~=false end
+    if not shouldRun and f.Enabled then return f:Disable()~=false end
+    return true
+end
+function State:SetAutoBlock(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetM1Block(v)==false then return false end self.Toggles.AutoBlock=v return syncRuntime(self) end
 function State:SetM1AfterBlock(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetM1AfterBlock(v)==false then return false end self.Toggles.M1AfterBlock=v return true end
 function State:SetM1Catch(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetM1Catch(v)==false then return false end self.Toggles.M1Catch=v return true end
-function State:SetDashBlock(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetDashBlock(v)==false then return false end self.Toggles.DashBlock=v return true end
-function State:SetSkillBlock(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetSkillBlock(v)==false then return false end self.Toggles.SkillBlock=v return true end
+function State:SetDashBlock(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetDashBlock(v)==false then return false end self.Toggles.DashBlock=v return syncRuntime(self) end
+function State:SetSkillBlock(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetSkillBlock(v)==false then return false end self.Toggles.SkillBlock=v return syncRuntime(self) end
 function State:SetShowDetectionBox(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetShowDetectionBox(v)==false then return false end self.Toggles.ShowDetectionBox=v return true end
 local function setValue(self,key,method,value) if self.Destroyed then return false end value=tonumber(value) if not value then return false end local f=self.Features.AutoBlock if not f or f[method](f,value)==false then return false end self.Values[key]=f.Config[key] return true end
 function State:SetNormalRange(v) return setValue(self,"NormalRange","SetNormalRange",v) end
