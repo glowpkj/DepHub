@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T21:24:32.362769+00:00",
-  "commit": "3a8b351dc0bcf9d1c61fe3a7ba4d8663c8912227",
+  "generatedAt": "2026-09-01T21:25:01.667607+00:00",
+  "commit": "153f9776678a078fd9aa42210c90336750e0127e",
   "version": "0.0.4",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "3a8b351dc0bcf9d1c61fe3a7ba4d8663c8912227",
+      "commit": "153f9776678a078fd9aa42210c90336750e0127e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "3a8b351dc0bcf9d1c61fe3a7ba4d8663c8912227",
+      "commit": "153f9776678a078fd9aa42210c90336750e0127e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "3a8b351dc0bcf9d1c61fe3a7ba4d8663c8912227",
+      "commit": "153f9776678a078fd9aa42210c90336750e0127e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -90,8 +90,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "d39015988249a08b1b9638d467bc31598646803549a984b12dca93a83cb97f3e",
-      "commit": "3a8b351dc0bcf9d1c61fe3a7ba4d8663c8912227",
+      "version": "174746e4cd0f1fca5792e9547b0570e770eb534063cd51e7695cb3236abd7e36",
+      "commit": "153f9776678a078fd9aa42210c90336750e0127e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,6 +104,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "153f977",
+      "Date": "2026-09-01T18:24:52-03:00",
+      "Changes": [
+        "refactor(tsb): make block modes independently activatable"
+      ]
+    },
     {
       "Version": "3a8b351",
       "Date": "2026-09-01T18:24:23-03:00",
@@ -130,13 +137,6 @@
       "Date": "2026-09-01T18:15:50-03:00",
       "Changes": [
         "feat(tsb): expose detection box controls"
-      ]
-    },
-    {
-      "Version": "f1505f8",
-      "Date": "2026-09-01T18:15:35-03:00",
-      "Changes": [
-        "feat(tsb): add local detection box and M1ing confirmation"
       ]
     }
   ]
