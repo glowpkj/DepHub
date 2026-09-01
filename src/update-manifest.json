@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T23:56:04.888225+00:00",
-  "commit": "02cdedde2a5f86a677a07c24e2e917ccc6979da2",
-  "version": "0.0.4",
+  "generatedAt": "2026-09-01T23:56:54.904875+00:00",
+  "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
+  "version": "0.0.5",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "02cdedde2a5f86a677a07c24e2e917ccc6979da2",
+      "version": "ca23e200401eccdd71535d5d46dc48e92b827ba78d8c4471feab0b362f735956",
+      "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -34,8 +34,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "02cdedde2a5f86a677a07c24e2e917ccc6979da2",
+      "version": "46524429d22f884e95510d608b7c6598bcb33e64cf8fb6def63cc1377e81ef79",
+      "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -62,8 +62,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "02cdedde2a5f86a677a07c24e2e917ccc6979da2",
+      "version": "0ce0150a42f8b0a86bfcdf7d4486e3cde12ea7bc17e247289dca5fd227e1b649",
+      "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -90,8 +90,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "088201c48749811c34483579754734c90a00b539b446bf2085ae09c815c006d7",
-      "commit": "02cdedde2a5f86a677a07c24e2e917ccc6979da2",
+      "version": "812e4027f4c462b62b6a3d959125c9118555b14a6344dc7bd259a3263b938507",
+      "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,6 +104,20 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "596f8fd",
+      "Date": "2026-09-01T20:56:35-03:00",
+      "Changes": [
+        "chore: bump DepHub version for Violence District"
+      ]
+    },
+    {
+      "Version": "d452bfd",
+      "Date": "2026-09-01T20:56:27-03:00",
+      "Changes": [
+        "feat(violence-district): wire dedicated module and frontend"
+      ]
+    },
     {
       "Version": "9642b31",
       "Date": "2026-09-01T18:38:18-03:00",
@@ -123,20 +137,6 @@
       "Date": "2026-09-01T18:37:05-03:00",
       "Changes": [
         "fix(tsb): harden autoblock respawn and add diagnostics"
-      ]
-    },
-    {
-      "Version": "6e3c5e2",
-      "Date": "2026-09-01T18:26:02-03:00",
-      "Changes": [
-        "feat(tsb): group feature settings and add sliders"
-      ]
-    },
-    {
-      "Version": "8fc7cf1",
-      "Date": "2026-09-01T18:25:25-03:00",
-      "Changes": [
-        "refactor(tsb): separate m1 dash and skill block modes"
       ]
     }
   ]
