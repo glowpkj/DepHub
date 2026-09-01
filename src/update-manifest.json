@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T21:15:59.313827+00:00",
-  "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
+  "generatedAt": "2026-09-01T21:16:24.368377+00:00",
+  "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
   "version": "0.0.4",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
+      "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
+      "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
+      "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -90,8 +90,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "aca754155da64721972d89bf6fa91108f6f9103f3bd4afe1700ada1a626b9616",
-      "commit": "4de7f3c9632add966b977e6d95a500aad8e20516",
+      "version": "cab82e3cfbd5650f2c4b64de702456cabd2eb96f6642147e7f97d1f24ce7633e",
+      "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,6 +104,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "fdfdc3f",
+      "Date": "2026-09-01T18:16:14-03:00",
+      "Changes": [
+        "feat(tsb): add detection box UI controls"
+      ]
+    },
     {
       "Version": "4de7f3c",
       "Date": "2026-09-01T18:15:50-03:00",
@@ -130,13 +137,6 @@
       "Date": "2026-08-31T20:52:25-03:00",
       "Changes": [
         "chore(tsb): add update marker"
-      ]
-    },
-    {
-      "Version": "9385692",
-      "Date": "2026-08-31T20:49:58-03:00",
-      "Changes": [
-        "chore: bump DepHub version for TSB support"
       ]
     }
   ]
