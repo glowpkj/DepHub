@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T23:56:54.904875+00:00",
-  "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
+  "generatedAt": "2026-09-01T23:57:06.496074+00:00",
+  "commit": "842a216ae33e1b3b70eb893a16ed898fc48e597e",
   "version": "0.0.5",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "ca23e200401eccdd71535d5d46dc48e92b827ba78d8c4471feab0b362f735956",
-      "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
+      "commit": "842a216ae33e1b3b70eb893a16ed898fc48e597e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "46524429d22f884e95510d608b7c6598bcb33e64cf8fb6def63cc1377e81ef79",
-      "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
+      "commit": "842a216ae33e1b3b70eb893a16ed898fc48e597e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "0ce0150a42f8b0a86bfcdf7d4486e3cde12ea7bc17e247289dca5fd227e1b649",
-      "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
+      "commit": "842a216ae33e1b3b70eb893a16ed898fc48e597e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,7 +91,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "812e4027f4c462b62b6a3d959125c9118555b14a6344dc7bd259a3263b938507",
-      "commit": "16c2ddc4f8042c4b8e1fe8bb374c7b0a0cbcf968",
+      "commit": "842a216ae33e1b3b70eb893a16ed898fc48e597e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -101,9 +101,31 @@
         "src/games/features/tsb/frontend.lua",
         "src/games/updates/3808081382.txt"
       ]
+    },
+    "6739698191": {
+      "name": "Violence District",
+      "version": "b1f4f31bbe297a26c212fb210ce0dd3ad5bc43dd11248590e321ca36cae3e409",
+      "commit": "842a216ae33e1b3b70eb893a16ed898fc48e597e",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/updater.lua",
+        "src/games/violencedistrict.lua",
+        "src/games/features/violencedistrict/esp.lua",
+        "src/games/features/violencedistrict/generator.lua",
+        "src/games/features/violencedistrict/frontend.lua",
+        "src/games/updates/6739698191.txt"
+      ]
     }
   },
   "recentUpdates": [
+    {
+      "Version": "16c2ddc",
+      "Date": "2026-09-01T20:56:43-03:00",
+      "Changes": [
+        "chore(violence-district): add update marker"
+      ]
+    },
     {
       "Version": "596f8fd",
       "Date": "2026-09-01T20:56:35-03:00",
@@ -119,24 +141,17 @@
       ]
     },
     {
-      "Version": "9642b31",
-      "Date": "2026-09-01T18:38:18-03:00",
+      "Version": "02cdedd",
+      "Date": "2026-09-01T20:55:56-03:00",
       "Changes": [
-        "feat(tsb): animate feature settings and add live debug panel"
+        "feat(violence-district): add dedicated compact frontend"
       ]
     },
     {
-      "Version": "238a5c9",
-      "Date": "2026-09-01T18:37:27-03:00",
+      "Version": "8fa0495",
+      "Date": "2026-09-01T20:55:12-03:00",
       "Changes": [
-        "feat(tsb): expose autoblock diagnostics"
-      ]
-    },
-    {
-      "Version": "1a62438",
-      "Date": "2026-09-01T18:37:05-03:00",
-      "Changes": [
-        "fix(tsb): harden autoblock respawn and add diagnostics"
+        "feat(violence-district): add game backend"
       ]
     }
   ]
