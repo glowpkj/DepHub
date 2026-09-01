@@ -11,7 +11,7 @@ local LocalPlayer=Players.LocalPlayer
 local env=type(getgenv)=="function" and getgenv() or _G
 local STATE_KEY="__DEPHUB_TSB"
 local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION="0.0.3"
+local VERSION="0.0.4"
 local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
 local function compile(source)
@@ -28,8 +28,8 @@ local function loadFeature(path,context)
     local okNew,feature=pcall(factory.new,context) if not okNew or type(feature)~="table" then return false,tostring(feature) end
     return true,feature
 end
-local State={Started=false,Destroyed=false,Version=VERSION,Features={},Toggles={AutoBlock=false,M1AfterBlock=false,M1Catch=false,DashBlock=false,SkillBlock=false,ShowDetectionBox=false},Values={NormalRange=12,SpecialRange=50,SkillRange=50,SkillHold=1.2,DetectionBoxSize=12}}
-local context={Players=Players,RunService=RunService,VirtualInputManager=VirtualInputManager,Workspace=Workspace,LocalPlayer=LocalPlayer,NormalRange=12,SpecialRange=50,SkillRange=50,SkillHold=1.2,DetectionBoxSize=12,M1Block=false,M1AfterBlock=false,M1Catch=false,DashBlock=false,SkillBlock=false,ShowDetectionBox=false}
+local State={Started=false,Destroyed=false,Version=VERSION,Features={},Toggles={AutoBlock=false,M1AfterBlock=false,M1Catch=false,DashBlock=false,SkillBlock=false,ShowDetectionBox=false,Debug=false},Values={NormalRange=12,SpecialRange=50,SkillRange=50,SkillHold=1.2,DetectionBoxSize=12}}
+local context={Players=Players,RunService=RunService,VirtualInputManager=VirtualInputManager,Workspace=Workspace,LocalPlayer=LocalPlayer,NormalRange=12,SpecialRange=50,SkillRange=50,SkillHold=1.2,DetectionBoxSize=12,M1Block=false,M1AfterBlock=false,M1Catch=false,DashBlock=false,SkillBlock=false,ShowDetectionBox=false,Debug=false}
 local okAutoBlock,AutoBlock=loadFeature("src/games/features/tsb/autoblock.lua",context)
 if not okAutoBlock then return false end
 State.Features.AutoBlock=AutoBlock
@@ -47,6 +47,7 @@ function State:SetM1Catch(v) if self.Destroyed then return false end v=v==true l
 function State:SetDashBlock(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetDashBlock(v)==false then return false end self.Toggles.DashBlock=v return syncRuntime(self) end
 function State:SetSkillBlock(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetSkillBlock(v)==false then return false end self.Toggles.SkillBlock=v return syncRuntime(self) end
 function State:SetShowDetectionBox(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetShowDetectionBox(v)==false then return false end self.Toggles.ShowDetectionBox=v return true end
+function State:SetDebug(v) if self.Destroyed then return false end v=v==true local f=self.Features.AutoBlock if not f or f:SetDebug(v)==false then return false end self.Toggles.Debug=v return true end
 local function setValue(self,key,method,value) if self.Destroyed then return false end value=tonumber(value) if not value then return false end local f=self.Features.AutoBlock if not f or f[method](f,value)==false then return false end self.Values[key]=f.Config[key] return true end
 function State:SetNormalRange(v) return setValue(self,"NormalRange","SetNormalRange",v) end
 function State:SetSpecialRange(v) return setValue(self,"SpecialRange","SetSpecialRange",v) end
@@ -56,6 +57,7 @@ function State:SetDetectionBoxSize(v) return setValue(self,"DetectionBoxSize","S
 function State:GetToggle(name) return self.Toggles[name]==true end
 function State:GetValue(name) return self.Values[name] end
 function State:GetAutoBlockConfig() local f=self.Features.AutoBlock return f and f:GetConfig() or nil end
+function State:GetDebugInfo() local f=self.Features.AutoBlock return f and f:GetDebugInfo() or nil end
 function State:Start() if self.Destroyed or self.Started then return false end self.Started=true return true end
 function State:Destroy() if self.Destroyed then return end self.Destroyed=true local f=self.Features and self.Features.AutoBlock if f and type(f.Destroy)=="function" then pcall(f.Destroy,f) end self.Features=nil if env[STATE_KEY]==self then env[STATE_KEY]=nil end if env.__DEPHUB and env.__DEPHUB.TSB==self then env.__DEPHUB.TSB=nil end end
 if not LocalPlayer then pcall(State.Destroy,State) return false end
