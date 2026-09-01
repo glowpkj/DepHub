@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T21:16:24.368377+00:00",
-  "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
+  "generatedAt": "2026-09-01T21:23:59.973086+00:00",
+  "commit": "65c2102c5c1b577223874d0191959bfb494aab2e",
   "version": "0.0.4",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
+      "commit": "65c2102c5c1b577223874d0191959bfb494aab2e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
+      "commit": "65c2102c5c1b577223874d0191959bfb494aab2e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
+      "commit": "65c2102c5c1b577223874d0191959bfb494aab2e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -90,8 +90,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "cab82e3cfbd5650f2c4b64de702456cabd2eb96f6642147e7f97d1f24ce7633e",
-      "commit": "fdfdc3f1de041bc09ccc2d2230119a4273f01a61",
+      "version": "e1b261401c6e1203d8d8fe69a0e9493afe3b93ce6b2399737cd3b836193b592a",
+      "commit": "65c2102c5c1b577223874d0191959bfb494aab2e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,6 +104,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "65c2102",
+      "Date": "2026-09-01T18:23:50-03:00",
+      "Changes": [
+        "feat(tsb): add dash and skill block toggles"
+      ]
+    },
     {
       "Version": "fdfdc3f",
       "Date": "2026-09-01T18:16:14-03:00",
@@ -130,13 +137,6 @@
       "Date": "2026-08-31T20:59:00-03:00",
       "Changes": [
         "tune(tsb): lower default M1 block range"
-      ]
-    },
-    {
-      "Version": "a38b71f",
-      "Date": "2026-08-31T20:52:25-03:00",
-      "Changes": [
-        "chore(tsb): add update marker"
       ]
     }
   ]
