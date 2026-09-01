@@ -88,5 +88,18 @@
       "src/games/features/tsb/frontend.lua",
       "src/games/updates/3808081382.txt"
     ]
+  },
+  "6739698191": {
+    "name": "Violence District",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/updater.lua",
+      "src/games/violencedistrict.lua",
+      "src/games/features/violencedistrict/esp.lua",
+      "src/games/features/violencedistrict/generator.lua",
+      "src/games/features/violencedistrict/frontend.lua",
+      "src/games/updates/6739698191.txt"
+    ]
   }
 }
