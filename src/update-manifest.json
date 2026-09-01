@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-08-31T23:59:09.172182+00:00",
-  "commit": "00572f66b830e22aefe61621bccea5654995a831",
+  "generatedAt": "2026-09-01T21:15:47.902229+00:00",
+  "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
   "version": "0.0.4",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6749e53536236954a6b44567ddcbd954bd868d1981f98fdeb557348ec2db32d6",
-      "commit": "00572f66b830e22aefe61621bccea5654995a831",
+      "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "c9cf464ce5b43fc01febd4783c2821e29096ab34d2c42ddfe68ecd6c4fd2d5b6",
-      "commit": "00572f66b830e22aefe61621bccea5654995a831",
+      "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a7b4f65b787ba5790f06fbc8c3be39c3bd4f846f0174ddc1f0dc30561abdbefe",
-      "commit": "00572f66b830e22aefe61621bccea5654995a831",
+      "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -90,8 +90,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "bd9e5dbe54f6d390609e9574af7e7edbaf5ce583c418ef20bbca7e6a7617622c",
-      "commit": "00572f66b830e22aefe61621bccea5654995a831",
+      "version": "35cdcec4714e452cdcbf3958f1e7ac1bb0b5f16b75cab36d4e35a3c3683b975c",
+      "commit": "f1505f81103b2ae3662cf50f98fa0bfcdd711df3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,6 +104,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "f1505f8",
+      "Date": "2026-09-01T18:15:35-03:00",
+      "Changes": [
+        "feat(tsb): add local detection box and M1ing confirmation"
+      ]
+    },
     {
       "Version": "00572f6",
       "Date": "2026-08-31T20:59:00-03:00",
@@ -130,13 +137,6 @@
       "Date": "2026-08-31T20:49:43-03:00",
       "Changes": [
         "feat(tsb): wire backend and dedicated frontend"
-      ]
-    },
-    {
-      "Version": "60ee5f3",
-      "Date": "2026-08-31T20:48:41-03:00",
-      "Changes": [
-        "feat(tsb): add compact game frontend"
       ]
     }
   ]
