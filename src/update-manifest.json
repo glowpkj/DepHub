@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-01T23:58:20.552297+00:00",
-  "commit": "bf0f1020d3c5da5a0386657d3d18c278ca995ee6",
+  "generatedAt": "2026-09-02T00:27:32.280238+00:00",
+  "commit": "3bea6077926640c660b9263310b22354df66cb1f",
   "version": "0.0.5",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "ca23e200401eccdd71535d5d46dc48e92b827ba78d8c4471feab0b362f735956",
-      "commit": "bf0f1020d3c5da5a0386657d3d18c278ca995ee6",
+      "commit": "3bea6077926640c660b9263310b22354df66cb1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "46524429d22f884e95510d608b7c6598bcb33e64cf8fb6def63cc1377e81ef79",
-      "commit": "bf0f1020d3c5da5a0386657d3d18c278ca995ee6",
+      "commit": "3bea6077926640c660b9263310b22354df66cb1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "0ce0150a42f8b0a86bfcdf7d4486e3cde12ea7bc17e247289dca5fd227e1b649",
-      "commit": "bf0f1020d3c5da5a0386657d3d18c278ca995ee6",
+      "commit": "3bea6077926640c660b9263310b22354df66cb1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,7 +91,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "812e4027f4c462b62b6a3d959125c9118555b14a6344dc7bd259a3263b938507",
-      "commit": "bf0f1020d3c5da5a0386657d3d18c278ca995ee6",
+      "commit": "3bea6077926640c660b9263310b22354df66cb1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,8 +104,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "b1f4f31bbe297a26c212fb210ce0dd3ad5bc43dd11248590e321ca36cae3e409",
-      "commit": "bf0f1020d3c5da5a0386657d3d18c278ca995ee6",
+      "version": "c7d6096ef189c5a12881b4c94d9c225dc4ee42eb033863e4d33f3eafa68b4ade",
+      "commit": "3bea6077926640c660b9263310b22354df66cb1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -119,6 +119,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "3bea607",
+      "Date": "2026-09-01T21:27:18-03:00",
+      "Changes": [
+        "fix(violence-district): stabilize generators and add exit lever discovery"
+      ]
+    },
     {
       "Version": "16c2ddc",
       "Date": "2026-09-01T20:56:43-03:00",
@@ -145,13 +152,6 @@
       "Date": "2026-09-01T20:55:56-03:00",
       "Changes": [
         "feat(violence-district): add dedicated compact frontend"
-      ]
-    },
-    {
-      "Version": "8fa0495",
-      "Date": "2026-09-01T20:55:12-03:00",
-      "Changes": [
-        "feat(violence-district): add game backend"
       ]
     }
   ]
