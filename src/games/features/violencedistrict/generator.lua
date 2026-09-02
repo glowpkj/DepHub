@@ -26,6 +26,7 @@ function Factory.new(context)
     local ReplicatedStorage=context.ReplicatedStorage or game:GetService("ReplicatedStorage")
     local Workspace=context.Workspace or game:GetService("Workspace")
     local LocalPlayer=context.LocalPlayer or Players.LocalPlayer
+    local PlayerGui=LocalPlayer and (LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui",10))
 
     local self={
         Enabled=false,
@@ -39,11 +40,15 @@ function Factory.new(context)
         RepairRange=tonumber(context.RepairRange) or 14,
         CurrentPoint=nil,
         CurrentGenerator=nil,
-        LastRepairAt=0,
+        RepairActive=false,
         LastSkillAt=0,
         StepAccumulator=0,
+        MapCache=nil,
+        ExitLeverCache=nil,
+        ExitGateCache=nil,
         DebugInfo={
             Runtime="idle",
+            Map="missing",
             RepairRemote="missing",
             SkillRemote="missing",
             Generators="missing",
@@ -51,10 +56,13 @@ function Factory.new(context)
             NearestDistance=0,
             CurrentGenerator="none",
             CurrentPoint="none",
+            RepairActive=false,
             RepairCalls=0,
+            RepairStops=0,
             SkillChecks=0,
-            LastAction="none",
             LastSkillIndex=0,
+            ExitLever="missing",
+            LastAction="none",
             LastError="none"
         }
     }
@@ -66,11 +74,65 @@ function Factory.new(context)
         end
     end
 
-    function self:_getGeneratorFolder()
-        local map=Workspace:FindFirstChild("Map")
-        local folder=map and map:FindFirstChild("Generators")
-        self.DebugInfo.Generators=folder and "ready" or "missing"
-        return folder
+    function self:_root()
+        local character=LocalPlayer and LocalPlayer.Character
+        return character and character:FindFirstChild("HumanoidRootPart")
+    end
+
+    function self:_worldPart(instance)
+        if not instance then return nil end
+        if instance:IsA("BasePart") then return instance end
+        return instance:FindFirstChildWhichIsA("BasePart",true)
+    end
+
+    function self:_worldPosition(instance)
+        if not instance then return nil end
+        if instance:IsA("BasePart") then return instance.Position end
+        if instance:IsA("Model") then
+            local ok,pivot=pcall(instance.GetPivot,instance)
+            if ok then return pivot.Position end
+        end
+        local part=self:_worldPart(instance)
+        return part and part.Position or nil
+    end
+
+    function self:_looksLikeMap(instance)
+        if not instance or not instance.Parent then return false end
+        if instance.Name=="Map" then return true end
+        local hasGate=false
+        local hasGenerator=false
+        for _,descendant in ipairs(instance:GetDescendants()) do
+            if descendant.Name=="Gate" then hasGate=true end
+            if string.match(descendant.Name,"^GeneratorPoint%d+$") then hasGenerator=true end
+            if hasGate and hasGenerator then return true end
+        end
+        return false
+    end
+
+    function self:_getMapRoot()
+        if self.MapCache and self.MapCache.Parent then
+            self.DebugInfo.Map=self.MapCache:GetFullName()
+            return self.MapCache
+        end
+
+        self.MapCache=nil
+        local direct=Workspace:FindFirstChild("Map")
+        if direct then
+            self.MapCache=direct
+            self.DebugInfo.Map=direct:GetFullName()
+            return direct
+        end
+
+        for _,child in ipairs(Workspace:GetChildren()) do
+            if (child:IsA("Folder") or child:IsA("Model")) and self:_looksLikeMap(child) then
+                self.MapCache=child
+                self.DebugInfo.Map=child:GetFullName()
+                return child
+            end
+        end
+
+        self.DebugInfo.Map="missing"
+        return nil
     end
 
     function self:_getRemotes()
@@ -83,69 +145,160 @@ function Factory.new(context)
         return repair,skill
     end
 
-    function self:_root()
-        local character=LocalPlayer and LocalPlayer.Character
-        return character and character:FindFirstChild("HumanoidRootPart")
-    end
-
-    function self:_worldPosition(instance)
-        if not instance then return nil end
-        if instance:IsA("BasePart") then return instance.Position end
-        if instance:IsA("Model") then
-            local ok,pivot=pcall(instance.GetPivot,instance)
-            if ok then return pivot.Position end
-        end
-        local part=instance:FindFirstChildWhichIsA("BasePart",true)
-        return part and part.Position or nil
-    end
-
-    function self:_generatorFromPoint(point,folder)
-        local current=point
-        while current and current.Parent do
-            if current.Parent==folder then return current end
+    function self:_generatorForPoint(point,map)
+        if not point then return nil end
+        local current=point.Parent
+        local fallback=nil
+        while current and current~=map do
+            if current:IsA("Model") then
+                fallback=fallback or current
+                if string.find(string.lower(current.Name),"generator",1,true) then
+                    return current
+                end
+            end
             current=current.Parent
         end
-        return nil
+        return fallback
     end
 
     function self:_findNearestRepairPoint(maxRange)
         local root=self:_root()
-        local folder=self:_getGeneratorFolder()
-        if not root or not folder then return nil,nil,math.huge end
+        local map=self:_getMapRoot()
+        if not root or not map then
+            self.DebugInfo.Generators="missing"
+            return nil,nil,math.huge
+        end
+
         local bestPoint,bestGenerator,bestDistance=nil,nil,math.huge
-        for _,generator in ipairs(folder:GetChildren()) do
-            for _,descendant in ipairs(generator:GetDescendants()) do
-                if string.match(descendant.Name,"^GeneratorPoint%d+$") then
-                    local position=self:_worldPosition(descendant)
-                    if position then
-                        local distance=(position-root.Position).Magnitude
-                        if distance<bestDistance and (not maxRange or distance<=maxRange) then
-                            bestPoint=descendant
-                            bestGenerator=generator
-                            bestDistance=distance
-                        end
+        local count=0
+
+        for _,descendant in ipairs(map:GetDescendants()) do
+            if string.match(descendant.Name,"^GeneratorPoint%d+$") then
+                count=count+1
+                local position=self:_worldPosition(descendant)
+                if position then
+                    local distance=(position-root.Position).Magnitude
+                    if distance<bestDistance and (not maxRange or distance<=maxRange) then
+                        bestPoint=descendant
+                        bestGenerator=self:_generatorForPoint(descendant,map)
+                        bestDistance=distance
                     end
                 end
             end
         end
+
+        self.DebugInfo.Generators=count>0 and ("ready:"..tostring(count)) or "missing"
         self.DebugInfo.NearestPoint=bestPoint and bestPoint.Name or "none"
         self.DebugInfo.NearestDistance=bestDistance<math.huge and bestDistance or 0
         return bestPoint,bestGenerator,bestDistance
     end
 
+    function self:_findExitLever()
+        if self.ExitLeverCache and self.ExitLeverCache.Parent and self.ExitGateCache and self.ExitGateCache.Parent then
+            self.DebugInfo.ExitLever=self.ExitLeverCache:GetFullName()
+            return self.ExitLeverCache,self.ExitGateCache
+        end
+
+        self.ExitLeverCache=nil
+        self.ExitGateCache=nil
+        local map=self:_getMapRoot()
+        if not map then
+            self.DebugInfo.ExitLever="missing"
+            return nil,nil
+        end
+
+        local root=self:_root()
+        local bestLever,bestGate,bestDistance=nil,nil,math.huge
+
+        for _,descendant in ipairs(map:GetDescendants()) do
+            if descendant.Name=="ExitLever" then
+                local current=descendant.Parent
+                local gate=nil
+                while current and current~=map do
+                    if current.Name=="Gate" and current:IsA("Model") then
+                        gate=current
+                        break
+                    end
+                    current=current.Parent
+                end
+
+                if gate then
+                    local position=self:_worldPosition(descendant)
+                    local distance=position and root and (position-root.Position).Magnitude or 0
+                    if not bestLever or distance<bestDistance then
+                        bestLever=descendant
+                        bestGate=gate
+                        bestDistance=distance
+                    end
+                end
+            end
+        end
+
+        self.ExitLeverCache=bestLever
+        self.ExitGateCache=bestGate
+        self.DebugInfo.ExitLever=bestLever and bestLever:GetFullName() or "missing"
+        return bestLever,bestGate
+    end
+
+    function self:HasExitLever()
+        local lever=self:_findExitLever()
+        return lever~=nil
+    end
+
+    function self:GetExitLeverInfo()
+        local lever,gate=self:_findExitLever()
+        return {
+            Available=lever~=nil,
+            Lever=lever,
+            Gate=gate,
+            Path=lever and lever:GetFullName() or "none"
+        }
+    end
+
+    function self:TeleportToExitLever()
+        local root=self:_root()
+        local lever=self:_findExitLever()
+        if not root or not lever then
+            self:_debug("ExitLever nao encontrado")
+            return false
+        end
+
+        local targetPart=self:_worldPart(lever)
+        local targetCFrame=nil
+
+        if targetPart then
+            targetCFrame=targetPart.CFrame
+        elseif lever:IsA("Model") then
+            local ok,pivot=pcall(lever.GetPivot,lever)
+            if ok then targetCFrame=pivot end
+        end
+
+        if not targetCFrame then
+            self:_debug("ExitLever sem posicao")
+            return false
+        end
+
+        root.CFrame=targetCFrame*CFrame.new(0,3,3)
+        self:_debug("teleport ExitLever")
+        return true
+    end
+
     function self:_fireRepair(point,generator)
-        if not point then return false end
+        if not point or self.RepairActive then return false end
         local repair=self:_getRemotes()
         if not repair or not repair:IsA("RemoteEvent") then return false end
+
         local ok,err=pcall(repair.FireServer,repair,point,true)
         if not ok then
             self.DebugInfo.LastError=tostring(err)
-            self:_debug("RepairEvent error: "..tostring(err))
+            self:_debug("RepairEvent start error: "..tostring(err))
             return false
         end
+
         self.CurrentPoint=point
         self.CurrentGenerator=generator
-        self.LastRepairAt=os_clock()
+        self.RepairActive=true
+        self.DebugInfo.RepairActive=true
         self.DebugInfo.RepairCalls=self.DebugInfo.RepairCalls+1
         self.DebugInfo.CurrentPoint=point.Name
         self.DebugInfo.CurrentGenerator=generator and generator.Name or "none"
@@ -153,13 +306,42 @@ function Factory.new(context)
         return true
     end
 
+    function self:_stopRepair(reason)
+        local point=self.CurrentPoint
+        local wasActive=self.RepairActive
+
+        if wasActive and point and point.Parent then
+            local repair=self:_getRemotes()
+            if repair and repair:IsA("RemoteEvent") then
+                local ok,err=pcall(repair.FireServer,repair,point,false)
+                if not ok then
+                    self.DebugInfo.LastError=tostring(err)
+                    self:_debug("RepairEvent stop error: "..tostring(err))
+                else
+                    self.DebugInfo.RepairStops=self.DebugInfo.RepairStops+1
+                end
+            end
+        end
+
+        self.RepairActive=false
+        self.CurrentPoint=nil
+        self.CurrentGenerator=nil
+        self.DebugInfo.RepairActive=false
+        self.DebugInfo.CurrentPoint="none"
+        self.DebugInfo.CurrentGenerator="none"
+
+        if wasActive and reason then
+            self:_debug("repair stop: "..tostring(reason))
+        end
+    end
+
     function self:_resolveSkillIndex(skillObject)
         if skillObject then
             for _,name in ipairs({"Index","SkillCheckIndex","SkillcheckIndex","Check","Number","Stage"}) do
-                local value=skillObject:GetAttribute(name)
-                value=tonumber(value)
+                local value=tonumber(skillObject:GetAttribute(name))
                 if value then return value end
             end
+
             for _,descendant in ipairs(skillObject:GetDescendants()) do
                 if descendant:IsA("IntValue") or descendant:IsA("NumberValue") then
                     local lowered=string.lower(descendant.Name)
@@ -173,9 +355,27 @@ function Factory.new(context)
         return 1
     end
 
+    function self:_debugSkillGui()
+        if not self.Debug or not PlayerGui then return end
+        local found=0
+        for _,object in ipairs(PlayerGui:GetDescendants()) do
+            if object:IsA("GuiObject") and object.Visible then
+                local lowered=string.lower(object.Name)
+                if string.find(lowered,"skill",1,true) or string.find(lowered,"check",1,true) or string.find(lowered,"gen",1,true) then
+                    found=found+1
+                    print("[DepHub VD SkillUI] "..object:GetFullName().." pos="..tostring(object.AbsolutePosition).." size="..tostring(object.AbsoluteSize))
+                    if found>=20 then break end
+                end
+            end
+        end
+        if found==0 then
+            print("[DepHub VD SkillUI] nenhum GuiObject nomeado como skill/check/gen")
+        end
+    end
+
     function self:_submitSkillCheck(skillObject)
         if self.Destroyed or not self.Enabled or not self.AutoSkillCheck then return false end
-        if os_clock()-self.LastSkillAt<0.12 then return false end
+        if os_clock()-self.LastSkillAt<0.18 then return false end
 
         local _,skillRemote=self:_getRemotes()
         if not skillRemote or not skillRemote:IsA("RemoteEvent") then return false end
@@ -185,12 +385,15 @@ function Factory.new(context)
             point=self.CurrentPoint
             generator=self.CurrentGenerator
         end
+
         if not point or not generator then
             self:_debug("skillcheck sem generator/point")
             return false
         end
 
         local index=self:_resolveSkillIndex(skillObject)
+        self:_debugSkillGui()
+
         local ok,err=pcall(skillRemote.FireServer,skillRemote,"success",index,generator,point)
         if not ok then
             self.DebugInfo.LastError=tostring(err)
@@ -203,7 +406,7 @@ function Factory.new(context)
         self.DebugInfo.LastSkillIndex=index
         self.DebugInfo.CurrentGenerator=generator.Name
         self.DebugInfo.CurrentPoint=point.Name
-        self:_debug("skillcheck success: index="..tostring(index).." | "..generator.Name.." / "..point.Name)
+        self:_debug("skillcheck success enviado: index="..tostring(index).." | "..generator.Name.." / "..point.Name)
         return true
     end
 
@@ -221,17 +424,13 @@ function Factory.new(context)
     function self:_bindCharacter(character)
         disconnectAll(self.CharacterConnections)
         self.Character=character
-        self.CurrentPoint=nil
-        self.CurrentGenerator=nil
+        self:_stopRepair("character mudou")
         if not character then return end
-        self.CharacterConnections[#self.CharacterConnections+1]=character.ChildAdded:Connect(function(instance)
+
+        self.CharacterConnections[#self.CharacterConnections+1]=character.DescendantAdded:Connect(function(instance)
             self:_onCharacterDescendant(instance)
         end)
-        self.CharacterConnections[#self.CharacterConnections+1]=character.DescendantAdded:Connect(function(instance)
-            if instance.Parent~=character then
-                self:_onCharacterDescendant(instance)
-            end
-        end)
+
         for _,instance in ipairs(character:GetDescendants()) do
             if string.lower(instance.Name)=="skillcheck-gen" then
                 self:_onCharacterDescendant(instance)
@@ -243,32 +442,44 @@ function Factory.new(context)
     function self:_step(dt)
         if self.Destroyed or not self.Enabled then return end
         self.StepAccumulator=self.StepAccumulator+dt
-        if self.StepAccumulator<0.25 then return end
+        if self.StepAccumulator<0.2 then return end
         self.StepAccumulator=0
 
         self:_getRemotes()
-        if not self.AutoRepair then return end
+        self:_findExitLever()
 
-        local point,generator,distance=self:_findNearestRepairPoint(self.RepairRange)
-        if not point then
-            self.CurrentPoint=nil
-            self.CurrentGenerator=nil
-            self.DebugInfo.CurrentPoint="none"
-            self.DebugInfo.CurrentGenerator="none"
+        if not self.AutoRepair then
+            if self.RepairActive then self:_stopRepair("Auto Repair desligado") end
             return
         end
 
-        local changed=point~=self.CurrentPoint or generator~=self.CurrentGenerator
-        local stale=os_clock()-self.LastRepairAt>=1.5
-        if changed or stale then
-            self:_fireRepair(point,generator)
-        else
+        if self.RepairActive then
+            local root=self:_root()
+            local position=self.CurrentPoint and self.CurrentPoint.Parent and self:_worldPosition(self.CurrentPoint) or nil
+            if not root or not position then
+                self:_stopRepair("point sumiu")
+                return
+            end
+
+            local distance=(position-root.Position).Magnitude
             self.DebugInfo.NearestDistance=distance
+            if distance>self.RepairRange+2 then
+                self:_stopRepair("saiu do range")
+            end
+            return
+        end
+
+        local point,generator=self:_findNearestRepairPoint(self.RepairRange)
+        if point then
+            self:_fireRepair(point,generator)
         end
     end
 
     function self:SetAutoRepair(value)
         self.AutoRepair=value==true
+        if not self.AutoRepair then
+            self:_stopRepair("toggle")
+        end
         self:_debug(self.AutoRepair and "auto repair ligado" or "auto repair desligado")
         return true
     end
@@ -307,6 +518,7 @@ function Factory.new(context)
         self.Enabled=true
         self.DebugInfo.Runtime="running"
         self:_bindCharacter(LocalPlayer.Character)
+
         self.Connections[#self.Connections+1]=LocalPlayer.CharacterAdded:Connect(function(character)
             task.defer(function()
                 if self.Destroyed or not self.Enabled then return end
@@ -314,13 +526,14 @@ function Factory.new(context)
                 self:_debug("respawn detectado")
             end)
         end)
+
         self.Connections[#self.Connections+1]=LocalPlayer.CharacterRemoving:Connect(function()
+            self:_stopRepair("character removido")
             disconnectAll(self.CharacterConnections)
             self.Character=nil
-            self.CurrentPoint=nil
-            self.CurrentGenerator=nil
             self:_debug("character removido")
         end)
+
         self.Connections[#self.Connections+1]=RunService.Heartbeat:Connect(function(dt)
             local ok,err=pcall(self._step,self,dt)
             if not ok then
@@ -328,18 +541,18 @@ function Factory.new(context)
                 if self.Debug then warn("[DepHub VD Generator] "..tostring(err)) end
             end
         end)
+
         return true
     end
 
     function self:Disable()
         if self.Destroyed then return false end
+        self:_stopRepair("feature desligada")
         self.Enabled=false
         self.DebugInfo.Runtime="idle"
         disconnectAll(self.Connections)
         disconnectAll(self.CharacterConnections)
         self.Character=nil
-        self.CurrentPoint=nil
-        self.CurrentGenerator=nil
         self.StepAccumulator=0
         return true
     end
