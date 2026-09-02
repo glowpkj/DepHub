@@ -1,16 +1,17 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-02T00:31:05.903172+00:00",
-  "commit": "cf24c9ead4d972bc6232687f96034c0c5be56225",
+  "generatedAt": "2026-09-02T00:31:27.776728+00:00",
+  "commit": "74e1a51adcc2eef0e947b1335a8f1b5205ae6ab3",
   "version": "0.0.6",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "7540928713124e78a8cbf37a88ee307f294b0ac745c4ea16af59a7317ccdcb08",
-      "commit": "cf24c9ead4d972bc6232687f96034c0c5be56225",
+      "version": "a029e069cb0230ea4b702798bf7a4874c4ec5ee58f91ad4731e15bc1da8eb20b",
+      "commit": "74e1a51adcc2eef0e947b1335a8f1b5205ae6ab3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
+        "src/core/ui-guard.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/playeresp.lua",
         "src/games/features/bloxfruits/fruit.lua",
@@ -34,11 +35,12 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "7c598558e13b8cc3b49e3719690a7749861ffb62be25d3a61361ef968489fbe6",
-      "commit": "cf24c9ead4d972bc6232687f96034c0c5be56225",
+      "version": "a86f4f99203b5cebf47bba1d80a8c2e573396334624f31412c6aa34222a8f786",
+      "commit": "74e1a51adcc2eef0e947b1335a8f1b5205ae6ab3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
+        "src/core/ui-guard.lua",
         "src/core/anti-afk.lua",
         "src/core/dashboard.lua",
         "src/core/health-monitor.lua",
@@ -62,11 +64,12 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "3ffab6dc5d9ac59b8e3a63e08b0ca18697ad5b2a829f2aa09c5055a1b8d1b90a",
-      "commit": "cf24c9ead4d972bc6232687f96034c0c5be56225",
+      "version": "09cd5f25c8ab5b632025af460f7c2700916f8197504ac063ace36ead02d63bfd",
+      "commit": "74e1a51adcc2eef0e947b1335a8f1b5205ae6ab3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
+        "src/core/ui-guard.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/playeresp.lua",
         "src/games/features/bloxfruits/fruit.lua",
@@ -90,11 +93,12 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "d69ffb3fe6ccd5c3a76abf9de384a454eee994ba117c083c06fc7f4a75fd7c33",
-      "commit": "cf24c9ead4d972bc6232687f96034c0c5be56225",
+      "version": "bf44bc7c2e5fc729b28c6fc42dfcbb94da1211dbf1cca115c33128fb9eb4968f",
+      "commit": "74e1a51adcc2eef0e947b1335a8f1b5205ae6ab3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
+        "src/core/ui-guard.lua",
         "src/core/updater.lua",
         "src/games/tsb.lua",
         "src/games/features/tsb/autoblock.lua",
@@ -104,11 +108,12 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "2e4abf65d528d31b8ea28fcf806365cba3dc35b004b8ddab739d67345466ad10",
-      "commit": "cf24c9ead4d972bc6232687f96034c0c5be56225",
+      "version": "ae23f9ffc607a90146d57002d17e34ab9e09ac88ff1be8abed2163d7fd247650",
+      "commit": "74e1a51adcc2eef0e947b1335a8f1b5205ae6ab3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
+        "src/core/ui-guard.lua",
         "src/core/updater.lua",
         "src/games/violencedistrict.lua",
         "src/games/features/violencedistrict/esp.lua",
@@ -134,6 +139,13 @@
       ]
     },
     {
+      "Version": "4e4b183",
+      "Date": "2026-09-01T21:29:22-03:00",
+      "Changes": [
+        "feat(core): keep DepHub UI enabled and above game UI"
+      ]
+    },
+    {
       "Version": "14df04b",
       "Date": "2026-09-01T21:28:44-03:00",
       "Changes": [
@@ -145,13 +157,6 @@
       "Date": "2026-09-01T21:27:55-03:00",
       "Changes": [
         "feat(violence-district): expose dynamic map utilities"
-      ]
-    },
-    {
-      "Version": "3f9b6c0",
-      "Date": "2026-09-01T21:27:37-03:00",
-      "Changes": [
-        "fix(violence-district): limit ESP to killer and survivors"
       ]
     }
   ]
