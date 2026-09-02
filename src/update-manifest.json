@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-02T00:27:45.060891+00:00",
-  "commit": "3f9b6c036ed5dbc7405944d746d26f8e78f84775",
+  "generatedAt": "2026-09-02T00:28:03.638348+00:00",
+  "commit": "d64a218a9f8549bbc8005ce8e65fa979cd05ff15",
   "version": "0.0.5",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "ca23e200401eccdd71535d5d46dc48e92b827ba78d8c4471feab0b362f735956",
-      "commit": "3f9b6c036ed5dbc7405944d746d26f8e78f84775",
+      "commit": "d64a218a9f8549bbc8005ce8e65fa979cd05ff15",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,7 +35,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "46524429d22f884e95510d608b7c6598bcb33e64cf8fb6def63cc1377e81ef79",
-      "commit": "3f9b6c036ed5dbc7405944d746d26f8e78f84775",
+      "commit": "d64a218a9f8549bbc8005ce8e65fa979cd05ff15",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -63,7 +63,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "0ce0150a42f8b0a86bfcdf7d4486e3cde12ea7bc17e247289dca5fd227e1b649",
-      "commit": "3f9b6c036ed5dbc7405944d746d26f8e78f84775",
+      "commit": "d64a218a9f8549bbc8005ce8e65fa979cd05ff15",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,7 +91,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "812e4027f4c462b62b6a3d959125c9118555b14a6344dc7bd259a3263b938507",
-      "commit": "3f9b6c036ed5dbc7405944d746d26f8e78f84775",
+      "commit": "d64a218a9f8549bbc8005ce8e65fa979cd05ff15",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,8 +104,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "74fc3ffc8e24c867d14b9d51e5868537fe82b3571a31a6f2d4e03669dc404fac",
-      "commit": "3f9b6c036ed5dbc7405944d746d26f8e78f84775",
+      "version": "4930450b5006e2e10eee2e336dccc6d0fb42efbb1089f3a3d93fa4a70447aa5e",
+      "commit": "d64a218a9f8549bbc8005ce8e65fa979cd05ff15",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -119,6 +119,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "d64a218",
+      "Date": "2026-09-01T21:27:55-03:00",
+      "Changes": [
+        "feat(violence-district): expose dynamic map utilities"
+      ]
+    },
     {
       "Version": "3f9b6c0",
       "Date": "2026-09-01T21:27:37-03:00",
@@ -145,13 +152,6 @@
       "Date": "2026-09-01T20:56:35-03:00",
       "Changes": [
         "chore: bump DepHub version for Violence District"
-      ]
-    },
-    {
-      "Version": "d452bfd",
-      "Date": "2026-09-01T20:56:27-03:00",
-      "Changes": [
-        "feat(violence-district): wire dedicated module and frontend"
       ]
     }
   ]
