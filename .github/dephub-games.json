@@ -4,6 +4,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
+      "src/core/ui-guard.lua",
       "src/games/bloxfruits.lua",
       "src/games/features/bloxfruits/playeresp.lua",
       "src/games/features/bloxfruits/fruit.lua",
@@ -30,6 +31,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
+      "src/core/ui-guard.lua",
       "src/core/anti-afk.lua",
       "src/core/dashboard.lua",
       "src/core/health-monitor.lua",
@@ -56,6 +58,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
+      "src/core/ui-guard.lua",
       "src/games/bloxfruits.lua",
       "src/games/features/bloxfruits/playeresp.lua",
       "src/games/features/bloxfruits/fruit.lua",
@@ -82,6 +85,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
+      "src/core/ui-guard.lua",
       "src/core/updater.lua",
       "src/games/tsb.lua",
       "src/games/features/tsb/autoblock.lua",
@@ -94,6 +98,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
+      "src/core/ui-guard.lua",
       "src/core/updater.lua",
       "src/games/violencedistrict.lua",
       "src/games/features/violencedistrict/esp.lua",
