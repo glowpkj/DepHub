@@ -1,1 +1,1 @@
-0.0.5 | Violence District support with player ESP, generator repair assist and auto skill check
+0.0.6 | Dynamic map discovery, ExitLever teleport, safer generator repair, role-only ESP and persistent topmost UI
