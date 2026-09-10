@@ -11,6 +11,7 @@ on:
       - "library/**"
       - "src/version.txt"
       - ".github/dephub-games.json"
+      - "tests/validate_repo.js"
 
 permissions:
   contents: write
@@ -23,6 +24,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Validate repository
+        run: node tests/validate_repo.js
 
       - name: Generate manifest
         env:
