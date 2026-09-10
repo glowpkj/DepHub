@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-10T22:52:42.807507+00:00",
-  "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
+  "generatedAt": "2026-09-10T22:53:57.055884+00:00",
+  "commit": "81f61a00b3868afe8853df347f616795ec0c1dc0",
   "version": "0.0.6",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "a029e069cb0230ea4b702798bf7a4874c4ec5ee58f91ad4731e15bc1da8eb20b",
-      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
+      "commit": "81f61a00b3868afe8853df347f616795ec0c1dc0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "a86f4f99203b5cebf47bba1d80a8c2e573396334624f31412c6aa34222a8f786",
-      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
+      "commit": "81f61a00b3868afe8853df347f616795ec0c1dc0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "09cd5f25c8ab5b632025af460f7c2700916f8197504ac063ace36ead02d63bfd",
-      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
+      "commit": "81f61a00b3868afe8853df347f616795ec0c1dc0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -93,8 +93,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "cdc77400284b2ef5e0005ce61cf0ecc60173cda5f6653461b63c1e472075bc52",
-      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
+      "version": "41b8556853442164412e4294e5355dbc9d1a1229d6df1c7f44e5f51ee324114a",
+      "commit": "81f61a00b3868afe8853df347f616795ec0c1dc0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -109,7 +109,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "77881bc083aeea53b8f9f1d5ae49345ba0e2914d9f3c57671c6014d8e86e54df",
-      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
+      "commit": "81f61a00b3868afe8853df347f616795ec0c1dc0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -124,6 +124,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "81f61a0",
+      "Date": "2026-09-10T19:53:49-03:00",
+      "Changes": [
+        "feat(tsb): harden compact combat frontend"
+      ]
+    },
     {
       "Version": "97df259",
       "Date": "2026-09-10T19:52:34-03:00",
@@ -150,13 +157,6 @@
       "Date": "2026-09-01T21:30:55-03:00",
       "Changes": [
         "chore: bump DepHub version for VD map and UI fixes"
-      ]
-    },
-    {
-      "Version": "a70f9cf",
-      "Date": "2026-09-01T21:30:37-03:00",
-      "Changes": [
-        "feat(core): enforce persistent topmost DepHub UI"
       ]
     }
   ]
