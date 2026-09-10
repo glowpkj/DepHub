@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-02T00:31:49.076912+00:00",
-  "commit": "6ab5180b03e2206490931b014cb6ae9d6db80b0d",
+  "generatedAt": "2026-09-10T22:49:34.294879+00:00",
+  "commit": "d90ee13b9d58edcdd26705a59f01f952fa71722e",
   "version": "0.0.6",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "a029e069cb0230ea4b702798bf7a4874c4ec5ee58f91ad4731e15bc1da8eb20b",
-      "commit": "6ab5180b03e2206490931b014cb6ae9d6db80b0d",
+      "commit": "d90ee13b9d58edcdd26705a59f01f952fa71722e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "a86f4f99203b5cebf47bba1d80a8c2e573396334624f31412c6aa34222a8f786",
-      "commit": "6ab5180b03e2206490931b014cb6ae9d6db80b0d",
+      "commit": "d90ee13b9d58edcdd26705a59f01f952fa71722e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "09cd5f25c8ab5b632025af460f7c2700916f8197504ac063ace36ead02d63bfd",
-      "commit": "6ab5180b03e2206490931b014cb6ae9d6db80b0d",
+      "commit": "d90ee13b9d58edcdd26705a59f01f952fa71722e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -94,7 +94,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "bf44bc7c2e5fc729b28c6fc42dfcbb94da1211dbf1cca115c33128fb9eb4968f",
-      "commit": "6ab5180b03e2206490931b014cb6ae9d6db80b0d",
+      "commit": "d90ee13b9d58edcdd26705a59f01f952fa71722e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -109,7 +109,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "77881bc083aeea53b8f9f1d5ae49345ba0e2914d9f3c57671c6014d8e86e54df",
-      "commit": "6ab5180b03e2206490931b014cb6ae9d6db80b0d",
+      "commit": "d90ee13b9d58edcdd26705a59f01f952fa71722e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
