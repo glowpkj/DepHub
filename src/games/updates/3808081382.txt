@@ -1,1 +1,1 @@
-0.0.1 | TSB compact frontend and auto block foundation
+0.0.5 | Event-driven combat tracking, animation registry, safer cleanup, Scan Hz and hardened UI
