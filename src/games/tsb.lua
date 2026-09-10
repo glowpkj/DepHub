@@ -144,6 +144,16 @@ env[STATE_KEY] = State
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.TSB = State
 
+local function releaseCombatInputs()
+    local character = LocalPlayer and LocalPlayer.Character
+    local remote = character and character:FindFirstChild("Communicate")
+    if not remote or not remote:IsA("RemoteEvent") then return false end
+
+    pcall(remote.FireServer, remote, {Goal = "KeyRelease", Key = Enum.KeyCode.F})
+    pcall(remote.FireServer, remote, {Goal = "LeftClickRelease", Mobile = true})
+    return true
+end
+
 local function syncRuntime(self)
     if self.Destroyed then return false end
 
@@ -159,7 +169,9 @@ local function syncRuntime(self)
     end
 
     if not shouldRun and feature.Enabled then
-        return feature:Disable() ~= false
+        local ok = feature:Disable() ~= false
+        releaseCombatInputs()
+        return ok
     end
 
     return true
@@ -293,6 +305,8 @@ end
 function State:Destroy()
     if self.Destroyed then return end
     self.Destroyed = true
+
+    releaseCombatInputs()
 
     local features = self.Features
     self.Features = nil
