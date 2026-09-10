@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-10T22:51:08.028314+00:00",
-  "commit": "86a42973f2a6084d90ed52f6e39615c6735c9438",
+  "generatedAt": "2026-09-10T22:52:42.807507+00:00",
+  "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
   "version": "0.0.6",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "a029e069cb0230ea4b702798bf7a4874c4ec5ee58f91ad4731e15bc1da8eb20b",
-      "commit": "86a42973f2a6084d90ed52f6e39615c6735c9438",
+      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "a86f4f99203b5cebf47bba1d80a8c2e573396334624f31412c6aa34222a8f786",
-      "commit": "86a42973f2a6084d90ed52f6e39615c6735c9438",
+      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "09cd5f25c8ab5b632025af460f7c2700916f8197504ac063ace36ead02d63bfd",
-      "commit": "86a42973f2a6084d90ed52f6e39615c6735c9438",
+      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -93,8 +93,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "16cd11e8b4ab17c3f4a16fee636430b9a4c09551c70bff4d772946498e43bfb3",
-      "commit": "86a42973f2a6084d90ed52f6e39615c6735c9438",
+      "version": "cdc77400284b2ef5e0005ce61cf0ecc60173cda5f6653461b63c1e472075bc52",
+      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -109,7 +109,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "77881bc083aeea53b8f9f1d5ae49345ba0e2914d9f3c57671c6014d8e86e54df",
-      "commit": "86a42973f2a6084d90ed52f6e39615c6735c9438",
+      "commit": "97df259fccb118b83f01bc708c309ce72e16f690",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -124,6 +124,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "97df259",
+      "Date": "2026-09-10T19:52:34-03:00",
+      "Changes": [
+        "refactor(tsb): make combat detection event driven"
+      ]
+    },
     {
       "Version": "86a4297",
       "Date": "2026-09-10T19:50:58-03:00",
@@ -150,13 +157,6 @@
       "Date": "2026-09-01T21:30:37-03:00",
       "Changes": [
         "feat(core): enforce persistent topmost DepHub UI"
-      ]
-    },
-    {
-      "Version": "4e4b183",
-      "Date": "2026-09-01T21:29:22-03:00",
-      "Changes": [
-        "feat(core): keep DepHub UI enabled and above game UI"
       ]
     }
   ]
