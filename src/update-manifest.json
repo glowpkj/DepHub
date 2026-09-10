@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-10T22:54:42.607030+00:00",
-  "commit": "59317d1e15b8cbb63fd7a47a1ac362eeaf1ebd36",
+  "generatedAt": "2026-09-10T22:55:12.265087+00:00",
+  "commit": "8316a3e6f89e821fb464340fc8be1505a2718056",
   "version": "0.0.7",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "825d5d2520cfe9e9dab01a0ea9694ea6bd47458e1880356e92689c24a7f4419c",
-      "commit": "59317d1e15b8cbb63fd7a47a1ac362eeaf1ebd36",
+      "commit": "8316a3e6f89e821fb464340fc8be1505a2718056",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "3f76f6c0205a472d7979945fd7c9164f5cb6ebe9533edd4b51887651cc32dda3",
-      "commit": "59317d1e15b8cbb63fd7a47a1ac362eeaf1ebd36",
+      "commit": "8316a3e6f89e821fb464340fc8be1505a2718056",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "fbe9694c77add62b04976d4f008f04cf3828ff708ca3ebdb109dab3576d1214a",
-      "commit": "59317d1e15b8cbb63fd7a47a1ac362eeaf1ebd36",
+      "commit": "8316a3e6f89e821fb464340fc8be1505a2718056",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -93,14 +93,15 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "5033ff2edf247724aec687d4298ef28b8da5b5fb6996de9177a99689d517444c",
-      "commit": "59317d1e15b8cbb63fd7a47a1ac362eeaf1ebd36",
+      "version": "1083274ebfae47fbd8ae9d6469f313a1965e3adbbf13b321b0d5ebf8f6940603",
+      "commit": "8316a3e6f89e821fb464340fc8be1505a2718056",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/ui-guard.lua",
         "src/core/updater.lua",
         "src/games/tsb.lua",
+        "src/games/features/tsb/animations.lua",
         "src/games/features/tsb/autoblock.lua",
         "src/games/features/tsb/frontend.lua",
         "src/games/updates/3808081382.txt"
@@ -109,7 +110,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "d18676127f5c4ad541ef4f61a11fb459e9d525b028c441d24bed833fef20d008",
-      "commit": "59317d1e15b8cbb63fd7a47a1ac362eeaf1ebd36",
+      "commit": "8316a3e6f89e821fb464340fc8be1505a2718056",
       "files": [
         "DepHub.lua",
         "src/version.txt",
