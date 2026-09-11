@@ -11,7 +11,7 @@ local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.7"
+local VERSION = "0.0.8"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -51,9 +51,11 @@ local function cleanupRuntime()
             "BloxFruitsUI",
             "TSBUI",
             "ViolenceDistrictUI",
+            "MM2UI",
             "BloxFruits",
             "TSB",
             "ViolenceDistrict",
+            "MM2",
             "Universal",
             "Runtime",
             "Window"
@@ -70,6 +72,8 @@ local function cleanupRuntime()
     env.__DEPHUB_TSB_FRONTEND = nil
     env.__DEPHUB_VD = nil
     env.__DEPHUB_VD_FRONTEND = nil
+    env.__DEPHUB_MM2 = nil
+    env.__DEPHUB_MM2_FRONTEND = nil
     env.__DEPHUB_UI_GUARD = nil
 end
 
@@ -122,10 +126,7 @@ end
 local function getCache()
     local cache = env[CACHE_KEY]
     if type(cache) ~= "table" or cache.Version ~= VERSION or type(cache.Sources) ~= "table" then
-        cache = {
-            Version = VERSION,
-            Sources = {}
-        }
+        cache = {Version = VERSION, Sources = {}}
         env[CACHE_KEY] = cache
     end
     return cache.Sources
@@ -137,85 +138,52 @@ local function performRequest(url)
         type(http_request) == "function" and http_request or nil,
         type(syn) == "table" and type(syn.request) == "function" and syn.request or nil
     }
-
     local lastError = "Resposta HTTP vazia"
-
     for attempt = 1, 2 do
         for _, requestFunction in ipairs(requestFunctions) do
             if requestFunction then
-                local ok, response = pcall(requestFunction, {
-                    Url = url,
-                    Method = "GET"
-                })
-
+                local ok, response = pcall(requestFunction, {Url = url, Method = "GET"})
                 if ok and type(response) == "table" then
                     local body = response.Body or response.body
                     local status = tonumber(response.StatusCode or response.status_code or 200) or 200
-                    if status >= 200 and status < 400 and type(body) == "string" and #body > 0 then
-                        return true, body
-                    end
+                    if status >= 200 and status < 400 and type(body) == "string" and #body > 0 then return true, body end
                     lastError = "HTTP " .. tostring(status)
                 elseif not ok then
                     lastError = tostring(response)
                 end
             end
         end
-
-        local ok, result = pcall(function()
-            return game:HttpGet(url)
-        end)
-
-        if ok and type(result) == "string" and #result > 0 then
-            return true, result
-        end
-
+        local ok, result = pcall(function() return game:HttpGet(url) end)
+        if ok and type(result) == "string" and #result > 0 then return true, result end
         lastError = ok and "Resposta HTTP vazia" or tostring(result)
         if attempt < 2 then task.wait(0.12) end
     end
-
     return false, lastError
 end
 
 local function httpGet(path, useCache)
     local cache = getCache()
-
-    if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then
-        return true, cache[path]
-    end
-
+    if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
     local ok, result = performRequest(BASE_URL .. path)
     if not ok then return false, result end
-
-    if useCache ~= false then
-        cache[path] = result
-    end
-
+    if useCache ~= false then cache[path] = result end
     return true, result
 end
 
 local function compile(source)
-    if type(loadstring) ~= "function" then
-        return false, "loadstring indisponivel"
-    end
-
+    if type(loadstring) ~= "function" then return false, "loadstring indisponivel" end
     local ok, chunk, compileError = pcall(loadstring, source)
-    if not ok or type(chunk) ~= "function" then
-        return false, tostring(compileError or chunk)
-    end
-
+    if not ok or type(chunk) ~= "function" then return false, tostring(compileError or chunk) end
     return true, chunk
 end
 
 local function loadModule(path, useCache)
     local okSource, source = httpGet(path, useCache)
     if not okSource then return false, source end
-
     local okCompile, chunk = compile(source)
     if not okCompile then return false, chunk end
-
     local okRun, result = pcall(chunk)
     if not okRun then return false, tostring(result) end
-
     return true, result
 end
 
@@ -225,140 +193,77 @@ log("PlaceId: " .. placeId)
 log("GameId: " .. gameId)
 
 local okVersion, remoteVersion = httpGet("src/version.txt", false)
-if okVersion then
-    env.__DEPHUB.RemoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION
-end
+if okVersion then env.__DEPHUB.RemoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION end
 
 local targets = {
-    ["994732206"] = {
-        Core = "src/games/bloxfruits.lua"
-    },
-    ["85211729168715"] = {
-        Core = "src/games/bloxfruits.lua"
-    },
-    ["119048529960596"] = {
-        Core = "src/games/rt3.lua"
-    },
-    ["10449761463"] = {
-        Core = "src/games/tsb.lua",
-        Frontend = "src/games/features/tsb/frontend.lua",
-        TSB = true
-    },
-    ["3808081382"] = {
-        Core = "src/games/tsb.lua",
-        Frontend = "src/games/features/tsb/frontend.lua",
-        TSB = true
-    },
-    ["93978595733734"] = {
-        Core = "src/games/violencedistrict.lua",
-        Frontend = "src/games/features/violencedistrict/frontend.lua",
-        ViolenceDistrict = true
-    },
-    ["6739698191"] = {
-        Core = "src/games/violencedistrict.lua",
-        Frontend = "src/games/features/violencedistrict/frontend.lua",
-        ViolenceDistrict = true
-    }
+    ["994732206"] = {Core = "src/games/bloxfruits.lua"},
+    ["85211729168715"] = {Core = "src/games/bloxfruits.lua"},
+    ["119048529960596"] = {Core = "src/games/rt3.lua"},
+    ["10449761463"] = {Core = "src/games/tsb.lua", Frontend = "src/games/features/tsb/frontend.lua", TSB = true},
+    ["3808081382"] = {Core = "src/games/tsb.lua", Frontend = "src/games/features/tsb/frontend.lua", TSB = true},
+    ["93978595733734"] = {Core = "src/games/violencedistrict.lua", Frontend = "src/games/features/violencedistrict/frontend.lua", ViolenceDistrict = true},
+    ["6739698191"] = {Core = "src/games/violencedistrict.lua", Frontend = "src/games/features/violencedistrict/frontend.lua", ViolenceDistrict = true},
+    ["142823291"] = {Core = "src/games/mm2.lua", Frontend = "src/games/features/mm2/frontend.lua", MM2 = true},
+    ["66654135"] = {Core = "src/games/mm2.lua", Frontend = "src/games/features/mm2/frontend.lua", MM2 = true}
 }
 
-local target = targets[placeId] or targets[gameId] or {
-    Core = "src/games/universal.lua",
-    Universal = true
-}
-
-if not game:IsLoaded() then
-    game.Loaded:Wait()
-end
-
+local target = targets[placeId] or targets[gameId] or {Core = "src/games/universal.lua", Universal = true}
+if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait()
 
 local okCore, coreResult = loadModule(target.Core, false)
-if not okCore then
-    return fail(coreResult)
-end
-
+if not okCore then return fail(coreResult) end
 local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
 local isVD = target.ViolenceDistrict == true
+local isMM2 = target.MM2 == true
 
 if isRT3 then
-    if coreResult ~= true then
-        return fail("Modulo RT3 nao inicializou")
-    end
+    if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
 elseif type(coreResult) ~= "table" then
     return fail(coreResult)
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and not isMM2 and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
 env.__DEPHUB.ViolenceDistrict = isVD and coreResult or nil
+env.__DEPHUB.MM2 = isMM2 and coreResult or nil
 
 local mode
 local backend
-
-if target.Universal then
-    mode = "Universal"
-    backend = coreResult
-elseif isRT3 then
-    mode = "RT3"
-    backend = env.__DEPHUB.Runtime
-elseif isTSB then
-    mode = "TSB"
-    backend = coreResult
-elseif isVD then
-    mode = "ViolenceDistrict"
-    backend = coreResult
-else
-    mode = "BloxFruits"
-    backend = coreResult
-end
+if target.Universal then mode = "Universal" backend = coreResult
+elseif isRT3 then mode = "RT3" backend = env.__DEPHUB.Runtime
+elseif isTSB then mode = "TSB" backend = coreResult
+elseif isVD then mode = "ViolenceDistrict" backend = coreResult
+elseif isMM2 then mode = "MM2" backend = coreResult
+else mode = "BloxFruits" backend = coreResult end
 
 if isTSB then
     env[STATE_KEY].Frontend = "tsb-compact-2"
-
     local okFrontend, frontend = loadModule(target.Frontend, false)
-    if not okFrontend or type(frontend) ~= "table" then
-        return fail(okFrontend and "Frontend TSB invalido" or frontend)
-    end
-
+    if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend TSB invalido" or frontend) end
     env.__DEPHUB.TSBUI = frontend
     env.__DEPHUB.Frontend = frontend
 elseif isVD then
     env[STATE_KEY].Frontend = "vd-compact-1"
-
     local okFrontend, frontend = loadModule(target.Frontend, false)
-    if not okFrontend or type(frontend) ~= "table" then
-        return fail(okFrontend and "Frontend Violence District invalido" or frontend)
-    end
-
+    if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend Violence District invalido" or frontend) end
     env.__DEPHUB.ViolenceDistrictUI = frontend
+    env.__DEPHUB.Frontend = frontend
+elseif isMM2 then
+    env[STATE_KEY].Frontend = "mm2-compact-1"
+    local okFrontend, frontend = loadModule(target.Frontend, false)
+    if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend MM2 invalido" or frontend) end
+    env.__DEPHUB.MM2UI = frontend
     env.__DEPHUB.Frontend = frontend
 else
     env[STATE_KEY].Frontend = "library-1"
-
-    local subtitles = {
-        Universal = "UNIVERSAL",
-        BloxFruits = "BLOX FRUITS",
-        RT3 = "RESTAURANT TYCOON 3"
-    }
-
+    local subtitles = {Universal = "UNIVERSAL", BloxFruits = "BLOX FRUITS", RT3 = "RESTAURANT TYCOON 3"}
     local okLibrary, Library = loadModule("library/init.lua", false)
-    if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then
-        return fail(okLibrary and "Library invalida" or Library)
-    end
-
-    local okFrontend, frontend = pcall(Library.new, {
-        Mode = mode,
-        Backend = backend,
-        Title = "DEPHUB",
-        Subtitle = subtitles[mode]
-    })
-
-    if not okFrontend or type(frontend) ~= "table" then
-        return fail(frontend)
-    end
-
+    if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then return fail(okLibrary and "Library invalida" or Library) end
+    local okFrontend, frontend = pcall(Library.new, {Mode = mode, Backend = backend, Title = "DEPHUB", Subtitle = subtitles[mode]})
+    if not okFrontend or type(frontend) ~= "table" then return fail(frontend) end
     env.__DEPHUB.Frontend = frontend
 end
 
@@ -378,19 +283,10 @@ env[STATE_KEY].finishedAt = os.clock()
 
 task.defer(function()
     local ok, updaterModule = loadModule("src/core/updater.lua", false)
-    if not ok or type(updaterModule) ~= "table" or type(updaterModule.new) ~= "function" then
-        return
-    end
-
+    if not ok or type(updaterModule) ~= "table" or type(updaterModule.new) ~= "function" then return end
     local okNew, updater = pcall(function()
-        return updaterModule.new({
-            PlaceId = game.PlaceId,
-            GameId = game.GameId,
-            PollInterval = 30,
-            Mode = "serverhop"
-        })
+        return updaterModule.new({PlaceId = game.PlaceId, GameId = game.GameId, PollInterval = 30, Mode = "serverhop"})
     end)
-
     if okNew and updater then
         env.__DEPHUB.Updater = updater
         pcall(updater.Start, updater)
