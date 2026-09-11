@@ -87,6 +87,7 @@
       "src/version.txt",
       "src/core/ui-guard.lua",
       "src/core/updater.lua",
+      "library/compact.lua",
       "src/games/tsb.lua",
       "src/games/features/tsb/animations.lua",
       "src/games/features/tsb/autoblock.lua",
@@ -115,12 +116,13 @@
       "src/version.txt",
       "src/core/ui-guard.lua",
       "src/core/updater.lua",
+      "library/compact.lua",
       "src/games/mm2.lua",
       "src/games/features/mm2/roletracker.lua",
       "src/games/features/mm2/roundtracker.lua",
       "src/games/features/mm2/esp.lua",
       "src/games/features/mm2/coinfarm.lua",
-      "src/games/features/mm2/evade.lua",
+      "src/games/features/mm2/playerteleport.lua",
       "src/games/features/mm2/frontend.lua",
       "src/games/updates/66654135.txt"
     ]
