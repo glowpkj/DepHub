@@ -1,1 +1,1 @@
-0.0.2 | Faster event-driven coin farm, next alive player teleport, shared compact UI library and removed murder evade
+0.0.3 | Fast event-driven coin farm, next alive player teleport, shared compact UI, GunDrop ESP and safe automatic gun pickup
