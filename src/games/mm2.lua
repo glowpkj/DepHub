@@ -11,7 +11,7 @@ local LocalPlayer=Players.LocalPlayer
 local env=type(getgenv)=="function" and getgenv() or _G
 local STATE_KEY="__DEPHUB_MM2"
 local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION="0.0.2"
+local VERSION="0.0.3"
 
 local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
@@ -41,14 +41,16 @@ local okCoin,CoinFarm=loadFeature("src/games/features/mm2/coinfarm.lua",base)
 if not okCoin then pcall(RoleTracker.Destroy,RoleTracker) pcall(RoundTracker.Destroy,RoundTracker) pcall(ESP.Destroy,ESP) return false end
 local okTeleport,PlayerTeleport=loadFeature("src/games/features/mm2/playerteleport.lua",base)
 if not okTeleport then pcall(RoleTracker.Destroy,RoleTracker) pcall(RoundTracker.Destroy,RoundTracker) pcall(ESP.Destroy,ESP) pcall(CoinFarm.Destroy,CoinFarm) return false end
+local okGun,GunDrop=loadFeature("src/games/features/mm2/gundrop.lua",base)
+if not okGun then pcall(RoleTracker.Destroy,RoleTracker) pcall(RoundTracker.Destroy,RoundTracker) pcall(ESP.Destroy,ESP) pcall(CoinFarm.Destroy,CoinFarm) pcall(PlayerTeleport.Destroy,PlayerTeleport) return false end
 
 local State={
     Version=VERSION,
     Started=false,
     Destroyed=false,
-    Features={RoleTracker=RoleTracker,RoundTracker=RoundTracker,ESP=ESP,CoinFarm=CoinFarm,PlayerTeleport=PlayerTeleport},
-    Toggles={RoleESP=false,AutoCoins=false},
-    Values={CoinSafeDistance=18,CoinDelay=0.05}
+    Features={RoleTracker=RoleTracker,RoundTracker=RoundTracker,ESP=ESP,CoinFarm=CoinFarm,PlayerTeleport=PlayerTeleport,GunDrop=GunDrop},
+    Toggles={RoleESP=false,AutoCoins=false,GunDropESP=false,AutoGetGun=false},
+    Values={CoinSafeDistance=18,CoinDelay=0.05,GunSafeDistance=22,GunPickupHold=0.16}
 }
 
 env[STATE_KEY]=State
@@ -83,15 +85,41 @@ function State:SetCoinDelay(v)
     return true
 end
 
+function State:SetGunDropESP(v)
+    v=v==true
+    if GunDrop:SetESP(v)==false then return false end
+    self.Toggles.GunDropESP=v
+    return true
+end
+
+function State:SetAutoGetGun(v)
+    v=v==true
+    if GunDrop:SetAutoPickup(v)==false then return false end
+    self.Toggles.AutoGetGun=v
+    return true
+end
+
+function State:SetGunSafeDistance(v)
+    v=tonumber(v)
+    if not v or GunDrop:SetSafeDistance(v)==false then return false end
+    self.Values.GunSafeDistance=GunDrop.SafeDistance
+    return true
+end
+
+function State:SetGunPickupHold(v)
+    v=tonumber(v)
+    if not v or GunDrop:SetPickupHold(v)==false then return false end
+    self.Values.GunPickupHold=GunDrop.PickupHold
+    return true
+end
+
 function State:TeleportNextAlivePlayer()
     if self.Destroyed then return false,"destroyed" end
     return PlayerTeleport:TeleportNext()
 end
 
-function State:GetAlivePlayers()
-    return PlayerTeleport:GetAliveTargets()
-end
-
+function State:GetAlivePlayers() return PlayerTeleport:GetAliveTargets() end
+function State:GetGunDrop() return RoleTracker:GetGunDrop() end
 function State:GetToggle(name) return self.Toggles[name]==true end
 function State:GetValue(name) return self.Values[name] end
 function State:GetMurder() return RoleTracker:GetMurder() end
@@ -102,7 +130,8 @@ function State:GetDebugInfo()
         Role=RoleTracker:GetDebugInfo(),
         Round=RoundTracker:GetDebugInfo(),
         Coin=CoinFarm:GetDebugInfo(),
-        Teleport=PlayerTeleport:GetDebugInfo()
+        Teleport=PlayerTeleport:GetDebugInfo(),
+        Gun=GunDrop:GetDebugInfo()
     }
 end
 
