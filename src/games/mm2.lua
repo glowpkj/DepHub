@@ -6,13 +6,12 @@ local pcall=pcall
 local pairs=pairs
 
 local Players=game:GetService("Players")
-local RunService=game:GetService("RunService")
 local Workspace=game:GetService("Workspace")
 local LocalPlayer=Players.LocalPlayer
 local env=type(getgenv)=="function" and getgenv() or _G
 local STATE_KEY="__DEPHUB_MM2"
 local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION="0.0.1"
+local VERSION="0.0.2"
 
 local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
@@ -29,7 +28,7 @@ local function loadFeature(path,context)
     return true,feature
 end
 
-local base={Players=Players,RunService=RunService,Workspace=Workspace,LocalPlayer=LocalPlayer}
+local base={Players=Players,Workspace=Workspace,LocalPlayer=LocalPlayer}
 local okRole,RoleTracker=loadFeature("src/games/features/mm2/roletracker.lua",base)
 if not okRole then return false end
 base.RoleTracker=RoleTracker
@@ -40,35 +39,72 @@ local okESP,ESP=loadFeature("src/games/features/mm2/esp.lua",base)
 if not okESP then pcall(RoleTracker.Destroy,RoleTracker) pcall(RoundTracker.Destroy,RoundTracker) return false end
 local okCoin,CoinFarm=loadFeature("src/games/features/mm2/coinfarm.lua",base)
 if not okCoin then pcall(RoleTracker.Destroy,RoleTracker) pcall(RoundTracker.Destroy,RoundTracker) pcall(ESP.Destroy,ESP) return false end
-local okEvade,Evade=loadFeature("src/games/features/mm2/evade.lua",base)
-if not okEvade then pcall(RoleTracker.Destroy,RoleTracker) pcall(RoundTracker.Destroy,RoundTracker) pcall(ESP.Destroy,ESP) pcall(CoinFarm.Destroy,CoinFarm) return false end
+local okTeleport,PlayerTeleport=loadFeature("src/games/features/mm2/playerteleport.lua",base)
+if not okTeleport then pcall(RoleTracker.Destroy,RoleTracker) pcall(RoundTracker.Destroy,RoundTracker) pcall(ESP.Destroy,ESP) pcall(CoinFarm.Destroy,CoinFarm) return false end
 
 local State={
     Version=VERSION,
     Started=false,
     Destroyed=false,
-    Features={RoleTracker=RoleTracker,RoundTracker=RoundTracker,ESP=ESP,CoinFarm=CoinFarm,Evade=Evade},
-    Toggles={RoleESP=false,AutoCoins=false,MurderEvade=false,ShowDangerBox=false},
-    Values={DangerSize=18,EscapeHeight=32,CoinSafeDistance=18}
+    Features={RoleTracker=RoleTracker,RoundTracker=RoundTracker,ESP=ESP,CoinFarm=CoinFarm,PlayerTeleport=PlayerTeleport},
+    Toggles={RoleESP=false,AutoCoins=false},
+    Values={CoinSafeDistance=18,CoinDelay=0.05}
 }
 
 env[STATE_KEY]=State
 env.__DEPHUB=env.__DEPHUB or {}
 env.__DEPHUB.MM2=State
 
-function State:SetRoleESP(v) v=v==true self.Toggles.RoleESP=v return (v and ESP:Enable() or ESP:Disable())~=false end
-function State:SetAutoCoins(v) v=v==true self.Toggles.AutoCoins=v return (v and CoinFarm:Enable() or CoinFarm:Disable())~=false end
-function State:SetMurderEvade(v) v=v==true self.Toggles.MurderEvade=v return (v and Evade:Enable() or Evade:Disable())~=false end
-function State:SetShowDangerBox(v) v=v==true self.Toggles.ShowDangerBox=v return Evade:SetShowBox(v)~=false end
-function State:SetDangerSize(v) v=tonumber(v) if not v then return false end if not Evade:SetDangerSize(v) then return false end self.Values.DangerSize=Evade.DangerSize return true end
-function State:SetEscapeHeight(v) v=tonumber(v) if not v then return false end if not Evade:SetEscapeHeight(v) then return false end self.Values.EscapeHeight=Evade.EscapeHeight return true end
-function State:SetCoinSafeDistance(v) v=tonumber(v) if not v then return false end if not CoinFarm:SetSafeDistance(v) then return false end self.Values.CoinSafeDistance=CoinFarm.SafeDistance return true end
+function State:SetRoleESP(v)
+    v=v==true
+    self.Toggles.RoleESP=v
+    return (v and ESP:Enable() or ESP:Disable())~=false
+end
+
+function State:SetAutoCoins(v)
+    v=v==true
+    self.Toggles.AutoCoins=v
+    return (v and CoinFarm:Enable() or CoinFarm:Disable())~=false
+end
+
+function State:SetCoinSafeDistance(v)
+    v=tonumber(v)
+    if not v then return false end
+    if not CoinFarm:SetSafeDistance(v) then return false end
+    self.Values.CoinSafeDistance=CoinFarm.SafeDistance
+    return true
+end
+
+function State:SetCoinDelay(v)
+    v=tonumber(v)
+    if not v then return false end
+    if not CoinFarm:SetDelay(v) then return false end
+    self.Values.CoinDelay=CoinFarm.Delay
+    return true
+end
+
+function State:TeleportNextAlivePlayer()
+    if self.Destroyed then return false,"destroyed" end
+    return PlayerTeleport:TeleportNext()
+end
+
+function State:GetAlivePlayers()
+    return PlayerTeleport:GetAliveTargets()
+end
+
 function State:GetToggle(name) return self.Toggles[name]==true end
 function State:GetValue(name) return self.Values[name] end
 function State:GetMurder() return RoleTracker:GetMurder() end
 function State:GetSheriff() return RoleTracker:GetSheriff() end
 function State:IsRoundActive() return RoundTracker:IsRoundActive() end
-function State:GetDebugInfo() return {Role=RoleTracker:GetDebugInfo(),Round=RoundTracker:GetDebugInfo(),Coin=CoinFarm:GetDebugInfo(),Evade=Evade:GetDebugInfo()} end
+function State:GetDebugInfo()
+    return {
+        Role=RoleTracker:GetDebugInfo(),
+        Round=RoundTracker:GetDebugInfo(),
+        Coin=CoinFarm:GetDebugInfo(),
+        Teleport=PlayerTeleport:GetDebugInfo()
+    }
+end
 
 function State:Start()
     if self.Destroyed or self.Started then return false end
