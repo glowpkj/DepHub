@@ -11,7 +11,7 @@ local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.8"
+local VERSION = "0.0.9"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -252,7 +252,7 @@ elseif isVD then
     env.__DEPHUB.ViolenceDistrictUI = frontend
     env.__DEPHUB.Frontend = frontend
 elseif isMM2 then
-    env[STATE_KEY].Frontend = "mm2-compact-1"
+    env[STATE_KEY].Frontend = "mm2-compact-2"
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend MM2 invalido" or frontend) end
     env.__DEPHUB.MM2UI = frontend
