@@ -123,6 +123,7 @@
       "src/games/features/mm2/esp.lua",
       "src/games/features/mm2/coinfarm.lua",
       "src/games/features/mm2/playerteleport.lua",
+      "src/games/features/mm2/gundrop.lua",
       "src/games/features/mm2/frontend.lua",
       "src/games/updates/66654135.txt"
     ]
