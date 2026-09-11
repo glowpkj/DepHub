@@ -1,1 +1,1 @@
-0.0.1 | Role tracking, role ESP, safe coin farm, murder attack evade and lobby round detection
+0.0.2 | Faster event-driven coin farm, next alive player teleport, shared compact UI library and removed murder evade
