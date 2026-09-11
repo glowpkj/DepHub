@@ -68,11 +68,29 @@ function validateFeatureDirectory(gameId, directory, requiredFiles) {
   }
 }
 
-validateFeatureDirectory('3808081382', 'src/games/features/tsb', ['src/core/updater.lua', 'src/games/tsb.lua']);
-validateFeatureDirectory('66654135', 'src/games/features/mm2', ['src/core/updater.lua', 'src/games/mm2.lua']);
+validateFeatureDirectory('3808081382', 'src/games/features/tsb', [
+  'src/core/updater.lua',
+  'library/compact.lua',
+  'src/games/tsb.lua'
+]);
+validateFeatureDirectory('66654135', 'src/games/features/mm2', [
+  'src/core/updater.lua',
+  'library/compact.lua',
+  'src/games/mm2.lua',
+  'src/games/features/mm2/playerteleport.lua'
+]);
 
 if (!loader.includes('["142823291"]') || !loader.includes('["66654135"]') || !loader.includes('src/games/mm2.lua')) {
   fail('MM2 loader routing is incomplete');
+}
+
+if (exists('src/games/features/mm2/evade.lua')) {
+  fail('Retired MM2 evade module still exists');
+}
+
+const compact = read('library/compact.lua');
+for (const api of ['AddSection', 'AddToggle', 'AddFeature', 'AddSlider', 'AddButton', 'AddStatus']) {
+  if (!compact.includes(api)) fail(`Shared compact library missing API: ${api}`);
 }
 
 const legacyUi = path.join(root, 'src/ui');
