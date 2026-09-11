@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-11T19:23:31.011570+00:00",
-  "commit": "333775b085a13ea82da827bcb62807f188f60a2e",
+  "generatedAt": "2026-09-11T19:23:41.779415+00:00",
+  "commit": "2b319e4d85c76f58e697d3a7bfa462c3dd5f336e",
   "version": "0.0.8",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "4e37f30ba785c5d295dab825d0683054d336376349d14307d30251ed142f0660",
-      "commit": "333775b085a13ea82da827bcb62807f188f60a2e",
+      "commit": "2b319e4d85c76f58e697d3a7bfa462c3dd5f336e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "73cfc7c271a25ab679e102a891318902497d2b66840edc5f15756bbbab9d5f77",
-      "commit": "333775b085a13ea82da827bcb62807f188f60a2e",
+      "commit": "2b319e4d85c76f58e697d3a7bfa462c3dd5f336e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "4f4013d47f8cb141ac2acba5e3ddbbabfb70bba05f9ce763fda2348897550cd3",
-      "commit": "333775b085a13ea82da827bcb62807f188f60a2e",
+      "commit": "2b319e4d85c76f58e697d3a7bfa462c3dd5f336e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -93,8 +93,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "d2f099c4acf39f4e6ce656010d0cc74a3838827c58c6d74cea149666df3d9150",
-      "commit": "333775b085a13ea82da827bcb62807f188f60a2e",
+      "version": "c483a6e78a9e73dcdd00f63edf276fadd430d6eb8fd72333ddd249b9642c8f60",
+      "commit": "2b319e4d85c76f58e697d3a7bfa462c3dd5f336e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -111,7 +111,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "95634305b68144623ae381eb5d8296e8827947fc7332a4795b35cf55888d425c",
-      "commit": "333775b085a13ea82da827bcb62807f188f60a2e",
+      "commit": "2b319e4d85c76f58e697d3a7bfa462c3dd5f336e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -127,7 +127,7 @@
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "5e0b169ae1fb835f4779ad1aa78d0355a2b3951886f69fe446791e447ba25a01",
-      "commit": "333775b085a13ea82da827bcb62807f188f60a2e",
+      "commit": "2b319e4d85c76f58e697d3a7bfa462c3dd5f336e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -146,6 +146,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "2b319e4",
+      "Date": "2026-09-11T16:23:33-03:00",
+      "Changes": [
+        "chore(tsb): note shared compact library migration"
+      ]
+    },
     {
       "Version": "333775b",
       "Date": "2026-09-11T16:23:21-03:00",
@@ -172,13 +179,6 @@
       "Date": "2026-09-11T16:20:37-03:00",
       "Changes": [
         "refactor(mm2): remove evade and add player teleport"
-      ]
-    },
-    {
-      "Version": "65f872f",
-      "Date": "2026-09-11T16:20:18-03:00",
-      "Changes": [
-        "feat(mm2): add next alive player teleport"
       ]
     }
   ]
