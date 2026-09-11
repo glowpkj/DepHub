@@ -71,6 +71,7 @@ function Factory.new(context)
 
     function self:_findGunDrop()
         if self.GunDrop and self.GunDrop.Parent then
+            self.DebugInfo.GunDrop=self.GunDrop:GetFullName()
             return self.GunDrop
         end
         self.GunDrop=nil
@@ -125,9 +126,7 @@ function Factory.new(context)
         end
 
         if sheriff then
-            if sheriff~=self.Sheriff then
-                self:_setSheriff(sheriff)
-            end
+            if sheriff~=self.Sheriff then self:_setSheriff(sheriff) end
         elseif self.Sheriff and not self.Sheriff.Parent then
             self:_setSheriff(nil)
         end
@@ -145,6 +144,8 @@ function Factory.new(context)
     function self:GetMurder() return self.Murder end
     function self:GetSheriff() return self.Sheriff end
     function self:GetLastSheriff() return self.LastSheriff end
+    function self:GetGunDrop() return self:_findGunDrop() end
+    function self:HasTool(player,name) return self:_hasTool(player,name) end
 
     function self:ResetRound()
         self.GunDrop=nil
@@ -213,6 +214,12 @@ function Factory.new(context)
             if object.Name=="GunDrop" then
                 self.GunDrop=object
                 self.DebugInfo.GunDrop=object:GetFullName()
+            end
+        end)
+        self.Connections[#self.Connections+1]=Workspace.DescendantRemoving:Connect(function(object)
+            if object==self.GunDrop then
+                self.GunDrop=nil
+                self.DebugInfo.GunDrop="missing"
             end
         end)
         self.Connections[#self.Connections+1]=RunService.Heartbeat:Connect(function(dt)
