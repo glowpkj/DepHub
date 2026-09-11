@@ -25,8 +25,8 @@ local UI=Library.new({
     Title="DEPHUB",
     Subtitle="MURDER MYSTERY 2",
     Accent=Color3.fromRGB(111,238,190),
-    Width=290,
-    Height=430,
+    Width=292,
+    Height=470,
     Open=true
 })
 if type(UI)~="table" then return false end
@@ -47,6 +47,20 @@ UI:AddSlider("Murder Safe Distance",0,60,1,Backend:GetValue("CoinSafeDistance") 
     return Backend:SetCoinSafeDistance(v)
 end,coinSettings)
 
+UI:AddSection("GUN DROP")
+UI:AddToggle("Gun Drop ESP",Backend:GetToggle("GunDropESP"),function(v)
+    return Backend:SetGunDropESP(v)
+end)
+local autoGun,gunSettings=UI:AddFeature("Auto Get Gun",Backend:GetToggle("AutoGetGun"),function(v)
+    return Backend:SetAutoGetGun(v)
+end)
+UI:AddSlider("Gun Safe Distance",5,80,1,Backend:GetValue("GunSafeDistance") or 22,function(v)
+    return Backend:SetGunSafeDistance(v)
+end,gunSettings)
+UI:AddSlider("Pickup Hold",0.05,0.40,0.01,Backend:GetValue("GunPickupHold") or 0.16,function(v)
+    return Backend:SetGunPickupHold(v)
+end,gunSettings)
+
 UI:AddSection("PLAYERS")
 UI:AddButton("TELEPORT NEXT ALIVE",function()
     local ok,name=Backend:TeleportNextAlivePlayer()
@@ -55,7 +69,7 @@ UI:AddButton("TELEPORT NEXT ALIVE",function()
 end)
 
 UI:AddSection("STATUS")
-local Status=UI:AddStatus("LIVE STATUS",nil,124)
+local Status=UI:AddStatus("LIVE STATUS",nil,144)
 local alive=true
 local elapsed=0
 local statusConnection
@@ -70,12 +84,15 @@ statusConnection=RunService.Heartbeat:Connect(function(dt)
     local coin=info and info.Coin or {}
     local round=info and info.Round or {}
     local teleport=info and info.Teleport or {}
+    local gun=info and info.Gun or {}
     Status:Set(
         "round: "..(Backend:IsRoundActive() and "active" or "lobby")..
         "\nmurder: "..(murder and murder.Name or "none")..
         "\nsheriff: "..(sheriff and sheriff.Name or "none")..
         "\nalive targets: "..tostring(round.AliveRoundPlayers or 0)..
         "\ncoins: "..tostring(coin.Coins or 0).." | farm tp: "..tostring(coin.Teleports or 0)..
+        "\ngun: "..tostring(gun.GunDrop or "missing")..
+        "\ngun safe: "..tostring(gun.Safe).." | pickups: "..tostring(gun.Pickups or 0)..
         "\nlast player: "..tostring(teleport.LastTarget or "none")
     )
 end)
