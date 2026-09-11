@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-11T19:26:56.022460+00:00",
-  "commit": "969fc9fa997856ace93cf233cd777c123a1f59b9",
+  "generatedAt": "2026-09-11T19:27:07.070037+00:00",
+  "commit": "6aba872b4e610add77e7800e5593887a76adc5b0",
   "version": "0.0.9",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "e4672e3b12df8b8ab88c4fbaedd75f899c7bd1b6ae9e9ab7794f69ab8193a882",
-      "commit": "969fc9fa997856ace93cf233cd777c123a1f59b9",
+      "commit": "6aba872b4e610add77e7800e5593887a76adc5b0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "236de444f64f047e3862dd2891bc03306894bec3ed41f701a5dde4fceb03966a",
-      "commit": "969fc9fa997856ace93cf233cd777c123a1f59b9",
+      "commit": "6aba872b4e610add77e7800e5593887a76adc5b0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "9dd4f84745f071987d1a17ad9214731ff513ef432781a2637d01475ba068fb58",
-      "commit": "969fc9fa997856ace93cf233cd777c123a1f59b9",
+      "commit": "6aba872b4e610add77e7800e5593887a76adc5b0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -94,7 +94,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "38b22f1822feff39ebd7ba102e421970965587039f3dcc6cc9f00fb758e29667",
-      "commit": "969fc9fa997856ace93cf233cd777c123a1f59b9",
+      "commit": "6aba872b4e610add77e7800e5593887a76adc5b0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -111,7 +111,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "22d832fdfe3b5ba0f7993d50171d3b0bea867fcc6283fb4d9785e5d8d3d3ad9a",
-      "commit": "969fc9fa997856ace93cf233cd777c123a1f59b9",
+      "commit": "6aba872b4e610add77e7800e5593887a76adc5b0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -126,8 +126,8 @@
     },
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "60432c3ef62496ba47fd918490f660ac25b1e7c0d802692367dba885ce108d05",
-      "commit": "969fc9fa997856ace93cf233cd777c123a1f59b9",
+      "version": "40b58dd78e78a8233a0887864d63075004ce516bf9d8c43e3f1d9ff44324d731",
+      "commit": "6aba872b4e610add77e7800e5593887a76adc5b0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -147,6 +147,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "6aba872",
+      "Date": "2026-09-11T16:26:57-03:00",
+      "Changes": [
+        "chore(mm2): document safe gun drop pickup"
+      ]
+    },
     {
       "Version": "969fc9f",
       "Date": "2026-09-11T16:26:47-03:00",
@@ -173,13 +180,6 @@
       "Date": "2026-09-11T16:24:59-03:00",
       "Changes": [
         "feat(mm2): add safe dropped gun pickup"
-      ]
-    },
-    {
-      "Version": "1e136e8",
-      "Date": "2026-09-11T16:24:35-03:00",
-      "Changes": [
-        "feat(mm2): add safe gun drop ESP and pickup"
       ]
     }
   ]
