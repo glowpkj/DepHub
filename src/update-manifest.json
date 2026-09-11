@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-11T19:19:50.509912+00:00",
-  "commit": "80b914b77d1948ac76b942de8265d905334eb838",
+  "generatedAt": "2026-09-11T19:20:13.834876+00:00",
+  "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
   "version": "0.0.8",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "4e37f30ba785c5d295dab825d0683054d336376349d14307d30251ed142f0660",
-      "commit": "80b914b77d1948ac76b942de8265d905334eb838",
+      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "73cfc7c271a25ab679e102a891318902497d2b66840edc5f15756bbbab9d5f77",
-      "commit": "80b914b77d1948ac76b942de8265d905334eb838",
+      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "4f4013d47f8cb141ac2acba5e3ddbbabfb70bba05f9ce763fda2348897550cd3",
-      "commit": "80b914b77d1948ac76b942de8265d905334eb838",
+      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -94,7 +94,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "e46b8c6f982fa0e0144d1cb6a5e0b2a702713d840820d193fc67e023cd6e0641",
-      "commit": "80b914b77d1948ac76b942de8265d905334eb838",
+      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -110,7 +110,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "95634305b68144623ae381eb5d8296e8827947fc7332a4795b35cf55888d425c",
-      "commit": "80b914b77d1948ac76b942de8265d905334eb838",
+      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -125,8 +125,8 @@
     },
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "c33394eb44625b6a6d27013b1182f080b262c575051598194e5cc358a28842be",
-      "commit": "80b914b77d1948ac76b942de8265d905334eb838",
+      "version": "e4273b0c045e81f3300d34eb0f0a1fb437a9f60a118f35a283eee61d939617a3",
+      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -144,6 +144,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "d21d544",
+      "Date": "2026-09-11T16:20:03-03:00",
+      "Changes": [
+        "refactor(mm2): make coin farm fast and event driven"
+      ]
+    },
     {
       "Version": "80b914b",
       "Date": "2026-09-11T16:19:40-03:00",
@@ -170,13 +177,6 @@
       "Date": "2026-09-11T15:58:15-03:00",
       "Changes": [
         "chore: bump DepHub to 0.0.8"
-      ]
-    },
-    {
-      "Version": "47344ea",
-      "Date": "2026-09-11T15:57:42-03:00",
-      "Changes": [
-        "feat(mm2): add compact frontend"
       ]
     }
   ]
