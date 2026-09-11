@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-11T18:57:53.590757+00:00",
-  "commit": "47344eaf240734a2c4000d842c8af06a8cb5b291",
-  "version": "0.0.7",
+  "generatedAt": "2026-09-11T18:59:30.373037+00:00",
+  "commit": "ee6c7f58e84fcffc8f008bc19b06f74f256453f0",
+  "version": "0.0.8",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "825d5d2520cfe9e9dab01a0ea9694ea6bd47458e1880356e92689c24a7f4419c",
-      "commit": "47344eaf240734a2c4000d842c8af06a8cb5b291",
+      "version": "4e37f30ba785c5d295dab825d0683054d336376349d14307d30251ed142f0660",
+      "commit": "ee6c7f58e84fcffc8f008bc19b06f74f256453f0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -35,8 +35,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "3f76f6c0205a472d7979945fd7c9164f5cb6ebe9533edd4b51887651cc32dda3",
-      "commit": "47344eaf240734a2c4000d842c8af06a8cb5b291",
+      "version": "73cfc7c271a25ab679e102a891318902497d2b66840edc5f15756bbbab9d5f77",
+      "commit": "ee6c7f58e84fcffc8f008bc19b06f74f256453f0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -64,8 +64,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "fbe9694c77add62b04976d4f008f04cf3828ff708ca3ebdb109dab3576d1214a",
-      "commit": "47344eaf240734a2c4000d842c8af06a8cb5b291",
+      "version": "4f4013d47f8cb141ac2acba5e3ddbbabfb70bba05f9ce763fda2348897550cd3",
+      "commit": "ee6c7f58e84fcffc8f008bc19b06f74f256453f0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -93,8 +93,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "01fb9ab886a030061351fb240d3c05478e3c74a26d21dc0958670a01f3701246",
-      "commit": "47344eaf240734a2c4000d842c8af06a8cb5b291",
+      "version": "e46b8c6f982fa0e0144d1cb6a5e0b2a702713d840820d193fc67e023cd6e0641",
+      "commit": "ee6c7f58e84fcffc8f008bc19b06f74f256453f0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -109,8 +109,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "d18676127f5c4ad541ef4f61a11fb459e9d525b028c441d24bed833fef20d008",
-      "commit": "47344eaf240734a2c4000d842c8af06a8cb5b291",
+      "version": "95634305b68144623ae381eb5d8296e8827947fc7332a4795b35cf55888d425c",
+      "commit": "ee6c7f58e84fcffc8f008bc19b06f74f256453f0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -122,42 +122,61 @@
         "src/games/features/violencedistrict/frontend.lua",
         "src/games/updates/6739698191.txt"
       ]
+    },
+    "66654135": {
+      "name": "Murder Mystery 2",
+      "version": "065b903cf37f71c9d7b7510f5b63007e59728c31e6adfd59f2f53a31c063f317",
+      "commit": "ee6c7f58e84fcffc8f008bc19b06f74f256453f0",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/ui-guard.lua",
+        "src/core/updater.lua",
+        "src/games/mm2.lua",
+        "src/games/features/mm2/roletracker.lua",
+        "src/games/features/mm2/roundtracker.lua",
+        "src/games/features/mm2/esp.lua",
+        "src/games/features/mm2/coinfarm.lua",
+        "src/games/features/mm2/evade.lua",
+        "src/games/features/mm2/frontend.lua",
+        "src/games/updates/66654135.txt"
+      ]
     }
   },
   "recentUpdates": [
     {
-      "Version": "62377d9",
-      "Date": "2026-09-10T19:59:33-03:00",
+      "Version": "ee6c7f5",
+      "Date": "2026-09-11T15:59:19-03:00",
       "Changes": [
-        "fix(tsb): release combat inputs on shutdown"
+        "feat(mm2): route MM2 backend and frontend"
       ]
     },
     {
-      "Version": "fdb271a",
-      "Date": "2026-09-10T19:56:41-03:00",
+      "Version": "79d7837",
+      "Date": "2026-09-11T15:58:25-03:00",
       "Changes": [
-        "chore(tsb): finalize 0.0.5 test marker"
+        "feat(mm2): add release marker"
       ]
     },
     {
-      "Version": "8a6c822",
-      "Date": "2026-09-10T19:55:32-03:00",
+      "Version": "36392a8",
+      "Date": "2026-09-11T15:58:15-03:00",
       "Changes": [
-        "chore(tsb): update release marker"
+        "chore: bump DepHub to 0.0.8"
       ]
     },
     {
-      "Version": "59317d1",
-      "Date": "2026-09-10T19:54:34-03:00",
+      "Version": "47344ea",
+      "Date": "2026-09-11T15:57:42-03:00",
       "Changes": [
-        "chore: bump DepHub to 0.0.7"
+        "feat(mm2): add compact frontend"
       ]
     },
     {
-      "Version": "a7b140c",
-      "Date": "2026-09-10T19:54:23-03:00",
+      "Version": "8d370c9",
+      "Date": "2026-09-11T15:57:10-03:00",
       "Changes": [
-        "refactor(core): harden loader version and cache lifecycle"
+        "feat(mm2): add game backend"
       ]
     }
   ]
