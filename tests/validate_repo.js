@@ -39,50 +39,40 @@ for (const [gameId, game] of Object.entries(manifestConfig)) {
 
   const seen = new Set();
   for (const file of game.files) {
-    if (typeof file !== 'string' || !file) {
-      fail(`Invalid tracked path in ${gameId}`);
-    }
-    if (seen.has(file)) {
-      fail(`Duplicate tracked path in ${gameId}: ${file}`);
-    }
+    if (typeof file !== 'string' || !file) fail(`Invalid tracked path in ${gameId}`);
+    if (seen.has(file)) fail(`Duplicate tracked path in ${gameId}: ${file}`);
     seen.add(file);
-    if (!exists(file)) {
-      fail(`Missing tracked file for ${gameId}: ${file}`);
-    }
+    if (!exists(file)) fail(`Missing tracked file for ${gameId}: ${file}`);
   }
 
   for (const required of requiredCommon) {
-    if (!seen.has(required)) {
-      fail(`Game ${gameId} is missing required tracked file: ${required}`);
-    }
+    if (!seen.has(required)) fail(`Game ${gameId} is missing required tracked file: ${required}`);
   }
 
   const updateFile = `src/games/updates/${gameId}.txt`;
-  if (!seen.has(updateFile) || !exists(updateFile)) {
-    fail(`Game ${gameId} is missing its update marker: ${updateFile}`);
+  if (!seen.has(updateFile) || !exists(updateFile)) fail(`Game ${gameId} is missing its update marker: ${updateFile}`);
+}
+
+function validateFeatureDirectory(gameId, directory, requiredFiles) {
+  const game = manifestConfig[gameId];
+  if (!game) fail(`Manifest entry is missing: ${gameId}`);
+  const files = new Set(game.files);
+  for (const required of requiredFiles) {
+    if (!files.has(required)) fail(`${game.name} manifest is missing: ${required}`);
+  }
+  const absolute = path.join(root, directory);
+  for (const entry of fs.readdirSync(absolute, {withFileTypes: true})) {
+    if (!entry.isFile() || !entry.name.endsWith('.lua')) continue;
+    const relative = `${directory}/${entry.name}`;
+    if (!files.has(relative)) fail(`${game.name} feature is not tracked by the manifest: ${relative}`);
   }
 }
 
-const tsbId = '3808081382';
-const tsb = manifestConfig[tsbId];
-if (!tsb) {
-  fail('TSB manifest entry is missing');
-}
+validateFeatureDirectory('3808081382', 'src/games/features/tsb', ['src/core/updater.lua', 'src/games/tsb.lua']);
+validateFeatureDirectory('66654135', 'src/games/features/mm2', ['src/core/updater.lua', 'src/games/mm2.lua']);
 
-const tsbFiles = new Set(tsb.files);
-for (const required of ['src/core/updater.lua', 'src/games/tsb.lua']) {
-  if (!tsbFiles.has(required)) {
-    fail('TSB manifest is missing: ' + required);
-  }
-}
-
-const tsbFeatureDir = path.join(root, 'src/games/features/tsb');
-for (const entry of fs.readdirSync(tsbFeatureDir, {withFileTypes: true})) {
-  if (!entry.isFile() || !entry.name.endsWith('.lua')) continue;
-  const relative = `src/games/features/tsb/${entry.name}`;
-  if (!tsbFiles.has(relative)) {
-    fail('TSB feature is not tracked by the manifest: ' + relative);
-  }
+if (!loader.includes('["142823291"]') || !loader.includes('["66654135"]') || !loader.includes('src/games/mm2.lua')) {
+  fail('MM2 loader routing is incomplete');
 }
 
 const legacyUi = path.join(root, 'src/ui');
