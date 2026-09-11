@@ -1,1 +1,1 @@
-0.0.5 | Event-driven combat tracking, animation registry, safer cleanup, tunable Scan Hz and hardened UI
+0.0.6 | Event-driven combat tracking, shared compact UI library, safer cleanup, tunable Scan Hz and responsive frontend
