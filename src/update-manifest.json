@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-11T19:24:14.937372+00:00",
-  "commit": "b73bc87e85fc991a8a7b83b81acac7cf3958504d",
+  "generatedAt": "2026-09-11T19:25:46.920361+00:00",
+  "commit": "b9a17759aa02eb04b624e5ae754007e236663828",
   "version": "0.0.8",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "4e37f30ba785c5d295dab825d0683054d336376349d14307d30251ed142f0660",
-      "commit": "b73bc87e85fc991a8a7b83b81acac7cf3958504d",
+      "commit": "b9a17759aa02eb04b624e5ae754007e236663828",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "73cfc7c271a25ab679e102a891318902497d2b66840edc5f15756bbbab9d5f77",
-      "commit": "b73bc87e85fc991a8a7b83b81acac7cf3958504d",
+      "commit": "b9a17759aa02eb04b624e5ae754007e236663828",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "4f4013d47f8cb141ac2acba5e3ddbbabfb70bba05f9ce763fda2348897550cd3",
-      "commit": "b73bc87e85fc991a8a7b83b81acac7cf3958504d",
+      "commit": "b9a17759aa02eb04b624e5ae754007e236663828",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -94,7 +94,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "c483a6e78a9e73dcdd00f63edf276fadd430d6eb8fd72333ddd249b9642c8f60",
-      "commit": "b73bc87e85fc991a8a7b83b81acac7cf3958504d",
+      "commit": "b9a17759aa02eb04b624e5ae754007e236663828",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -111,7 +111,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "95634305b68144623ae381eb5d8296e8827947fc7332a4795b35cf55888d425c",
-      "commit": "b73bc87e85fc991a8a7b83b81acac7cf3958504d",
+      "commit": "b9a17759aa02eb04b624e5ae754007e236663828",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -126,8 +126,8 @@
     },
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "f0d6b3670a9ff89b6a64e4119e0fa69fe0f9da231b60195df2445a2580bc3eb6",
-      "commit": "b73bc87e85fc991a8a7b83b81acac7cf3958504d",
+      "version": "1515c847ed204c8d48a35cc6aeae09cbd98e01ec5a75ef5beb514c074162b8c5",
+      "commit": "b9a17759aa02eb04b624e5ae754007e236663828",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -140,12 +140,34 @@
         "src/games/features/mm2/esp.lua",
         "src/games/features/mm2/coinfarm.lua",
         "src/games/features/mm2/playerteleport.lua",
+        "src/games/features/mm2/gundrop.lua",
         "src/games/features/mm2/frontend.lua",
         "src/games/updates/66654135.txt"
       ]
     }
   },
   "recentUpdates": [
+    {
+      "Version": "0a8318d",
+      "Date": "2026-09-11T16:25:16-03:00",
+      "Changes": [
+        "feat(mm2): add safe dropped gun controls"
+      ]
+    },
+    {
+      "Version": "fcbfd11",
+      "Date": "2026-09-11T16:24:59-03:00",
+      "Changes": [
+        "feat(mm2): add safe dropped gun pickup"
+      ]
+    },
+    {
+      "Version": "1e136e8",
+      "Date": "2026-09-11T16:24:35-03:00",
+      "Changes": [
+        "feat(mm2): add safe gun drop ESP and pickup"
+      ]
+    },
     {
       "Version": "b73bc87",
       "Date": "2026-09-11T16:24:06-03:00",
@@ -158,27 +180,6 @@
       "Date": "2026-09-11T16:23:33-03:00",
       "Changes": [
         "chore(tsb): note shared compact library migration"
-      ]
-    },
-    {
-      "Version": "333775b",
-      "Date": "2026-09-11T16:23:21-03:00",
-      "Changes": [
-        "chore(mm2): update release marker"
-      ]
-    },
-    {
-      "Version": "08966e6",
-      "Date": "2026-09-11T16:21:14-03:00",
-      "Changes": [
-        "refactor(tsb): move frontend onto shared compact library"
-      ]
-    },
-    {
-      "Version": "d25742c",
-      "Date": "2026-09-11T16:20:55-03:00",
-      "Changes": [
-        "refactor(mm2): move frontend onto shared compact library"
       ]
     }
   ]
