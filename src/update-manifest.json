@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-11T19:20:13.834876+00:00",
-  "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
+  "generatedAt": "2026-09-11T19:23:03.361020+00:00",
+  "commit": "8b4a1d283cacdbf1b39a91be4acdd9f95063a09d",
   "version": "0.0.8",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "4e37f30ba785c5d295dab825d0683054d336376349d14307d30251ed142f0660",
-      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
+      "commit": "8b4a1d283cacdbf1b39a91be4acdd9f95063a09d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "73cfc7c271a25ab679e102a891318902497d2b66840edc5f15756bbbab9d5f77",
-      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
+      "commit": "8b4a1d283cacdbf1b39a91be4acdd9f95063a09d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "4f4013d47f8cb141ac2acba5e3ddbbabfb70bba05f9ce763fda2348897550cd3",
-      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
+      "commit": "8b4a1d283cacdbf1b39a91be4acdd9f95063a09d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -93,13 +93,14 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "e46b8c6f982fa0e0144d1cb6a5e0b2a702713d840820d193fc67e023cd6e0641",
-      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
+      "version": "d2f099c4acf39f4e6ce656010d0cc74a3838827c58c6d74cea149666df3d9150",
+      "commit": "8b4a1d283cacdbf1b39a91be4acdd9f95063a09d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/ui-guard.lua",
         "src/core/updater.lua",
+        "library/compact.lua",
         "src/games/tsb.lua",
         "src/games/features/tsb/animations.lua",
         "src/games/features/tsb/autoblock.lua",
@@ -110,7 +111,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "95634305b68144623ae381eb5d8296e8827947fc7332a4795b35cf55888d425c",
-      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
+      "commit": "8b4a1d283cacdbf1b39a91be4acdd9f95063a09d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -125,19 +126,20 @@
     },
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "e4273b0c045e81f3300d34eb0f0a1fb437a9f60a118f35a283eee61d939617a3",
-      "commit": "d21d54457da5d6db8af48fcc4ca036a09fb81be8",
+      "version": "f225f958072b21753030a1cf39a64f4c759ed107dbd3e8dd63cd6afe6af994f4",
+      "commit": "8b4a1d283cacdbf1b39a91be4acdd9f95063a09d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/ui-guard.lua",
         "src/core/updater.lua",
+        "library/compact.lua",
         "src/games/mm2.lua",
         "src/games/features/mm2/roletracker.lua",
         "src/games/features/mm2/roundtracker.lua",
         "src/games/features/mm2/esp.lua",
         "src/games/features/mm2/coinfarm.lua",
-        "src/games/features/mm2/evade.lua",
+        "src/games/features/mm2/playerteleport.lua",
         "src/games/features/mm2/frontend.lua",
         "src/games/updates/66654135.txt"
       ]
@@ -145,38 +147,38 @@
   },
   "recentUpdates": [
     {
+      "Version": "08966e6",
+      "Date": "2026-09-11T16:21:14-03:00",
+      "Changes": [
+        "refactor(tsb): move frontend onto shared compact library"
+      ]
+    },
+    {
+      "Version": "d25742c",
+      "Date": "2026-09-11T16:20:55-03:00",
+      "Changes": [
+        "refactor(mm2): move frontend onto shared compact library"
+      ]
+    },
+    {
+      "Version": "9f2e433",
+      "Date": "2026-09-11T16:20:37-03:00",
+      "Changes": [
+        "refactor(mm2): remove evade and add player teleport"
+      ]
+    },
+    {
+      "Version": "65f872f",
+      "Date": "2026-09-11T16:20:18-03:00",
+      "Changes": [
+        "feat(mm2): add next alive player teleport"
+      ]
+    },
+    {
       "Version": "d21d544",
       "Date": "2026-09-11T16:20:03-03:00",
       "Changes": [
         "refactor(mm2): make coin farm fast and event driven"
-      ]
-    },
-    {
-      "Version": "80b914b",
-      "Date": "2026-09-11T16:19:40-03:00",
-      "Changes": [
-        "feat(mm2): expose alive round player tracking"
-      ]
-    },
-    {
-      "Version": "ee6c7f5",
-      "Date": "2026-09-11T15:59:19-03:00",
-      "Changes": [
-        "feat(mm2): route MM2 backend and frontend"
-      ]
-    },
-    {
-      "Version": "79d7837",
-      "Date": "2026-09-11T15:58:25-03:00",
-      "Changes": [
-        "feat(mm2): add release marker"
-      ]
-    },
-    {
-      "Version": "36392a8",
-      "Date": "2026-09-11T15:58:15-03:00",
-      "Changes": [
-        "chore: bump DepHub to 0.0.8"
       ]
     }
   ]
