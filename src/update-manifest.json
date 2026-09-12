@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-12T23:48:43.297563+00:00",
-  "commit": "a42d2ad40d23335a3c8eb4b5089cc699e8d00de1",
+  "generatedAt": "2026-09-12T23:54:49.142965+00:00",
+  "commit": "7300f6440bd35c57d02ce228528aa97926c6d1ea",
   "version": "0.0.9",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "e4672e3b12df8b8ab88c4fbaedd75f899c7bd1b6ae9e9ab7794f69ab8193a882",
-      "commit": "a42d2ad40d23335a3c8eb4b5089cc699e8d00de1",
+      "commit": "7300f6440bd35c57d02ce228528aa97926c6d1ea",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "236de444f64f047e3862dd2891bc03306894bec3ed41f701a5dde4fceb03966a",
-      "commit": "a42d2ad40d23335a3c8eb4b5089cc699e8d00de1",
+      "commit": "7300f6440bd35c57d02ce228528aa97926c6d1ea",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "9dd4f84745f071987d1a17ad9214731ff513ef432781a2637d01475ba068fb58",
-      "commit": "a42d2ad40d23335a3c8eb4b5089cc699e8d00de1",
+      "commit": "7300f6440bd35c57d02ce228528aa97926c6d1ea",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -93,8 +93,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "f168f3425464e11906591f8a15831ebc9c6dde6e8e38b176e4079727fdacd092",
-      "commit": "a42d2ad40d23335a3c8eb4b5089cc699e8d00de1",
+      "version": "6ab2a621cecef0115e6f120c414a9f651fc23a0be9ee669efcbc126f6bf3f9cb",
+      "commit": "7300f6440bd35c57d02ce228528aa97926c6d1ea",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,6 +104,7 @@
         "src/games/tsb.lua",
         "src/games/features/tsb/animations.lua",
         "src/games/features/tsb/autoblock.lua",
+        "src/games/features/tsb/autoblock-v2.lua",
         "src/games/features/tsb/frontend.lua",
         "src/games/updates/3808081382.txt"
       ]
@@ -111,7 +112,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "22d832fdfe3b5ba0f7993d50171d3b0bea867fcc6283fb4d9785e5d8d3d3ad9a",
-      "commit": "a42d2ad40d23335a3c8eb4b5089cc699e8d00de1",
+      "commit": "7300f6440bd35c57d02ce228528aa97926c6d1ea",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -127,7 +128,7 @@
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "40b58dd78e78a8233a0887864d63075004ce516bf9d8c43e3f1d9ff44324d731",
-      "commit": "a42d2ad40d23335a3c8eb4b5089cc699e8d00de1",
+      "commit": "7300f6440bd35c57d02ce228528aa97926c6d1ea",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,6 +149,20 @@
   },
   "recentUpdates": [
     {
+      "Version": "02139cf",
+      "Date": "2026-09-12T20:54:25-03:00",
+      "Changes": [
+        "feat(tsb): switch to attack-aware autoblock v2"
+      ]
+    },
+    {
+      "Version": "1ac8cfc",
+      "Date": "2026-09-12T20:53:58-03:00",
+      "Changes": [
+        "feat(tsb): add attack-aware autoblock runtime"
+      ]
+    },
+    {
       "Version": "0eb5639",
       "Date": "2026-09-12T10:54:39-03:00",
       "Changes": [
@@ -166,20 +181,6 @@
       "Date": "2026-09-12T10:53:53-03:00",
       "Changes": [
         "refactor(tsb): remove m1 catch and add precise camera-facing block"
-      ]
-    },
-    {
-      "Version": "6aba872",
-      "Date": "2026-09-11T16:26:57-03:00",
-      "Changes": [
-        "chore(mm2): document safe gun drop pickup"
-      ]
-    },
-    {
-      "Version": "969fc9f",
-      "Date": "2026-09-11T16:26:47-03:00",
-      "Changes": [
-        "chore: bump DepHub to 0.0.9"
       ]
     }
   ]
