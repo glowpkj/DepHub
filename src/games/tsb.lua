@@ -13,7 +13,7 @@ local LocalPlayer = Players.LocalPlayer
 local env = type(getgenv) == "function" and getgenv() or _G
 local STATE_KEY = "__DEPHUB_TSB"
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.6"
+local VERSION = "0.0.7"
 
 local previous = type(env[STATE_KEY]) == "table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy) == "function" then
@@ -132,7 +132,7 @@ local context = {
     ScanHz = State.Values.ScanHz
 }
 
-local okAutoBlock, AutoBlock = loadFeature("src/games/features/tsb/autoblock.lua", context)
+local okAutoBlock, AutoBlock = loadFeature("src/games/features/tsb/autoblock-v2.lua", context)
 if not okAutoBlock then
     return false
 end
