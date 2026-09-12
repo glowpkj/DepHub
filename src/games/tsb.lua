@@ -7,14 +7,13 @@ local pairs = pairs
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 local Workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 local env = type(getgenv) == "function" and getgenv() or _G
 local STATE_KEY = "__DEPHUB_TSB"
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.5"
+local VERSION = "0.0.6"
 
 local previous = type(env[STATE_KEY]) == "table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy) == "function" then
@@ -96,7 +95,7 @@ local State = {
     Toggles = {
         AutoBlock = false,
         M1AfterBlock = false,
-        M1Catch = false,
+        FaceAttacker = true,
         DashBlock = false,
         SkillBlock = false,
         ShowDetectionBox = false,
@@ -115,13 +114,12 @@ local State = {
 local context = {
     Players = Players,
     RunService = RunService,
-    VirtualInputManager = VirtualInputManager,
     Workspace = Workspace,
     LocalPlayer = LocalPlayer,
     AnimationData = AnimationData,
     M1Block = State.Toggles.AutoBlock,
     M1AfterBlock = State.Toggles.M1AfterBlock,
-    M1Catch = State.Toggles.M1Catch,
+    FaceAttacker = State.Toggles.FaceAttacker,
     DashBlock = State.Toggles.DashBlock,
     SkillBlock = State.Toggles.SkillBlock,
     ShowDetectionBox = State.Toggles.ShowDetectionBox,
@@ -224,8 +222,8 @@ function State:SetM1AfterBlock(value)
     return setToggle(self, "M1AfterBlock", "SetM1AfterBlock", value, false)
 end
 
-function State:SetM1Catch(value)
-    return setToggle(self, "M1Catch", "SetM1Catch", value, false)
+function State:SetFaceAttacker(value)
+    return setToggle(self, "FaceAttacker", "SetFaceAttacker", value, false)
 end
 
 function State:SetDashBlock(value)
