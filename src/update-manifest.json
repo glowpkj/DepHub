@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-12T13:54:02.924531+00:00",
-  "commit": "dad99cdc13414e1dd50d35bd5f6efa66ca79d223",
+  "generatedAt": "2026-09-12T13:54:27.236318+00:00",
+  "commit": "9575d71c72cd4d51464dba38f1adc8c83e21961b",
   "version": "0.0.9",
   "games": {
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "e4672e3b12df8b8ab88c4fbaedd75f899c7bd1b6ae9e9ab7794f69ab8193a882",
-      "commit": "dad99cdc13414e1dd50d35bd5f6efa66ca79d223",
+      "commit": "9575d71c72cd4d51464dba38f1adc8c83e21961b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -36,7 +36,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "236de444f64f047e3862dd2891bc03306894bec3ed41f701a5dde4fceb03966a",
-      "commit": "dad99cdc13414e1dd50d35bd5f6efa66ca79d223",
+      "commit": "9575d71c72cd4d51464dba38f1adc8c83e21961b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -65,7 +65,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "9dd4f84745f071987d1a17ad9214731ff513ef432781a2637d01475ba068fb58",
-      "commit": "dad99cdc13414e1dd50d35bd5f6efa66ca79d223",
+      "commit": "9575d71c72cd4d51464dba38f1adc8c83e21961b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -93,8 +93,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "0da8bd43ce58aa16253aba1c7ef62e37e408ef3ddf1a9e2823abc6f617416e9a",
-      "commit": "dad99cdc13414e1dd50d35bd5f6efa66ca79d223",
+      "version": "e5654ba3997bc7c00d8d8f169e3b846886aa94f114e0538bc7ad6182aa18a540",
+      "commit": "9575d71c72cd4d51464dba38f1adc8c83e21961b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -111,7 +111,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "22d832fdfe3b5ba0f7993d50171d3b0bea867fcc6283fb4d9785e5d8d3d3ad9a",
-      "commit": "dad99cdc13414e1dd50d35bd5f6efa66ca79d223",
+      "commit": "9575d71c72cd4d51464dba38f1adc8c83e21961b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -127,7 +127,7 @@
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "40b58dd78e78a8233a0887864d63075004ce516bf9d8c43e3f1d9ff44324d731",
-      "commit": "dad99cdc13414e1dd50d35bd5f6efa66ca79d223",
+      "commit": "9575d71c72cd4d51464dba38f1adc8c83e21961b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -147,6 +147,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "9575d71",
+      "Date": "2026-09-12T10:54:19-03:00",
+      "Changes": [
+        "refactor(tsb): remove m1 catch backend and add face attacker toggle"
+      ]
+    },
     {
       "Version": "dad99cd",
       "Date": "2026-09-12T10:53:53-03:00",
@@ -173,13 +180,6 @@
       "Date": "2026-09-11T16:26:35-03:00",
       "Changes": [
         "chore: bump loader to 0.0.9"
-      ]
-    },
-    {
-      "Version": "0a8318d",
-      "Date": "2026-09-11T16:25:16-03:00",
-      "Changes": [
-        "feat(mm2): add safe dropped gun controls"
       ]
     }
   ]
