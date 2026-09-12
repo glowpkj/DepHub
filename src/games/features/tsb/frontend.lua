@@ -38,8 +38,8 @@ end)
 UI:AddToggle("M1 After Block",Backend:GetToggle("M1AfterBlock"),function(v)
     return Backend:SetM1AfterBlock(v)
 end,autoSettings)
-UI:AddToggle("M1 Catch",Backend:GetToggle("M1Catch"),function(v)
-    return Backend:SetM1Catch(v)
+UI:AddToggle("Face Attacker",Backend:GetToggle("FaceAttacker"),function(v)
+    return Backend:SetFaceAttacker(v)
 end,autoSettings)
 UI:AddToggle("Show Hitbox",Backend:GetToggle("ShowDetectionBox"),function(v)
     return Backend:SetShowDetectionBox(v)
@@ -79,7 +79,7 @@ UI:AddButton("RESET COMBAT STATE",function()
     local ok=Backend:ResetCombatState()
     return ok and "RESET DONE" or "RESET FAILED"
 end,debugSettings)
-local Status=UI:AddStatus("LIVE STATUS",debugSettings,142)
+local Status=UI:AddStatus("LIVE STATUS",debugSettings,154)
 
 local alive=true
 local elapsed=0
@@ -96,6 +96,8 @@ statusConnection=RunService.Heartbeat:Connect(function(dt)
         "\ncharacter: "..tostring(info.Character).." | remote: "..tostring(info.Remote)..
         "\ntracked: "..tostring(info.TrackedPlayers or 0).." | block: "..tostring(info.BlockActive)..
         "\nsource: "..tostring(info.BlockSource or "none").." | total: "..tostring(info.Blocks or 0)..
+        "\ncamera: "..tostring(info.CameraLock or false).." | locks: "..tostring(info.CameraLocks or 0)..
+        "\ncounters: "..tostring(info.Counters or 0).." | pending: "..tostring(info.CounterPending or false)..
         "\nplayer: "..tostring(info.LastPlayer or "none").." | dist: "..string.format("%.1f",tonumber(info.LastDistance) or 0)..
         "\nid: "..tostring(info.LastAnimation or "none").." | err: "..tostring(info.LastError or "none")
     )
