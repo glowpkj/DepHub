@@ -1,1 +1,1 @@
-0.0.6 | Event-driven combat tracking, shared compact UI library, safer cleanup, tunable Scan Hz and responsive frontend
+0.0.7 | Attack-aware autoblock, held-M1 suppression, single counter M1, attacker camera lock and safer combat cleanup
