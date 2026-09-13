@@ -34,3 +34,17 @@ game:GetService("ReplicatedStorage").Remotes.Generator.SkillCheckResultEvent:Fir
 ```
 
 The meaning of the second argument (`1`) is not confirmed yet. The implementation attempts to read an index/stage value from the `Skillcheck-gen` object and falls back to `1` when none is exposed.
+
+## AutoParry research
+Only attacks that can actually be parried should be registered. Charge/hold animations and non-parryable abilities should not trigger AutoParry.
+
+### Veil
+- Killer name: `veil`
+- Parryable basic attack animation: `78935059863801` (`attack`)
+- Lunge hold `122812055447896` is preparation only and should not trigger AutoParry.
+- Spear attacks are intentionally excluded because they are not parryable.
+
+### Runtime observation awaiting killer confirmation
+- Basic attack observed by the local animation logger: `139369275981139` (`attack`)
+- Lunge hold observed: `110355011987939`
+- Keep this entry unassigned until the killer identity is confirmed.
