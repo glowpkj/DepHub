@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-26T21:16:44.932426+00:00",
-  "commit": "e733d2259427d8024441f06643c0a2316e63b454",
+  "generatedAt": "2026-09-26T21:16:57.072977+00:00",
+  "commit": "8c2e7e4961ab3818cd767a4e34895da3004a782e",
   "version": "0.0.16",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "6afaa7f9ab5d5442ef8eb2aef8d4d066368cd230be9794e89d338d90ec1a2908",
-      "commit": "e733d2259427d8024441f06643c0a2316e63b454",
+      "commit": "8c2e7e4961ab3818cd767a4e34895da3004a782e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "03c3584c42082ba2f07dc0b6755cccd5bd235eb586bd6cab42dbb63d9ee712b6",
-      "commit": "e733d2259427d8024441f06643c0a2316e63b454",
+      "commit": "8c2e7e4961ab3818cd767a4e34895da3004a782e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "36ea7f6b34de65cf5561ea5a1f3f178c755fe2dba5aad97fde324e100ebd9a74",
-      "commit": "e733d2259427d8024441f06643c0a2316e63b454",
+      "commit": "8c2e7e4961ab3818cd767a4e34895da3004a782e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "4b806de1192637516e3a00eb764da9ad748c461cc54bf561af33d6553e7ae11b",
-      "commit": "e733d2259427d8024441f06643c0a2316e63b454",
+      "commit": "8c2e7e4961ab3818cd767a4e34895da3004a782e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,7 +104,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "e7a2d7c9856788f882da1b7f7e45db5f3eefe02a1874c7329aceebce60d78817",
-      "commit": "e733d2259427d8024441f06643c0a2316e63b454",
+      "commit": "8c2e7e4961ab3818cd767a4e34895da3004a782e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "0c143a10ed372e58898196aeeb5761f1a5707d16a3d52434e42b4b4ce80f5930",
-      "commit": "e733d2259427d8024441f06643c0a2316e63b454",
+      "commit": "8c2e7e4961ab3818cd767a4e34895da3004a782e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "5985a82e8175f7bfae9e8ec52733e21f0e144e9d3e4cc27b7d1f7cff4538074d",
-      "commit": "e733d2259427d8024441f06643c0a2316e63b454",
+      "version": "5a0ff3b1d9d3276e5e33fb549e309349616698a01c3c2eb15fc23dbfb247e960",
+      "commit": "8c2e7e4961ab3818cd767a4e34895da3004a782e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -176,6 +176,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "8c2e7e4",
+      "Date": "2026-09-26T18:16:48-03:00",
+      "Changes": [
+        "Update Noob Piece combat and movement changelog"
+      ]
+    },
+    {
       "Version": "e733d22",
       "Date": "2026-09-26T18:16:37-03:00",
       "Changes": [
@@ -201,13 +208,6 @@
       "Date": "2026-09-26T18:15:08-03:00",
       "Changes": [
         "Simplify Noob Piece Auto Attack controls"
-      ]
-    },
-    {
-      "Version": "2fb96f4",
-      "Date": "2026-09-26T18:14:59-03:00",
-      "Changes": [
-        "Separate Auto Attack from farm weapon selection"
       ]
     }
   ]
