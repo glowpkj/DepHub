@@ -17,7 +17,7 @@ local AutoTeam=loadFeature("src/games/features/noobpiece/autoteam.lua")
 local WanderingGacha=loadFeature("src/games/features/noobpiece/wanderinggacha.lua")
 
 local backend={
-    Version="0.0.9",
+    Version="0.0.10",
     Toggles={
         ChestESP=false,
         AutoChest=false,
