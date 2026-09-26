@@ -158,9 +158,9 @@ function ChestESP:SetEnabled(enabled)
             elseif record.Gui and (not self:_spawned(model) or not record.Adornee or not record.Adornee.Parent) then
                 self:_refresh(model)
             elseif record.DistanceLabel and root and record.Adornee then
-                record.DistanceLabel.Text=string.format("<b>BAU</b>\\n<font color=\\\"#FFCD46\\\">%.2f STUDS</font>",(root.Position-record.Adornee.Position).Magnitude)
+                record.DistanceLabel.Text=string.format("<b>BAU</b>"..string.char(10).."<font color='#FFCD46'>%.2f STUDS</font>",(root.Position-record.Adornee.Position).Magnitude)
             elseif record.DistanceLabel then
-                record.DistanceLabel.Text="<b>BAU</b>\\n<font color=\\\"#FFCD46\\\">-- STUDS</font>"
+                record.DistanceLabel.Text="<b>BAU</b>"..string.char(10).."<font color='#FFCD46'>-- STUDS</font>"
             end
         end
     end))
