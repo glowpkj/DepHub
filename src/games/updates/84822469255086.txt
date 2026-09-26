@@ -1,1 +1,1 @@
-0.0.11 | Segmented travel pauses improve movement stability, enemy selection scans all island folders by NPC attributes including bosses, and the UI can refresh the enemy list
+0.0.12 | Long movement runs for up to 3 seconds per segment, pauses for 0.5 seconds, then continues toward the destination
