@@ -52,12 +52,30 @@ function Content.mount(window,backend)
         end
     })
 
-    window:CreateDropdown(autoFarm,{
+    local enemyDropdown=window:CreateDropdown(autoFarm,{
         Title="INIMIGO",
         Description="SELECIONA O TIPO DE MOB PELO NPC ID.",
         Values=backend:GetEnemyTypes(),
         Default=backend:GetValue("SelectedEnemy"),
         Callback=function(value) backend:SetSelectedEnemy(value) end
+    })
+
+    window:CreateButton(autoFarm,{
+        Title="ATUALIZAR INIMIGOS",
+        Description="RELE TODOS OS MOBS E BOSSES DAS ILHAS CARREGADAS.",
+        Callback=function()
+            local values=backend:GetEnemyTypes()
+            local selected=backend:GetValue("SelectedEnemy")
+
+            if not table.find(values,selected) then
+                selected=values[1]
+                if selected then
+                    backend:SetSelectedEnemy(selected)
+                end
+            end
+
+            enemyDropdown:SetValues(values,selected,true)
+        end
     })
 
     window:CreateDropdown(autoFarm,{
