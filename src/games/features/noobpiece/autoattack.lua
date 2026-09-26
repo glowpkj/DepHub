@@ -11,8 +11,9 @@ function AutoAttack.new()
         Remote=ReplicatedStorage:WaitForChild("Events"):WaitForChild("PlayerAttack"),
         Enabled=false,
         RangeCheck=true,
-        Interval=0.05,
+        Interval=0,
         FallbackRange=8,
+        WeaponCategory="Fists",
         Token=0,
         Enemies={},
         Connections={}
@@ -82,8 +83,31 @@ function AutoAttack:_character()
     return character,root
 end
 
+function AutoAttack:_weapon(character)
+    local equipped=character:FindFirstChildOfClass("Tool")
+
+    if equipped and equipped:GetAttribute("StatCategory")==self.WeaponCategory then
+        return equipped
+    end
+
+    local backpack=self.Player:FindFirstChildOfClass("Backpack")
+    if not backpack then return nil end
+
+    for _,tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool:GetAttribute("StatCategory")==self.WeaponCategory then
+            local humanoid=character:FindFirstChildOfClass("Humanoid")
+            if humanoid then
+                pcall(humanoid.EquipTool,humanoid,tool)
+            end
+            return tool
+        end
+    end
+
+    return nil
+end
+
 function AutoAttack:_range(character)
-    local tool=character:FindFirstChildOfClass("Tool")
+    local tool=self:_weapon(character)
     local range=tool and tool:GetAttribute("Range")
 
     if typeof(range)=="number" then
@@ -91,6 +115,26 @@ function AutoAttack:_range(character)
     end
 
     return self.FallbackRange
+end
+
+function AutoAttack:GetRange()
+    local character=self.Player.Character
+    if not character then return self.FallbackRange end
+    return self:_range(character)
+end
+
+function AutoAttack:_argument(tool)
+    local category=tool and tool:GetAttribute("StatCategory")
+
+    if category=="Fists" then
+        return "0"
+    end
+
+    if category=="Sword" then
+        return ""
+    end
+
+    return ""
 end
 
 function AutoAttack:_enemyInRange(root,range)
@@ -127,11 +171,20 @@ function AutoAttack:_run(token)
             end
 
             if canAttack then
-                self.Remote:FireServer(1)
+                local tool=self:_weapon(character)
+
+                if tool then
+                    pcall(tool.Activate,tool)
+                    self.Remote:FireServer(self:_argument(tool))
+                end
             end
         end
 
-        task.wait(self.Interval)
+        if self.Interval>0 then
+            task.wait(self.Interval)
+        else
+            task.wait()
+        end
     end
 end
 
@@ -152,6 +205,19 @@ end
 
 function AutoAttack:SetRangeCheck(enabled)
     self.RangeCheck=enabled==true
+end
+
+function AutoAttack:SetWeaponCategory(category)
+    if category~="Fists" and category~="Sword" then
+        return false
+    end
+
+    self.WeaponCategory=category
+    return true
+end
+
+function AutoAttack:GetWeaponCategory()
+    return self.WeaponCategory
 end
 
 function AutoAttack:Destroy()
