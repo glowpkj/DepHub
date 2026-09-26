@@ -54,12 +54,24 @@ end
 
 function backend:SetAutoChest(enabled)
     enabled=enabled==true
+
+    if enabled and self.Toggles.AutoFarm then
+        self.Toggles.AutoFarm=false
+        self.AutoFarm:SetEnabled(false)
+    end
+
     self.Toggles.AutoChest=enabled
     self.AutoChest:SetEnabled(enabled)
 end
 
 function backend:SetAutoFarm(enabled)
     enabled=enabled==true
+
+    if enabled and self.Toggles.AutoChest then
+        self.Toggles.AutoChest=false
+        self.AutoChest:SetEnabled(false)
+    end
+
     self.Toggles.AutoFarm=enabled
     self.AutoFarm:SetEnabled(enabled)
 end
