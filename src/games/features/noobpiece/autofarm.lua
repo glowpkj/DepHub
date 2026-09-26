@@ -167,10 +167,10 @@ function AutoFarm:_run(token)
         end
 
         local range=self:_range()
-        local goal,desired=self:_goal(root,enemyRoot,range)
-        local distance=(root.Position-enemyRoot.Position).Magnitude
+        local goal=self:_goal(root,enemyRoot,range)
+        local goalDistance=(root.Position-goal.Position).Magnitude
 
-        if math.abs(distance-desired)>self.Tolerance then
+        if goalDistance>self.Tolerance then
             self.Movement:FlyTo(goal)
         else
             self:_face(root,enemyRoot)
