@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-26T19:04:08.929994+00:00",
-  "commit": "98468100a798daf6745c95913be53d1e1eb667ba",
-  "version": "0.0.12",
+  "generatedAt": "2026-09-26T19:07:45.697234+00:00",
+  "commit": "307ffa475d12028da9861dbcf8016bb93008c4db",
+  "version": "0.0.13",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "cd082af0f5865be51032d1e6711c480a5ad5b50b4c55dfe24f10c448897001b0",
-      "commit": "98468100a798daf6745c95913be53d1e1eb667ba",
+      "version": "d50d524e4ae67ccb770cfce5eaadf39e9ba9a3e84c97fb2486d8dfd5586d60d0",
+      "commit": "307ffa475d12028da9861dbcf8016bb93008c4db",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "caeee5eba39222e67875b035554c2512a4748974ec4eef1160582dddc99a76f6",
-      "commit": "98468100a798daf6745c95913be53d1e1eb667ba",
+      "version": "7bebc325405508b2fbb671eda1823710173d3c0b2e3d0068dc1c7d61d6a3bffa",
+      "commit": "307ffa475d12028da9861dbcf8016bb93008c4db",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -56,8 +56,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "a34861243bb6755cd93b5caa9c93ff7bc372734a3d00192904b4349113656334",
-      "commit": "98468100a798daf6745c95913be53d1e1eb667ba",
+      "version": "7377fc55ae7321686a78a431c6ef8b41456f884651dd28f4ceff52be6bca1735",
+      "commit": "307ffa475d12028da9861dbcf8016bb93008c4db",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -74,8 +74,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "47d1bfa0b33f84f8916b4316a40b0ea9d19f573725fc311a64800a20a4bac8b9",
-      "commit": "98468100a798daf6745c95913be53d1e1eb667ba",
+      "version": "1318ed66d285f36faa1e376c8717bbd54e91c5238028f8b63cda51c80386a380",
+      "commit": "307ffa475d12028da9861dbcf8016bb93008c4db",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -103,8 +103,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "4356a39199c5ecf37127e1ee56059b1e872981938855bee0a870d435498649b3",
-      "commit": "98468100a798daf6745c95913be53d1e1eb667ba",
+      "version": "846a71764d26120a064d66cd5137a2d8e33e338cab4613ab06187f80b4e74a16",
+      "commit": "307ffa475d12028da9861dbcf8016bb93008c4db",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -132,8 +132,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "7a29aa2a1ddb975aeee3020d572391025156daa917ed3bbcad11a2a8338d48c1",
-      "commit": "98468100a798daf6745c95913be53d1e1eb667ba",
+      "version": "b4ebe7d44c9c7679f538f921d8eb95c3b1fd9e8d245f14eb1e8ebfcc8c6b0f4a",
+      "commit": "307ffa475d12028da9861dbcf8016bb93008c4db",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "8c9d2bec2a8cd0acec9179aa572fd5060bde413abe5e9f8cd24f9b673ecabb85",
-      "commit": "98468100a798daf6745c95913be53d1e1eb667ba",
+      "version": "03773e34ba76997512500d7eda57be46f36b1a7e29448f8757fc78ae01dc41b8",
+      "commit": "307ffa475d12028da9861dbcf8016bb93008c4db",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -172,38 +172,38 @@
   },
   "recentUpdates": [
     {
+      "Version": "307ffa4",
+      "Date": "2026-09-26T16:07:38-03:00",
+      "Changes": [
+        "Update Noob Piece chest ESP marker"
+      ]
+    },
+    {
+      "Version": "207a6ea",
+      "Date": "2026-09-26T16:07:35-03:00",
+      "Changes": [
+        "Bump DepHub to 0.0.13"
+      ]
+    },
+    {
+      "Version": "d823e10",
+      "Date": "2026-09-26T16:07:33-03:00",
+      "Changes": [
+        "Bump DepHub loader to 0.0.13"
+      ]
+    },
+    {
+      "Version": "e2febc8",
+      "Date": "2026-09-26T16:07:28-03:00",
+      "Changes": [
+        "Simplify Noob Piece chest ESP label"
+      ]
+    },
+    {
       "Version": "9846810",
       "Date": "2026-09-26T16:04:00-03:00",
       "Changes": [
         "Update Noob Piece auto chest marker"
-      ]
-    },
-    {
-      "Version": "cf24bf2",
-      "Date": "2026-09-26T16:03:56-03:00",
-      "Changes": [
-        "Bump DepHub to 0.0.12"
-      ]
-    },
-    {
-      "Version": "aa7e164",
-      "Date": "2026-09-26T16:03:54-03:00",
-      "Changes": [
-        "Bump DepHub loader to 0.0.12"
-      ]
-    },
-    {
-      "Version": "0d9c9b4",
-      "Date": "2026-09-26T16:03:48-03:00",
-      "Changes": [
-        "Add Noob Piece auto chest controls"
-      ]
-    },
-    {
-      "Version": "891c366",
-      "Date": "2026-09-26T16:03:46-03:00",
-      "Changes": [
-        "Add Noob Piece auto chest backend"
       ]
     }
   ]
