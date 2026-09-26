@@ -5,7 +5,7 @@ function Content.mount(window,backend)
     local section=window:CreateSection(page,"BAUS")
     window:CreateToggle(section,{
         Title="ESP DE BAU",
-        Description="MOSTRA TODOS OS BAUS DO MAPA E A DISTANCIA.",
+        Description="MOSTRA APENAS BAUS SPAWNADOS, COM PREVIEW E DISTANCIA.",
         Default=backend:GetToggle("ChestESP"),
         Callback=function(enabled) backend:SetChestESP(enabled) end
     })
