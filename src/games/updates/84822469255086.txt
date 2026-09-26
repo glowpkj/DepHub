@@ -1,1 +1,1 @@
-0.0.4 | Simplified chest ESP label with chest name and precise distance only
+0.0.5 | Shared tween movement at speed 45, Auto Chest now uses it, and standalone Auto Attack with optional range check
