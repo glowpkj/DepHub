@@ -54,7 +54,7 @@ function Movement:_toCFrame(target)
     return nil
 end
 
-function Movement:_isClear(cframe,character)
+function Movement:_isRootClear(cframe,character)
     local params=OverlapParams.new()
     params.FilterType=Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances={character}
@@ -63,7 +63,7 @@ function Movement:_isClear(cframe,character)
         Workspace.GetPartBoundsInBox,
         Workspace,
         cframe,
-        Vector3.new(2.5,3.5,2.5),
+        Vector3.new(1.8,2,1.8),
         params
     )
 
@@ -78,32 +78,6 @@ function Movement:_isClear(cframe,character)
     end
 
     return true
-end
-
-function Movement:_clearLanding(cframe,character)
-    local right=cframe.RightVector
-    local forward=cframe.LookVector
-    local offsets={
-        Vector3.zero,
-        Vector3.new(0,1.5,0),
-        Vector3.new(0,3,0),
-        Vector3.new(0,5,0),
-        right*2,
-        -right*2,
-        forward*2,
-        -forward*2,
-        right*3+Vector3.new(0,2,0),
-        -right*3+Vector3.new(0,2,0)
-    }
-
-    for _,offset in ipairs(offsets) do
-        local candidate=cframe+offset
-        if self:_isClear(candidate,character) then
-            return candidate
-        end
-    end
-
-    return nil
 end
 
 function Movement:_noclip(character)
@@ -130,7 +104,6 @@ function Movement:_applyTravelState(humanoid,root)
     humanoid.JumpPower=0
     humanoid.JumpHeight=0
     humanoid.AutoRotate=false
-
     self:_noclip(root.Parent)
 end
 
@@ -180,11 +153,8 @@ function Movement:Stop()
     if heartbeat then pcall(heartbeat.Disconnect,heartbeat) end
 
     if root and root.Parent then
-        if not self:_isClear(root.CFrame,root.Parent) then
-            local safe=self:_clearLanding(root.CFrame,root.Parent) or lastClear
-            if safe then
-                root.CFrame=safe
-            end
+        if not self:_isRootClear(root.CFrame,root.Parent) and lastClear then
+            root.CFrame=lastClear
         end
 
         root.AssemblyLinearVelocity=Vector3.zero
@@ -221,13 +191,8 @@ function Movement:FlyTo(target,speed)
 
     self:Stop()
     local token=self.MoveToken
-
-    goal=self:_clearLanding(goal,root.Parent)
-    if not goal then
-        return false,"no clear landing"
-    end
-
     local distance=(root.Position-goal.Position).Magnitude
+
     if distance<=0.05 then
         return true
     end
@@ -237,7 +202,7 @@ function Movement:FlyTo(target,speed)
     self.ActiveRoot=root
     self:_applyTravelState(humanoid,root)
 
-    if self:_isClear(root.CFrame,root.Parent) then
+    if self:_isRootClear(root.CFrame,root.Parent) then
         self.LastClearCFrame=root.CFrame
     end
 
@@ -250,6 +215,7 @@ function Movement:FlyTo(target,speed)
 
     self.SteppedConnection=RunService.Stepped:Connect(function()
         if token~=self.MoveToken or not root.Parent then return end
+
         self:_noclip(root.Parent)
         humanoid.WalkSpeed=0
         humanoid.JumpPower=0
@@ -258,6 +224,7 @@ function Movement:FlyTo(target,speed)
     end)
 
     local lastClearCheck=0
+
     self.HeartbeatConnection=RunService.Heartbeat:Connect(function()
         if token~=self.MoveToken then return end
 
@@ -269,9 +236,11 @@ function Movement:FlyTo(target,speed)
         root.AssemblyLinearVelocity=Vector3.zero
         root.AssemblyAngularVelocity=Vector3.zero
 
-        if os.clock()-lastClearCheck>=0.12 then
-            lastClearCheck=os.clock()
-            if self:_isClear(root.CFrame,root.Parent) then
+        local now=os.clock()
+        if now-lastClearCheck>=0.15 then
+            lastClearCheck=now
+
+            if self:_isRootClear(root.CFrame,root.Parent) then
                 self.LastClearCFrame=root.CFrame
             end
         end
