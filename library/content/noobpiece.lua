@@ -60,6 +60,23 @@ function Content.mount(window,backend)
         Callback=function(value) backend:SetWeaponCategory(value) end
     })
 
+    local team=window:CreateSection(farmPage,"TIME")
+
+    window:CreateDropdown(team,{
+        Title="TIME",
+        Description="ESCOLHE O TIME USADO PELO AUTO TEAM.",
+        Values=backend:GetTeams(),
+        Default=backend:GetValue("SelectedTeam"),
+        Callback=function(value) backend:SetSelectedTeam(value) end
+    })
+
+    window:CreateToggle(team,{
+        Title="AUTO TEAM",
+        Description="ENTRA AUTOMATICAMENTE NO TIME SELECIONADO.",
+        Default=backend:GetToggle("AutoTeam"),
+        Callback=function(enabled) backend:SetAutoTeam(enabled) end
+    })
+
     local combat=window:CreateSection(farmPage,"COMBATE")
 
     window:CreateToggle(combat,{
