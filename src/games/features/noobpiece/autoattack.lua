@@ -10,6 +10,7 @@ function AutoAttack.new()
         Player=Players.LocalPlayer,
         Remote=ReplicatedStorage:WaitForChild("Events"):WaitForChild("PlayerAttack"),
         Enabled=false,
+        FarmEnabled=false,
         RangeCheck=true,
         Interval=0,
         FallbackRange=8,
@@ -160,7 +161,7 @@ function AutoAttack:_enemyInRange(root,range)
 end
 
 function AutoAttack:_run(token)
-    while self.Enabled and token==self.Token do
+    while (self.Enabled or self.FarmEnabled) and token==self.Token do
         local character,root=self:_character()
 
         if character and root then
@@ -188,19 +189,29 @@ function AutoAttack:_run(token)
     end
 end
 
-function AutoAttack:SetEnabled(enabled)
-    enabled=enabled==true
-    if self.Enabled==enabled then return end
-
-    self.Enabled=enabled
+function AutoAttack:_refresh()
     self.Token+=1
 
-    if enabled then
+    if self.Enabled or self.FarmEnabled then
         local token=self.Token
         task.spawn(function()
             self:_run(token)
         end)
     end
+end
+
+function AutoAttack:SetEnabled(enabled)
+    enabled=enabled==true
+    if self.Enabled==enabled then return end
+    self.Enabled=enabled
+    self:_refresh()
+end
+
+function AutoAttack:SetFarmEnabled(enabled)
+    enabled=enabled==true
+    if self.FarmEnabled==enabled then return end
+    self.FarmEnabled=enabled
+    self:_refresh()
 end
 
 function AutoAttack:SetRangeCheck(enabled)
@@ -221,7 +232,9 @@ function AutoAttack:GetWeaponCategory()
 end
 
 function AutoAttack:Destroy()
-    self:SetEnabled(false)
+    self.Enabled=false
+    self.FarmEnabled=false
+    self:_refresh()
 
     for _,connection in ipairs(self.Connections) do
         pcall(connection.Disconnect,connection)
