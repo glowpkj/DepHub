@@ -5,27 +5,27 @@ local AutoAttack={}
 AutoAttack.__index=AutoAttack
 
 function AutoAttack.new()
-    local self=setmetatable({
+    return setmetatable({
         Player=Players.LocalPlayer,
         Remote=ReplicatedStorage:WaitForChild("Events"):WaitForChild("PlayerAttack"),
         Enabled=false,
         FarmEnabled=false,
+        FarmReady=false,
+        Interval=0.05,
+        ActivateInterval=0.1,
         Token=0
     },AutoAttack)
-
-    return self
 end
 
 function AutoAttack:_character()
     local character=self.Player.Character
     local humanoid=character and character:FindFirstChildOfClass("Humanoid")
-    local root=character and character:FindFirstChild("HumanoidRootPart")
 
-    if not character or not humanoid or humanoid.Health<=0 or not root then
+    if not character or not humanoid or humanoid.Health<=0 then
         return nil
     end
 
-    return character,root
+    return character
 end
 
 function AutoAttack:_argument(tool)
@@ -36,18 +36,26 @@ function AutoAttack:_argument(tool)
 end
 
 function AutoAttack:_run(token)
-    while (self.Enabled or self.FarmEnabled) and token==self.Token do
-        local character=self:_character()
+    local lastActivate=0
 
-        if character then
-            local tool=character:FindFirstChildOfClass("Tool")
+    while (self.Enabled or self.FarmEnabled) and token==self.Token do
+        if self.Enabled or self.FarmReady then
+            local character=self:_character()
+            local tool=character and character:FindFirstChildOfClass("Tool")
+
             if tool then
-                pcall(tool.Activate,tool)
-                self.Remote:FireServer(self:_argument(tool))
+                local now=os.clock()
+
+                if now-lastActivate>=self.ActivateInterval then
+                    lastActivate=now
+                    pcall(tool.Activate,tool)
+                end
+
+                pcall(self.Remote.FireServer,self.Remote,self:_argument(tool))
             end
         end
 
-        task.wait()
+        task.wait(self.Interval)
     end
 end
 
@@ -65,6 +73,7 @@ end
 function AutoAttack:SetEnabled(enabled)
     enabled=enabled==true
     if self.Enabled==enabled then return end
+
     self.Enabled=enabled
     self:_refresh()
 end
@@ -72,15 +81,25 @@ end
 function AutoAttack:SetFarmEnabled(enabled)
     enabled=enabled==true
     if self.FarmEnabled==enabled then return end
+
     self.FarmEnabled=enabled
+
+    if not enabled then
+        self.FarmReady=false
+    end
+
     self:_refresh()
+end
+
+function AutoAttack:SetFarmReady(ready)
+    self.FarmReady=self.FarmEnabled and ready==true
 end
 
 function AutoAttack:Destroy()
     self.Enabled=false
     self.FarmEnabled=false
+    self.FarmReady=false
     self:_refresh()
-
 end
 
 return AutoAttack
