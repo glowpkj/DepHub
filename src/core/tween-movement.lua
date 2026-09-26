@@ -1,8 +1,7 @@
 local Players=game:GetService("Players")
 local TweenService=game:GetService("TweenService")
 local RunService=game:GetService("RunService")
-
-local LocalPlayer=Players.LocalPlayer
+local Workspace=game:GetService("Workspace")
 
 local Movement={}
 Movement.__index=Movement
@@ -11,15 +10,18 @@ function Movement.new(config)
     config=config or {}
 
     return setmetatable({
+        Player=Players.LocalPlayer,
         Speed=tonumber(config.Speed) or 45,
         MinDuration=tonumber(config.MinDuration) or 0.05,
         UsePhysics=config.UsePhysics~=false,
         Tween=nil,
-        VelocityConnection=nil,
+        SteppedConnection=nil,
+        HeartbeatConnection=nil,
         ActiveHumanoid=nil,
         ActiveRoot=nil,
         CollisionState={},
         ControlState=nil,
+        LastClearCFrame=nil,
         Moving=false,
         MoveToken=0,
         Destroyed=false
@@ -27,7 +29,7 @@ function Movement.new(config)
 end
 
 function Movement:_character()
-    local character=LocalPlayer and LocalPlayer.Character
+    local character=self.Player and self.Player.Character
     local humanoid=character and character:FindFirstChildOfClass("Humanoid")
     local root=character and character:FindFirstChild("HumanoidRootPart")
 
@@ -39,35 +41,84 @@ function Movement:_character()
 end
 
 function Movement:_toCFrame(target)
-    local targetType=typeof(target)
+    local kind=typeof(target)
 
-    if targetType=="CFrame" then
+    if kind=="CFrame" then
         return target
-    end
-
-    if targetType=="Vector3" then
+    elseif kind=="Vector3" then
         return CFrame.new(target)
-    end
-
-    if targetType=="Instance" and target:IsA("BasePart") then
+    elseif kind=="Instance" and target:IsA("BasePart") then
         return target.CFrame
     end
 
     return nil
 end
 
-function Movement:_applyTravelState(humanoid,root)
-    local character=root and root.Parent
-    if not character then return end
+function Movement:_isClear(cframe,character)
+    local params=OverlapParams.new()
+    params.FilterType=Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances={character}
 
-    self.CollisionState={}
-    for _,object in ipairs(character:GetDescendants()) do
-        if object:IsA("BasePart") then
-            self.CollisionState[object]=object.CanCollide
-            object.CanCollide=false
+    local ok,parts=pcall(
+        Workspace.GetPartBoundsInBox,
+        Workspace,
+        cframe,
+        Vector3.new(2.5,3.5,2.5),
+        params
+    )
+
+    if not ok then
+        return true
+    end
+
+    for _,part in ipairs(parts) do
+        if part:IsA("BasePart") and part.CanCollide then
+            return false
         end
     end
 
+    return true
+end
+
+function Movement:_clearLanding(cframe,character)
+    local right=cframe.RightVector
+    local forward=cframe.LookVector
+    local offsets={
+        Vector3.zero,
+        Vector3.new(0,1.5,0),
+        Vector3.new(0,3,0),
+        Vector3.new(0,5,0),
+        right*2,
+        -right*2,
+        forward*2,
+        -forward*2,
+        right*3+Vector3.new(0,2,0),
+        -right*3+Vector3.new(0,2,0)
+    }
+
+    for _,offset in ipairs(offsets) do
+        local candidate=cframe+offset
+        if self:_isClear(candidate,character) then
+            return candidate
+        end
+    end
+
+    return nil
+end
+
+function Movement:_noclip(character)
+    for _,part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if self.CollisionState[part]==nil then
+                self.CollisionState[part]=part.CanCollide
+            end
+            part.CanCollide=false
+        end
+    end
+end
+
+function Movement:_applyTravelState(humanoid,root)
+    self.CollisionState={}
     self.ControlState={
         WalkSpeed=humanoid.WalkSpeed,
         JumpPower=humanoid.JumpPower,
@@ -79,6 +130,8 @@ function Movement:_applyTravelState(humanoid,root)
     humanoid.JumpPower=0
     humanoid.JumpHeight=0
     humanoid.AutoRotate=false
+
+    self:_noclip(root.Parent)
 end
 
 function Movement:_restoreTravelState(humanoid)
@@ -98,12 +151,8 @@ function Movement:_restoreTravelState(humanoid)
         humanoid.JumpHeight=state.JumpHeight
         humanoid.AutoRotate=state.AutoRotate
     end
-end
 
-function Movement:_restoreHumanoid(humanoid)
-    if not humanoid or not humanoid.Parent or humanoid.Health<=0 then return end
-
-    if self.UsePhysics and humanoid:GetState()==Enum.HumanoidStateType.Physics then
+    if humanoid and humanoid.Parent and humanoid.Health>0 and self.UsePhysics and humanoid:GetState()==Enum.HumanoidStateType.Physics then
         pcall(humanoid.ChangeState,humanoid,Enum.HumanoidStateType.GettingUp)
     end
 end
@@ -112,24 +161,36 @@ function Movement:Stop()
     self.MoveToken+=1
 
     local tween=self.Tween
-    local connection=self.VelocityConnection
+    local stepped=self.SteppedConnection
+    local heartbeat=self.HeartbeatConnection
     local humanoid=self.ActiveHumanoid
+    local root=self.ActiveRoot
+    local lastClear=self.LastClearCFrame
 
     self.Tween=nil
-    self.VelocityConnection=nil
+    self.SteppedConnection=nil
+    self.HeartbeatConnection=nil
     self.ActiveHumanoid=nil
     self.ActiveRoot=nil
+    self.LastClearCFrame=nil
     self.Moving=false
 
-    if tween then
-        pcall(tween.Cancel,tween)
+    if tween then pcall(tween.Cancel,tween) end
+    if stepped then pcall(stepped.Disconnect,stepped) end
+    if heartbeat then pcall(heartbeat.Disconnect,heartbeat) end
+
+    if root and root.Parent then
+        if not self:_isClear(root.CFrame,root.Parent) then
+            local safe=self:_clearLanding(root.CFrame,root.Parent) or lastClear
+            if safe then
+                root.CFrame=safe
+            end
+        end
+
+        root.AssemblyLinearVelocity=Vector3.zero
+        root.AssemblyAngularVelocity=Vector3.zero
     end
 
-    if connection then
-        pcall(connection.Disconnect,connection)
-    end
-
-    self:_restoreHumanoid(humanoid)
     self:_restoreTravelState(humanoid)
     return true
 end
@@ -143,8 +204,8 @@ function Movement:FlyTo(target,speed)
         return false,"destroyed"
     end
 
-    local targetCFrame=self:_toCFrame(target)
-    if not targetCFrame then
+    local goal=self:_toCFrame(target)
+    if not goal then
         return false,"invalid target"
     end
 
@@ -161,17 +222,24 @@ function Movement:FlyTo(target,speed)
     self:Stop()
     local token=self.MoveToken
 
-    local distance=(root.Position-targetCFrame.Position).Magnitude
+    goal=self:_clearLanding(goal,root.Parent)
+    if not goal then
+        return false,"no clear landing"
+    end
+
+    local distance=(root.Position-goal.Position).Magnitude
     if distance<=0.05 then
         return true
     end
-
-    local duration=math.max(distance/moveSpeed,self.MinDuration)
 
     self.Moving=true
     self.ActiveHumanoid=humanoid
     self.ActiveRoot=root
     self:_applyTravelState(humanoid,root)
+
+    if self:_isClear(root.CFrame,root.Parent) then
+        self.LastClearCFrame=root.CFrame
+    end
 
     root.AssemblyLinearVelocity=Vector3.zero
     root.AssemblyAngularVelocity=Vector3.zero
@@ -180,60 +248,58 @@ function Movement:FlyTo(target,speed)
         pcall(humanoid.ChangeState,humanoid,Enum.HumanoidStateType.Physics)
     end
 
-    local connection
-    connection=RunService.Stepped:Connect(function()
-        if self.MoveToken~=token or not root.Parent then return end
-
-        local character=root.Parent
-
-        for _,object in ipairs(character:GetDescendants()) do
-            if object:IsA("BasePart") then
-                if self.CollisionState[object]==nil then
-                    self.CollisionState[object]=object.CanCollide
-                end
-                object.CanCollide=false
-            end
-        end
-
+    self.SteppedConnection=RunService.Stepped:Connect(function()
+        if token~=self.MoveToken or not root.Parent then return end
+        self:_noclip(root.Parent)
         humanoid.WalkSpeed=0
         humanoid.JumpPower=0
         humanoid.JumpHeight=0
         humanoid.AutoRotate=false
-        root.AssemblyLinearVelocity=Vector3.zero
-        root.AssemblyAngularVelocity=Vector3.zero
     end)
 
-    self.VelocityConnection=connection
+    local lastClearCheck=0
+    self.HeartbeatConnection=RunService.Heartbeat:Connect(function()
+        if token~=self.MoveToken then return end
 
-    local tween=TweenService:Create(
-        root,
-        TweenInfo.new(duration,Enum.EasingStyle.Linear),
-        {CFrame=targetCFrame}
-    )
+        if not root.Parent or humanoid.Health<=0 then
+            self:Stop()
+            return
+        end
+
+        root.AssemblyLinearVelocity=Vector3.zero
+        root.AssemblyAngularVelocity=Vector3.zero
+
+        if os.clock()-lastClearCheck>=0.12 then
+            lastClearCheck=os.clock()
+            if self:_isClear(root.CFrame,root.Parent) then
+                self.LastClearCFrame=root.CFrame
+            end
+        end
+    end)
+
+    local ok,tween=pcall(function()
+        return TweenService:Create(
+            root,
+            TweenInfo.new(math.max(distance/moveSpeed,self.MinDuration),Enum.EasingStyle.Linear),
+            {CFrame=goal}
+        )
+    end)
+
+    if not ok then
+        self:Stop()
+        return false,tostring(tween)
+    end
 
     self.Tween=tween
     tween:Play()
 
     local playbackState=tween.Completed:Wait()
 
-    if self.MoveToken~=token then
+    if token~=self.MoveToken then
         return false,"cancelled"
     end
 
-    if self.VelocityConnection==connection then
-        pcall(connection.Disconnect,connection)
-        self.VelocityConnection=nil
-    end
-
-    if self.Tween==tween then
-        self.Tween=nil
-    end
-
-    self.ActiveHumanoid=nil
-    self.ActiveRoot=nil
-    self.Moving=false
-    self:_restoreHumanoid(humanoid)
-    self:_restoreTravelState(humanoid)
+    self:Stop()
 
     if playbackState==Enum.PlaybackState.Completed then
         return true
