@@ -17,7 +17,7 @@ local AutoTeam=loadFeature("src/games/features/noobpiece/autoteam.lua")
 local WanderingGacha=loadFeature("src/games/features/noobpiece/wanderinggacha.lua")
 
 local backend={
-    Version="0.0.10",
+    Version="0.0.11",
     Toggles={
         ChestESP=false,
         AutoChest=false,
@@ -37,6 +37,8 @@ local backend={
 backend.Movement=Movement.new({
     Speed=45,
     MinDuration=0.05,
+    MaxSegmentDuration=1.1,
+    SegmentPause=0.08,
     UsePhysics=true
 })
 
