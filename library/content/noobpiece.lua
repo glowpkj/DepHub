@@ -41,8 +41,8 @@ function Content.mount(window,backend)
     local autoFarm=window:CreateSection(farmPage,"AUTO FARM")
 
     autoFarmToggle=window:CreateToggle(autoFarm,{
-        Title="AUTO FARM NOOB",
-        Description="VAI ATE O NOOB E FICA NA BORDA DO RANGE DA ARMA.",
+        Title="AUTO FARM MOBS",
+        Description="VAI ATE O MOB SELECIONADO E FICA ATRAS DELE NA BORDA DO RANGE.",
         Default=backend:GetToggle("AutoFarm"),
         Callback=function(enabled)
             backend:SetAutoFarm(enabled)
@@ -53,11 +53,27 @@ function Content.mount(window,backend)
     })
 
     window:CreateDropdown(autoFarm,{
+        Title="INIMIGO",
+        Description="SELECIONA O TIPO DE MOB PELO NPC ID.",
+        Values=backend:GetEnemyTypes(),
+        Default=backend:GetValue("SelectedEnemy"),
+        Callback=function(value) backend:SetSelectedEnemy(value) end
+    })
+
+    window:CreateDropdown(autoFarm,{
         Title="ARMA",
         Description="ESCOLHE ENTRE ESTILO DE LUTA E ESPADA.",
         Values={"Fists","Sword"},
         Default=backend:GetValue("WeaponCategory"),
         Callback=function(value) backend:SetWeaponCategory(value) end
+    })
+
+    local utility=window:CreateSection(farmPage,"NPCS")
+
+    window:CreateButton(utility,{
+        Title="WANDERING GACHA",
+        Description="TELEPORTA ATE O NPC DE GIRAR FRUTA SE ELE ESTIVER NO MAPA.",
+        Callback=function() backend:TeleportWanderingGacha() end
     })
 
     local team=window:CreateSection(farmPage,"TIME")
