@@ -81,17 +81,11 @@ function Content.mount(window,backend)
 
     window:CreateToggle(combat,{
         Title="AUTO ATTACK",
-        Description="ATACA AUTOMATICAMENTE COM A TOOL E O REMOTE.",
+        Description="ATACA SEMPRE COM A TOOL EQUIPADA E O REMOTE.",
         Default=backend:GetToggle("AutoAttack"),
         Callback=function(enabled) backend:SetAutoAttack(enabled) end
     })
 
-    window:CreateToggle(combat,{
-        Title="CHECK RANGE",
-        Description="SO ATACA QUANDO EXISTE UM INIMIGO DENTRO DO RANGE DA TOOL.",
-        Default=backend:GetToggle("AutoAttackRange"),
-        Callback=function(enabled) backend:SetAutoAttackRange(enabled) end
-    })
 
     window:OpenPage("ESP")
 end
