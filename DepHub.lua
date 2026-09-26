@@ -11,7 +11,7 @@ local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.11"
+local VERSION = "0.0.12"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -56,6 +56,7 @@ local function cleanupRuntime()
             "TSB",
             "ViolenceDistrict",
             "MM2",
+            "NoobPiece",
             "Universal",
             "Runtime",
             "Window"
