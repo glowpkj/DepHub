@@ -129,8 +129,8 @@ function Movement:Stop()
         pcall(connection.Disconnect,connection)
     end
 
-    self:_restoreTravelState(humanoid)
     self:_restoreHumanoid(humanoid)
+    self:_restoreTravelState(humanoid)
     return true
 end
 
@@ -181,8 +181,24 @@ function Movement:FlyTo(target,speed)
     end
 
     local connection
-    connection=RunService.Heartbeat:Connect(function()
+    connection=RunService.Stepped:Connect(function()
         if self.MoveToken~=token or not root.Parent then return end
+
+        local character=root.Parent
+
+        for _,object in ipairs(character:GetDescendants()) do
+            if object:IsA("BasePart") then
+                if self.CollisionState[object]==nil then
+                    self.CollisionState[object]=object.CanCollide
+                end
+                object.CanCollide=false
+            end
+        end
+
+        humanoid.WalkSpeed=0
+        humanoid.JumpPower=0
+        humanoid.JumpHeight=0
+        humanoid.AutoRotate=false
         root.AssemblyLinearVelocity=Vector3.zero
         root.AssemblyAngularVelocity=Vector3.zero
     end)
@@ -216,8 +232,8 @@ function Movement:FlyTo(target,speed)
     self.ActiveHumanoid=nil
     self.ActiveRoot=nil
     self.Moving=false
-    self:_restoreTravelState(humanoid)
     self:_restoreHumanoid(humanoid)
+    self:_restoreTravelState(humanoid)
 
     if playbackState==Enum.PlaybackState.Completed then
         return true
