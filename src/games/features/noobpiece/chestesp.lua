@@ -43,46 +43,6 @@ function ChestESP:_clearVisual(record)
     record.DistanceLabel=nil
 end
 
-function ChestESP:_buildPreview(viewport,model)
-    local camera=Instance.new("Camera")
-    camera.FieldOfView=35
-    camera.Parent=viewport
-    viewport.CurrentCamera=camera
-
-    local world=Instance.new("WorldModel")
-    world.Parent=viewport
-
-    local oldArchivable=model.Archivable
-    model.Archivable=true
-    local ok,clone=pcall(function() return model:Clone() end)
-    model.Archivable=oldArchivable
-    if not ok or not clone then return end
-
-    for _,descendant in ipairs(clone:GetDescendants()) do
-        if descendant:IsA("LuaSourceContainer") or descendant:IsA("BillboardGui") or descendant:IsA("Highlight") then
-            descendant:Destroy()
-        elseif descendant:IsA("BasePart") then
-            descendant.Anchored=true
-            descendant.CanCollide=false
-            descendant.CanTouch=false
-            descendant.CanQuery=false
-        end
-    end
-
-    clone.Parent=world
-    pcall(function() clone:PivotTo(CFrame.new()) end)
-    local okBounds,boundsCF,boundsSize=pcall(function()
-        local cf,size=clone:GetBoundingBox()
-        return cf,size
-    end)
-    if not okBounds then return end
-
-    local radius=math.max(boundsSize.X,boundsSize.Y,boundsSize.Z)
-    local cameraDistance=math.max(3,radius*2.15)
-    local center=boundsCF.Position
-    camera.CFrame=CFrame.lookAt(center+Vector3.new(cameraDistance*0.72,cameraDistance*0.42,cameraDistance),center)
-end
-
 function ChestESP:_createVisual(model,record)
     if record.Gui or not self.Enabled or not self:_spawned(model) then return end
     local adornee=self:_adornee(model)
@@ -102,88 +62,29 @@ function ChestESP:_createVisual(model,record)
     gui.Name="DepHubChestLabel"
     gui.Adornee=adornee
     gui.AlwaysOnTop=true
-    gui.Size=UDim2.fromOffset(270,78)
-    gui.StudsOffset=Vector3.new(0,3.5,0)
+    gui.Size=UDim2.fromOffset(150,42)
+    gui.StudsOffset=Vector3.new(0,3,0)
     gui.MaxDistance=5000
     gui.LightInfluence=0
     gui.Parent=adornee
 
-    local card=Instance.new("Frame")
-    card.Name="Card"
-    card.Size=UDim2.fromScale(1,1)
-    card.BackgroundColor3=Color3.fromRGB(17,18,22)
-    card.BackgroundTransparency=0.08
-    card.BorderSizePixel=0
-    card.Parent=gui
-    local corner=Instance.new("UICorner")
-    corner.CornerRadius=UDim.new(0,10)
-    corner.Parent=card
-    local stroke=Instance.new("UIStroke")
-    stroke.Color=Color3.fromRGB(255,205,70)
-    stroke.Transparency=0.25
-    stroke.Thickness=1
-    stroke.Parent=card
-
-    local preview=Instance.new("ViewportFrame")
-    preview.Name="ChestPreview"
-    preview.Size=UDim2.fromOffset(64,64)
-    preview.Position=UDim2.fromOffset(7,7)
-    preview.BackgroundColor3=Color3.fromRGB(27,28,34)
-    preview.BorderSizePixel=0
-    preview.Ambient=Color3.fromRGB(210,210,210)
-    preview.LightColor=Color3.new(1,1,1)
-    preview.LightDirection=Vector3.new(-1,-1,-1)
-    preview.Parent=card
-    local previewCorner=Instance.new("UICorner")
-    previewCorner.CornerRadius=UDim.new(0,8)
-    previewCorner.Parent=preview
-    local previewStroke=Instance.new("UIStroke")
-    previewStroke.Color=Color3.fromRGB(255,205,70)
-    previewStroke.Transparency=0.6
-    previewStroke.Thickness=1
-    previewStroke.Parent=preview
-    self:_buildPreview(preview,model)
-
-    local name=Instance.new("TextLabel")
-    name.Name="ChestName"
-    name.BackgroundTransparency=1
-    name.Position=UDim2.fromOffset(82,8)
-    name.Size=UDim2.new(1,-90,0,21)
-    name.Font=Enum.Font.GothamBold
-    name.Text="BAU"
-    name.TextColor3=Color3.new(1,1,1)
-    name.TextSize=15
-    name.TextXAlignment=Enum.TextXAlignment.Left
-    name.Parent=card
-
-    local description=Instance.new("TextLabel")
-    description.Name="Description"
-    description.BackgroundTransparency=1
-    description.Position=UDim2.fromOffset(82,30)
-    description.Size=UDim2.new(1,-90,0,18)
-    description.Font=Enum.Font.GothamMedium
-    description.Text="BAU DISPONIVEL"
-    description.TextColor3=Color3.fromRGB(210,210,215)
-    description.TextSize=11
-    description.TextXAlignment=Enum.TextXAlignment.Left
-    description.Parent=card
-
-    local distance=Instance.new("TextLabel")
-    distance.Name="Distance"
-    distance.BackgroundTransparency=1
-    distance.Position=UDim2.fromOffset(82,51)
-    distance.Size=UDim2.new(1,-90,0,18)
-    distance.Font=Enum.Font.GothamBold
-    distance.Text="DISTANCIA: --"
-    distance.TextColor3=Color3.fromRGB(255,205,70)
-    distance.TextSize=11
-    distance.TextXAlignment=Enum.TextXAlignment.Left
-    distance.Parent=card
+    local label=Instance.new("TextLabel")
+    label.Name="Label"
+    label.BackgroundTransparency=1
+    label.Size=UDim2.fromScale(1,1)
+    label.Font=Enum.Font.GothamBold
+    label.RichText=true
+    label.TextColor3=Color3.new(1,1,1)
+    label.TextStrokeColor3=Color3.new(0,0,0)
+    label.TextStrokeTransparency=0.25
+    label.TextSize=13
+    label.Text="<b>BAU</b>\n<font color=\"#FFCD46\">-- STUDS</font>"
+    label.Parent=gui
 
     record.Highlight=highlight
     record.Gui=gui
     record.Adornee=adornee
-    record.DistanceLabel=distance
+    record.DistanceLabel=label
 end
 
 function ChestESP:_refresh(model)
@@ -257,9 +158,9 @@ function ChestESP:SetEnabled(enabled)
             elseif record.Gui and (not self:_spawned(model) or not record.Adornee or not record.Adornee.Parent) then
                 self:_refresh(model)
             elseif record.DistanceLabel and root and record.Adornee then
-                record.DistanceLabel.Text=string.format("DISTANCIA: %d STUDS",math.floor((root.Position-record.Adornee.Position).Magnitude+0.5))
+                record.DistanceLabel.Text=string.format("<b>BAU</b>\\n<font color=\\\"#FFCD46\\\">%.2f STUDS</font>",(root.Position-record.Adornee.Position).Magnitude)
             elseif record.DistanceLabel then
-                record.DistanceLabel.Text="DISTANCIA: --"
+                record.DistanceLabel.Text="<b>BAU</b>\\n<font color=\\\"#FFCD46\\\">-- STUDS</font>"
             end
         end
     end))
