@@ -59,7 +59,7 @@ function AutoFarm:_range()
     local tool=self:_weapon()
     local range=tool and tool:GetAttribute("Range")
 
-    if typeof(range)=="number" then
+    if typeof(range)=="number" and range>0 then
         return range
     end
 
@@ -184,8 +184,8 @@ function AutoFarm:_face(root,enemyRoot)
 end
 
 function AutoFarm:_goal(enemyRoot,range)
-    local desired=math.max(0.5,range-self.RangeMargin)
-    local position=enemyRoot.Position+enemyRoot.CFrame.LookVector*desired
+    local desired=math.max(1,range-self.RangeMargin)
+    local position=enemyRoot.Position-enemyRoot.CFrame.LookVector*desired
     position=Vector3.new(position.X,enemyRoot.Position.Y,position.Z)
 
     return CFrame.lookAt(
@@ -196,12 +196,14 @@ end
 
 function AutoFarm:_run(token)
     self.AutoAttack:SetFarmEnabled(true)
+    self.AutoAttack:SetFarmReady(false)
 
     while self.Enabled and token==self.Token do
         local root=self:_character()
 
         if not root then
             self.Target=nil
+            self.AutoAttack:SetFarmReady(false)
             task.wait(0.25)
             continue
         end
@@ -213,7 +215,8 @@ function AutoFarm:_run(token)
         local target=self.Target
 
         if not target then
-            task.wait(0.15)
+            self.AutoAttack:SetFarmReady(false)
+            task.wait(0.4)
             continue
         end
 
@@ -221,23 +224,29 @@ function AutoFarm:_run(token)
 
         if not enemyRoot then
             self.Target=nil
+            self.AutoAttack:SetFarmReady(false)
+            task.wait(0.1)
             continue
         end
 
         local range=self:_range()
-        local goal=self:_goal(enemyRoot,range)
+        local goal,desired=self:_goal(enemyRoot,range)
         local goalDistance=(root.Position-goal.Position).Magnitude
+        local targetDistance=(root.Position-enemyRoot.Position).Magnitude
 
-        if goalDistance>self.Tolerance then
+        if goalDistance>self.Tolerance or targetDistance>range then
+            self.AutoAttack:SetFarmReady(false)
             self.Movement:FlyTo(goal)
         else
             self:_face(root,enemyRoot)
-            task.wait(0.03)
+            self.AutoAttack:SetFarmReady(targetDistance<=range and targetDistance>=math.max(0.5,desired-1.5))
+            task.wait(0.05)
         end
     end
 
     if token==self.Token then
         self.Target=nil
+        self.AutoAttack:SetFarmReady(false)
         self.AutoAttack:SetFarmEnabled(false)
     end
 end
@@ -256,6 +265,7 @@ function AutoFarm:SetEnabled(enabled)
         end)
     else
         self.Target=nil
+        self.AutoAttack:SetFarmReady(false)
         self.AutoAttack:SetFarmEnabled(false)
 
         if self.Movement then
