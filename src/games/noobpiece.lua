@@ -14,20 +14,23 @@ local AutoChest=loadFeature("src/games/features/noobpiece/autochest.lua")
 local AutoAttack=loadFeature("src/games/features/noobpiece/autoattack.lua")
 local AutoFarm=loadFeature("src/games/features/noobpiece/autofarm.lua")
 local AutoTeam=loadFeature("src/games/features/noobpiece/autoteam.lua")
+local WanderingGacha=loadFeature("src/games/features/noobpiece/wanderinggacha.lua")
 
 local backend={
-    Version="0.0.8",
+    Version="0.0.9",
     Toggles={
         ChestESP=false,
         AutoChest=false,
         AutoAttack=false,
         AutoFarm=false,
-        AutoTeam=false
+        AutoTeam=false,
+        AutoFarmMobs=false
     },
     Values={
         AutoChestDelay=0.35,
         WeaponCategory="Fists",
-        SelectedTeam="Noob"
+        SelectedTeam="Noob",
+        SelectedEnemy="Noob"
     }
 }
 
@@ -43,10 +46,12 @@ backend.AutoChest=AutoChest.new(backend.Movement)
 backend.AutoAttack=AutoAttack.new()
 backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack)
 backend.AutoTeam=AutoTeam.new()
+backend.WanderingGacha=WanderingGacha.new(backend.Movement)
 
 backend.AutoChest:SetDelay(backend.Values.AutoChestDelay)
 backend.AutoFarm:SetWeaponCategory(backend.Values.WeaponCategory)
 backend.AutoTeam:SetSelected(backend.Values.SelectedTeam)
+backend.AutoFarm:SetSelectedEnemy(backend.Values.SelectedEnemy)
 backend.IslandTracker:Start()
 
 function backend:SetChestESP(enabled)
@@ -77,6 +82,22 @@ function backend:SetAutoFarm(enabled)
 
     self.Toggles.AutoFarm=enabled
     self.AutoFarm:SetEnabled(enabled)
+end
+
+function backend:SetSelectedEnemy(name)
+    if self.AutoFarm:SetSelectedEnemy(name) then
+        self.Values.SelectedEnemy=name
+        return true
+    end
+    return false
+end
+
+function backend:GetEnemyTypes()
+    return self.AutoFarm:GetEnemyTypes()
+end
+
+function backend:TeleportWanderingGacha()
+    return self.WanderingGacha:Teleport()
 end
 
 function backend:SetWeaponCategory(category)
@@ -130,6 +151,7 @@ function backend:GetKnownIslands()
 end
 
 function backend:Destroy()
+    self.WanderingGacha:Destroy()
     self.AutoTeam:Destroy()
     self.AutoFarm:Destroy()
     self.AutoChest:Destroy()
