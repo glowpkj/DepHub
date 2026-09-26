@@ -73,7 +73,8 @@ local function cleanupRuntime()
     env.__DEPHUB_VD = nil
     env.__DEPHUB_VD_FRONTEND = nil
     env.__DEPHUB_MM2 = nil
-    env.__DEPHUB_MM2_FRONTEND = nil\n    env.__DEPHUB_NOOBPIECE = nil
+    env.__DEPHUB_MM2_FRONTEND = nil
+    env.__DEPHUB_NOOBPIECE = nil
     env.__DEPHUB_UI_GUARD = nil
 end
 
@@ -204,7 +205,8 @@ local targets = {
     ["93978595733734"] = {Core = "src/games/violencedistrict.lua", Frontend = "src/games/features/violencedistrict/frontend.lua", ViolenceDistrict = true},
     ["6739698191"] = {Core = "src/games/violencedistrict.lua", Frontend = "src/games/features/violencedistrict/frontend.lua", ViolenceDistrict = true},
     ["142823291"] = {Core = "src/games/mm2.lua", Frontend = "src/games/features/mm2/frontend.lua", MM2 = true},
-    ["66654135"] = {Core = "src/games/mm2.lua", Frontend = "src/games/features/mm2/frontend.lua", MM2 = true},\n    ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true}
+    ["66654135"] = {Core = "src/games/mm2.lua", Frontend = "src/games/features/mm2/frontend.lua", MM2 = true},
+    ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true}
 }
 
 local target = targets[placeId] or targets[gameId] or {Core = "src/games/universal.lua", Universal = true}
@@ -216,7 +218,8 @@ if not okCore then return fail(coreResult) end
 local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
 local isVD = target.ViolenceDistrict == true
-local isMM2 = target.MM2 == true\nlocal isNoobPiece = target.NoobPiece == true
+local isMM2 = target.MM2 == true
+local isNoobPiece = target.NoobPiece == true
 
 if isRT3 then
     if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
@@ -228,7 +231,8 @@ env.__DEPHUB.Universal = target.Universal and coreResult or nil
 env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and not isMM2 and not isNoobPiece and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
 env.__DEPHUB.ViolenceDistrict = isVD and coreResult or nil
-env.__DEPHUB.MM2 = isMM2 and coreResult or nil\nenv.__DEPHUB.NoobPiece = isNoobPiece and coreResult or nil
+env.__DEPHUB.MM2 = isMM2 and coreResult or nil
+env.__DEPHUB.NoobPiece = isNoobPiece and coreResult or nil
 
 local mode
 local backend
@@ -236,7 +240,8 @@ if target.Universal then mode = "Universal" backend = coreResult
 elseif isRT3 then mode = "RT3" backend = env.__DEPHUB.Runtime
 elseif isTSB then mode = "TSB" backend = coreResult
 elseif isVD then mode = "ViolenceDistrict" backend = coreResult
-elseif isMM2 then mode = "MM2" backend = coreResult\nelseif isNoobPiece then mode = "NoobPiece" backend = coreResult
+elseif isMM2 then mode = "MM2" backend = coreResult
+elseif isNoobPiece then mode = "NoobPiece" backend = coreResult
 else mode = "BloxFruits" backend = coreResult end
 
 if isTSB then
