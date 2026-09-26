@@ -7,20 +7,38 @@ local function loadFeature(path)
     return chunk()
 end
 
+local Movement=loadFeature("src/core/tween-movement.lua")
 local ChestESP=loadFeature("src/games/features/noobpiece/chestesp.lua")
 local IslandTracker=loadFeature("src/games/features/noobpiece/islandtracker.lua")
 local AutoChest=loadFeature("src/games/features/noobpiece/autochest.lua")
+local AutoAttack=loadFeature("src/games/features/noobpiece/autoattack.lua")
 
 local backend={
-    Version="0.0.3",
-    Toggles={ChestESP=false,AutoChest=false},
-    Values={AutoChestDelay=0.35}
+    Version="0.0.5",
+    Toggles={
+        ChestESP=false,
+        AutoChest=false,
+        AutoAttack=false,
+        AutoAttackRange=true
+    },
+    Values={
+        AutoChestDelay=0.35
+    }
 }
+
+backend.Movement=Movement.new({
+    Speed=45,
+    MinDuration=0.05,
+    UsePhysics=true
+})
 
 backend.ChestESP=ChestESP.new()
 backend.IslandTracker=IslandTracker.new()
-backend.AutoChest=AutoChest.new()
+backend.AutoChest=AutoChest.new(backend.Movement)
+backend.AutoAttack=AutoAttack.new()
+
 backend.AutoChest:SetDelay(backend.Values.AutoChestDelay)
+backend.AutoAttack:SetRangeCheck(backend.Toggles.AutoAttackRange)
 backend.IslandTracker:Start()
 
 function backend:SetChestESP(enabled)
@@ -41,6 +59,18 @@ function backend:SetAutoChestDelay(value)
     self.AutoChest:SetDelay(value)
 end
 
+function backend:SetAutoAttack(enabled)
+    enabled=enabled==true
+    self.Toggles.AutoAttack=enabled
+    self.AutoAttack:SetEnabled(enabled)
+end
+
+function backend:SetAutoAttackRange(enabled)
+    enabled=enabled==true
+    self.Toggles.AutoAttackRange=enabled
+    self.AutoAttack:SetRangeCheck(enabled)
+end
+
 function backend:GetToggle(name)
     return self.Toggles[name]
 end
@@ -55,6 +85,8 @@ end
 
 function backend:Destroy()
     self.AutoChest:Destroy()
+    self.AutoAttack:Destroy()
+    self.Movement:Destroy()
     self.ChestESP:Destroy()
     self.IslandTracker:Destroy()
 end
