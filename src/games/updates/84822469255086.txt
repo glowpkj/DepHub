@@ -1,1 +1,1 @@
-0.0.10 | Fixed Auto Farm freeze risk by gating attacks until in range, throttling remote/tool activation, correcting behind-target positioning, and removing unstable tween landing adjustment loops
+0.0.11 | Segmented travel pauses improve movement stability, enemy selection scans all island folders by NPC attributes including bosses, and the UI can refresh the enemy list
