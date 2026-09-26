@@ -25,7 +25,7 @@ local Common=loadModule("library/content/common.lua")
 local contents={
     Universal="library/content/universal.lua",
     BloxFruits="library/content/bloxfruits.lua",
-    RT3="library/content/rt3.lua"
+    RT3="library/content/rt3.lua",\n    NoobPiece="library/content/noobpiece.lua"
 }
 
 local Library={Theme=Theme,Version="1.0.0"}
