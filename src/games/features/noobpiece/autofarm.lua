@@ -13,7 +13,9 @@ function AutoFarm.new(movement,autoAttack)
         Token=0,
         Target=nil,
         RangeMargin=1,
-        Tolerance=0.75
+        Tolerance=0.75,
+        FallbackRange=8,
+        WeaponCategory="Fists"
     },AutoFarm)
 end
 
@@ -27,6 +29,53 @@ function AutoFarm:_character()
     end
 
     return root
+end
+
+function AutoFarm:_weapon()
+    local character=self.Player.Character
+    local humanoid=character and character:FindFirstChildOfClass("Humanoid")
+    if not character or not humanoid then return nil end
+
+    local equipped=character:FindFirstChildOfClass("Tool")
+    if equipped and equipped:GetAttribute("StatCategory")==self.WeaponCategory then
+        return equipped
+    end
+
+    local backpack=self.Player:FindFirstChildOfClass("Backpack")
+    if not backpack then return nil end
+
+    for _,tool in ipairs(backpack:GetChildren()) do
+        if tool:IsA("Tool") and tool:GetAttribute("StatCategory")==self.WeaponCategory then
+            pcall(humanoid.EquipTool,humanoid,tool)
+            return tool
+        end
+    end
+
+    return nil
+end
+
+function AutoFarm:_range()
+    local tool=self:_weapon()
+    local range=tool and tool:GetAttribute("Range")
+
+    if typeof(range)=="number" then
+        return range
+    end
+
+    return self.FallbackRange
+end
+
+function AutoFarm:SetWeaponCategory(category)
+    if category~="Fists" and category~="Sword" then
+        return false
+    end
+
+    self.WeaponCategory=category
+    return true
+end
+
+function AutoFarm:GetWeaponCategory()
+    return self.WeaponCategory
 end
 
 function AutoFarm:_folder()
@@ -77,16 +126,8 @@ function AutoFarm:_face(root,enemyRoot)
 end
 
 function AutoFarm:_goal(root,enemyRoot,range)
-    local offset=root.Position-enemyRoot.Position
-
-    if offset.Magnitude<0.05 then
-        offset=-enemyRoot.CFrame.LookVector
-    else
-        offset=offset.Unit
-    end
-
     local desired=math.max(0.5,range-self.RangeMargin)
-    local position=enemyRoot.Position+offset*desired
+    local position=enemyRoot.Position-enemyRoot.CFrame.LookVector*desired
     position=Vector3.new(position.X,enemyRoot.Position.Y,position.Z)
 
     return CFrame.lookAt(
@@ -125,7 +166,7 @@ function AutoFarm:_run(token)
             continue
         end
 
-        local range=self.AutoAttack:GetRange()
+        local range=self:_range()
         local goal,desired=self:_goal(root,enemyRoot,range)
         local distance=(root.Position-enemyRoot.Position).Magnitude
 
