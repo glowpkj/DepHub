@@ -1,1 +1,1 @@
-0.0.7 | Auto Farm Noob at weapon range edge, shared tween collision/control lock, weapon-aware Auto Attack with auto-equip, and selectable Auto Team
+0.0.8 | Auto Attack now continuously attacks with any equipped weapon, Auto Farm owns weapon selection and stays behind targets at range edge, and tween noclip is enforced throughout travel
