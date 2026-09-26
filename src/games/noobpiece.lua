@@ -8,8 +8,12 @@ local function loadFeature(path)
 end
 
 local ChestESP=loadFeature("src/games/features/noobpiece/chestesp.lua")
-local backend={Version="0.0.1",Toggles={ChestESP=false}}
+local IslandTracker=loadFeature("src/games/features/noobpiece/islandtracker.lua")
+
+local backend={Version="0.0.2",Toggles={ChestESP=false}}
 backend.ChestESP=ChestESP.new()
+backend.IslandTracker=IslandTracker.new()
+backend.IslandTracker:Start()
 
 function backend:SetChestESP(enabled)
     enabled=enabled==true
@@ -21,8 +25,13 @@ function backend:GetToggle(name)
     return self.Toggles[name]
 end
 
+function backend:GetKnownIslands()
+    return self.IslandTracker:GetKnownIslands()
+end
+
 function backend:Destroy()
     self.ChestESP:Destroy()
+    self.IslandTracker:Destroy()
 end
 
 env.__DEPHUB_NOOBPIECE=backend
