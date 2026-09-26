@@ -18,6 +18,8 @@ function Movement.new(config)
         VelocityConnection=nil,
         ActiveHumanoid=nil,
         ActiveRoot=nil,
+        CollisionState={},
+        ControlState=nil,
         Moving=false,
         MoveToken=0,
         Destroyed=false
@@ -54,6 +56,50 @@ function Movement:_toCFrame(target)
     return nil
 end
 
+function Movement:_applyTravelState(humanoid,root)
+    local character=root and root.Parent
+    if not character then return end
+
+    self.CollisionState={}
+    for _,object in ipairs(character:GetDescendants()) do
+        if object:IsA("BasePart") then
+            self.CollisionState[object]=object.CanCollide
+            object.CanCollide=false
+        end
+    end
+
+    self.ControlState={
+        WalkSpeed=humanoid.WalkSpeed,
+        JumpPower=humanoid.JumpPower,
+        JumpHeight=humanoid.JumpHeight,
+        AutoRotate=humanoid.AutoRotate
+    }
+
+    humanoid.WalkSpeed=0
+    humanoid.JumpPower=0
+    humanoid.JumpHeight=0
+    humanoid.AutoRotate=false
+end
+
+function Movement:_restoreTravelState(humanoid)
+    for part,canCollide in pairs(self.CollisionState) do
+        if part and part.Parent then
+            part.CanCollide=canCollide
+        end
+    end
+    table.clear(self.CollisionState)
+
+    local state=self.ControlState
+    self.ControlState=nil
+
+    if humanoid and humanoid.Parent and state then
+        humanoid.WalkSpeed=state.WalkSpeed
+        humanoid.JumpPower=state.JumpPower
+        humanoid.JumpHeight=state.JumpHeight
+        humanoid.AutoRotate=state.AutoRotate
+    end
+end
+
 function Movement:_restoreHumanoid(humanoid)
     if not humanoid or not humanoid.Parent or humanoid.Health<=0 then return end
 
@@ -83,6 +129,7 @@ function Movement:Stop()
         pcall(connection.Disconnect,connection)
     end
 
+    self:_restoreTravelState(humanoid)
     self:_restoreHumanoid(humanoid)
     return true
 end
@@ -124,6 +171,7 @@ function Movement:FlyTo(target,speed)
     self.Moving=true
     self.ActiveHumanoid=humanoid
     self.ActiveRoot=root
+    self:_applyTravelState(humanoid,root)
 
     root.AssemblyLinearVelocity=Vector3.zero
     root.AssemblyAngularVelocity=Vector3.zero
@@ -168,6 +216,7 @@ function Movement:FlyTo(target,speed)
     self.ActiveHumanoid=nil
     self.ActiveRoot=nil
     self.Moving=false
+    self:_restoreTravelState(humanoid)
     self:_restoreHumanoid(humanoid)
 
     if playbackState==Enum.PlaybackState.Completed then
