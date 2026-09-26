@@ -1,13 +1,34 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-26T18:33:07.101734+00:00",
-  "commit": "65ffcb7b4489ddb4b750acc2980ce61a5ca49d9e",
-  "version": "0.0.9",
+  "generatedAt": "2026-09-26T18:39:03.813868+00:00",
+  "commit": "7328fa50bd66edd1ae348f2c73c25bf1a9f83f66",
+  "version": "0.0.10",
   "games": {
+    "66654135": {
+      "name": "Murder Mystery 2",
+      "version": "97c7ac4d5507b95868634d3081ea6076301a04fc0b0c70fb943db94fdedea8cd",
+      "commit": "7328fa50bd66edd1ae348f2c73c25bf1a9f83f66",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/ui-guard.lua",
+        "src/core/updater.lua",
+        "library/compact.lua",
+        "src/games/mm2.lua",
+        "src/games/features/mm2/roletracker.lua",
+        "src/games/features/mm2/roundtracker.lua",
+        "src/games/features/mm2/esp.lua",
+        "src/games/features/mm2/coinfarm.lua",
+        "src/games/features/mm2/playerteleport.lua",
+        "src/games/features/mm2/gundrop.lua",
+        "src/games/features/mm2/frontend.lua",
+        "src/games/updates/66654135.txt"
+      ]
+    },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "e4672e3b12df8b8ab88c4fbaedd75f899c7bd1b6ae9e9ab7794f69ab8193a882",
-      "commit": "65ffcb7b4489ddb4b750acc2980ce61a5ca49d9e",
+      "version": "a4b89a5878a7af14a0fb5f0f84784bcdce2b29d14f884576e61129623dbf1411",
+      "commit": "7328fa50bd66edd1ae348f2c73c25bf1a9f83f66",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -33,10 +54,28 @@
         "library/content/bloxfruits.lua"
       ]
     },
+    "3808081382": {
+      "name": "The Strongest Battlegrounds",
+      "version": "fe5ca64a272a075d92971438b2265c6863d588a096b7495028fe26d54d65f75e",
+      "commit": "7328fa50bd66edd1ae348f2c73c25bf1a9f83f66",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/ui-guard.lua",
+        "src/core/updater.lua",
+        "library/compact.lua",
+        "src/games/tsb.lua",
+        "src/games/features/tsb/animations.lua",
+        "src/games/features/tsb/autoblock.lua",
+        "src/games/features/tsb/autoblock-v2.lua",
+        "src/games/features/tsb/frontend.lua",
+        "src/games/updates/3808081382.txt"
+      ]
+    },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "236de444f64f047e3862dd2891bc03306894bec3ed41f701a5dde4fceb03966a",
-      "commit": "65ffcb7b4489ddb4b750acc2980ce61a5ca49d9e",
+      "version": "184e48ee5d3f9f3b01f9e5455bd6ec5dde33fd24d0ff8bf1eef9cf88090370d2",
+      "commit": "7328fa50bd66edd1ae348f2c73c25bf1a9f83f66",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -64,8 +103,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "9dd4f84745f071987d1a17ad9214731ff513ef432781a2637d01475ba068fb58",
-      "commit": "65ffcb7b4489ddb4b750acc2980ce61a5ca49d9e",
+      "version": "cfab28e2681d89a229fbe7563e4cebdb9278cc8955990b423e88ad6bde4cf2cd",
+      "commit": "7328fa50bd66edd1ae348f2c73c25bf1a9f83f66",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,28 +130,10 @@
         "library/content/bloxfruits.lua"
       ]
     },
-    "3808081382": {
-      "name": "The Strongest Battlegrounds",
-      "version": "079940740a6ae766db55d49cc99feb0cbd903d04b7c94863c4b74ad722c6c4ee",
-      "commit": "65ffcb7b4489ddb4b750acc2980ce61a5ca49d9e",
-      "files": [
-        "DepHub.lua",
-        "src/version.txt",
-        "src/core/ui-guard.lua",
-        "src/core/updater.lua",
-        "library/compact.lua",
-        "src/games/tsb.lua",
-        "src/games/features/tsb/animations.lua",
-        "src/games/features/tsb/autoblock.lua",
-        "src/games/features/tsb/autoblock-v2.lua",
-        "src/games/features/tsb/frontend.lua",
-        "src/games/updates/3808081382.txt"
-      ]
-    },
     "6739698191": {
       "name": "Violence District",
-      "version": "22d832fdfe3b5ba0f7993d50171d3b0bea867fcc6283fb4d9785e5d8d3d3ad9a",
-      "commit": "65ffcb7b4489ddb4b750acc2980ce61a5ca49d9e",
+      "version": "e14cf5018469297a27ba9a329b91bff4c6a4c34f6dca49ffe198cd31837bff69",
+      "commit": "7328fa50bd66edd1ae348f2c73c25bf1a9f83f66",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -125,62 +146,62 @@
         "src/games/updates/6739698191.txt"
       ]
     },
-    "66654135": {
-      "name": "Murder Mystery 2",
-      "version": "40b58dd78e78a8233a0887864d63075004ce516bf9d8c43e3f1d9ff44324d731",
-      "commit": "65ffcb7b4489ddb4b750acc2980ce61a5ca49d9e",
+    "84822469255086": {
+      "name": "Noob Piece",
+      "version": "7202bce3652f6df6f6a70a0902b7ed53304a82d6083111c2d554873717c00d58",
+      "commit": "7328fa50bd66edd1ae348f2c73c25bf1a9f83f66",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/ui-guard.lua",
         "src/core/updater.lua",
-        "library/compact.lua",
-        "src/games/mm2.lua",
-        "src/games/features/mm2/roletracker.lua",
-        "src/games/features/mm2/roundtracker.lua",
-        "src/games/features/mm2/esp.lua",
-        "src/games/features/mm2/coinfarm.lua",
-        "src/games/features/mm2/playerteleport.lua",
-        "src/games/features/mm2/gundrop.lua",
-        "src/games/features/mm2/frontend.lua",
-        "src/games/updates/66654135.txt"
+        "src/games/noobpiece.lua",
+        "src/games/features/noobpiece/chestesp.lua",
+        "src/games/updates/84822469255086.txt",
+        "library/init.lua",
+        "library/theme.lua",
+        "library/utils.lua",
+        "library/components.lua",
+        "library/window.lua",
+        "library/content/common.lua",
+        "library/content/noobpiece.lua"
       ]
     }
   },
   "recentUpdates": [
     {
-      "Version": "4c48000",
-      "Date": "2026-09-12T20:54:53-03:00",
+      "Version": "e1c4e4a",
+      "Date": "2026-09-26T15:37:04-03:00",
       "Changes": [
-        "chore(tsb): document attack-aware autoblock"
+        "Fix DepHub version file newline"
       ]
     },
     {
-      "Version": "02139cf",
-      "Date": "2026-09-12T20:54:25-03:00",
+      "Version": "68d74d0",
+      "Date": "2026-09-26T15:36:07-03:00",
       "Changes": [
-        "feat(tsb): switch to attack-aware autoblock v2"
+        "Fix Noob Piece library line breaks"
       ]
     },
     {
-      "Version": "1ac8cfc",
-      "Date": "2026-09-12T20:53:58-03:00",
+      "Version": "bf9ce0a",
+      "Date": "2026-09-26T15:36:02-03:00",
       "Changes": [
-        "feat(tsb): add attack-aware autoblock runtime"
+        "Fix Noob Piece loader line breaks"
       ]
     },
     {
-      "Version": "0eb5639",
-      "Date": "2026-09-12T10:54:39-03:00",
+      "Version": "12722e1",
+      "Date": "2026-09-26T15:33:24-03:00",
       "Changes": [
-        "feat(tsb): add face attacker control and counter diagnostics"
+        "Bump DepHub to 0.0.10"
       ]
     },
     {
-      "Version": "9575d71",
-      "Date": "2026-09-12T10:54:19-03:00",
+      "Version": "a37c1a8",
+      "Date": "2026-09-26T15:33:18-03:00",
       "Changes": [
-        "refactor(tsb): remove m1 catch backend and add face attacker toggle"
+        "Route Noob Piece through original DepHub library"
       ]
     }
   ]
