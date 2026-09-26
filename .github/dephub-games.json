@@ -142,6 +142,7 @@
       "src/games/features/noobpiece/autochest.lua",
       "src/games/features/noobpiece/autoattack.lua",
       "src/games/features/noobpiece/autofarm.lua",
+      "src/games/features/noobpiece/autoteam.lua",
       "src/games/features/noobpiece/islandtracker.lua",
       "src/games/updates/84822469255086.txt",
       "library/init.lua",
