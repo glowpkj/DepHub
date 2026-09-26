@@ -11,7 +11,7 @@ local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.9"
+local VERSION = "0.0.10"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -73,7 +73,7 @@ local function cleanupRuntime()
     env.__DEPHUB_VD = nil
     env.__DEPHUB_VD_FRONTEND = nil
     env.__DEPHUB_MM2 = nil
-    env.__DEPHUB_MM2_FRONTEND = nil
+    env.__DEPHUB_MM2_FRONTEND = nil\n    env.__DEPHUB_NOOBPIECE = nil
     env.__DEPHUB_UI_GUARD = nil
 end
 
@@ -204,7 +204,7 @@ local targets = {
     ["93978595733734"] = {Core = "src/games/violencedistrict.lua", Frontend = "src/games/features/violencedistrict/frontend.lua", ViolenceDistrict = true},
     ["6739698191"] = {Core = "src/games/violencedistrict.lua", Frontend = "src/games/features/violencedistrict/frontend.lua", ViolenceDistrict = true},
     ["142823291"] = {Core = "src/games/mm2.lua", Frontend = "src/games/features/mm2/frontend.lua", MM2 = true},
-    ["66654135"] = {Core = "src/games/mm2.lua", Frontend = "src/games/features/mm2/frontend.lua", MM2 = true}
+    ["66654135"] = {Core = "src/games/mm2.lua", Frontend = "src/games/features/mm2/frontend.lua", MM2 = true},\n    ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true}
 }
 
 local target = targets[placeId] or targets[gameId] or {Core = "src/games/universal.lua", Universal = true}
@@ -216,7 +216,7 @@ if not okCore then return fail(coreResult) end
 local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
 local isVD = target.ViolenceDistrict == true
-local isMM2 = target.MM2 == true
+local isMM2 = target.MM2 == true\nlocal isNoobPiece = target.NoobPiece == true
 
 if isRT3 then
     if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
@@ -225,10 +225,10 @@ elseif type(coreResult) ~= "table" then
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and not isMM2 and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and not isMM2 and not isNoobPiece and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
 env.__DEPHUB.ViolenceDistrict = isVD and coreResult or nil
-env.__DEPHUB.MM2 = isMM2 and coreResult or nil
+env.__DEPHUB.MM2 = isMM2 and coreResult or nil\nenv.__DEPHUB.NoobPiece = isNoobPiece and coreResult or nil
 
 local mode
 local backend
@@ -236,7 +236,7 @@ if target.Universal then mode = "Universal" backend = coreResult
 elseif isRT3 then mode = "RT3" backend = env.__DEPHUB.Runtime
 elseif isTSB then mode = "TSB" backend = coreResult
 elseif isVD then mode = "ViolenceDistrict" backend = coreResult
-elseif isMM2 then mode = "MM2" backend = coreResult
+elseif isMM2 then mode = "MM2" backend = coreResult\nelseif isNoobPiece then mode = "NoobPiece" backend = coreResult
 else mode = "BloxFruits" backend = coreResult end
 
 if isTSB then
@@ -259,7 +259,7 @@ elseif isMM2 then
     env.__DEPHUB.Frontend = frontend
 else
     env[STATE_KEY].Frontend = "library-1"
-    local subtitles = {Universal = "UNIVERSAL", BloxFruits = "BLOX FRUITS", RT3 = "RESTAURANT TYCOON 3"}
+    local subtitles = {Universal = "UNIVERSAL", BloxFruits = "BLOX FRUITS", RT3 = "RESTAURANT TYCOON 3", NoobPiece = "NOOB PIECE"}
     local okLibrary, Library = loadModule("library/init.lua", false)
     if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then return fail(okLibrary and "Library invalida" or Library) end
     local okFrontend, frontend = pcall(Library.new, {Mode = mode, Backend = backend, Title = "DEPHUB", Subtitle = subtitles[mode]})
