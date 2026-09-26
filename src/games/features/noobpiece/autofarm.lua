@@ -15,7 +15,8 @@ function AutoFarm.new(movement,autoAttack)
         RangeMargin=1,
         Tolerance=0.75,
         FallbackRange=8,
-        WeaponCategory="Fists"
+        WeaponCategory="Fists",
+        SelectedEnemy="Noob"
     },AutoFarm)
 end
 
@@ -78,16 +79,73 @@ function AutoFarm:GetWeaponCategory()
     return self.WeaponCategory
 end
 
+function AutoFarm:SetSelectedEnemy(name)
+    if type(name)~="string" or name=="" then
+        return false
+    end
+
+    self.SelectedEnemy=name
+    self.Target=nil
+    return true
+end
+
+function AutoFarm:GetSelectedEnemy()
+    return self.SelectedEnemy
+end
+
 function AutoFarm:_folder()
     local quests=Workspace:FindFirstChild("Quests")
     return quests and quests:FindFirstChild("Enemies")
 end
 
+function AutoFarm:_npcId(model)
+    local id=model:GetAttribute("NpcId")
+    if type(id)=="string" and id~="" then
+        return id
+    end
+    return model.Name
+end
+
+function AutoFarm:GetEnemyTypes()
+    local folder=self:_folder()
+    local seen={}
+    local values={}
+
+    if not folder then
+        return {self.SelectedEnemy}
+    end
+
+    for _,object in ipairs(folder:GetDescendants()) do
+        if object:IsA("Model") then
+            local humanoid=object:FindFirstChildOfClass("Humanoid")
+            local root=object:FindFirstChild("HumanoidRootPart")
+
+            if humanoid and root then
+                local id=self:_npcId(object)
+
+                if not seen[id] then
+                    seen[id]=true
+                    values[#values+1]=id
+                end
+            end
+        end
+    end
+
+    table.sort(values)
+
+    if #values==0 then
+        values[1]=self.SelectedEnemy
+    end
+
+    return values
+end
+
 function AutoFarm:_valid(model)
-    if not model or model.Name~="Noob" then return false end
+    if not model then return false end
 
     local folder=self:_folder()
     if not folder or not model:IsDescendantOf(folder) then return false end
+    if self:_npcId(model)~=self.SelectedEnemy then return false end
 
     local humanoid=model:FindFirstChildOfClass("Humanoid")
     local root=model:FindFirstChild("HumanoidRootPart")
@@ -103,7 +161,7 @@ function AutoFarm:_nearest(root)
     local nearestDistance=math.huge
 
     for _,object in ipairs(folder:GetDescendants()) do
-        if object:IsA("Model") and object.Name=="Noob" and self:_valid(object) then
+        if object:IsA("Model") and self:_valid(object) then
             local enemyRoot=object:FindFirstChild("HumanoidRootPart")
             local distance=(root.Position-enemyRoot.Position).Magnitude
 
@@ -125,9 +183,9 @@ function AutoFarm:_face(root,enemyRoot)
     end
 end
 
-function AutoFarm:_goal(root,enemyRoot,range)
+function AutoFarm:_goal(enemyRoot,range)
     local desired=math.max(0.5,range-self.RangeMargin)
-    local position=enemyRoot.Position-enemyRoot.CFrame.LookVector*desired
+    local position=enemyRoot.Position+enemyRoot.CFrame.LookVector*desired
     position=Vector3.new(position.X,enemyRoot.Position.Y,position.Z)
 
     return CFrame.lookAt(
@@ -167,7 +225,7 @@ function AutoFarm:_run(token)
         end
 
         local range=self:_range()
-        local goal=self:_goal(root,enemyRoot,range)
+        local goal=self:_goal(enemyRoot,range)
         local goalDistance=(root.Position-goal.Position).Magnitude
 
         if goalDistance>self.Tolerance then
