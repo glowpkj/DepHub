@@ -1,1 +1,1 @@
-0.0.3 | Auto Chest for currently streamed spawned chests with direct character teleport, optional touch collection and configurable interval
+0.0.4 | Simplified chest ESP label with chest name and precise distance only
