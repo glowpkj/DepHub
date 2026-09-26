@@ -1,1 +1,1 @@
-0.0.1 | Initial Noob Piece support with chest ESP using the original DepHub library
+0.0.2 | Spawn-aware chest ESP with 3D chest card preview, 0.5 fill highlight and streamed island position markers
