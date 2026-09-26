@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-26T20:57:26.540009+00:00",
-  "commit": "5cd02410cfaa46a0c6f722a094ba03215accb017",
+  "generatedAt": "2026-09-26T20:57:36.589534+00:00",
+  "commit": "c785cdbc75cdd97bf32b9f7f138136f3fc7a98e0",
   "version": "0.0.15",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "bc5bb6ca8217975733f4d4e37cc93513ae97487fc690e4c3633864e60ff08247",
-      "commit": "5cd02410cfaa46a0c6f722a094ba03215accb017",
+      "commit": "c785cdbc75cdd97bf32b9f7f138136f3fc7a98e0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "b7be37c284d7e0b7d14bea34961711322708207d00f5ee5186927414937243a1",
-      "commit": "5cd02410cfaa46a0c6f722a094ba03215accb017",
+      "commit": "c785cdbc75cdd97bf32b9f7f138136f3fc7a98e0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "86f5a17707b0666612d6609de1f9e3c7ac6dc0eac8ce8a3abb68f8e292805b1c",
-      "commit": "5cd02410cfaa46a0c6f722a094ba03215accb017",
+      "commit": "c785cdbc75cdd97bf32b9f7f138136f3fc7a98e0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "349ebdf2879eb4cff857c0a3ec2928c0930ef852e4889534ffbe1e61750d4758",
-      "commit": "5cd02410cfaa46a0c6f722a094ba03215accb017",
+      "commit": "c785cdbc75cdd97bf32b9f7f138136f3fc7a98e0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,7 +104,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "13ad540b136f40d99f7a355985e1c7801ca4fc53b5068e9b1490cfc2d4cae6d7",
-      "commit": "5cd02410cfaa46a0c6f722a094ba03215accb017",
+      "commit": "c785cdbc75cdd97bf32b9f7f138136f3fc7a98e0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "b5a743c58bb28271ae6479e2b88e0ef897661e4cee8f82aad0c9c71dc59a9018",
-      "commit": "5cd02410cfaa46a0c6f722a094ba03215accb017",
+      "commit": "c785cdbc75cdd97bf32b9f7f138136f3fc7a98e0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "72b028d88f0f886a8446874194af35c25ea410f9aa90cf3277c9bd0bf86decc3",
-      "commit": "5cd02410cfaa46a0c6f722a094ba03215accb017",
+      "version": "f0cfac17bd16d1e3e63c38c8074160a50b962e1cabbdfa11e9a32e4e1bea8aa6",
+      "commit": "c785cdbc75cdd97bf32b9f7f138136f3fc7a98e0",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -174,6 +174,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "c785cdb",
+      "Date": "2026-09-26T17:57:28-03:00",
+      "Changes": [
+        "Update Noob Piece Auto Farm changelog"
+      ]
+    },
     {
       "Version": "5cd0241",
       "Date": "2026-09-26T17:57:18-03:00",
@@ -200,13 +207,6 @@
       "Date": "2026-09-26T17:56:38-03:00",
       "Changes": [
         "Prevent conflicting Noob Piece movement tasks"
-      ]
-    },
-    {
-      "Version": "65f9bdc",
-      "Date": "2026-09-26T17:56:22-03:00",
-      "Changes": [
-        "Integrate Noob Piece Auto Farm"
       ]
     }
   ]
