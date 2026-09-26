@@ -16,12 +16,11 @@ local AutoFarm=loadFeature("src/games/features/noobpiece/autofarm.lua")
 local AutoTeam=loadFeature("src/games/features/noobpiece/autoteam.lua")
 
 local backend={
-    Version="0.0.7",
+    Version="0.0.8",
     Toggles={
         ChestESP=false,
         AutoChest=false,
         AutoAttack=false,
-        AutoAttackRange=true,
         AutoFarm=false,
         AutoTeam=false
     },
@@ -46,8 +45,7 @@ backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack)
 backend.AutoTeam=AutoTeam.new()
 
 backend.AutoChest:SetDelay(backend.Values.AutoChestDelay)
-backend.AutoAttack:SetRangeCheck(backend.Toggles.AutoAttackRange)
-backend.AutoAttack:SetWeaponCategory(backend.Values.WeaponCategory)
+backend.AutoFarm:SetWeaponCategory(backend.Values.WeaponCategory)
 backend.AutoTeam:SetSelected(backend.Values.SelectedTeam)
 backend.IslandTracker:Start()
 
@@ -82,7 +80,7 @@ function backend:SetAutoFarm(enabled)
 end
 
 function backend:SetWeaponCategory(category)
-    if self.AutoAttack:SetWeaponCategory(category) then
+    if self.AutoFarm:SetWeaponCategory(category) then
         self.Values.WeaponCategory=category
         return true
     end
@@ -117,12 +115,6 @@ function backend:SetAutoAttack(enabled)
     enabled=enabled==true
     self.Toggles.AutoAttack=enabled
     self.AutoAttack:SetEnabled(enabled)
-end
-
-function backend:SetAutoAttackRange(enabled)
-    enabled=enabled==true
-    self.Toggles.AutoAttackRange=enabled
-    self.AutoAttack:SetRangeCheck(enabled)
 end
 
 function backend:GetToggle(name)
