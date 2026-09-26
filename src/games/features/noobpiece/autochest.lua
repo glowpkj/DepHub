@@ -4,9 +4,10 @@ local Workspace=game:GetService("Workspace")
 local AutoChest={}
 AutoChest.__index=AutoChest
 
-function AutoChest.new()
+function AutoChest.new(movement)
     return setmetatable({
         Player=Players.LocalPlayer,
+        Movement=movement,
         Enabled=false,
         Token=0,
         Delay=0.35,
@@ -41,30 +42,49 @@ end
 function AutoChest:_nearest(root)
     local folder=Workspace:FindFirstChild("Bau")
     if not folder then return nil,nil end
+
     local bestModel,bestPart,bestDistance
+
     for _,model in ipairs(folder:GetChildren()) do
         if model:IsA("Model") and model.Name=="Bau" then
             local part=self:_targetPart(model)
+
             if part then
                 local distance=(root.Position-part.Position).Magnitude
+
                 if not bestDistance or distance<bestDistance then
                     bestModel,bestPart,bestDistance=model,part,distance
                 end
             end
         end
     end
+
     return bestModel,bestPart
 end
 
-function AutoChest:_teleport(character,part)
-    local target=CFrame.new(part.Position+Vector3.new(0,self.Height,0))
+function AutoChest:_targetCFrame(part)
+    local position=part.Position+Vector3.new(0,self.Height,0)
     local look=part.CFrame.LookVector
-    target=CFrame.lookAt(target.Position,target.Position+Vector3.new(look.X,0,look.Z))
-    character:PivotTo(target)
+    local flatLook=Vector3.new(look.X,0,look.Z)
+
+    if flatLook.Magnitude<0.01 then
+        flatLook=Vector3.new(0,0,-1)
+    end
+
+    return CFrame.lookAt(position,position+flatLook.Unit)
+end
+
+function AutoChest:_move(part)
+    if not self.Movement then
+        return false
+    end
+
+    return self.Movement:FlyTo(self:_targetCFrame(part))
 end
 
 function AutoChest:_touch(root,part)
     if type(firetouchinterest)~="function" then return end
+
     pcall(firetouchinterest,root,part,0)
     task.wait(0.04)
     pcall(firetouchinterest,root,part,1)
@@ -72,13 +92,15 @@ end
 
 function AutoChest:_run(token)
     while self.Enabled and token==self.Token do
-        local character,root=self:_character()
-        if not character then
+        local _,root=self:_character()
+
+        if not root then
             task.wait(0.4)
             continue
         end
 
         local model,part=self:_nearest(root)
+
         if not model or not part then
             self.LastTarget=nil
             task.wait(0.25)
@@ -86,18 +108,26 @@ function AutoChest:_run(token)
         end
 
         self.LastTarget=model
-        self:_teleport(character,part)
-        task.wait(0.08)
 
-        local _,newRoot=self:_character()
-        if newRoot and part.Parent and self:_spawned(model) then
-            self:_touch(newRoot,part)
+        local moved=self:_move(part)
+        if not self.Enabled or token~=self.Token then
+            break
+        end
+
+        if moved then
+            local _,newRoot=self:_character()
+
+            if newRoot and part.Parent and self:_spawned(model) then
+                self:_touch(newRoot,part)
+            end
         end
 
         local started=os.clock()
+
         while self.Enabled and token==self.Token and model.Parent and self:_spawned(model) and os.clock()-started<1.25 do
             task.wait(0.08)
         end
+
         task.wait(self.Delay)
     end
 end
@@ -109,13 +139,21 @@ end
 function AutoChest:SetEnabled(enabled)
     enabled=enabled==true
     if self.Enabled==enabled then return end
+
     self.Enabled=enabled
     self.Token+=1
+
     if enabled then
         local token=self.Token
-        task.spawn(function() self:_run(token) end)
+        task.spawn(function()
+            self:_run(token)
+        end)
     else
         self.LastTarget=nil
+
+        if self.Movement then
+            self.Movement:Stop()
+        end
     end
 end
 
