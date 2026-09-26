@@ -1,1 +1,1 @@
-0.0.5 | Shared tween movement at speed 45, Auto Chest now uses it, and standalone Auto Attack with optional range check
+0.0.6 | Auto Farm Noob with range-edge positioning, shared tween travel collision/control lock, weapon auto-equip, and weapon-aware Auto Attack
