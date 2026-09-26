@@ -1,1 +1,1 @@
-0.0.6 | Auto Farm Noob with range-edge positioning, shared tween travel collision/control lock, weapon auto-equip, and weapon-aware Auto Attack
+0.0.7 | Auto Farm Noob at weapon range edge, shared tween collision/control lock, weapon-aware Auto Attack with auto-equip, and selectable Auto Team
