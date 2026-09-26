@@ -115,23 +115,37 @@ function AutoFarm:GetEnemyTypes()
         return {self.SelectedEnemy}
     end
 
-    for _,object in ipairs(folder:GetDescendants()) do
-        if object:IsA("Model") then
-            local humanoid=object:FindFirstChildOfClass("Humanoid")
-            local root=object:FindFirstChild("HumanoidRootPart")
+    local function add(model)
+        if not model:IsA("Model") then return end
 
-            if humanoid and root then
-                local id=self:_npcId(object)
+        local id=model:GetAttribute("NpcId")
+        local hasInfo=type(id)=="string"
+            or model:GetAttribute("DisplayName")~=nil
+            or model:GetAttribute("Level")~=nil
+            or model:GetAttribute("Damage")~=nil
+            or model:GetAttribute("Boss")~=nil
 
-                if not seen[id] then
-                    seen[id]=true
-                    values[#values+1]=id
-                end
-            end
+        if not hasInfo then return end
+
+        id=type(id)=="string" and id~="" and id or model.Name
+
+        if not seen[id] then
+            seen[id]=true
+            values[#values+1]=id
         end
     end
 
-    table.sort(values)
+    for _,island in ipairs(folder:GetChildren()) do
+        add(island)
+
+        for _,object in ipairs(island:GetDescendants()) do
+            add(object)
+        end
+    end
+
+    table.sort(values,function(left,right)
+        return string.lower(left)<string.lower(right)
+    end)
 
     if #values==0 then
         values[1]=self.SelectedEnemy
