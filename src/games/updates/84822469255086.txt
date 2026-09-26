@@ -1,1 +1,1 @@
-0.0.8 | Auto Attack now continuously attacks with any equipped weapon, Auto Farm owns weapon selection and stays behind targets at range edge, and tween noclip is enforced throughout travel
+0.0.9 | Auto Farm supports selectable enemy types by NpcId, keeps behind targets at weapon range edge, Wandering Gacha teleport added, and tween noclip landing stability improved
