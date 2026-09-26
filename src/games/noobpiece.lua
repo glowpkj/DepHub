@@ -13,19 +13,22 @@ local IslandTracker=loadFeature("src/games/features/noobpiece/islandtracker.lua"
 local AutoChest=loadFeature("src/games/features/noobpiece/autochest.lua")
 local AutoAttack=loadFeature("src/games/features/noobpiece/autoattack.lua")
 local AutoFarm=loadFeature("src/games/features/noobpiece/autofarm.lua")
+local AutoTeam=loadFeature("src/games/features/noobpiece/autoteam.lua")
 
 local backend={
-    Version="0.0.6",
+    Version="0.0.7",
     Toggles={
         ChestESP=false,
         AutoChest=false,
         AutoAttack=false,
         AutoAttackRange=true,
-        AutoFarm=false
+        AutoFarm=false,
+        AutoTeam=false
     },
     Values={
         AutoChestDelay=0.35,
-        WeaponCategory="Fists"
+        WeaponCategory="Fists",
+        SelectedTeam="Noob"
     }
 }
 
@@ -40,10 +43,12 @@ backend.IslandTracker=IslandTracker.new()
 backend.AutoChest=AutoChest.new(backend.Movement)
 backend.AutoAttack=AutoAttack.new()
 backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack)
+backend.AutoTeam=AutoTeam.new()
 
 backend.AutoChest:SetDelay(backend.Values.AutoChestDelay)
 backend.AutoAttack:SetRangeCheck(backend.Toggles.AutoAttackRange)
 backend.AutoAttack:SetWeaponCategory(backend.Values.WeaponCategory)
+backend.AutoTeam:SetSelected(backend.Values.SelectedTeam)
 backend.IslandTracker:Start()
 
 function backend:SetChestESP(enabled)
@@ -84,6 +89,24 @@ function backend:SetWeaponCategory(category)
     return false
 end
 
+function backend:SetSelectedTeam(name)
+    if self.AutoTeam:SetSelected(name) then
+        self.Values.SelectedTeam=name
+        return true
+    end
+    return false
+end
+
+function backend:SetAutoTeam(enabled)
+    enabled=enabled==true
+    self.Toggles.AutoTeam=enabled
+    self.AutoTeam:SetEnabled(enabled)
+end
+
+function backend:GetTeams()
+    return self.AutoTeam:GetTeams()
+end
+
 function backend:SetAutoChestDelay(value)
     value=math.clamp(tonumber(value) or 0.35,0.1,2)
     self.Values.AutoChestDelay=value
@@ -115,6 +138,7 @@ function backend:GetKnownIslands()
 end
 
 function backend:Destroy()
+    self.AutoTeam:Destroy()
     self.AutoFarm:Destroy()
     self.AutoChest:Destroy()
     self.AutoAttack:Destroy()
