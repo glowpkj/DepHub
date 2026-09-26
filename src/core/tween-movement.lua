@@ -13,6 +13,8 @@ function Movement.new(config)
         Player=Players.LocalPlayer,
         Speed=tonumber(config.Speed) or 45,
         MinDuration=tonumber(config.MinDuration) or 0.05,
+        MaxSegmentDuration=tonumber(config.MaxSegmentDuration) or 1.1,
+        SegmentPause=tonumber(config.SegmentPause) or 0.08,
         UsePhysics=config.UsePhysics~=false,
         Tween=nil,
         SteppedConnection=nil,
@@ -246,35 +248,64 @@ function Movement:FlyTo(target,speed)
         end
     end)
 
-    local ok,tween=pcall(function()
-        return TweenService:Create(
-            root,
-            TweenInfo.new(math.max(distance/moveSpeed,self.MinDuration),Enum.EasingStyle.Linear),
-            {CFrame=goal}
-        )
-    end)
+    local completed=true
 
-    if not ok then
-        self:Stop()
-        return false,tostring(tween)
+    while token==self.MoveToken do
+        local delta=goal.Position-root.Position
+        local remaining=delta.Magnitude
+
+        if remaining<=0.05 then
+            root.CFrame=goal
+            break
+        end
+
+        local segmentDuration=math.min(remaining/moveSpeed,self.MaxSegmentDuration)
+        local segmentDistance=math.min(remaining,moveSpeed*self.MaxSegmentDuration)
+        local nextPosition=root.Position+delta.Unit*segmentDistance
+        local segmentGoal=CFrame.new(nextPosition)*goal.Rotation
+
+        local ok,tween=pcall(function()
+            return TweenService:Create(
+                root,
+                TweenInfo.new(math.max(segmentDuration,self.MinDuration),Enum.EasingStyle.Linear),
+                {CFrame=segmentGoal}
+            )
+        end)
+
+        if not ok then
+            self:Stop()
+            return false,tostring(tween)
+        end
+
+        self.Tween=tween
+        tween:Play()
+
+        local playbackState=tween.Completed:Wait()
+
+        if token~=self.MoveToken then
+            return false,"cancelled"
+        end
+
+        if playbackState~=Enum.PlaybackState.Completed then
+            completed=false
+            break
+        end
+
+        self.Tween=nil
+        root.AssemblyLinearVelocity=Vector3.zero
+        root.AssemblyAngularVelocity=Vector3.zero
+
+        if remaining>segmentDistance+0.05 and self.SegmentPause>0 then
+            task.wait(self.SegmentPause)
+        end
     end
-
-    self.Tween=tween
-    tween:Play()
-
-    local playbackState=tween.Completed:Wait()
 
     if token~=self.MoveToken then
         return false,"cancelled"
     end
 
     self:Stop()
-
-    if playbackState==Enum.PlaybackState.Completed then
-        return true
-    end
-
-    return false,"cancelled"
+    return completed
 end
 
 function Movement:SetSpeed(value)
