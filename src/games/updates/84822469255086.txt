@@ -1,1 +1,1 @@
-0.0.2 | Spawn-aware chest ESP with 3D chest card preview, 0.5 fill highlight and streamed island position markers
+0.0.3 | Auto Chest for currently streamed spawned chests with direct character teleport, optional touch collection and configurable interval
