@@ -12,17 +12,20 @@ local ChestESP=loadFeature("src/games/features/noobpiece/chestesp.lua")
 local IslandTracker=loadFeature("src/games/features/noobpiece/islandtracker.lua")
 local AutoChest=loadFeature("src/games/features/noobpiece/autochest.lua")
 local AutoAttack=loadFeature("src/games/features/noobpiece/autoattack.lua")
+local AutoFarm=loadFeature("src/games/features/noobpiece/autofarm.lua")
 
 local backend={
-    Version="0.0.5",
+    Version="0.0.6",
     Toggles={
         ChestESP=false,
         AutoChest=false,
         AutoAttack=false,
-        AutoAttackRange=true
+        AutoAttackRange=true,
+        AutoFarm=false
     },
     Values={
-        AutoChestDelay=0.35
+        AutoChestDelay=0.35,
+        WeaponCategory="Fists"
     }
 }
 
@@ -36,9 +39,11 @@ backend.ChestESP=ChestESP.new()
 backend.IslandTracker=IslandTracker.new()
 backend.AutoChest=AutoChest.new(backend.Movement)
 backend.AutoAttack=AutoAttack.new()
+backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack)
 
 backend.AutoChest:SetDelay(backend.Values.AutoChestDelay)
 backend.AutoAttack:SetRangeCheck(backend.Toggles.AutoAttackRange)
+backend.AutoAttack:SetWeaponCategory(backend.Values.WeaponCategory)
 backend.IslandTracker:Start()
 
 function backend:SetChestESP(enabled)
@@ -51,6 +56,20 @@ function backend:SetAutoChest(enabled)
     enabled=enabled==true
     self.Toggles.AutoChest=enabled
     self.AutoChest:SetEnabled(enabled)
+end
+
+function backend:SetAutoFarm(enabled)
+    enabled=enabled==true
+    self.Toggles.AutoFarm=enabled
+    self.AutoFarm:SetEnabled(enabled)
+end
+
+function backend:SetWeaponCategory(category)
+    if self.AutoAttack:SetWeaponCategory(category) then
+        self.Values.WeaponCategory=category
+        return true
+    end
+    return false
 end
 
 function backend:SetAutoChestDelay(value)
@@ -84,6 +103,7 @@ function backend:GetKnownIslands()
 end
 
 function backend:Destroy()
+    self.AutoFarm:Destroy()
     self.AutoChest:Destroy()
     self.AutoAttack:Destroy()
     self.Movement:Destroy()
