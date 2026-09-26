@@ -1,8 +1,3 @@
-local game=game
-local type=type
-local tonumber=tonumber
-local typeof=typeof
-
 local Players=game:GetService("Players")
 local TweenService=game:GetService("TweenService")
 local RunService=game:GetService("RunService")
@@ -16,16 +11,20 @@ function Movement.new(config)
     config=config or {}
 
     return setmetatable({
-        Speed=tonumber(config.Speed) or 120,
+        Speed=tonumber(config.Speed) or 45,
         MinDuration=tonumber(config.MinDuration) or 0.05,
+        UsePhysics=config.UsePhysics~=false,
         Tween=nil,
         VelocityConnection=nil,
+        ActiveHumanoid=nil,
+        ActiveRoot=nil,
         Moving=false,
+        MoveToken=0,
         Destroyed=false
     },Movement)
 end
 
-function Movement:_root()
+function Movement:_character()
     local character=LocalPlayer and LocalPlayer.Character
     local humanoid=character and character:FindFirstChildOfClass("Humanoid")
     local root=character and character:FindFirstChild("HumanoidRootPart")
@@ -34,7 +33,7 @@ function Movement:_root()
         return nil
     end
 
-    return root
+    return humanoid,root
 end
 
 function Movement:_toCFrame(target)
@@ -55,18 +54,36 @@ function Movement:_toCFrame(target)
     return nil
 end
 
+function Movement:_restoreHumanoid(humanoid)
+    if not humanoid or not humanoid.Parent or humanoid.Health<=0 then return end
+
+    if self.UsePhysics and humanoid:GetState()==Enum.HumanoidStateType.Physics then
+        pcall(humanoid.ChangeState,humanoid,Enum.HumanoidStateType.GettingUp)
+    end
+end
+
 function Movement:Stop()
-    if self.Tween then
-        pcall(self.Tween.Cancel,self.Tween)
-        self.Tween=nil
-    end
+    self.MoveToken+=1
 
-    if self.VelocityConnection then
-        pcall(self.VelocityConnection.Disconnect,self.VelocityConnection)
-        self.VelocityConnection=nil
-    end
+    local tween=self.Tween
+    local connection=self.VelocityConnection
+    local humanoid=self.ActiveHumanoid
 
+    self.Tween=nil
+    self.VelocityConnection=nil
+    self.ActiveHumanoid=nil
+    self.ActiveRoot=nil
     self.Moving=false
+
+    if tween then
+        pcall(tween.Cancel,tween)
+    end
+
+    if connection then
+        pcall(connection.Disconnect,connection)
+    end
+
+    self:_restoreHumanoid(humanoid)
     return true
 end
 
@@ -84,31 +101,49 @@ function Movement:FlyTo(target,speed)
         return false,"invalid target"
     end
 
-    local root=self:_root()
-    if not root then
+    local humanoid,root=self:_character()
+    if not humanoid or not root then
         return false,"character unavailable"
     end
-
-    self:Stop()
 
     local moveSpeed=tonumber(speed) or self.Speed
     if moveSpeed<=0 then
         return false,"invalid speed"
     end
 
+    self:Stop()
+    local token=self.MoveToken
+
     local distance=(root.Position-targetCFrame.Position).Magnitude
+    if distance<=0.05 then
+        return true
+    end
+
     local duration=math.max(distance/moveSpeed,self.MinDuration)
 
     self.Moving=true
-    self.VelocityConnection=RunService.Heartbeat:Connect(function()
-        if not self.Moving or not root.Parent then return end
+    self.ActiveHumanoid=humanoid
+    self.ActiveRoot=root
+
+    root.AssemblyLinearVelocity=Vector3.zero
+    root.AssemblyAngularVelocity=Vector3.zero
+
+    if self.UsePhysics then
+        pcall(humanoid.ChangeState,humanoid,Enum.HumanoidStateType.Physics)
+    end
+
+    local connection
+    connection=RunService.Heartbeat:Connect(function()
+        if self.MoveToken~=token or not root.Parent then return end
         root.AssemblyLinearVelocity=Vector3.zero
         root.AssemblyAngularVelocity=Vector3.zero
     end)
 
+    self.VelocityConnection=connection
+
     local tween=TweenService:Create(
         root,
-        TweenInfo.new(duration,Enum.EasingStyle.Linear,Enum.EasingDirection.Out),
+        TweenInfo.new(duration,Enum.EasingStyle.Linear),
         {CFrame=targetCFrame}
     )
 
@@ -117,16 +152,23 @@ function Movement:FlyTo(target,speed)
 
     local playbackState=tween.Completed:Wait()
 
+    if self.MoveToken~=token then
+        return false,"cancelled"
+    end
+
+    if self.VelocityConnection==connection then
+        pcall(connection.Disconnect,connection)
+        self.VelocityConnection=nil
+    end
+
     if self.Tween==tween then
         self.Tween=nil
     end
 
-    if self.VelocityConnection then
-        pcall(self.VelocityConnection.Disconnect,self.VelocityConnection)
-        self.VelocityConnection=nil
-    end
-
+    self.ActiveHumanoid=nil
+    self.ActiveRoot=nil
     self.Moving=false
+    self:_restoreHumanoid(humanoid)
 
     if playbackState==Enum.PlaybackState.Completed then
         return true
