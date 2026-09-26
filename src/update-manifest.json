@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-26T22:31:22.365795+00:00",
-  "commit": "e97a9f8d2326b1cf8f352f3cc16ae6ec7f51fc61",
-  "version": "0.0.18",
+  "generatedAt": "2026-09-26T22:32:45.061849+00:00",
+  "commit": "f6668bf7c062749ac27f2e411f083902a79a60f2",
+  "version": "0.0.19",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "3aea4d0e18d51fe07f443899f6457a7d906859efba81abf0f2fa68b6ec45b9fe",
-      "commit": "e97a9f8d2326b1cf8f352f3cc16ae6ec7f51fc61",
+      "version": "c80b7f3d60359667a87a199d4a35e60477a5f06fd07c46c831f879a0a04fd4ed",
+      "commit": "f6668bf7c062749ac27f2e411f083902a79a60f2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "3b738e43637b42e88fd8bd513661f87b68bd539783bd66d5574f15dd19918592",
-      "commit": "e97a9f8d2326b1cf8f352f3cc16ae6ec7f51fc61",
+      "version": "9cf6c4d1f339f5e088836ae021cbaa596d4d5fb2ae681b188fb07878ffba444c",
+      "commit": "f6668bf7c062749ac27f2e411f083902a79a60f2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -56,8 +56,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "76d6348bf49c36b5750485ecd0089ecbf74ff42a4d4dcc5c2c1f21f9a674bf16",
-      "commit": "e97a9f8d2326b1cf8f352f3cc16ae6ec7f51fc61",
+      "version": "c1b375d52698a0937a0dce1c65f91613f3cb2b83aaba375f3084f95ed4d3c198",
+      "commit": "f6668bf7c062749ac27f2e411f083902a79a60f2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -74,8 +74,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "897ff613b2a52e68ee1967e262b9d9e860db417033899ba2cbb3f4c1c1c88f74",
-      "commit": "e97a9f8d2326b1cf8f352f3cc16ae6ec7f51fc61",
+      "version": "da186c65dcffa0cdc242aeb0f313b48109790c1f6d84458b9f7414e0a20fea2b",
+      "commit": "f6668bf7c062749ac27f2e411f083902a79a60f2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -103,8 +103,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "21e79fadcf95b3058e41851c8a16ba153ed6505656e4ab26d26fce1b887f4337",
-      "commit": "e97a9f8d2326b1cf8f352f3cc16ae6ec7f51fc61",
+      "version": "0819d87bff0d5b28cb54152d4b88e000a3a9a009b3ac08ba24a30e16197c6a29",
+      "commit": "f6668bf7c062749ac27f2e411f083902a79a60f2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -132,8 +132,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "f1ff9632ea2ec28244c34194606f9c1ca8bb4fd638917d5a2daced5025f05d6a",
-      "commit": "e97a9f8d2326b1cf8f352f3cc16ae6ec7f51fc61",
+      "version": "84b3825574bdb9d4cedac19a9a88a6154fa2fab68a0fe68547f7813c4a62bf29",
+      "commit": "f6668bf7c062749ac27f2e411f083902a79a60f2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "30c3f2fc1423cc108324fc1bd8abf678133e21de042345d711e3c2faa141f0ac",
-      "commit": "e97a9f8d2326b1cf8f352f3cc16ae6ec7f51fc61",
+      "version": "d9648ec68a0604f08bb9dc13b9a72d7ae44b0fad98c7b55f550633e6993bb772",
+      "commit": "f6668bf7c062749ac27f2e411f083902a79a60f2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -177,38 +177,38 @@
   },
   "recentUpdates": [
     {
+      "Version": "f6668bf",
+      "Date": "2026-09-26T19:32:36-03:00",
+      "Changes": [
+        "Document Noob Piece segmented travel update"
+      ]
+    },
+    {
+      "Version": "bec5419",
+      "Date": "2026-09-26T19:32:28-03:00",
+      "Changes": [
+        "Bump loader to 0.0.19"
+      ]
+    },
+    {
+      "Version": "f5a065c",
+      "Date": "2026-09-26T19:32:21-03:00",
+      "Changes": [
+        "Bump DepHub version to 0.0.19"
+      ]
+    },
+    {
+      "Version": "55a2752",
+      "Date": "2026-09-26T19:32:14-03:00",
+      "Changes": [
+        "Configure segmented Noob Piece travel pauses"
+      ]
+    },
+    {
       "Version": "e97a9f8",
       "Date": "2026-09-26T19:31:14-03:00",
       "Changes": [
         "Add Noob Piece enemy list refresh control"
-      ]
-    },
-    {
-      "Version": "d1a6f4a",
-      "Date": "2026-09-26T19:30:57-03:00",
-      "Changes": [
-        "List enemy ids from every Noob Piece island folder"
-      ]
-    },
-    {
-      "Version": "efe4e68",
-      "Date": "2026-09-26T19:30:47-03:00",
-      "Changes": [
-        "Add short stability pauses to long tween travel"
-      ]
-    },
-    {
-      "Version": "52855dc",
-      "Date": "2026-09-26T19:07:55-03:00",
-      "Changes": [
-        "Document Noob Piece Auto Farm stability fix"
-      ]
-    },
-    {
-      "Version": "b519a08",
-      "Date": "2026-09-26T19:07:50-03:00",
-      "Changes": [
-        "Bump loader to 0.0.18"
       ]
     }
   ]
