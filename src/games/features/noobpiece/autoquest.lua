@@ -29,6 +29,7 @@ function AutoQuest.new(movement,islandData,autoFarm)
         WaitingDialog=false,
         LastInteract=0,
         DialogMovement=nil,
+        IgnoreHudUntil=0,
         Connections={}
     },AutoQuest)
 
@@ -57,6 +58,10 @@ function AutoQuest:_character()
 end
 
 function AutoQuest:_syncHud()
+    if os.clock()<self.IgnoreHudUntil then
+        return
+    end
+
     local playerGui=self.Player:FindFirstChild("PlayerGui")
     local hud=playerGui and playerGui:FindFirstChild("QuestHUD")
     local quest=hud and hud:FindFirstChild("Quest")
@@ -95,12 +100,14 @@ function AutoQuest:_onQuestUpdate(data)
             self.ActiveQuest=nil
         end
 
+        self.IgnoreHudUntil=os.clock()+0.6
+
         if self.Enabled then
             self.Stage=nil
             self.WaitingDialog=false
             self.Token+=1
             local token=self.Token
-            task.spawn(function()
+            task.delay(0.2,function()
                 self:_run(token)
             end)
         end
