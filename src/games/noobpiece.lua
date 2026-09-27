@@ -152,6 +152,7 @@ function backend:SetIslandESP(enabled)
     enabled=enabled==true
     self.Toggles.IslandESP=enabled
     self.IslandTracker:SetESPEnabled(enabled)
+    self:_RefreshMirageESP()
 end
 
 function backend:SetSelectedIsland(name)
@@ -169,6 +170,10 @@ function backend:SetSelectedIsland(name)
     end
 
     return true
+end
+
+function backend:ConnectIslandAvailabilityChanged(callback)
+    return self.IslandAvailability.Event:Connect(callback)
 end
 
 function backend:GetIslandNames()
@@ -330,6 +335,23 @@ function backend:GetKnownIslands()
 end
 
 function backend:Destroy()
+    if self.IslandWorkspaceConnection then
+        self.IslandWorkspaceConnection:Disconnect()
+    end
+
+    if self.IslandWorkspaceRemovingConnection then
+        self.IslandWorkspaceRemovingConnection:Disconnect()
+    end
+
+    if self.MirageMarker then
+        self.MirageMarker:Destroy()
+        self.MirageMarker=nil
+    end
+
+    if self.IslandAvailability then
+        self.IslandAvailability:Destroy()
+    end
+
     self.AutoQuest:Destroy()
     self.NpcESP:Destroy()
     self.WanderingGacha:Destroy()
