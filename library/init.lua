@@ -1,7 +1,11 @@
 local environment = type(getgenv)=="function" and getgenv() or _G
 local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local libraryVersion=environment.__DEPHUB and environment.__DEPHUB.Version or "standalone"
 local cache=environment.__DEPHUB_LIBRARY_CACHE
-if type(cache)~="table" then cache={}; environment.__DEPHUB_LIBRARY_CACHE=cache end
+if type(cache)~="table" or cache.__Version~=libraryVersion then
+    cache={__Version=libraryVersion}
+    environment.__DEPHUB_LIBRARY_CACHE=cache
+end
 local requestNonce=tostring(math.floor(os.clock()*1000000))
 
 local function loadModule(path)
@@ -29,7 +33,7 @@ local contents={
     NoobPiece="library/content/noobpiece.lua"
 }
 
-local Library={Theme=Theme,Version="1.0.0"}
+local Library={Theme=Theme,Version="1.1.0"}
 
 function Library.new(options)
     options=options or {}
@@ -45,6 +49,7 @@ function Library.new(options)
     local ok,reason=pcall(function()
         loadModule(contentPath).mount(window,options.Backend,Common)
         Common.mount(window,options.Backend,environment)
+        window:OpenPage("HOME")
     end)
     if not ok then window:Destroy(); error(reason) end
     environment.__DEPHUB_FRONTEND=window
@@ -54,7 +59,7 @@ function Library.new(options)
 end
 
 function Library.clearCache()
-    environment.__DEPHUB_LIBRARY_CACHE={}
+    environment.__DEPHUB_LIBRARY_CACHE={__Version=libraryVersion}
     cache=environment.__DEPHUB_LIBRARY_CACHE
 end
 
