@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T12:35:28.808118+00:00",
-  "commit": "3eef09ee07d5ce35aa5afa555d80579879a53047",
+  "generatedAt": "2026-09-27T12:36:41.147844+00:00",
+  "commit": "4e5aa9504d3af4bebcd389d4a77e381a9859fa39",
   "version": "0.0.21",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "048c213f09c6ffb0c4f7a11a1853cc33f2e47e8b65284d48a99f6578e153aa7f",
-      "commit": "3eef09ee07d5ce35aa5afa555d80579879a53047",
+      "commit": "4e5aa9504d3af4bebcd389d4a77e381a9859fa39",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "ee2eba80fe625b2e58b9060100c562bea941a6af4980970273e5498b3ad5b7e6",
-      "commit": "3eef09ee07d5ce35aa5afa555d80579879a53047",
+      "commit": "4e5aa9504d3af4bebcd389d4a77e381a9859fa39",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "d69ac864190c02c484b5bfffa62d6f2b1039deae48fdc2db98fc37d88657c61f",
-      "commit": "3eef09ee07d5ce35aa5afa555d80579879a53047",
+      "commit": "4e5aa9504d3af4bebcd389d4a77e381a9859fa39",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "07b15cba4f887fccafb497fa93273b6be02beb7b4085c2ea42b2fb6142a6979f",
-      "commit": "3eef09ee07d5ce35aa5afa555d80579879a53047",
+      "commit": "4e5aa9504d3af4bebcd389d4a77e381a9859fa39",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,7 +104,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "c744003be0fbefeb5c00bf3934ca1dd6dc6e026d6f6b0ca8f88abbd84cec617d",
-      "commit": "3eef09ee07d5ce35aa5afa555d80579879a53047",
+      "commit": "4e5aa9504d3af4bebcd389d4a77e381a9859fa39",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "e526a32fb88d4f159cd86c7f2daeaedf1f659f8ed6614fe984e6d1247c58ac46",
-      "commit": "3eef09ee07d5ce35aa5afa555d80579879a53047",
+      "commit": "4e5aa9504d3af4bebcd389d4a77e381a9859fa39",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "011ff2998bfc47d42190347e2eb5c98a464ad461fcdc6e256985564a9ce1334f",
-      "commit": "3eef09ee07d5ce35aa5afa555d80579879a53047",
+      "version": "097751fd33a89deae60879bfcf8da93500ce603ab5e7dd3e19bc22de18b0023a",
+      "commit": "4e5aa9504d3af4bebcd389d4a77e381a9859fa39",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -178,6 +178,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "4e5aa95",
+      "Date": "2026-09-27T09:36:32-03:00",
+      "Changes": [
+        "Use plain separator for Noob Piece enemy catalog keys"
+      ]
+    },
+    {
       "Version": "3eef09e",
       "Date": "2026-09-27T09:35:19-03:00",
       "Changes": [
@@ -203,13 +210,6 @@
       "Date": "2026-09-27T09:34:47-03:00",
       "Changes": [
         "Add Noob Piece island ESP and teleport controls"
-      ]
-    },
-    {
-      "Version": "a2f3718",
-      "Date": "2026-09-27T09:34:24-03:00",
-      "Changes": [
-        "Fix Noob Piece island integration formatting"
       ]
     }
   ]
