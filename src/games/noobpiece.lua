@@ -86,6 +86,14 @@ function backend:SetSelectedIsland(name)
     end
 
     self.Values.SelectedIsland=name
+
+    if self.Toggles.IslandTeleport then
+        self.Movement:Stop()
+        task.spawn(function()
+            self:TeleportIsland(name)
+        end)
+    end
+
     return true
 end
 
