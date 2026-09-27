@@ -144,6 +144,7 @@
       "src/games/features/noobpiece/autofarm.lua",
       "src/games/features/noobpiece/autoteam.lua",
       "src/games/features/noobpiece/wanderinggacha.lua",
+      "src/games/features/noobpiece/islanddata.lua",
       "src/games/features/noobpiece/islandtracker.lua",
       "src/games/updates/84822469255086.txt",
       "library/init.lua",
