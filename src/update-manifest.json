@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T18:21:06.602638+00:00",
-  "commit": "265ed43ebcea1320ee588d6a835dda63773fd7d5",
+  "generatedAt": "2026-09-27T18:21:54.247432+00:00",
+  "commit": "19c1dd60b4389684a0d02dc81d84c06a1cdac7ce",
   "version": "0.0.24",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "ed6527c726a746c4fddfdcce8d6f8318e819d41757b11fd0689625478e3eb23a",
-      "commit": "265ed43ebcea1320ee588d6a835dda63773fd7d5",
+      "commit": "19c1dd60b4389684a0d02dc81d84c06a1cdac7ce",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "9363c0f264c6e6fe94eb0138cfa3bddeb847171509951aba2693f56b933c1f98",
-      "commit": "265ed43ebcea1320ee588d6a835dda63773fd7d5",
+      "commit": "19c1dd60b4389684a0d02dc81d84c06a1cdac7ce",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "15780ff1441f2ef6d6ad458190651784027100324d0126a9509737e98c530cef",
-      "commit": "265ed43ebcea1320ee588d6a835dda63773fd7d5",
+      "commit": "19c1dd60b4389684a0d02dc81d84c06a1cdac7ce",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "011454e7872f0b5738c0137d9a82487ace552a75fecf9b95d544b6ac9bac1187",
-      "commit": "265ed43ebcea1320ee588d6a835dda63773fd7d5",
+      "commit": "19c1dd60b4389684a0d02dc81d84c06a1cdac7ce",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,7 +104,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a0517810f5caac7eada321897c72f6175d584a96efa665abecffe09244640348",
-      "commit": "265ed43ebcea1320ee588d6a835dda63773fd7d5",
+      "commit": "19c1dd60b4389684a0d02dc81d84c06a1cdac7ce",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "2e1dc59fa4f2da123ba6cbdd2f4156de3fe5e72ca1c804e6722ce59ad63a63d5",
-      "commit": "265ed43ebcea1320ee588d6a835dda63773fd7d5",
+      "commit": "19c1dd60b4389684a0d02dc81d84c06a1cdac7ce",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "0b4047234ebf9479a05ea89fc2347e350d388e9e45cbec0067aa0d680f687a64",
-      "commit": "265ed43ebcea1320ee588d6a835dda63773fd7d5",
+      "version": "f17c06a57729d02d9d07ab453beecc19003503e125ce26bb60e237ff1903df0d",
+      "commit": "19c1dd60b4389684a0d02dc81d84c06a1cdac7ce",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -180,6 +180,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "19c1dd6",
+      "Date": "2026-09-27T15:21:46-03:00",
+      "Changes": [
+        "fix: settle streamed enemies before cancelling island travel"
+      ]
+    },
+    {
       "Version": "265ed43",
       "Date": "2026-09-27T15:20:57-03:00",
       "Changes": [
@@ -205,13 +212,6 @@
       "Date": "2026-09-27T15:20:27-03:00",
       "Changes": [
         "chore: remove obsolete island arrival polling state"
-      ]
-    },
-    {
-      "Version": "3b21b9a",
-      "Date": "2026-09-27T15:20:10-03:00",
-      "Changes": [
-        "feat: arbitrate Noob Piece movement consumers"
       ]
     }
   ]
