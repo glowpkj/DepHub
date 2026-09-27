@@ -183,7 +183,8 @@ function AutoFarm:_buildCatalog()
                     Island=island.Name,
                     IslandOrder=island.Order,
                     EnemyOrder=enemy.Order,
-                    Boss=enemy.Boss
+                    Boss=enemy.Boss,
+                    Level=enemy.Level or enemy.QuestMinLevel
                 })
             end
         end
