@@ -311,7 +311,7 @@ function IslandTracker:Teleport(name,owner,priority)
         return false
     end
 
-    return self.Movement:FlyTo(cframe*CFrame.new(0,3,0),nil,owner or "IslandTeleport",priority or 250)
+    return self.Movement:FlyTo(cframe*CFrame.new(0,3,0),nil,owner or "IslandTeleport",priority)
 end
 
 function IslandTracker:GetKnownIslands()
