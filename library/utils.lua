@@ -10,7 +10,7 @@ function Utils.new(window, theme)
 
     function self:Corner(object, radius)
         local corner = Instance.new("UICorner")
-        corner.CornerRadius = radius or UDim.new(0, 8)
+        corner.CornerRadius = radius or UDim.new(0, 6)
         corner.Parent = object
         return corner
     end
@@ -47,9 +47,9 @@ function Utils.new(window, theme)
         if previous then pcall(previous.Cancel, previous) end
         local tween = game:GetService("TweenService"):Create(object, TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), properties)
         window.Tweens[key] = tween
-        self:Track(tween.Completed:Connect(function()
+        tween.Completed:Once(function()
             if window.Tweens[key] == tween then window.Tweens[key] = nil end
-        end))
+        end)
         tween:Play()
         return tween
     end
