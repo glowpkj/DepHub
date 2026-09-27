@@ -371,7 +371,7 @@ function AutoQuest:_run(token)
 
         if not island or not enemy then
             if self.AutoFarm then
-                self.AutoFarm:SetPaused(true)
+                self.AutoFarm:SetPaused(false)
             end
             return
         end
