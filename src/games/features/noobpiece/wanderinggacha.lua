@@ -4,6 +4,9 @@ local Workspace=game:GetService("Workspace")
 local WanderingGacha={}
 WanderingGacha.__index=WanderingGacha
 
+local MOVEMENT_OWNER="WanderingGacha"
+local MOVEMENT_PRIORITY=400
+
 function WanderingGacha.new(movement)
     return setmetatable({
         Player=Players.LocalPlayer,
@@ -47,7 +50,7 @@ function WanderingGacha:Teleport()
         Vector3.new(root.Position.X,position.Y,root.Position.Z)
     )
 
-    return self.Movement:FlyTo(goal)
+    return self.Movement:FlyTo(goal,nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
 end
 
 function WanderingGacha:Destroy()
