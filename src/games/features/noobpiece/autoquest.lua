@@ -467,7 +467,12 @@ function AutoQuest:SetEnabled(enabled)
         if self.AutoFarm then
             self.AutoFarm:SetPaused(false)
         end
-        self:_restoreDialog()
+
+        if self.Player:GetAttribute("DialogOpen") then
+            self:_restoreDialog()
+        end
+
+        self.DialogMovement=nil
         return
     end
 
