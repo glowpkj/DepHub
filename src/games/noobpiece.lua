@@ -7,7 +7,8 @@ local function loadFeature(path)
     return chunk()
 end
 
-local Movement=loadFeature("src/core/tween-movement.lua")\nlocal IslandData=loadFeature("src/games/features/noobpiece/islanddata.lua")
+local Movement=loadFeature("src/core/tween-movement.lua")
+local IslandData=loadFeature("src/games/features/noobpiece/islanddata.lua")
 local ChestESP=loadFeature("src/games/features/noobpiece/chestesp.lua")
 local IslandTracker=loadFeature("src/games/features/noobpiece/islandtracker.lua")
 local AutoChest=loadFeature("src/games/features/noobpiece/autochest.lua")
@@ -20,6 +21,7 @@ local backend={
     Version="0.0.13",
     Toggles={
         ChestESP=false,
+        IslandESP=false,
         AutoChest=false,
         AutoAttack=false,
         AutoFarm=false,
@@ -30,7 +32,8 @@ local backend={
         AutoChestDelay=0.35,
         WeaponCategory="Fists",
         SelectedTeam="Noob",
-        SelectedEnemy="Noob"
+        SelectedEnemy="Noob",
+        SelectedIsland="HomeIsland"
     }
 }
 
@@ -43,7 +46,7 @@ backend.Movement=Movement.new({
 })
 
 backend.ChestESP=ChestESP.new()
-backend.IslandTracker=IslandTracker.new()
+backend.IslandTracker=IslandTracker.new(IslandData,backend.Movement)
 backend.AutoChest=AutoChest.new(backend.Movement)
 backend.AutoAttack=AutoAttack.new()
 backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack,IslandData)
@@ -62,7 +65,37 @@ function backend:SetChestESP(enabled)
     self.ChestESP:SetEnabled(enabled)
 end
 
-function backend:SetIslandESP(enabled)\n    enabled=enabled==true\n    self.Toggles.IslandESP=enabled\n    self.IslandTracker:SetESPEnabled(enabled)\nend\n\nfunction backend:SetSelectedIsland(name)\n    if type(name)~="string" or name=="" then return false end\n    self.Values.SelectedIsland=name\n    return true\nend\n\nfunction backend:GetIslandNames()\n    return self.IslandTracker:GetTeleportNames()\nend\n\nfunction backend:TeleportIsland(name)\n    name=name or self.Values.SelectedIsland\n    if type(name)~="string" or name=="" then return false end\n    self.Values.SelectedIsland=name\n    return self.IslandTracker:Teleport(name)\nend\n\nfunction backend:SetAutoChest(enabled)
+function backend:SetIslandESP(enabled)
+    enabled=enabled==true
+    self.Toggles.IslandESP=enabled
+    self.IslandTracker:SetESPEnabled(enabled)
+end
+
+function backend:SetSelectedIsland(name)
+    if type(name)~="string" or name=="" then
+        return false
+    end
+
+    self.Values.SelectedIsland=name
+    return true
+end
+
+function backend:GetIslandNames()
+    return self.IslandTracker:GetTeleportNames()
+end
+
+function backend:TeleportIsland(name)
+    name=name or self.Values.SelectedIsland
+
+    if type(name)~="string" or name=="" then
+        return false
+    end
+
+    self.Values.SelectedIsland=name
+    return self.IslandTracker:Teleport(name)
+end
+
+function backend:SetAutoChest(enabled)
     enabled=enabled==true
 
     if enabled and self.Toggles.AutoFarm then
@@ -88,14 +121,19 @@ end
 
 function backend:SetSelectedEnemy(name)
     if self.AutoFarm:SetSelectedEnemy(name) then
-        self.Values.SelectedEnemy=name
+        self.Values.SelectedEnemy=self.AutoFarm:GetSelectedEnemy()
         return true
     end
+
     return false
 end
 
 function backend:GetEnemyTypes()
     return self.AutoFarm:GetEnemyTypes()
+end
+
+function backend:GetSelectedEnemyOption()
+    return self.AutoFarm:GetSelectedEnemyOption()
 end
 
 function backend:TeleportWanderingGacha()
@@ -107,6 +145,7 @@ function backend:SetWeaponCategory(category)
         self.Values.WeaponCategory=category
         return true
     end
+
     return false
 end
 
@@ -115,6 +154,7 @@ function backend:SetSelectedTeam(name)
         self.Values.SelectedTeam=name
         return true
     end
+
     return false
 end
 
