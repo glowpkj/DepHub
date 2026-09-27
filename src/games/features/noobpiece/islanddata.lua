@@ -142,7 +142,7 @@ function IslandData.GetTeleportable()
     local result={}
 
     for _,island in ipairs(islands) do
-        if island.CFrame then
+        if island.CFrame and not island.Mirage then
             result[#result+1]=island
         end
     end
