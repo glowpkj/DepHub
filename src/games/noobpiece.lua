@@ -21,7 +21,7 @@ local NpcESP=loadFeature("src/games/features/noobpiece/npcesp.lua")
 local AutoQuest=loadFeature("src/games/features/noobpiece/autoquest.lua")
 
 local backend={
-    Version="0.0.15",
+    Version="0.0.16",
     Toggles={
         ChestESP=false,
         IslandESP=false,
@@ -46,7 +46,7 @@ local backend={
 backend.Movement=Movement.new({
     Speed=45,
     MinDuration=0.05,
-    MaxSegmentDuration=2.5,
+    MaxSegmentDuration=3,
     SegmentPause=0.5,
     UsePhysics=true
 })
@@ -163,7 +163,7 @@ function backend:SetSelectedIsland(name)
     self.Values.SelectedIsland=name
 
     if self.Toggles.IslandTeleport then
-        self.Movement:Stop(true)
+        self.Movement:CancelOwner("IslandTeleport",true)
         task.spawn(function()
             self:TeleportIsland(name)
         end)
@@ -198,7 +198,7 @@ function backend:TeleportIsland(name)
     end
 
     self.Values.SelectedIsland=name
-    return self.IslandTracker:Teleport(name)
+    return self.IslandTracker:Teleport(name,"IslandTeleport",250)
 end
 
 function backend:SetIslandTeleport(enabled)
@@ -206,7 +206,7 @@ function backend:SetIslandTeleport(enabled)
     self.Toggles.IslandTeleport=enabled
 
     if not enabled then
-        self.Movement:Stop(true)
+        self.Movement:CancelOwner("IslandTeleport",true)
         return true
     end
 
