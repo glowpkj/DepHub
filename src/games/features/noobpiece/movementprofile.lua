@@ -6,7 +6,7 @@ return {
     ArrivalRadius=0.75,
     MinDuration=0.03,
     MaxSegmentDuration=3,
-    SegmentPause=0.5,
+    SegmentPause=2.5,
     UsePhysics=true,
     Priorities={
         AutoChest=100,
