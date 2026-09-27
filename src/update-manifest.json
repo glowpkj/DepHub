@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T13:26:05.116166+00:00",
-  "commit": "0d959a37fd72e7e96d5adee61f9e485daaad3355",
-  "version": "0.0.21",
+  "generatedAt": "2026-09-27T13:26:46.189946+00:00",
+  "commit": "b9c13e7150b05d12b4e14770d20653c7c62b99f8",
+  "version": "0.0.22",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "048c213f09c6ffb0c4f7a11a1853cc33f2e47e8b65284d48a99f6578e153aa7f",
-      "commit": "0d959a37fd72e7e96d5adee61f9e485daaad3355",
+      "version": "64c4a0d5903a629663b17e1d08712517185ed355bbba70d8d7011ecf57d4db3c",
+      "commit": "b9c13e7150b05d12b4e14770d20653c7c62b99f8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "ee2eba80fe625b2e58b9060100c562bea941a6af4980970273e5498b3ad5b7e6",
-      "commit": "0d959a37fd72e7e96d5adee61f9e485daaad3355",
+      "version": "6bf0728792583fd39a1d045fc01708a9b5e92b4fb92e62207ebb31c65bf94fcf",
+      "commit": "b9c13e7150b05d12b4e14770d20653c7c62b99f8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -56,8 +56,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "d69ac864190c02c484b5bfffa62d6f2b1039deae48fdc2db98fc37d88657c61f",
-      "commit": "0d959a37fd72e7e96d5adee61f9e485daaad3355",
+      "version": "11b303dd792d1d21955b67c3df8dec3e517d7512074b8fa817bd8a5f7686a872",
+      "commit": "b9c13e7150b05d12b4e14770d20653c7c62b99f8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -74,8 +74,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "07b15cba4f887fccafb497fa93273b6be02beb7b4085c2ea42b2fb6142a6979f",
-      "commit": "0d959a37fd72e7e96d5adee61f9e485daaad3355",
+      "version": "e9d38141593a4a7d80f3c08a2acfe5af04fcbf449c4b016f67d06327a4c4ea7a",
+      "commit": "b9c13e7150b05d12b4e14770d20653c7c62b99f8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -103,8 +103,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "c744003be0fbefeb5c00bf3934ca1dd6dc6e026d6f6b0ca8f88abbd84cec617d",
-      "commit": "0d959a37fd72e7e96d5adee61f9e485daaad3355",
+      "version": "186bf46578e14738d8d8342798f34930a495c91badea1dbfaadc58309a6934c1",
+      "commit": "b9c13e7150b05d12b4e14770d20653c7c62b99f8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -132,8 +132,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "e526a32fb88d4f159cd86c7f2daeaedf1f659f8ed6614fe984e6d1247c58ac46",
-      "commit": "0d959a37fd72e7e96d5adee61f9e485daaad3355",
+      "version": "d0f7b12e1471f40179dc025e52c7b0579a3c11fde639a710fcd1735da7c5c453",
+      "commit": "b9c13e7150b05d12b4e14770d20653c7c62b99f8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "e36f1615c022d97474a20ebc16a487d9dc3df27e93649c12122af696df9b7f0e",
-      "commit": "0d959a37fd72e7e96d5adee61f9e485daaad3355",
+      "version": "8955317b5361927d7b9b4cd4080f9ed82c7954dc244563abcf4d73680673acc7",
+      "commit": "b9c13e7150b05d12b4e14770d20653c7c62b99f8",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -163,6 +163,8 @@
         "src/games/features/noobpiece/autofarm.lua",
         "src/games/features/noobpiece/autoteam.lua",
         "src/games/features/noobpiece/wanderinggacha.lua",
+        "src/games/features/noobpiece/npcesp.lua",
+        "src/games/features/noobpiece/autoquest.lua",
         "src/games/features/noobpiece/islanddata.lua",
         "src/games/features/noobpiece/islandtracker.lua",
         "src/games/updates/84822469255086.txt",
@@ -178,38 +180,38 @@
   },
   "recentUpdates": [
     {
+      "Version": "b9c13e7",
+      "Date": "2026-09-27T10:26:37-03:00",
+      "Changes": [
+        "Document Noob Piece Auto Quest update"
+      ]
+    },
+    {
+      "Version": "fbe47d2",
+      "Date": "2026-09-27T10:26:30-03:00",
+      "Changes": [
+        "Bump loader to 0.0.22"
+      ]
+    },
+    {
+      "Version": "2e7318c",
+      "Date": "2026-09-27T10:26:23-03:00",
+      "Changes": [
+        "Bump DepHub version to 0.0.22"
+      ]
+    },
+    {
+      "Version": "03460c3",
+      "Date": "2026-09-27T10:26:06-03:00",
+      "Changes": [
+        "Add Auto Quest, Gacha ESP, and island teleport toggle UI"
+      ]
+    },
+    {
       "Version": "0d959a3",
       "Date": "2026-09-27T10:25:55-03:00",
       "Changes": [
         "Show mirage ESP only while the island exists"
-      ]
-    },
-    {
-      "Version": "d564a27",
-      "Date": "2026-09-27T10:25:45-03:00",
-      "Changes": [
-        "Track live Mysterious Island availability"
-      ]
-    },
-    {
-      "Version": "5d83f47",
-      "Date": "2026-09-27T10:25:33-03:00",
-      "Changes": [
-        "Retarget active island teleport on selection change"
-      ]
-    },
-    {
-      "Version": "0f17126",
-      "Date": "2026-09-27T10:25:25-03:00",
-      "Changes": [
-        "Make island teleport toggleable and gate mirage travel"
-      ]
-    },
-    {
-      "Version": "843facc",
-      "Date": "2026-09-27T10:25:16-03:00",
-      "Changes": [
-        "Expose Auto Quest and Gacha ESP controls"
       ]
     }
   ]
