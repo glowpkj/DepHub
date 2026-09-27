@@ -7,7 +7,7 @@ local function loadFeature(path)
     return chunk()
 end
 
-local Movement=loadFeature("src/core/tween-movement.lua")
+local Movement=loadFeature("src/core/tween-movement.lua")\nlocal IslandData=loadFeature("src/games/features/noobpiece/islanddata.lua")
 local ChestESP=loadFeature("src/games/features/noobpiece/chestesp.lua")
 local IslandTracker=loadFeature("src/games/features/noobpiece/islandtracker.lua")
 local AutoChest=loadFeature("src/games/features/noobpiece/autochest.lua")
@@ -17,7 +17,7 @@ local AutoTeam=loadFeature("src/games/features/noobpiece/autoteam.lua")
 local WanderingGacha=loadFeature("src/games/features/noobpiece/wanderinggacha.lua")
 
 local backend={
-    Version="0.0.12",
+    Version="0.0.13",
     Toggles={
         ChestESP=false,
         AutoChest=false,
@@ -37,7 +37,7 @@ local backend={
 backend.Movement=Movement.new({
     Speed=45,
     MinDuration=0.05,
-    MaxSegmentDuration=3,
+    MaxSegmentDuration=2.5,
     SegmentPause=0.5,
     UsePhysics=true
 })
@@ -46,7 +46,7 @@ backend.ChestESP=ChestESP.new()
 backend.IslandTracker=IslandTracker.new()
 backend.AutoChest=AutoChest.new(backend.Movement)
 backend.AutoAttack=AutoAttack.new()
-backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack)
+backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack,IslandData)
 backend.AutoTeam=AutoTeam.new()
 backend.WanderingGacha=WanderingGacha.new(backend.Movement)
 
@@ -62,7 +62,7 @@ function backend:SetChestESP(enabled)
     self.ChestESP:SetEnabled(enabled)
 end
 
-function backend:SetAutoChest(enabled)
+function backend:SetIslandESP(enabled)\n    enabled=enabled==true\n    self.Toggles.IslandESP=enabled\n    self.IslandTracker:SetESPEnabled(enabled)\nend\n\nfunction backend:SetSelectedIsland(name)\n    if type(name)~="string" or name=="" then return false end\n    self.Values.SelectedIsland=name\n    return true\nend\n\nfunction backend:GetIslandNames()\n    return self.IslandTracker:GetTeleportNames()\nend\n\nfunction backend:TeleportIsland(name)\n    name=name or self.Values.SelectedIsland\n    if type(name)~="string" or name=="" then return false end\n    self.Values.SelectedIsland=name\n    return self.IslandTracker:Teleport(name)\nend\n\nfunction backend:SetAutoChest(enabled)
     enabled=enabled==true
 
     if enabled and self.Toggles.AutoFarm then
