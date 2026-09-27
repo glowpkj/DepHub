@@ -13,7 +13,7 @@ function Movement.new(config)
         Player=Players.LocalPlayer,
         Speed=tonumber(config.Speed) or 45,
         MinDuration=tonumber(config.MinDuration) or 0.05,
-        MaxSegmentDuration=tonumber(config.MaxSegmentDuration) or 1.1,
+        MaxSegmentDuration=tonumber(config.MaxSegmentDuration) or 3,
         SegmentPause=tonumber(config.SegmentPause) or 0.08,
         UsePhysics=config.UsePhysics~=false,
         Tween=nil,
@@ -26,6 +26,8 @@ function Movement.new(config)
         LastClearCFrame=nil,
         Moving=false,
         MoveToken=0,
+        ActiveOwner=nil,
+        ActivePriority=-math.huge,
         Destroyed=false
     },Movement)
 end
@@ -132,7 +134,19 @@ function Movement:_restoreTravelState(humanoid)
     end
 end
 
-function Movement:Stop(preservePosition)
+function Movement:GetOwner()
+    return self.ActiveOwner,self.ActivePriority
+end
+
+function Movement:IsOwnedBy(owner)
+    return self.ActiveOwner~=nil and self.ActiveOwner==tostring(owner)
+end
+
+function Movement:Stop(preservePosition,owner)
+    if owner~=nil and self.ActiveOwner~=nil and self.ActiveOwner~=tostring(owner) then
+        return false,"owner mismatch"
+    end
+
     self.MoveToken+=1
 
     local tween=self.Tween
@@ -149,6 +163,8 @@ function Movement:Stop(preservePosition)
     self.ActiveRoot=nil
     self.LastClearCFrame=nil
     self.Moving=false
+    self.ActiveOwner=nil
+    self.ActivePriority=-math.huge
 
     if tween then pcall(tween.Cancel,tween) end
     if stepped then pcall(stepped.Disconnect,stepped) end
@@ -167,11 +183,19 @@ function Movement:Stop(preservePosition)
     return true
 end
 
+function Movement:CancelOwner(owner,preservePosition)
+    if not self:IsOwnedBy(owner) then
+        return false
+    end
+
+    return self:Stop(preservePosition~=false,owner)
+end
+
 function Movement:IsMoving()
     return self.Moving==true
 end
 
-function Movement:FlyTo(target,speed)
+function Movement:FlyTo(target,speed,owner,priority)
     if self.Destroyed then
         return false,"destroyed"
     end
@@ -191,6 +215,13 @@ function Movement:FlyTo(target,speed)
         return false,"invalid speed"
     end
 
+    local moveOwner=tostring(owner or "default")
+    local movePriority=tonumber(priority) or 0
+
+    if self.Moving and self.ActiveOwner and self.ActiveOwner~=moveOwner and movePriority<self.ActivePriority then
+        return false,"busy",self.ActiveOwner
+    end
+
     self:Stop(true)
     local token=self.MoveToken
     local distance=(root.Position-goal.Position).Magnitude
@@ -200,6 +231,8 @@ function Movement:FlyTo(target,speed)
     end
 
     self.Moving=true
+    self.ActiveOwner=moveOwner
+    self.ActivePriority=movePriority
     self.ActiveHumanoid=humanoid
     self.ActiveRoot=root
     self:_applyTravelState(humanoid,root)
@@ -231,7 +264,7 @@ function Movement:FlyTo(target,speed)
         if token~=self.MoveToken then return end
 
         if not root.Parent or humanoid.Health<=0 then
-            self:Stop(true)
+            self:Stop(true,moveOwner)
             return
         end
 
@@ -273,7 +306,7 @@ function Movement:FlyTo(target,speed)
         end)
 
         if not ok then
-            self:Stop(true)
+            self:Stop(true,moveOwner)
             return false,tostring(tween)
         end
 
@@ -316,7 +349,7 @@ function Movement:FlyTo(target,speed)
         return false,"cancelled"
     end
 
-    self:Stop(true)
+    self:Stop(true,moveOwner)
     return completed
 end
 
