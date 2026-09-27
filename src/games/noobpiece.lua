@@ -130,6 +130,7 @@ end
 function backend:SetSelectedEnemy(name)
     if self.AutoFarm:SetSelectedEnemy(name) then
         self.Values.SelectedEnemy=self.AutoFarm:GetSelectedEnemy()
+        self.AutoQuest:SetSelectedEnemy(self.Values.SelectedEnemy)
         return true
     end
 
@@ -146,6 +147,18 @@ end
 
 function backend:TeleportWanderingGacha()
     return self.WanderingGacha:Teleport()
+end
+
+function backend:SetGachaESP(enabled)
+    enabled=enabled==true
+    self.Toggles.GachaESP=enabled
+    self.NpcESP:SetEnabled(enabled)
+end
+
+function backend:SetAutoQuest(enabled)
+    enabled=enabled==true
+    self.Toggles.AutoQuest=enabled
+    self.AutoQuest:SetEnabled(enabled)
 end
 
 function backend:SetWeaponCategory(category)
@@ -201,6 +214,8 @@ function backend:GetKnownIslands()
 end
 
 function backend:Destroy()
+    self.AutoQuest:Destroy()
+    self.NpcESP:Destroy()
     self.WanderingGacha:Destroy()
     self.AutoTeam:Destroy()
     self.AutoFarm:Destroy()
