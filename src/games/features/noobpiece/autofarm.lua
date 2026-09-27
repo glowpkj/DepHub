@@ -428,8 +428,32 @@ function AutoFarm:_approachIsland(root)
     end
 
     self.AutoAttack:SetFarmReady(false)
+
+    local watching=true
+
+    task.spawn(function()
+        while watching and self.Enabled and not self.Paused do
+            local currentRoot=self:_character()
+
+            if currentRoot then
+                if self:_nearest(currentRoot) then
+                    self.Movement:Stop()
+                    break
+                end
+
+                if (currentRoot.Position-destination.Position).Magnitude<=self.IslandArrivalRadius then
+                    self.Movement:Stop()
+                    break
+                end
+            end
+
+            task.wait(0.1)
+        end
+    end)
+
     local moved=self.Movement:FlyTo(destination)
-    task.wait(0.25)
+    watching=false
+    task.wait(0.15)
     return moved
 end
 
