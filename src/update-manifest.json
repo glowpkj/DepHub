@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T13:27:53.365373+00:00",
-  "commit": "05c9f402f155e1c93a34fadbfb96fb6894f76dee",
+  "generatedAt": "2026-09-27T13:28:09.801508+00:00",
+  "commit": "8118fe54124cb6dd9410590a898bbdd627742233",
   "version": "0.0.22",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "64c4a0d5903a629663b17e1d08712517185ed355bbba70d8d7011ecf57d4db3c",
-      "commit": "05c9f402f155e1c93a34fadbfb96fb6894f76dee",
+      "commit": "8118fe54124cb6dd9410590a898bbdd627742233",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6bf0728792583fd39a1d045fc01708a9b5e92b4fb92e62207ebb31c65bf94fcf",
-      "commit": "05c9f402f155e1c93a34fadbfb96fb6894f76dee",
+      "commit": "8118fe54124cb6dd9410590a898bbdd627742233",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "11b303dd792d1d21955b67c3df8dec3e517d7512074b8fa817bd8a5f7686a872",
-      "commit": "05c9f402f155e1c93a34fadbfb96fb6894f76dee",
+      "commit": "8118fe54124cb6dd9410590a898bbdd627742233",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "e9d38141593a4a7d80f3c08a2acfe5af04fcbf449c4b016f67d06327a4c4ea7a",
-      "commit": "05c9f402f155e1c93a34fadbfb96fb6894f76dee",
+      "commit": "8118fe54124cb6dd9410590a898bbdd627742233",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,7 +104,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "186bf46578e14738d8d8342798f34930a495c91badea1dbfaadc58309a6934c1",
-      "commit": "05c9f402f155e1c93a34fadbfb96fb6894f76dee",
+      "commit": "8118fe54124cb6dd9410590a898bbdd627742233",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "d0f7b12e1471f40179dc025e52c7b0579a3c11fde639a710fcd1735da7c5c453",
-      "commit": "05c9f402f155e1c93a34fadbfb96fb6894f76dee",
+      "commit": "8118fe54124cb6dd9410590a898bbdd627742233",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "ec7c7b6f707b607b7334d81295c31b2716acf761730b0e56b1e136497afb4495",
-      "commit": "05c9f402f155e1c93a34fadbfb96fb6894f76dee",
+      "version": "5421e84d51652f314da6f651ee21b12b60da811f83882989593204ed3aa95e38",
+      "commit": "8118fe54124cb6dd9410590a898bbdd627742233",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -180,6 +180,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "8118fe5",
+      "Date": "2026-09-27T10:28:01-03:00",
+      "Changes": [
+        "Keep routing until quest giver body streams in"
+      ]
+    },
+    {
       "Version": "05c9f40",
       "Date": "2026-09-27T10:27:45-03:00",
       "Changes": [
@@ -205,13 +212,6 @@
       "Date": "2026-09-27T10:26:23-03:00",
       "Changes": [
         "Bump DepHub version to 0.0.22"
-      ]
-    },
-    {
-      "Version": "03460c3",
-      "Date": "2026-09-27T10:26:06-03:00",
-      "Changes": [
-        "Add Auto Quest, Gacha ESP, and island teleport toggle UI"
       ]
     }
   ]
