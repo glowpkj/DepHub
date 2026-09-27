@@ -1,8 +1,8 @@
 return {
-    Speed=220,
-    NearSpeed=440,
-    NearDistance=380,
-    DirectDistance=12,
+    Speed=45,
+    NearSpeed=45,
+    NearDistance=0,
+    DirectDistance=0,
     ArrivalRadius=0.75,
     MinDuration=0.03,
     MaxSegmentDuration=3,
