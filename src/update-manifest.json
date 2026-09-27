@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T19:02:45.709356+00:00",
-  "commit": "00826770eadf32829a51c8b5cf999a34ec18686f",
-  "version": "0.0.25",
+  "generatedAt": "2026-09-27T19:03:07.824903+00:00",
+  "commit": "5e49e2c99c52761ec3f7cace1780bdfb7d8d714c",
+  "version": "0.0.26",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "5ba4e2523e2e8e922ad740584105091add1ada688a84b84d2f22a82bb4f38436",
-      "commit": "00826770eadf32829a51c8b5cf999a34ec18686f",
+      "version": "edcb94e58652cf57e314dc3431a2ad5d6226e8d7bba9edbbd3b992e81be676ce",
+      "commit": "5e49e2c99c52761ec3f7cace1780bdfb7d8d714c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "1f51d2ae5f5f2711a9b232fd297a2e853c589a53ee4d3987ddb4a2c1074ad522",
-      "commit": "00826770eadf32829a51c8b5cf999a34ec18686f",
+      "version": "a2340184343db9e5484d59a21ca6324c96743034b543db3284cbf98057bb5dfd",
+      "commit": "5e49e2c99c52761ec3f7cace1780bdfb7d8d714c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -56,8 +56,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "35def884403f4f9337bf6f4b028452b43058f3692e3d7e55f35933c3c7f96a94",
-      "commit": "00826770eadf32829a51c8b5cf999a34ec18686f",
+      "version": "8e8da66dfd6412f01b2f7fd4522b0d0b4c83feb550e1ab24172b6f00f1f5227a",
+      "commit": "5e49e2c99c52761ec3f7cace1780bdfb7d8d714c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -74,8 +74,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "d87e2d3b5f8ca573c3a2e645a58db86d0d9686412fe35ac8d2fa1d2978fb9af5",
-      "commit": "00826770eadf32829a51c8b5cf999a34ec18686f",
+      "version": "994eb979ebfe60fda73464f6a151987cfc805c0d8a18ec995a6cb3ed9ff94408",
+      "commit": "5e49e2c99c52761ec3f7cace1780bdfb7d8d714c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -103,8 +103,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "7551ae93b797b7f5a857b7610c95adb36dbbd6be58d714bd26c0da3c8cc2b562",
-      "commit": "00826770eadf32829a51c8b5cf999a34ec18686f",
+      "version": "b693d2b1b877c98d419cfe3c06ac9a4e3181686395ab7d49d2eb1b2edf7bb5ab",
+      "commit": "5e49e2c99c52761ec3f7cace1780bdfb7d8d714c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -132,8 +132,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "1c2f3164aaf5c56b4121ceadf153de4675d388faf5c30722ec9a44b16f962b69",
-      "commit": "00826770eadf32829a51c8b5cf999a34ec18686f",
+      "version": "bff2c0011bdf8cdd7079197e4c13944445927cf584fb5cf0bb727d4778e4ea90",
+      "commit": "5e49e2c99c52761ec3f7cace1780bdfb7d8d714c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "b09f60da066aa79bc2be9a7062976d554dd882df0f84af6c4c317120be9b224d",
-      "commit": "00826770eadf32829a51c8b5cf999a34ec18686f",
+      "version": "9f3bf84637a703e7380c178dd7de239487fe04977db89958ef41cc00cf84e7ca",
+      "commit": "5e49e2c99c52761ec3f7cace1780bdfb7d8d714c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -181,6 +181,27 @@
   },
   "recentUpdates": [
     {
+      "Version": "5e49e2c",
+      "Date": "2026-09-27T16:02:59-03:00",
+      "Changes": [
+        "chore: update loader to 0.0.26"
+      ]
+    },
+    {
+      "Version": "7507d5b",
+      "Date": "2026-09-27T16:02:54-03:00",
+      "Changes": [
+        "chore: bump DepHub to 0.0.26"
+      ]
+    },
+    {
+      "Version": "f3d3d13",
+      "Date": "2026-09-27T16:02:50-03:00",
+      "Changes": [
+        "chore: bump Noob Piece to 0.0.18"
+      ]
+    },
+    {
       "Version": "0082677",
       "Date": "2026-09-27T16:02:36-03:00",
       "Changes": [
@@ -192,27 +213,6 @@
       "Date": "2026-09-27T16:02:25-03:00",
       "Changes": [
         "refactor: keep adaptive movement as reusable default"
-      ]
-    },
-    {
-      "Version": "3b278a6",
-      "Date": "2026-09-27T15:39:38-03:00",
-      "Changes": [
-        "fix: normalize Noob Piece update note newline"
-      ]
-    },
-    {
-      "Version": "4a7c542",
-      "Date": "2026-09-27T15:39:28-03:00",
-      "Changes": [
-        "docs: record adaptive movement profile"
-      ]
-    },
-    {
-      "Version": "2db8e6f",
-      "Date": "2026-09-27T15:39:24-03:00",
-      "Changes": [
-        "chore: update loader to 0.0.25"
       ]
     }
   ]
