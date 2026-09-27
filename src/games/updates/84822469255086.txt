@@ -1,1 +1,1 @@
-0.0.12 | Long movement runs for up to 3 seconds per segment, pauses for 0.5 seconds, then continues toward the destination
+0.0.13 | Movement segments now run for 2.5 seconds with 0.5 second pauses. Added persistent mapped-island markers and teleporting for HomeIsland, CentralIsland, ForestIsland, and MysteriousIsland; Mysterious Island chest ESP; stored ShikaiZangetsu quest data; and added island-aware mob/boss cataloging and farm routing
