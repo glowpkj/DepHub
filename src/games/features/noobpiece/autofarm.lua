@@ -404,8 +404,34 @@ function AutoFarm:_goal(enemyRoot,range)
     ),desired
 end
 
+function AutoFarm:_hasLoadedEnemyDefinition()
+    local folder=self:_folder()
+
+    if not folder or not self.SelectedIsland then
+        return false
+    end
+
+    local islandFolder=folder:FindFirstChild(self.SelectedIsland)
+
+    if not islandFolder then
+        return false
+    end
+
+    for _,object in ipairs(islandFolder:GetDescendants()) do
+        if object:IsA("Model") and self:_npcId(object)==self.SelectedEnemy then
+            return true
+        end
+    end
+
+    return false
+end
+
 function AutoFarm:_approachIsland(root)
     if not self.SelectedIsland or not self.IslandData then
+        return false
+    end
+
+    if self:_hasLoadedEnemyDefinition() then
         return false
     end
 
@@ -417,13 +443,9 @@ function AutoFarm:_approachIsland(root)
 
     local destination=island.CFrame*CFrame.new(0,3,0)
 
-    if (root.Position-destination.Position).Magnitude<=80 then
-        return false
-    end
-
     self.AutoAttack:SetFarmReady(false)
     local moved=self.Movement:FlyTo(destination)
-    task.wait(0.75)
+    task.wait(0.25)
     return moved
 end
 
