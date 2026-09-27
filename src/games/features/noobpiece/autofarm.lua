@@ -126,7 +126,7 @@ function AutoFarm:_modelIsland(model)
 end
 
 function AutoFarm:_catalogKey(island,id)
-    return tostring(island or "Unknown").."\0"..tostring(id)
+    return tostring(island or "Unknown").."::"..tostring(id)
 end
 
 function AutoFarm:_buildCatalog()
