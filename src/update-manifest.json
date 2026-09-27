@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T18:39:48.676562+00:00",
-  "commit": "3b278a625e37bbe65b8b105f5fd8c466e0412d47",
+  "generatedAt": "2026-09-27T19:02:34.823040+00:00",
+  "commit": "6b0bace7621d68f3c0aab63b43dce74f74e917a5",
   "version": "0.0.25",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "5ba4e2523e2e8e922ad740584105091add1ada688a84b84d2f22a82bb4f38436",
-      "commit": "3b278a625e37bbe65b8b105f5fd8c466e0412d47",
+      "commit": "6b0bace7621d68f3c0aab63b43dce74f74e917a5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "1f51d2ae5f5f2711a9b232fd297a2e853c589a53ee4d3987ddb4a2c1074ad522",
-      "commit": "3b278a625e37bbe65b8b105f5fd8c466e0412d47",
+      "commit": "6b0bace7621d68f3c0aab63b43dce74f74e917a5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "35def884403f4f9337bf6f4b028452b43058f3692e3d7e55f35933c3c7f96a94",
-      "commit": "3b278a625e37bbe65b8b105f5fd8c466e0412d47",
+      "commit": "6b0bace7621d68f3c0aab63b43dce74f74e917a5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "d87e2d3b5f8ca573c3a2e645a58db86d0d9686412fe35ac8d2fa1d2978fb9af5",
-      "commit": "3b278a625e37bbe65b8b105f5fd8c466e0412d47",
+      "commit": "6b0bace7621d68f3c0aab63b43dce74f74e917a5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,7 +104,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "7551ae93b797b7f5a857b7610c95adb36dbbd6be58d714bd26c0da3c8cc2b562",
-      "commit": "3b278a625e37bbe65b8b105f5fd8c466e0412d47",
+      "commit": "6b0bace7621d68f3c0aab63b43dce74f74e917a5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "1c2f3164aaf5c56b4121ceadf153de4675d388faf5c30722ec9a44b16f962b69",
-      "commit": "3b278a625e37bbe65b8b105f5fd8c466e0412d47",
+      "commit": "6b0bace7621d68f3c0aab63b43dce74f74e917a5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "0d86f358eee6a20a143ab70f7e5a52f584b8d3e6583246490da62c171406e3b5",
-      "commit": "3b278a625e37bbe65b8b105f5fd8c466e0412d47",
+      "version": "f5e5858f6266232a2a3805d765bd538fa57ec87a6e24e984e22fd938f475e2b1",
+      "commit": "6b0bace7621d68f3c0aab63b43dce74f74e917a5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -181,6 +181,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "6b0bace",
+      "Date": "2026-09-27T16:02:25-03:00",
+      "Changes": [
+        "refactor: keep adaptive movement as reusable default"
+      ]
+    },
+    {
       "Version": "3b278a6",
       "Date": "2026-09-27T15:39:38-03:00",
       "Changes": [
@@ -206,13 +213,6 @@
       "Date": "2026-09-27T15:39:19-03:00",
       "Changes": [
         "chore: bump DepHub to 0.0.25"
-      ]
-    },
-    {
-      "Version": "46f165b",
-      "Date": "2026-09-27T15:38:54-03:00",
-      "Changes": [
-        "refactor: use movement profile for island priority"
       ]
     }
   ]
