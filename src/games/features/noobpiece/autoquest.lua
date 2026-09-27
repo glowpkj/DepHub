@@ -119,7 +119,7 @@ function AutoQuest:_onQuestUpdate(data)
     self.WaitingDialog=false
 
     if self.AutoFarm then
-        self.AutoFarm:SetPaused(false)
+        self.AutoFarm:SetPaused(self.Enabled and not self:_questMatches())
     end
 end
 
