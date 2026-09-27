@@ -132,7 +132,7 @@ function Movement:_restoreTravelState(humanoid)
     end
 end
 
-function Movement:Stop()
+function Movement:Stop(preservePosition)
     self.MoveToken+=1
 
     local tween=self.Tween
@@ -155,7 +155,7 @@ function Movement:Stop()
     if heartbeat then pcall(heartbeat.Disconnect,heartbeat) end
 
     if root and root.Parent then
-        if not self:_isRootClear(root.CFrame,root.Parent) and lastClear then
+        if not preservePosition and not self:_isRootClear(root.CFrame,root.Parent) and lastClear then
             root.CFrame=lastClear
         end
 
@@ -191,7 +191,7 @@ function Movement:FlyTo(target,speed)
         return false,"invalid speed"
     end
 
-    self:Stop()
+    self:Stop(true)
     local token=self.MoveToken
     local distance=(root.Position-goal.Position).Magnitude
 
@@ -231,7 +231,7 @@ function Movement:FlyTo(target,speed)
         if token~=self.MoveToken then return end
 
         if not root.Parent or humanoid.Health<=0 then
-            self:Stop()
+            self:Stop(true)
             return
         end
 
@@ -273,7 +273,7 @@ function Movement:FlyTo(target,speed)
         end)
 
         if not ok then
-            self:Stop()
+            self:Stop(true)
             return false,tostring(tween)
         end
 
@@ -304,7 +304,7 @@ function Movement:FlyTo(target,speed)
         return false,"cancelled"
     end
 
-    self:Stop()
+    self:Stop(true)
     return completed
 end
 
