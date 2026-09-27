@@ -4,6 +4,9 @@ local Workspace=game:GetService("Workspace")
 local AutoChest={}
 AutoChest.__index=AutoChest
 
+local MOVEMENT_OWNER="AutoChest"
+local MOVEMENT_PRIORITY=100
+
 function AutoChest.new(movement)
     return setmetatable({
         Player=Players.LocalPlayer,
@@ -79,7 +82,7 @@ function AutoChest:_move(part)
         return false
     end
 
-    return self.Movement:FlyTo(self:_targetCFrame(part))
+    return self.Movement:FlyTo(self:_targetCFrame(part),nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
 end
 
 function AutoChest:_touch(root,part)
@@ -152,7 +155,7 @@ function AutoChest:SetEnabled(enabled)
         self.LastTarget=nil
 
         if self.Movement then
-            self.Movement:Stop()
+            self.Movement:CancelOwner(MOVEMENT_OWNER,true)
         end
     end
 end
