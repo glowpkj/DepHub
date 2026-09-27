@@ -146,7 +146,6 @@ function Window:_build()
     search.TextColor3=self.Theme.White
     search.PlaceholderColor3=self.Theme.White
     search.TextTransparency=0
-    search.PlaceholderColor3=self.Theme.White
     search.Font=Enum.Font.GothamMedium
     search.TextSize=12
     search.ClearTextOnFocus=false
@@ -457,6 +456,7 @@ function Window:Toggle() self:SetOpen(not self.Open) end
 function Window:_clampWindowPosition()
     local viewport=self.Utils:Viewport()
     local size=self.MainFrame.AbsoluteSize
+    if size.X<1 or size.Y<1 then return end
     local center=self.MainFrame.AbsolutePosition+size/2
     local halfX=size.X/2
     local halfY=size.Y/2
