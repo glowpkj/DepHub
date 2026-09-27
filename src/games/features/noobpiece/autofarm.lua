@@ -5,7 +5,6 @@ local AutoFarm={}
 AutoFarm.__index=AutoFarm
 
 local MOVEMENT_OWNER="AutoFarm"
-local MOVEMENT_PRIORITY=200
 
 function AutoFarm.new(movement,autoAttack,islandData)
     return setmetatable({
@@ -476,7 +475,7 @@ function AutoFarm:_approachIsland(root)
         end)
     end
 
-    local moved=self.Movement:FlyTo(destination,nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
+    local moved=self.Movement:FlyTo(destination,nil,MOVEMENT_OWNER)
     watching=false
 
     if connection then
@@ -541,7 +540,7 @@ function AutoFarm:_run(token)
 
         if goalDistance>self.Tolerance or targetDistance>range then
             self.AutoAttack:SetFarmReady(false)
-            self.Movement:FlyTo(goal,nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
+            self.Movement:FlyTo(goal,nil,MOVEMENT_OWNER)
         else
             self:_face(root,enemyRoot)
             self.AutoAttack:SetFarmReady(
