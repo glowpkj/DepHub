@@ -296,7 +296,19 @@ function Movement:FlyTo(target,speed)
         root.AssemblyAngularVelocity=Vector3.zero
 
         if remaining>segmentDistance+0.05 and self.SegmentPause>0 then
-            task.wait(self.SegmentPause)
+            local holdCFrame=root.CFrame
+            local pauseUntil=os.clock()+self.SegmentPause
+
+            while token==self.MoveToken and os.clock()<pauseUntil do
+                if not root.Parent or humanoid.Health<=0 then
+                    break
+                end
+
+                root.CFrame=holdCFrame
+                root.AssemblyLinearVelocity=Vector3.zero
+                root.AssemblyAngularVelocity=Vector3.zero
+                RunService.Heartbeat:Wait()
+            end
         end
     end
 
