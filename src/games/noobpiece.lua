@@ -193,7 +193,7 @@ function backend:TeleportIsland(name)
     end
 
     self.Values.SelectedIsland=name
-    return self.IslandTracker:Teleport(name,"IslandTeleport",250)
+    return self.IslandTracker:Teleport(name,"IslandTeleport")
 end
 
 function backend:SetIslandTeleport(enabled)
