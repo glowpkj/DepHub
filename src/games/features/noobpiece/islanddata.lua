@@ -16,8 +16,8 @@ local islands={
         WorkspacePath={"Ilhas","HomeIsland"},
         EnemyFolder="HomeIsland",
         Enemies={
-            {Id="Noob",Order=1},
-            {Id="Bacon",Order=2},
+            {Id="Noob",Order=1,QuestGiver="QuestGiver1",QuestChoice="Noob",QuestId="QuestGiver1_1",QuestMinLevel=1,QuestMaxLevel=15},
+            {Id="Bacon",Order=2,QuestGiver="QuestGiver1",QuestChoice="Bacon",QuestId="QuestGiver1_2",QuestMinLevel=15,QuestMaxLevel=30},
             {Id="Mega Noob",Boss=true,Order=3}
         }
     },
