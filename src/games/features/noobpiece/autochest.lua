@@ -5,7 +5,6 @@ local AutoChest={}
 AutoChest.__index=AutoChest
 
 local MOVEMENT_OWNER="AutoChest"
-local MOVEMENT_PRIORITY=100
 
 function AutoChest.new(movement)
     return setmetatable({
@@ -82,7 +81,7 @@ function AutoChest:_move(part)
         return false
     end
 
-    return self.Movement:FlyTo(self:_targetCFrame(part),nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
+    return self.Movement:FlyTo(self:_targetCFrame(part),nil,MOVEMENT_OWNER)
 end
 
 function AutoChest:_touch(root,part)
