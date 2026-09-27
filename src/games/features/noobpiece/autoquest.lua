@@ -6,7 +6,6 @@ local AutoQuest={}
 AutoQuest.__index=AutoQuest
 
 local MOVEMENT_OWNER="AutoQuest"
-local MOVEMENT_PRIORITY=300
 
 local function lower(value)
     return string.lower(tostring(value or ""))
@@ -327,7 +326,7 @@ function AutoQuest:_moveNear(root,target)
         Vector3.new(target.Position.X,position.Y,target.Position.Z)
     )
 
-    return self.Movement:FlyTo(goal,nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
+    return self.Movement:FlyTo(goal,nil,MOVEMENT_OWNER)
 end
 
 function AutoQuest:_approachIsland(root,island)
@@ -341,7 +340,7 @@ function AutoQuest:_approachIsland(root,island)
         return false
     end
 
-    return self.Movement:FlyTo(destination,nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
+    return self.Movement:FlyTo(destination,nil,MOVEMENT_OWNER)
 end
 
 function AutoQuest:_requestQuest(island,enemy,token)
