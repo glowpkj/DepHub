@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T18:19:39.728391+00:00",
-  "commit": "06b6501b87e74b40fcf2aec55abf1bee1ceadbec",
+  "generatedAt": "2026-09-27T18:19:50.472312+00:00",
+  "commit": "f03d1bb063610d356551a32776024c48bb158a19",
   "version": "0.0.23",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "ddf18ccb4ac80d60ec87e7b0d4125835f66ef443d245f6e4379170623064fdee",
-      "commit": "06b6501b87e74b40fcf2aec55abf1bee1ceadbec",
+      "commit": "f03d1bb063610d356551a32776024c48bb158a19",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "ba1ae8e9c28fc8924510348741697ed2d40be3a1742402dd18fe6605f7d005b4",
-      "commit": "06b6501b87e74b40fcf2aec55abf1bee1ceadbec",
+      "commit": "f03d1bb063610d356551a32776024c48bb158a19",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "c9400422ce8d0de35d05f21535f96c3be8e9a0c8dcb302eefceb9acf7e6aac35",
-      "commit": "06b6501b87e74b40fcf2aec55abf1bee1ceadbec",
+      "commit": "f03d1bb063610d356551a32776024c48bb158a19",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "8ef67f4665a674ce5de2eb7cea5126e2ca9b02d564335e82be564187fbd6d7cf",
-      "commit": "06b6501b87e74b40fcf2aec55abf1bee1ceadbec",
+      "commit": "f03d1bb063610d356551a32776024c48bb158a19",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,7 +104,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "87313d569b2eb892e825ddc3ebc4fe09c6dfa6014d3bcf804572214c47a7e65f",
-      "commit": "06b6501b87e74b40fcf2aec55abf1bee1ceadbec",
+      "commit": "f03d1bb063610d356551a32776024c48bb158a19",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "c0b0fcf3bac764fcdd663563bcc578cf2d8dbbb230e20b9e37dc7e6373f50966",
-      "commit": "06b6501b87e74b40fcf2aec55abf1bee1ceadbec",
+      "commit": "f03d1bb063610d356551a32776024c48bb158a19",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "31c252663fd15e76dd21e93f06b460092b6d1ae27e688b8cd2f432df6efe0c70",
-      "commit": "06b6501b87e74b40fcf2aec55abf1bee1ceadbec",
+      "version": "31c843614be986306a60e5a123faae9275adbcc0f8b9adaec1b1cbc02af7aa4a",
+      "commit": "f03d1bb063610d356551a32776024c48bb158a19",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -180,6 +180,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "f03d1bb",
+      "Date": "2026-09-27T15:19:42-03:00",
+      "Changes": [
+        "refactor: prioritize manual gacha movement"
+      ]
+    },
+    {
       "Version": "06b6501",
       "Date": "2026-09-27T15:19:32-03:00",
       "Changes": [
@@ -205,13 +212,6 @@
       "Date": "2026-09-27T15:18:13-03:00",
       "Changes": [
         "feat: add movement ownership and priority arbitration"
-      ]
-    },
-    {
-      "Version": "e24a7c8",
-      "Date": "2026-09-27T14:53:21-03:00",
-      "Changes": [
-        "Document Noob Piece movement reset fix"
       ]
     }
   ]
