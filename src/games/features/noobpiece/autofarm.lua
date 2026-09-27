@@ -438,12 +438,12 @@ function AutoFarm:_approachIsland(root)
 
             if currentRoot then
                 if self:_nearest(currentRoot) then
-                    self.Movement:Stop()
+                    self.Movement:Stop(true)
                     break
                 end
 
                 if (currentRoot.Position-destination.Position).Magnitude<=self.IslandArrivalRadius then
-                    self.Movement:Stop()
+                    self.Movement:Stop(true)
                     break
                 end
             end
@@ -542,7 +542,7 @@ function AutoFarm:SetPaused(paused)
     self.AutoAttack:SetFarmReady(false)
 
     if paused and self.Movement then
-        self.Movement:Stop()
+        self.Movement:Stop(true)
     end
 end
 
@@ -568,7 +568,7 @@ function AutoFarm:SetEnabled(enabled)
         self.AutoAttack:SetFarmEnabled(false)
 
         if self.Movement then
-            self.Movement:Stop()
+            self.Movement:Stop(true)
         end
     end
 end
