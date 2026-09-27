@@ -9,6 +9,7 @@ local function loadFeature(path)
 end
 
 local Movement=loadFeature("src/core/tween-movement.lua")
+local MovementProfile=loadFeature("src/games/features/noobpiece/movementprofile.lua")
 local IslandData=loadFeature("src/games/features/noobpiece/islanddata.lua")
 local ChestESP=loadFeature("src/games/features/noobpiece/chestesp.lua")
 local IslandTracker=loadFeature("src/games/features/noobpiece/islandtracker.lua")
@@ -21,7 +22,7 @@ local NpcESP=loadFeature("src/games/features/noobpiece/npcesp.lua")
 local AutoQuest=loadFeature("src/games/features/noobpiece/autoquest.lua")
 
 local backend={
-    Version="0.0.16",
+    Version="0.0.17",
     Toggles={
         ChestESP=false,
         IslandESP=false,
@@ -43,13 +44,7 @@ local backend={
     }
 }
 
-backend.Movement=Movement.new({
-    Speed=45,
-    MinDuration=0.05,
-    MaxSegmentDuration=3,
-    SegmentPause=0.5,
-    UsePhysics=true
-})
+backend.Movement=Movement.new(MovementProfile)
 
 backend.ChestESP=ChestESP.new()
 backend.IslandTracker=IslandTracker.new(IslandData,backend.Movement)
