@@ -5,7 +5,12 @@ local islands={
         Name="HomeIsland",
         DisplayName="HomeIsland",
         Order=1,
-        CFrame=CFrame.new(57.08273696899414,13.48134994506836,67.45685577392578),
+        CFrame=CFrame.new(
+            -1690.98621,10.2895718,-69.7156982,
+            -0.5592103,0,0.829025805,
+            0,1,0,
+            -0.829025805,0,-0.5592103
+        ),
         LevelMin=1,
         LevelMax=30,
         WorkspacePath={"Ilhas","HomeIsland"},
