@@ -20,7 +20,6 @@ function AutoFarm.new(movement,autoAttack,islandData)
         RangeMargin=1,
         Tolerance=0.75,
         FallbackRange=8,
-        IslandArrivalRadius=350,
         WeaponCategory="Fists",
         SelectedEnemy="Noob",
         SelectedIsland="HomeIsland",
