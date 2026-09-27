@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-26T22:42:44.797598+00:00",
-  "commit": "9ace7c9764494b8283da98deec70fb640ef5318e",
+  "generatedAt": "2026-09-27T12:31:54.925126+00:00",
+  "commit": "f652f107022bb60bed1df6430b6dea4578206001",
   "version": "0.0.20",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "43451dc033593e7f7f366733fb4ed76ac81b80ed59d4b11258a020e8de0d0b76",
-      "commit": "9ace7c9764494b8283da98deec70fb640ef5318e",
+      "commit": "f652f107022bb60bed1df6430b6dea4578206001",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "4fa31925e410848504e066bca4b27e015a3df00270bff4613fe0d6e15ea5fd4d",
-      "commit": "9ace7c9764494b8283da98deec70fb640ef5318e",
+      "commit": "f652f107022bb60bed1df6430b6dea4578206001",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "5648868a7aae851490408a8ea0c09fa9570de916b7874ad1f9be2947f108c838",
-      "commit": "9ace7c9764494b8283da98deec70fb640ef5318e",
+      "commit": "f652f107022bb60bed1df6430b6dea4578206001",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "b58585970bc4dca84f732a0ccb8d4cdd89dbb53e6aac6ff7dcaa895a153ae9ce",
-      "commit": "9ace7c9764494b8283da98deec70fb640ef5318e",
+      "commit": "f652f107022bb60bed1df6430b6dea4578206001",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -104,7 +104,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "0c84f8afeb71031fce10b4604919eb9ad704794aa2ff9c877f12bf8da414ceb0",
-      "commit": "9ace7c9764494b8283da98deec70fb640ef5318e",
+      "commit": "f652f107022bb60bed1df6430b6dea4578206001",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "5d4ad02eed8e068a845a36279e0cdc5f22f4ba42cbfbbab897044909e1d2eee2",
-      "commit": "9ace7c9764494b8283da98deec70fb640ef5318e",
+      "commit": "f652f107022bb60bed1df6430b6dea4578206001",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -149,7 +149,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "141a07d3e459fe826e8ddeee054335167560b9578378f239f9e57ed232f8b107",
-      "commit": "9ace7c9764494b8283da98deec70fb640ef5318e",
+      "commit": "f652f107022bb60bed1df6430b6dea4578206001",
       "files": [
         "DepHub.lua",
         "src/version.txt",
