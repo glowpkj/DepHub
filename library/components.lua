@@ -90,8 +90,13 @@ end
 
 function Components:CreateButton(section, options)
     options = options or {}
-    local frame = self:_base(section, 58)
-    local label = self.Utils:Text(frame, string.upper(tostring(options.Title or "BUTTON")), UDim2.new(1, -56, 1, 0), UDim2.fromOffset(14, 0), 14, Enum.Font.GothamBold, self.Theme.White)
+    local hasDescription=type(options.Description)=="string" and options.Description~=""
+    local frame = self:_base(section, hasDescription and 70 or 58)
+    local label = self.Utils:Text(frame, string.upper(tostring(options.Title or "BUTTON")), UDim2.new(1, -56, 0, 26), UDim2.fromOffset(14, hasDescription and 8 or 16), 14, Enum.Font.GothamBold, self.Theme.White)
+    if hasDescription then
+        local description=self.Utils:Text(frame,string.upper(options.Description),UDim2.new(1,-56,0,22),UDim2.fromOffset(14,35),11,Enum.Font.GothamMedium,self.Theme.White)
+        description.TextTransparency=0.24
+    end
     local arrow = self.Utils:Text(frame, "›", UDim2.fromOffset(24, 36), UDim2.new(1, -37, 0.5, -18), 23, Enum.Font.GothamBold, self.Theme.White, Enum.TextXAlignment.Center)
     local stroke = frame:FindFirstChildOfClass("UIStroke")
     local hitbox = Instance.new("TextButton")
@@ -161,7 +166,7 @@ function Components:CreateSlider(section, options)
     local step = math.max(tonumber(options.Step) or 1, 0.001)
     local value = math.clamp(tonumber(options.Default) or minimum, minimum, maximum)
     local frame = self:_base(section, 86)
-    self:_info(frame, options.Title or "SLIDER", options.Description)
+    local title,description=self:_info(frame, options.Title or "SLIDER", options.Description)
     local valueLabel = self.Utils:Text(frame, "", UDim2.fromOffset(72, 26), UDim2.new(1, -86, 0, 9), 13, Enum.Font.GothamBold, self.Theme.White, Enum.TextXAlignment.Right)
     local bar = Instance.new("Frame")
     bar.Size, bar.Position, bar.BackgroundColor3, bar.BorderSizePixel = UDim2.new(1, -28, 0, 4), UDim2.new(0, 14, 1, -19), self.Theme.Input, 0
@@ -209,7 +214,12 @@ function Components:CreateSlider(section, options)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input == touch then dragging=false; touch=nil end
     end))
     render(true)
-    return self:_register(wrapper, section)
+    return self:_register(wrapper, section, function(_,compact)
+        frame.Size=UDim2.new(1,0,0,compact and 112 or 86)
+        title.Size=UDim2.new(1,compact and -28 or -190,0,26)
+        description.Size=UDim2.new(1,compact and -28 or -190,0,22)
+        valueLabel.Position=compact and UDim2.new(1,-86,0,56) or UDim2.new(1,-86,0,9)
+    end)
 end
 
 function Components:CreateDropdown(section, options)
@@ -234,7 +244,7 @@ function Components:CreateDropdown(section, options)
         for _, child in ipairs(menu:GetChildren()) do if child:IsA("TextButton") then child:Destroy() end end
         for index, option in ipairs(values) do
             local item = Instance.new("TextButton")
-            item.Size, item.BackgroundColor3, item.BorderSizePixel = UDim2.new(1, 0, 0, 30), self.Theme.SurfaceElevated, 0
+            item.Size, item.BackgroundColor3, item.BorderSizePixel = UDim2.new(1, 0, 0, 30), option==value and self.Theme.AccentDark or self.Theme.SurfaceElevated, 0
             item.Text, item.TextColor3, item.Font, item.TextSize, item.LayoutOrder = string.upper(tostring(option)), self.Theme.White, Enum.Font.GothamBold, 11, index
             item.Parent = menu
             wrapper.OptionConnections[#wrapper.OptionConnections+1] = item.MouseButton1Click:Connect(function() wrapper:SetValue(option); close() end)
@@ -252,6 +262,7 @@ function Components:CreateDropdown(section, options)
     function wrapper:SetValue(newValue, silent)
         if not table.find(values, newValue) then return false end
         value = newValue; button.Text = string.upper(tostring(value))
+        rebuild()
         if not silent then self._owner.Window:SafeCall(options.Callback, value) end
         return true
     end
