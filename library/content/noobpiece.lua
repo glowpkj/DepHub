@@ -3,6 +3,7 @@ local Content={}
 function Content.mount(window,backend)
     local autoChestToggle
     local autoFarmToggle
+    local islandTeleportToggle
 
     local espPage=window:CreateTab("ESP","ESP")
     local chestEsp=window:CreateSection(espPage,"BAUS")
@@ -27,9 +28,9 @@ function Content.mount(window,backend)
         end
     })
 
-    window:CreateDropdown(islands,{
+    local islandDropdown=window:CreateDropdown(islands,{
         Title="ILHA",
-        Description="SELECIONA UMA ILHA COM CFRAME JA MAPEADO.",
+        Description="SELECIONA UMA ILHA COM CFRAME JA MAPEADO. A MYSTERIOUS SO APARECE ENQUANTO EXISTIR.",
         Values=backend:GetIslandNames(),
         Default=backend:GetValue("SelectedIsland"),
         Callback=function(value)
@@ -37,13 +38,34 @@ function Content.mount(window,backend)
         end
     })
 
-    window:CreateButton(islands,{
+    islandTeleportToggle=window:CreateToggle(islands,{
         Title="TELEPORTAR ILHA",
-        Description="VAI ATE O CFRAME SALVO DA ILHA SELECIONADA.",
-        Callback=function()
-            backend:TeleportIsland(backend:GetValue("SelectedIsland"))
+        Description="ATIVA O MOVIMENTO ATE A ILHA SELECIONADA. DESATIVE PARA INTERROMPER.",
+        Default=backend:GetToggle("IslandTeleport"),
+        Callback=function(enabled)
+            if not backend:SetIslandTeleport(enabled) and enabled then
+                islandTeleportToggle:SetValue(false,true)
+            end
         end
     })
+
+    backend:ConnectIslandAvailabilityChanged(function(values)
+        local selected=backend:GetValue("SelectedIsland")
+
+        if not table.find(values,selected) then
+            if islandTeleportToggle then
+                islandTeleportToggle:SetValue(false,true)
+            end
+
+            selected=values[1]
+
+            if selected then
+                backend:SetSelectedIsland(selected)
+            end
+        end
+
+        islandDropdown:SetValues(values,selected,true)
+    end)
 
     local chestFarm=window:CreateSection(espPage,"AUTO BAU")
 
@@ -73,6 +95,15 @@ function Content.mount(window,backend)
 
     local farmPage=window:CreateTab("FARM","FARM")
     local autoFarm=window:CreateSection(farmPage,"AUTO FARM")
+
+    window:CreateToggle(autoFarm,{
+        Title="AUTO QUEST",
+        Description="PEGA E RENOVA AUTOMATICAMENTE A MISSAO DO INIMIGO SELECIONADO QUANDO ELA ESTA MAPEADA.",
+        Default=backend:GetToggle("AutoQuest"),
+        Callback=function(enabled)
+            backend:SetAutoQuest(enabled)
+        end
+    })
 
     autoFarmToggle=window:CreateToggle(autoFarm,{
         Title="AUTO FARM MOBS",
@@ -127,6 +158,15 @@ function Content.mount(window,backend)
     })
 
     local utility=window:CreateSection(farmPage,"NPCS")
+
+    window:CreateToggle(utility,{
+        Title="ESP WANDERING GACHA",
+        Description="MOSTRA O NPC DE GACHA E A DISTANCIA QUANDO ELE EXISTIR.",
+        Default=backend:GetToggle("GachaESP"),
+        Callback=function(enabled)
+            backend:SetGachaESP(enabled)
+        end
+    })
 
     window:CreateButton(utility,{
         Title="WANDERING GACHA",
