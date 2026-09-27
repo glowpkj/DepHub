@@ -11,11 +11,13 @@ function AutoFarm.new(movement,autoAttack,islandData)
         AutoAttack=autoAttack,
         IslandData=islandData,
         Enabled=false,
+        Paused=false,
         Token=0,
         Target=nil,
         RangeMargin=1,
         Tolerance=0.75,
         FallbackRange=8,
+        IslandArrivalRadius=350,
         WeaponCategory="Fists",
         SelectedEnemy="Noob",
         SelectedIsland="HomeIsland",
@@ -404,34 +406,12 @@ function AutoFarm:_goal(enemyRoot,range)
     ),desired
 end
 
-function AutoFarm:_hasLoadedEnemyDefinition()
-    local folder=self:_folder()
-
-    if not folder or not self.SelectedIsland then
-        return false
-    end
-
-    local islandFolder=folder:FindFirstChild(self.SelectedIsland)
-
-    if not islandFolder then
-        return false
-    end
-
-    for _,object in ipairs(islandFolder:GetDescendants()) do
-        if object:IsA("Model") and self:_npcId(object)==self.SelectedEnemy then
-            return true
-        end
-    end
-
-    return false
-end
-
 function AutoFarm:_approachIsland(root)
     if not self.SelectedIsland or not self.IslandData then
         return false
     end
 
-    if self:_hasLoadedEnemyDefinition() then
+    if self:_nearest(root) then
         return false
     end
 
@@ -442,6 +422,10 @@ function AutoFarm:_approachIsland(root)
     end
 
     local destination=island.CFrame*CFrame.new(0,3,0)
+
+    if (root.Position-destination.Position).Magnitude<=self.IslandArrivalRadius then
+        return false
+    end
 
     self.AutoAttack:SetFarmReady(false)
     local moved=self.Movement:FlyTo(destination)
@@ -454,6 +438,13 @@ function AutoFarm:_run(token)
     self.AutoAttack:SetFarmReady(false)
 
     while self.Enabled and token==self.Token do
+        if self.Paused then
+            self.Target=nil
+            self.AutoAttack:SetFarmReady(false)
+            task.wait(0.1)
+            continue
+        end
+
         local root=self:_character()
 
         if not root then
@@ -511,6 +502,22 @@ function AutoFarm:_run(token)
         self.Target=nil
         self.AutoAttack:SetFarmReady(false)
         self.AutoAttack:SetFarmEnabled(false)
+    end
+end
+
+function AutoFarm:SetPaused(paused)
+    paused=paused==true
+
+    if self.Paused==paused then
+        return
+    end
+
+    self.Paused=paused
+    self.Target=nil
+    self.AutoAttack:SetFarmReady(false)
+
+    if paused and self.Movement then
+        self.Movement:Stop()
     end
 end
 
