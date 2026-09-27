@@ -4,6 +4,9 @@ local Workspace=game:GetService("Workspace")
 local AutoFarm={}
 AutoFarm.__index=AutoFarm
 
+local MOVEMENT_OWNER="AutoFarm"
+local MOVEMENT_PRIORITY=200
+
 function AutoFarm.new(movement,autoAttack,islandData)
     return setmetatable({
         Player=Players.LocalPlayer,
@@ -407,12 +410,39 @@ function AutoFarm:_goal(enemyRoot,range)
     ),desired
 end
 
+function AutoFarm:_matchingEnemyModel(descendant)
+    local folder=self:_folder()
+
+    if not folder or not descendant then
+        return nil
+    end
+
+    local current=descendant
+
+    if not current:IsA("Model") then
+        current=current.Parent
+    end
+
+    while current and current~=folder do
+        if current:IsA("Model") and self:_valid(current) then
+            return current
+        end
+
+        current=current.Parent
+    end
+
+    return nil
+end
+
 function AutoFarm:_approachIsland(root)
     if not self.SelectedIsland or not self.IslandData then
         return false
     end
 
-    if self:_nearest(root) then
+    local existing=self:_nearest(root)
+
+    if existing then
+        self.Target=existing
         return false
     end
 
@@ -423,39 +453,34 @@ function AutoFarm:_approachIsland(root)
     end
 
     local destination=island.CFrame*CFrame.new(0,3,0)
-
-    if (root.Position-destination.Position).Magnitude<=self.IslandArrivalRadius then
-        return false
-    end
-
     self.AutoAttack:SetFarmReady(false)
 
-    local watching=true
+    local folder=self:_folder()
+    local connection
 
-    task.spawn(function()
-        while watching and self.Enabled and not self.Paused do
-            local currentRoot=self:_character()
-
-            if currentRoot then
-                if self:_nearest(currentRoot) then
-                    self.Movement:Stop(true)
-                    break
-                end
-
-                if (currentRoot.Position-destination.Position).Magnitude<=self.IslandArrivalRadius then
-                    self.Movement:Stop(true)
-                    break
-                end
+    if folder then
+        connection=folder.DescendantAdded:Connect(function(descendant)
+            if not self.Enabled or self.Paused then
+                return
             end
 
-            task.wait(0.1)
-        end
-    end)
+            local model=self:_matchingEnemyModel(descendant)
 
-    local moved=self.Movement:FlyTo(destination)
-    watching=false
-    task.wait(0.15)
-    return moved
+            if model then
+                self.Target=model
+                self.Movement:CancelOwner(MOVEMENT_OWNER,true)
+            end
+        end)
+    end
+
+    local moved=self.Movement:FlyTo(destination,nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
+
+    if connection then
+        connection:Disconnect()
+    end
+
+    task.wait(0.05)
+    return moved or self.Target~=nil
 end
 
 function AutoFarm:_run(token)
@@ -512,7 +537,7 @@ function AutoFarm:_run(token)
 
         if goalDistance>self.Tolerance or targetDistance>range then
             self.AutoAttack:SetFarmReady(false)
-            self.Movement:FlyTo(goal)
+            self.Movement:FlyTo(goal,nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
         else
             self:_face(root,enemyRoot)
             self.AutoAttack:SetFarmReady(
@@ -542,7 +567,7 @@ function AutoFarm:SetPaused(paused)
     self.AutoAttack:SetFarmReady(false)
 
     if paused and self.Movement then
-        self.Movement:Stop(true)
+        self.Movement:CancelOwner(MOVEMENT_OWNER,true)
     end
 end
 
@@ -568,7 +593,7 @@ function AutoFarm:SetEnabled(enabled)
         self.AutoAttack:SetFarmEnabled(false)
 
         if self.Movement then
-            self.Movement:Stop(true)
+            self.Movement:CancelOwner(MOVEMENT_OWNER,true)
         end
     end
 end
