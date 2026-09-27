@@ -123,6 +123,7 @@ function Window:_build()
     self.TabsHolder=tabs
 
     local sidebarFooter=newFrame("SidebarFooter",sidebar,UDim2.new(1,-40,0,1),UDim2.new(0,20,1,-48),self.Theme.Border)
+    self.SidebarFooter=sidebarFooter
     self.ShortcutLabel=self.Utils:Text(sidebar,"RIGHT CTRL  /  MENU",UDim2.new(1,-40,0,24),UDim2.new(0,20,1,-40),10,Enum.Font.GothamMedium,self.Theme.White)
 
     local content=newFrame("Content",body,UDim2.new(1,-182,1,0),UDim2.fromOffset(182,0),self.Theme.Background)
@@ -354,7 +355,7 @@ function Window:OpenPage(name)
         local selected=tab.Name==name
         tab.Marker.Visible=selected
         tab.Marker.BackgroundTransparency=0
-        tab.Text.Text=selected and ("[  "..tab.Label.."  ]") or tab.Label
+        tab.Text.Text=selected and (self.Compact and ("["..tab.Label.."]") or ("[  "..tab.Label.."  ]")) or tab.Label
         tab.Text.TextColor3=self.Theme.White
         tab.Button.BackgroundTransparency=1
     end
@@ -476,13 +477,25 @@ function Window:_updateResponsive(force)
     self.Sidebar.Size=UDim2.fromOffset(side,height)
     self.Content.Position=UDim2.fromOffset(side,0)
     self.Content.Size=UDim2.new(1,-side,1,0)
-    self.Brand.TextSize=compact and 17 or 23
+    self.Brand.TextSize=compact and 16 or 23
+    self.Brand.Position=compact and UDim2.fromOffset(12,22) or UDim2.fromOffset(20,22)
+    self.Brand.Size=compact and UDim2.new(1,-18,0,33) or UDim2.new(1,-34,0,33)
     self.SubtitleLabel.Visible=not compact
-    self.NavigationLabel.TextSize=compact and 9 or 10
+    self.NavigationLabel.Visible=not compact
+    self.SidebarFooter.Visible=not compact
+    self.ShortcutLabel.Visible=not compact
+    self.HomeHolder.Position=compact and UDim2.fromOffset(12,103) or UDim2.fromOffset(12,133)
+    self.TabsHolder.Position=compact and UDim2.fromOffset(12,158) or UDim2.fromOffset(12,188)
     self.HeaderTitle.TextSize=compact and 16 or 19
     self.HeaderTitle.Size=UDim2.new(1,compact and -26 or -250,0,32)
     self.SearchBox.Visible=not compact and self.CurrentPage~="HOME"
-    self.TabsHolder.Size=UDim2.new(1,-24,1,-243)
+    self.TabsHolder.Size=UDim2.new(1,-24,1,compact and -212 or -243)
+    for _,tab in ipairs(self.Tabs) do
+        tab.Text.TextSize=compact and 11 or 13
+        tab.Text.Position=compact and UDim2.fromOffset(8,0) or UDim2.fromOffset(15,0)
+        tab.Text.Size=compact and UDim2.new(1,-8,1,0) or UDim2.new(1,-24,1,0)
+        tab.Text.Text=tab.Name==self.CurrentPage and (compact and ("["..tab.Label.."]") or ("[  "..tab.Label.."  ]")) or tab.Label
+    end
 
     for _,page in pairs(self.Pages) do
         page.Padding.PaddingLeft=UDim.new(0,compact and 12 or 22)
