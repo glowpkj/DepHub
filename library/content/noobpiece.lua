@@ -9,9 +9,40 @@ function Content.mount(window,backend)
 
     window:CreateToggle(chestEsp,{
         Title="ESP DE BAU",
-        Description="MOSTRA APENAS BAUS SPAWNADOS COM NOME E DISTANCIA.",
+        Description="MOSTRA BAUS SPAWNADOS, INCLUINDO OS DA MYSTERIOUS ISLAND.",
         Default=backend:GetToggle("ChestESP"),
-        Callback=function(enabled) backend:SetChestESP(enabled) end
+        Callback=function(enabled)
+            backend:SetChestESP(enabled)
+        end
+    })
+
+    local islands=window:CreateSection(espPage,"ILHAS")
+
+    window:CreateToggle(islands,{
+        Title="ESP ILHAS",
+        Description="MOSTRA MARCADORES DAS ILHAS MAPEADAS MESMO QUANDO O MAPA DELAS NAO ESTA CARREGADO.",
+        Default=backend:GetToggle("IslandESP"),
+        Callback=function(enabled)
+            backend:SetIslandESP(enabled)
+        end
+    })
+
+    window:CreateDropdown(islands,{
+        Title="ILHA",
+        Description="SELECIONA UMA ILHA COM CFRAME JA MAPEADO.",
+        Values=backend:GetIslandNames(),
+        Default=backend:GetValue("SelectedIsland"),
+        Callback=function(value)
+            backend:SetSelectedIsland(value)
+        end
+    })
+
+    window:CreateButton(islands,{
+        Title="TELEPORTAR ILHA",
+        Description="VAI ATE O CFRAME SALVO DA ILHA SELECIONADA.",
+        Callback=function()
+            backend:TeleportIsland(backend:GetValue("SelectedIsland"))
+        end
     })
 
     local chestFarm=window:CreateSection(espPage,"AUTO BAU")
@@ -22,6 +53,7 @@ function Content.mount(window,backend)
         Default=backend:GetToggle("AutoChest"),
         Callback=function(enabled)
             backend:SetAutoChest(enabled)
+
             if enabled and autoFarmToggle then
                 autoFarmToggle:SetValue(false,true)
             end
@@ -34,7 +66,9 @@ function Content.mount(window,backend)
         Min=0.1,
         Max=2,
         Default=backend:GetValue("AutoChestDelay"),
-        Callback=function(value) backend:SetAutoChestDelay(value) end
+        Callback=function(value)
+            backend:SetAutoChestDelay(value)
+        end
     })
 
     local farmPage=window:CreateTab("FARM","FARM")
@@ -42,10 +76,11 @@ function Content.mount(window,backend)
 
     autoFarmToggle=window:CreateToggle(autoFarm,{
         Title="AUTO FARM MOBS",
-        Description="VAI ATE O MOB SELECIONADO E FICA ATRAS DELE NA BORDA DO RANGE.",
+        Description="VAI PRIMEIRO A ILHA MAPEADA, ESPERA O NPC CARREGAR E DEPOIS FARMA ATRAS DELE.",
         Default=backend:GetToggle("AutoFarm"),
         Callback=function(enabled)
             backend:SetAutoFarm(enabled)
+
             if enabled and autoChestToggle then
                 autoChestToggle:SetValue(false,true)
             end
@@ -54,21 +89,24 @@ function Content.mount(window,backend)
 
     local enemyDropdown=window:CreateDropdown(autoFarm,{
         Title="INIMIGO",
-        Description="SELECIONA O TIPO DE MOB PELO NPC ID.",
+        Description="LISTA MOBS E BOSSES POR ILHA E USA O LEVEL DO NPC QUANDO ELE ESTA DISPONIVEL.",
         Values=backend:GetEnemyTypes(),
-        Default=backend:GetValue("SelectedEnemy"),
-        Callback=function(value) backend:SetSelectedEnemy(value) end
+        Default=backend:GetSelectedEnemyOption(),
+        Callback=function(value)
+            backend:SetSelectedEnemy(value)
+        end
     })
 
     window:CreateButton(autoFarm,{
         Title="ATUALIZAR INIMIGOS",
-        Description="RELE TODOS OS MOBS E BOSSES DAS ILHAS CARREGADAS.",
+        Description="RELE OS ATRIBUTOS DOS NPCS CARREGADOS E ATUALIZA LEVEL, ILHA E BOSS.",
         Callback=function()
             local values=backend:GetEnemyTypes()
-            local selected=backend:GetValue("SelectedEnemy")
+            local selected=backend:GetSelectedEnemyOption()
 
             if not table.find(values,selected) then
                 selected=values[1]
+
                 if selected then
                     backend:SetSelectedEnemy(selected)
                 end
@@ -83,7 +121,9 @@ function Content.mount(window,backend)
         Description="ESCOLHE ENTRE ESTILO DE LUTA E ESPADA.",
         Values={"Fists","Sword"},
         Default=backend:GetValue("WeaponCategory"),
-        Callback=function(value) backend:SetWeaponCategory(value) end
+        Callback=function(value)
+            backend:SetWeaponCategory(value)
+        end
     })
 
     local utility=window:CreateSection(farmPage,"NPCS")
@@ -91,7 +131,9 @@ function Content.mount(window,backend)
     window:CreateButton(utility,{
         Title="WANDERING GACHA",
         Description="TELEPORTA ATE O NPC DE GIRAR FRUTA SE ELE ESTIVER NO MAPA.",
-        Callback=function() backend:TeleportWanderingGacha() end
+        Callback=function()
+            backend:TeleportWanderingGacha()
+        end
     })
 
     local team=window:CreateSection(farmPage,"TIME")
@@ -101,14 +143,18 @@ function Content.mount(window,backend)
         Description="ESCOLHE O TIME USADO PELO AUTO TEAM.",
         Values=backend:GetTeams(),
         Default=backend:GetValue("SelectedTeam"),
-        Callback=function(value) backend:SetSelectedTeam(value) end
+        Callback=function(value)
+            backend:SetSelectedTeam(value)
+        end
     })
 
     window:CreateToggle(team,{
         Title="AUTO TEAM",
         Description="ENTRA AUTOMATICAMENTE NO TIME SELECIONADO.",
         Default=backend:GetToggle("AutoTeam"),
-        Callback=function(enabled) backend:SetAutoTeam(enabled) end
+        Callback=function(enabled)
+            backend:SetAutoTeam(enabled)
+        end
     })
 
     local combat=window:CreateSection(farmPage,"COMBATE")
@@ -117,9 +163,10 @@ function Content.mount(window,backend)
         Title="AUTO ATTACK",
         Description="ATACA SEMPRE COM A TOOL EQUIPADA E O REMOTE.",
         Default=backend:GetToggle("AutoAttack"),
-        Callback=function(enabled) backend:SetAutoAttack(enabled) end
+        Callback=function(enabled)
+            backend:SetAutoAttack(enabled)
+        end
     })
-
 
     window:OpenPage("ESP")
 end
