@@ -67,6 +67,80 @@ backend.AutoTeam:SetSelected(backend.Values.SelectedTeam)
 backend.AutoFarm:SetSelectedEnemy(backend.Values.SelectedEnemy)
 backend.AutoQuest:SetSelectedEnemy(backend.Values.SelectedEnemy)
 backend.IslandTracker:Start()
+backend.IslandAvailability=Instance.new("BindableEvent")
+backend.MirageMarker=nil
+
+function backend:_RefreshMirageESP()
+    local available=Workspace:FindFirstChild("MysteriousIsland")~=nil
+
+    if not self.Toggles.IslandESP or not available then
+        if self.MirageMarker then
+            self.MirageMarker:Destroy()
+            self.MirageMarker=nil
+        end
+        return
+    end
+
+    local island=IslandData.Get("MysteriousIsland")
+
+    if not island or not island.CFrame or self.MirageMarker then
+        return
+    end
+
+    local part=Instance.new("Part")
+    part.Name="DepHubMysteriousIslandMarker"
+    part.Anchored=true
+    part.CanCollide=false
+    part.CanTouch=false
+    part.CanQuery=false
+    part.CastShadow=false
+    part.Transparency=1
+    part.Size=Vector3.new(4,4,4)
+    part.CFrame=island.CFrame
+    part.Parent=Workspace
+
+    local gui=Instance.new("BillboardGui")
+    gui.Name="DepHubMysteriousIslandESP"
+    gui.Adornee=part
+    gui.AlwaysOnTop=true
+    gui.Size=UDim2.fromOffset(190,42)
+    gui.StudsOffset=Vector3.new(0,5,0)
+    gui.MaxDistance=10000
+    gui.LightInfluence=0
+    gui.Parent=part
+
+    local label=Instance.new("TextLabel")
+    label.BackgroundTransparency=1
+    label.Size=UDim2.fromScale(1,1)
+    label.Font=Enum.Font.GothamBold
+    label.TextColor3=Color3.new(1,1,1)
+    label.TextStrokeColor3=Color3.new(0,0,0)
+    label.TextStrokeTransparency=0.2
+    label.TextSize=13
+    label.Text="MYSTERIOUS ISLAND"
+    label.Parent=gui
+
+    self.MirageMarker=part
+end
+
+backend.IslandWorkspaceConnection=Workspace.ChildAdded:Connect(function(child)
+    if child.Name=="MysteriousIsland" then
+        backend:_RefreshMirageESP()
+        backend.IslandAvailability:Fire(backend:GetIslandNames())
+    end
+end)
+
+backend.IslandWorkspaceRemovingConnection=Workspace.ChildRemoved:Connect(function(child)
+    if child.Name=="MysteriousIsland" then
+        backend:_RefreshMirageESP()
+
+        if backend.Toggles.IslandTeleport and backend.Values.SelectedIsland=="MysteriousIsland" then
+            backend:SetIslandTeleport(false)
+        end
+
+        backend.IslandAvailability:Fire(backend:GetIslandNames())
+    end
+end)
 
 function backend:SetChestESP(enabled)
     enabled=enabled==true
