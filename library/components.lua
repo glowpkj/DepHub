@@ -20,11 +20,18 @@ function Components:_section(page, title)
     holder.AutomaticSize = Enum.AutomaticSize.Y
     holder.BackgroundTransparency = 1
     local layout = Instance.new("UIListLayout")
-    layout.Padding = UDim.new(0, 8)
+    layout.Padding = UDim.new(0, 6)
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Parent = holder
-    local header = self.Utils:Text(holder, string.upper(tostring(title)), UDim2.new(1, 0, 0, 34), nil, 17, Enum.Font.GothamBold)
+    local header = self.Utils:Text(holder, string.upper(tostring(title)), UDim2.new(1, -25, 0, 29), UDim2.fromOffset(25, 0), 13, Enum.Font.GothamBold, self.Theme.White)
     header.LayoutOrder = 1
+    local accent = Instance.new("Frame")
+    accent.Name = "SectionAccent"
+    accent.Size = UDim2.fromOffset(17, 2)
+    accent.Position = UDim2.fromOffset(-25, 14)
+    accent.BackgroundColor3 = self.Theme.Accent
+    accent.BorderSizePixel = 0
+    accent.Parent = header
     local section = {Instance=holder, Header=header, NextOrder=2, Destroyed=false, Controls={}}
     function section:Add(object)
         if self.Destroyed or not object then return end
@@ -43,15 +50,16 @@ function Components:_base(section, height)
     frame.Size = UDim2.new(1, 0, 0, height)
     frame.BackgroundColor3 = self.Theme.Surface
     frame.BorderSizePixel = 0
-    self.Utils:Corner(frame)
-    self.Utils:Stroke(frame, self.Theme.Border, 0.42, 1)
+    self.Utils:Corner(frame, UDim.new(0, 5))
+    self.Utils:Stroke(frame, self.Theme.Border, 0.13, 1)
     section:Add(frame)
     return frame
 end
 
 function Components:_info(frame, title, description)
-    local titleLabel = self.Utils:Text(frame, string.upper(tostring(title)), UDim2.new(1, -190, 0, 26), UDim2.fromOffset(14, 8), 14, Enum.Font.GothamBold)
-    local descriptionLabel = self.Utils:Text(frame, string.upper(tostring(description or "")), UDim2.new(1, -190, 0, 22), UDim2.fromOffset(14, 33), 10, Enum.Font.GothamMedium, self.Theme.Text)
+    local titleLabel = self.Utils:Text(frame, string.upper(tostring(title)), UDim2.new(1, -190, 0, 26), UDim2.fromOffset(14, 7), 14, Enum.Font.GothamBold, self.Theme.White)
+    local descriptionLabel = self.Utils:Text(frame, string.upper(tostring(description or "")), UDim2.new(1, -190, 0, 22), UDim2.fromOffset(14, 32), 11, Enum.Font.GothamMedium, self.Theme.White)
+    descriptionLabel.TextTransparency = 0.24
     return titleLabel, descriptionLabel
 end
 
@@ -71,8 +79,9 @@ end
 function Components:CreateLabel(section, options)
     options = options or {}
     local frame = self:_base(section, options.Height or 62)
-    local title = self.Utils:Text(frame, string.upper(tostring(options.Title or "INFO")), UDim2.new(1, -28, 0, 24), UDim2.fromOffset(14, 7), 13, Enum.Font.GothamBold, options.Color or self.Theme.Accent)
-    local value = self.Utils:Text(frame, tostring(options.Text or options.Description or ""), UDim2.new(1, -28, 0, 22), UDim2.fromOffset(14, 31), 11, Enum.Font.Gotham, self.Theme.Text)
+    local title = self.Utils:Text(frame, string.upper(tostring(options.Title or "INFO")), UDim2.new(1, -28, 0, 24), UDim2.fromOffset(14, 7), 12, Enum.Font.GothamBold, self.Theme.White)
+    local value = self.Utils:Text(frame, tostring(options.Text or options.Description or ""), UDim2.new(1, -28, 0, 22), UDim2.fromOffset(14, 31), 12, Enum.Font.Gotham, self.Theme.White)
+    value.TextTransparency = 0.18
     local wrapper = {Instance=frame, Title=title, Label=value, Destroyed=false}
     function wrapper:SetText(text) value.Text = tostring(text or "") end
     function wrapper:GetText() return value.Text end
@@ -82,13 +91,23 @@ end
 function Components:CreateButton(section, options)
     options = options or {}
     local frame = self:_base(section, 58)
-    local label = self.Utils:Text(frame, string.upper(tostring(options.Title or "BUTTON")), UDim2.new(1, -28, 1, 0), UDim2.fromOffset(14, 0), 14, Enum.Font.GothamBold)
+    local label = self.Utils:Text(frame, string.upper(tostring(options.Title or "BUTTON")), UDim2.new(1, -56, 1, 0), UDim2.fromOffset(14, 0), 14, Enum.Font.GothamBold, self.Theme.White)
+    local arrow = self.Utils:Text(frame, "›", UDim2.fromOffset(24, 36), UDim2.new(1, -37, 0.5, -18), 23, Enum.Font.GothamBold, self.Theme.White, Enum.TextXAlignment.Center)
+    local stroke = frame:FindFirstChildOfClass("UIStroke")
     local hitbox = Instance.new("TextButton")
     hitbox.Size, hitbox.BackgroundTransparency, hitbox.Text, hitbox.AutoButtonColor = UDim2.fromScale(1, 1), 1, "", false
     hitbox.Parent = frame
     local wrapper = {Instance=frame, Label=label, Hitbox=hitbox, Destroyed=false}
-    self.Utils:Track(hitbox.MouseEnter:Connect(function() if not wrapper.Destroyed then frame.BackgroundColor3 = self.Theme.SurfaceHover end end))
-    self.Utils:Track(hitbox.MouseLeave:Connect(function() if not wrapper.Destroyed then frame.BackgroundColor3 = self.Theme.Surface end end))
+    self.Utils:Track(hitbox.MouseEnter:Connect(function()
+        if wrapper.Destroyed then return end
+        frame.BackgroundColor3 = self.Theme.SurfaceHover
+        if stroke then stroke.Color = self.Theme.Accent end
+    end))
+    self.Utils:Track(hitbox.MouseLeave:Connect(function()
+        if wrapper.Destroyed then return end
+        frame.BackgroundColor3 = self.Theme.Surface
+        if stroke then stroke.Color = self.Theme.Border end
+    end))
     self.Utils:Track(hitbox.MouseButton1Click:Connect(function()
         if not wrapper.Destroyed then self.Window:SafeCall(options.Callback) end
     end))
@@ -101,19 +120,23 @@ function Components:CreateToggle(section, options)
     local frame = self:_base(section, 68)
     local title, description = self:_info(frame, options.Title or "TOGGLE", options.Description)
     local switch = Instance.new("Frame")
-    switch.Size, switch.AnchorPoint, switch.BackgroundColor3, switch.BorderSizePixel = UDim2.fromOffset(48, 26), Vector2.new(0, 0.5), self.Theme.Input, 0
+    switch.Size = UDim2.fromOffset(24, 24)
+    switch.AnchorPoint = Vector2.new(0, 0.5)
+    switch.BackgroundColor3 = self.Theme.Input
+    switch.BorderSizePixel = 0
     switch.Parent = frame
-    self.Utils:Corner(switch, UDim.new(1, 0)); self.Utils:Stroke(switch, self.Theme.Border, 0.35, 1)
-    local knob = Instance.new("Frame")
-    knob.Size, knob.AnchorPoint, knob.BackgroundColor3, knob.BorderSizePixel = UDim2.fromOffset(18, 18), Vector2.new(0, 0.5), self.Theme.White, 0
-    knob.Parent = switch; self.Utils:Corner(knob, UDim.new(1, 0))
+    self.Utils:Corner(switch, UDim.new(0, 3))
+    local switchStroke = self.Utils:Stroke(switch, self.Theme.Border, 0.05, 1.3)
+    local check = self.Utils:Text(switch, "✓", UDim2.fromScale(1, 1), nil, 17, Enum.Font.GothamBold, self.Theme.White, Enum.TextXAlignment.Center)
+    check.Visible = false
     local hitbox = Instance.new("TextButton")
     hitbox.Size, hitbox.BackgroundTransparency, hitbox.Text, hitbox.AutoButtonColor = UDim2.fromScale(1, 1), 1, "", false
     hitbox.Parent = frame
     local wrapper = {Instance=frame, Hitbox=hitbox, Destroyed=false}
     local function render()
-        switch.BackgroundColor3 = value and self.Theme.Accent or self.Theme.Input
-        knob.Position = value and UDim2.new(1, -22, 0.5, 0) or UDim2.new(0, 4, 0.5, 0)
+        switch.BackgroundColor3 = value and self.Theme.AccentDark or self.Theme.Input
+        switchStroke.Color = value and self.Theme.Accent or self.Theme.Border
+        check.Visible = value
     end
     function wrapper:GetValue() return value end
     function wrapper:SetValue(newValue, silent)
@@ -125,9 +148,9 @@ function Components:CreateToggle(section, options)
     render()
     return self:_register(wrapper, section, function(_, compact)
         frame.Size = UDim2.new(1, 0, 0, compact and 92 or 68)
-        title.Size = UDim2.new(1, compact and -28 or -190, 0, 26)
-        description.Size = UDim2.new(1, compact and -28 or -190, 0, 22)
-        switch.Position = compact and UDim2.new(1, -62, 1, -24) or UDim2.new(1, -62, 0.5, 0)
+        title.Size = UDim2.new(1, compact and -28 or -64, 0, 26)
+        description.Size = UDim2.new(1, compact and -28 or -64, 0, 22)
+        switch.Position = compact and UDim2.new(1, -39, 1, -23) or UDim2.new(1, -40, 0.5, 0)
     end)
 end
 
@@ -139,19 +162,28 @@ function Components:CreateSlider(section, options)
     local value = math.clamp(tonumber(options.Default) or minimum, minimum, maximum)
     local frame = self:_base(section, 86)
     self:_info(frame, options.Title or "SLIDER", options.Description)
-    local valueLabel = self.Utils:Text(frame, "", UDim2.fromOffset(72, 26), UDim2.new(1, -86, 0, 9), 13, Enum.Font.GothamBold, self.Theme.Accent, Enum.TextXAlignment.Right)
+    local valueLabel = self.Utils:Text(frame, "", UDim2.fromOffset(72, 26), UDim2.new(1, -86, 0, 9), 13, Enum.Font.GothamBold, self.Theme.White, Enum.TextXAlignment.Right)
     local bar = Instance.new("Frame")
-    bar.Size, bar.Position, bar.BackgroundColor3, bar.BorderSizePixel = UDim2.new(1, -28, 0, 6), UDim2.new(0, 14, 1, -17), self.Theme.Input, 0
+    bar.Size, bar.Position, bar.BackgroundColor3, bar.BorderSizePixel = UDim2.new(1, -28, 0, 4), UDim2.new(0, 14, 1, -19), self.Theme.Input, 0
     bar.Parent = frame; self.Utils:Corner(bar, UDim.new(1, 0))
     local fill = Instance.new("Frame")
     fill.BackgroundColor3, fill.BorderSizePixel, fill.Parent = self.Theme.Accent, 0, bar; self.Utils:Corner(fill, UDim.new(1, 0))
+    local thumb = Instance.new("Frame")
+    thumb.Size = UDim2.fromOffset(11, 11)
+    thumb.AnchorPoint = Vector2.new(0.5, 0.5)
+    thumb.BackgroundColor3 = self.Theme.White
+    thumb.BorderSizePixel = 0
+    thumb.Parent = bar
+    self.Utils:Corner(thumb, UDim.new(1, 0))
     local hitbox = Instance.new("TextButton")
     hitbox.Size, hitbox.Position, hitbox.BackgroundTransparency, hitbox.Text = UDim2.new(1, 0, 0, 28), UDim2.new(0, 0, 0.5, -14), 1, ""
     hitbox.Parent = bar
     local dragging, touch = false, nil
     local wrapper = {Instance=frame, Hitbox=hitbox, Destroyed=false}
     local function render(silent)
-        fill.Size = UDim2.new((value-minimum)/(maximum-minimum), 0, 1, 0)
+        local alpha = (value-minimum)/(maximum-minimum)
+        fill.Size = UDim2.new(alpha, 0, 1, 0)
+        thumb.Position = UDim2.fromScale(alpha, 0.5)
         valueLabel.Text = step >= 1 and tostring(math.floor(value + 0.5)) or string.format("%.2f", value)
         if not silent then self.Window:SafeCall(options.Callback, value) end
     end
@@ -187,7 +219,7 @@ function Components:CreateDropdown(section, options)
     local frame = self:_base(section, 70)
     local title, description = self:_info(frame, options.Title or "DROPDOWN", options.Description)
     local button = Instance.new("TextButton")
-    button.BackgroundColor3, button.BorderSizePixel, button.TextColor3, button.TextSize, button.Font, button.AutoButtonColor = self.Theme.Input, 0, self.Theme.White, 11, Enum.Font.GothamBold, false
+    button.BackgroundColor3, button.BorderSizePixel, button.TextColor3, button.TextSize, button.Font, button.AutoButtonColor = self.Theme.Input, 0, self.Theme.White, 12, Enum.Font.GothamBold, false
     button.Parent = frame; self.Utils:Corner(button, UDim.new(0, 6)); self.Utils:Stroke(button, self.Theme.Border, 0.3, 1)
     local menu = Instance.new("ScrollingFrame")
     menu.BackgroundColor3, menu.BorderSizePixel, menu.ClipsDescendants, menu.Visible = self.Theme.SurfaceElevated, 0, true, false
@@ -203,7 +235,7 @@ function Components:CreateDropdown(section, options)
         for index, option in ipairs(values) do
             local item = Instance.new("TextButton")
             item.Size, item.BackgroundColor3, item.BorderSizePixel = UDim2.new(1, 0, 0, 30), self.Theme.SurfaceElevated, 0
-            item.Text, item.TextColor3, item.Font, item.TextSize, item.LayoutOrder = string.upper(tostring(option)), self.Theme.Text, Enum.Font.GothamBold, 10, index
+            item.Text, item.TextColor3, item.Font, item.TextSize, item.LayoutOrder = string.upper(tostring(option)), self.Theme.White, Enum.Font.GothamBold, 11, index
             item.Parent = menu
             wrapper.OptionConnections[#wrapper.OptionConnections+1] = item.MouseButton1Click:Connect(function() wrapper:SetValue(option); close() end)
         end
@@ -249,7 +281,7 @@ function Components:CreateInput(section, options)
     local title, description = self:_info(frame, options.Title or "INPUT", options.Description)
     local box = Instance.new("TextBox")
     box.BackgroundColor3, box.BorderSizePixel, box.Text, box.PlaceholderText = self.Theme.Input, 0, tostring(options.Default or ""), tostring(options.Placeholder or "ENTER VALUE")
-    box.TextColor3, box.PlaceholderColor3, box.Font, box.TextSize, box.ClearTextOnFocus = self.Theme.White, self.Theme.Text, Enum.Font.GothamMedium, 11, false
+    box.TextColor3, box.PlaceholderColor3, box.Font, box.TextSize, box.ClearTextOnFocus = self.Theme.White, self.Theme.White, Enum.Font.GothamMedium, 12, false
     box.Parent = frame; self.Utils:Corner(box, UDim.new(0, 6)); self.Utils:Stroke(box, self.Theme.Border, 0.3, 1)
     local wrapper = {Instance=frame, Box=box, Destroyed=false}
     function wrapper:GetValue() return box.Text end
@@ -325,8 +357,14 @@ function Components:CreateColor(section, options)
     end))
     return self:_register(wrapper,section,function(_,compact)
         frame.Size=UDim2.new(1,0,0,compact and 154 or 112)
-        apply.Size=compact and UDim2.new(1,-28,0,34) or UDim2.new(0,90,0,34)
-        apply.Position=compact and UDim2.fromOffset(14,108) or UDim2.new(1,-104,0,64)
+        preview.Size=compact and UDim2.fromOffset(28,34) or UDim2.fromOffset(40,34)
+        preview.Position=compact and UDim2.fromOffset(12,64) or UDim2.fromOffset(14,64)
+        for index,box in ipairs(boxes) do
+            box.Size=compact and UDim2.fromOffset(28,34) or UDim2.fromOffset(36,34)
+            box.Position=compact and UDim2.fromOffset(48+(index-1)*31,64) or UDim2.fromOffset(60+(index-1)*40,64)
+        end
+        apply.Size=compact and UDim2.new(1,-24,0,34) or UDim2.new(0,90,0,34)
+        apply.Position=compact and UDim2.fromOffset(12,108) or UDim2.new(1,-104,0,64)
     end)
 end
 
