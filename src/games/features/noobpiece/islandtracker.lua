@@ -298,7 +298,7 @@ function IslandTracker:GetTeleportNames()
     return result
 end
 
-function IslandTracker:Teleport(name)
+function IslandTracker:Teleport(name,owner,priority)
     local record=self.Known[name]
     local cframe=record and record.CFrame
 
@@ -311,7 +311,7 @@ function IslandTracker:Teleport(name)
         return false
     end
 
-    return self.Movement:FlyTo(cframe*CFrame.new(0,3,0))
+    return self.Movement:FlyTo(cframe*CFrame.new(0,3,0),nil,owner or "IslandTeleport",priority or 250)
 end
 
 function IslandTracker:GetKnownIslands()
