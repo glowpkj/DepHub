@@ -21,7 +21,7 @@ local NpcESP=loadFeature("src/games/features/noobpiece/npcesp.lua")
 local AutoQuest=loadFeature("src/games/features/noobpiece/autoquest.lua")
 
 local backend={
-    Version="0.0.14",
+    Version="0.0.15",
     Toggles={
         ChestESP=false,
         IslandESP=false,
