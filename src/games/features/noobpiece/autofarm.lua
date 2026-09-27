@@ -457,22 +457,27 @@ function AutoFarm:_approachIsland(root)
     local folder=self:_folder()
     local connection
 
+    local watching=true
+
     if folder then
         connection=folder.DescendantAdded:Connect(function(descendant)
-            if not self.Enabled or self.Paused then
-                return
-            end
+            task.defer(function()
+                if not watching or not self.Enabled or self.Paused then
+                    return
+                end
 
-            local model=self:_matchingEnemyModel(descendant)
+                local model=self:_matchingEnemyModel(descendant)
 
-            if model then
-                self.Target=model
-                self.Movement:CancelOwner(MOVEMENT_OWNER,true)
-            end
+                if model then
+                    self.Target=model
+                    self.Movement:CancelOwner(MOVEMENT_OWNER,true)
+                end
+            end)
         end)
     end
 
     local moved=self.Movement:FlyTo(destination,nil,MOVEMENT_OWNER,MOVEMENT_PRIORITY)
+    watching=false
 
     if connection then
         connection:Disconnect()
