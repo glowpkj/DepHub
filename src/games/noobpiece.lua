@@ -16,12 +16,17 @@ local AutoAttack=loadFeature("src/games/features/noobpiece/autoattack.lua")
 local AutoFarm=loadFeature("src/games/features/noobpiece/autofarm.lua")
 local AutoTeam=loadFeature("src/games/features/noobpiece/autoteam.lua")
 local WanderingGacha=loadFeature("src/games/features/noobpiece/wanderinggacha.lua")
+local NpcESP=loadFeature("src/games/features/noobpiece/npcesp.lua")
+local AutoQuest=loadFeature("src/games/features/noobpiece/autoquest.lua")
 
 local backend={
-    Version="0.0.13",
+    Version="0.0.14",
     Toggles={
         ChestESP=false,
         IslandESP=false,
+        IslandTeleport=false,
+        GachaESP=false,
+        AutoQuest=false,
         AutoChest=false,
         AutoAttack=false,
         AutoFarm=false,
@@ -52,11 +57,14 @@ backend.AutoAttack=AutoAttack.new()
 backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack,IslandData)
 backend.AutoTeam=AutoTeam.new()
 backend.WanderingGacha=WanderingGacha.new(backend.Movement)
+backend.NpcESP=NpcESP.new()
+backend.AutoQuest=AutoQuest.new(backend.Movement,IslandData,backend.AutoFarm)
 
 backend.AutoChest:SetDelay(backend.Values.AutoChestDelay)
 backend.AutoFarm:SetWeaponCategory(backend.Values.WeaponCategory)
 backend.AutoTeam:SetSelected(backend.Values.SelectedTeam)
 backend.AutoFarm:SetSelectedEnemy(backend.Values.SelectedEnemy)
+backend.AutoQuest:SetSelectedEnemy(backend.Values.SelectedEnemy)
 backend.IslandTracker:Start()
 
 function backend:SetChestESP(enabled)
