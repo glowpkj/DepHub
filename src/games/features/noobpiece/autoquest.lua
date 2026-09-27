@@ -337,6 +337,7 @@ function AutoQuest:_requestQuest(island,enemy,token)
     local npcRoot=self:_npcRoot(giver)
 
     if not npcRoot then
+        self:_approachIsland(root,island)
         task.wait(0.2)
         return false
     end
