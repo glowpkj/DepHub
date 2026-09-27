@@ -1,3 +1,4 @@
+local Workspace=game:GetService("Workspace")
 local env=type(getgenv)=="function" and getgenv() or _G
 local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
@@ -89,7 +90,13 @@ function backend:SetSelectedIsland(name)
 end
 
 function backend:GetIslandNames()
-    return self.IslandTracker:GetTeleportNames()
+    local names=self.IslandTracker:GetTeleportNames()
+
+    if Workspace:FindFirstChild("MysteriousIsland") and not table.find(names,"MysteriousIsland") then
+        names[#names+1]="MysteriousIsland"
+    end
+
+    return names
 end
 
 function backend:TeleportIsland(name)
@@ -99,8 +106,35 @@ function backend:TeleportIsland(name)
         return false
     end
 
+    if name=="MysteriousIsland" and not Workspace:FindFirstChild("MysteriousIsland") then
+        return false
+    end
+
     self.Values.SelectedIsland=name
     return self.IslandTracker:Teleport(name)
+end
+
+function backend:SetIslandTeleport(enabled)
+    enabled=enabled==true
+    self.Toggles.IslandTeleport=enabled
+
+    if not enabled then
+        self.Movement:Stop()
+        return true
+    end
+
+    local name=self.Values.SelectedIsland
+
+    if name=="MysteriousIsland" and not Workspace:FindFirstChild("MysteriousIsland") then
+        self.Toggles.IslandTeleport=false
+        return false
+    end
+
+    task.spawn(function()
+        self:TeleportIsland(name)
+    end)
+
+    return true
 end
 
 function backend:SetAutoChest(enabled)
