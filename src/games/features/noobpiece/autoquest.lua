@@ -177,12 +177,26 @@ function AutoQuest:_captureDialogMovement()
         return
     end
 
+    local huds={}
+    local playerGui=self.Player:FindFirstChild("PlayerGui")
+
+    if playerGui then
+        for _,name in ipairs({"StatsHUD","ButtonsHUD","CurrencyHUD","ProfileHUD"}) do
+            local hud=playerGui:FindFirstChild(name)
+
+            if hud then
+                huds[hud]=hud.Enabled
+            end
+        end
+    end
+
     self.DialogMovement={
         Humanoid=humanoid,
         WalkSpeed=humanoid.WalkSpeed,
         UseJumpPower=humanoid.UseJumpPower,
         JumpPower=humanoid.JumpPower,
-        JumpHeight=humanoid.JumpHeight
+        JumpHeight=humanoid.JumpHeight,
+        Huds=huds
     }
 end
 
@@ -212,6 +226,14 @@ function AutoQuest:_restoreDialog()
                 humanoid.JumpPower=state.JumpPower
             else
                 humanoid.JumpHeight=state.JumpHeight
+            end
+        end
+
+        if state and state.Huds then
+            for hud,wasEnabled in pairs(state.Huds) do
+                if hud and hud.Parent then
+                    hud.Enabled=wasEnabled
+                end
             end
         end
     end)
