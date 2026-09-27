@@ -12,9 +12,14 @@ function Movement.new(config)
     return setmetatable({
         Player=Players.LocalPlayer,
         Speed=tonumber(config.Speed) or 45,
+        NearSpeed=tonumber(config.NearSpeed),
+        NearDistance=math.max(tonumber(config.NearDistance) or 0,0),
+        DirectDistance=math.max(tonumber(config.DirectDistance) or 0,0),
+        ArrivalRadius=math.max(tonumber(config.ArrivalRadius) or 0.05,0.01),
         MinDuration=tonumber(config.MinDuration) or 0.05,
         MaxSegmentDuration=tonumber(config.MaxSegmentDuration) or 3,
         SegmentPause=tonumber(config.SegmentPause) or 0.08,
+        Priorities=type(config.Priorities)=="table" and config.Priorities or {},
         UsePhysics=config.UsePhysics~=false,
         Tween=nil,
         SteppedConnection=nil,
@@ -134,6 +139,33 @@ function Movement:_restoreTravelState(humanoid)
     end
 end
 
+function Movement:_resolveSpeed(remaining,requested)
+    local explicit=tonumber(requested)
+
+    if explicit and explicit>0 then
+        return explicit
+    end
+
+    if self.NearSpeed and self.NearSpeed>0 and self.NearDistance>0 and remaining<=self.NearDistance then
+        return self.NearSpeed
+    end
+
+    return self.Speed
+end
+
+function Movement:GetProfile()
+    return {
+        Speed=self.Speed,
+        NearSpeed=self.NearSpeed,
+        NearDistance=self.NearDistance,
+        DirectDistance=self.DirectDistance,
+        ArrivalRadius=self.ArrivalRadius,
+        MinDuration=self.MinDuration,
+        MaxSegmentDuration=self.MaxSegmentDuration,
+        SegmentPause=self.SegmentPause
+    }
+end
+
 function Movement:GetOwner()
     return self.ActiveOwner,self.ActivePriority
 end
@@ -210,13 +242,18 @@ function Movement:FlyTo(target,speed,owner,priority)
         return false,"character unavailable"
     end
 
-    local moveSpeed=tonumber(speed) or self.Speed
-    if moveSpeed<=0 then
+    local requestedSpeed=tonumber(speed)
+    if requestedSpeed and requestedSpeed<=0 then
+        return false,"invalid speed"
+    end
+
+    if self.Speed<=0 then
         return false,"invalid speed"
     end
 
     local moveOwner=tostring(owner or "default")
-    local movePriority=tonumber(priority) or 0
+    local configuredPriority=tonumber(self.Priorities[moveOwner]) or 0
+    local movePriority=tonumber(priority) or configuredPriority
 
     if self.Moving and self.ActiveOwner and self.ActiveOwner~=moveOwner and movePriority<self.ActivePriority then
         return false,"busy",self.ActiveOwner
@@ -226,7 +263,17 @@ function Movement:FlyTo(target,speed,owner,priority)
     local token=self.MoveToken
     local distance=(root.Position-goal.Position).Magnitude
 
-    if distance<=0.05 then
+    if distance<=self.ArrivalRadius then
+        root.CFrame=goal
+        root.AssemblyLinearVelocity=Vector3.zero
+        root.AssemblyAngularVelocity=Vector3.zero
+        return true
+    end
+
+    if self.DirectDistance>0 and distance<=self.DirectDistance then
+        root.CFrame=goal
+        root.AssemblyLinearVelocity=Vector3.zero
+        root.AssemblyAngularVelocity=Vector3.zero
         return true
     end
 
@@ -287,11 +334,12 @@ function Movement:FlyTo(target,speed,owner,priority)
         local delta=goal.Position-root.Position
         local remaining=delta.Magnitude
 
-        if remaining<=0.05 then
+        if remaining<=self.ArrivalRadius then
             root.CFrame=goal
             break
         end
 
+        local moveSpeed=self:_resolveSpeed(remaining,requestedSpeed)
         local segmentDuration=math.min(remaining/moveSpeed,self.MaxSegmentDuration)
         local segmentDistance=math.min(remaining,moveSpeed*self.MaxSegmentDuration)
         local nextPosition=root.Position+delta.Unit*segmentDistance
@@ -360,6 +408,19 @@ function Movement:SetSpeed(value)
     end
 
     self.Speed=value
+    return true
+end
+
+function Movement:SetNearSpeed(value,distance)
+    value=tonumber(value)
+    distance=tonumber(distance)
+
+    if not value or value<=0 or not distance or distance<=0 then
+        return false
+    end
+
+    self.NearSpeed=value
+    self.NearDistance=distance
     return true
 end
 
