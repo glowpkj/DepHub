@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T19:19:20.116455+00:00",
-  "commit": "587a6fe5a231040a1151f58f852490b94ad47476",
+  "generatedAt": "2026-09-27T19:20:24.225464+00:00",
+  "commit": "15b7cd4f107a0dc58da860cd99650d3d9db3d05f",
   "version": "0.0.26",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "edcb94e58652cf57e314dc3431a2ad5d6226e8d7bba9edbbd3b992e81be676ce",
-      "commit": "587a6fe5a231040a1151f58f852490b94ad47476",
+      "commit": "15b7cd4f107a0dc58da860cd99650d3d9db3d05f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "7ff1c7d839dcda4786759203dd25123d266ed24270d739a42ed7cd2baa7b038d",
-      "commit": "587a6fe5a231040a1151f58f852490b94ad47476",
+      "version": "689faf0053f91311de0045a3715dc97f546f67fb713a0a1f7da10f4f2d651845",
+      "commit": "15b7cd4f107a0dc58da860cd99650d3d9db3d05f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "8e8da66dfd6412f01b2f7fd4522b0d0b4c83feb550e1ab24172b6f00f1f5227a",
-      "commit": "587a6fe5a231040a1151f58f852490b94ad47476",
+      "commit": "15b7cd4f107a0dc58da860cd99650d3d9db3d05f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -74,8 +74,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "07c58eb9c099b48622f472a9dfc0b17fbafcceeb3afd6481c3e021f918243cd7",
-      "commit": "587a6fe5a231040a1151f58f852490b94ad47476",
+      "version": "4498a7e42b05516ee209ed3d2129c7279629cb50ce807e5f5824108965533067",
+      "commit": "15b7cd4f107a0dc58da860cd99650d3d9db3d05f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -103,8 +103,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "be61738c52cb27d6b3f5d0fbee9d9595e2526d865e79fd3c510f16d8bfc4c419",
-      "commit": "587a6fe5a231040a1151f58f852490b94ad47476",
+      "version": "427e24a7c5538ed9c0e3525a8806fe782dbff70dd3b221934a31fa0b2f4032c0",
+      "commit": "15b7cd4f107a0dc58da860cd99650d3d9db3d05f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "bff2c0011bdf8cdd7079197e4c13944445927cf584fb5cf0bb727d4778e4ea90",
-      "commit": "587a6fe5a231040a1151f58f852490b94ad47476",
+      "commit": "15b7cd4f107a0dc58da860cd99650d3d9db3d05f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +148,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "d717b967bae52796947402cf158e4354d1341b9692f2652fba7e9edb8b480fd9",
-      "commit": "587a6fe5a231040a1151f58f852490b94ad47476",
+      "version": "72394454dba58682256708add9e024e1e8ba6b55cf40bd99ea4288084818fe3f",
+      "commit": "15b7cd4f107a0dc58da860cd99650d3d9db3d05f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -181,6 +181,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "15b7cd4",
+      "Date": "2026-09-27T16:20:15-03:00",
+      "Changes": [
+        "design(ui): refine cards, square toggles, section markers and controls"
+      ]
+    },
+    {
       "Version": "587a6fe",
       "Date": "2026-09-27T16:19:10-03:00",
       "Changes": [
@@ -206,13 +213,6 @@
       "Date": "2026-09-27T16:14:30-03:00",
       "Changes": [
         "tune(noobpiece): pause 2.5 seconds between travel segments"
-      ]
-    },
-    {
-      "Version": "7d5c45f",
-      "Date": "2026-09-27T16:03:11-03:00",
-      "Changes": [
-        "docs: separate Noob Piece and generic movement profiles"
       ]
     }
   ]
