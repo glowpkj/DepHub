@@ -137,6 +137,7 @@
       "src/core/ui-guard.lua",
       "src/core/updater.lua",
       "src/core/tween-movement.lua",
+      "src/games/features/noobpiece/movementprofile.lua",
       "src/games/noobpiece.lua",
       "src/games/features/noobpiece/chestesp.lua",
       "src/games/features/noobpiece/autochest.lua",
