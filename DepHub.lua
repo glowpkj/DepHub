@@ -11,7 +11,7 @@ local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.27"
+local VERSION = "0.0.28"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -45,26 +45,11 @@ local function cleanupRuntime()
     local state = env.__DEPHUB
     if type(state) == "table" then
         for _, key in ipairs({
-            "Updater",
-            "UIGuard",
-            "Frontend",
-            "BloxFruitsUI",
-            "TSBUI",
-            "ViolenceDistrictUI",
-            "MM2UI",
-            "BloxFruits",
-            "TSB",
-            "ViolenceDistrict",
-            "MM2",
-            "NoobPiece",
-            "Universal",
-            "Runtime",
-            "Window"
+            "Updater","UIGuard","Frontend","BloxFruitsUI","TSBUI","ViolenceDistrictUI","MM2UI",
+            "BloxFruits","TSB","ViolenceDistrict","MM2","NoobPiece","Universal","Runtime","Window"
         }) do
             local target = state[key]
-            if type(target) == "table" and type(target.Destroy) == "function" then
-                pcall(target.Destroy, target)
-            end
+            if type(target) == "table" and type(target.Destroy) == "function" then pcall(target.Destroy, target) end
             state[key] = nil
         end
     end
@@ -93,12 +78,7 @@ cleanupRuntime()
 env[EXECUTED_KEY] = false
 
 env[STATE_KEY] = {
-    status = "running",
-    startedAt = os.clock(),
-    Version = VERSION,
-    PlaceId = placeId,
-    GameId = gameId,
-    Frontend = "pending"
+    status = "running",startedAt = os.clock(),Version = VERSION,PlaceId = placeId,GameId = gameId,Frontend = "pending"
 }
 
 env.__DEPHUB = env.__DEPHUB or {}
@@ -246,7 +226,7 @@ elseif isNoobPiece then mode = "NoobPiece" backend = coreResult
 else mode = "BloxFruits" backend = coreResult end
 
 if isTSB then
-    env[STATE_KEY].Frontend = "tsb-compact-2"
+    env[STATE_KEY].Frontend = "tsb-compact-3"
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend TSB invalido" or frontend) end
     env.__DEPHUB.TSBUI = frontend
