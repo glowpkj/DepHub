@@ -1,1 +1,1 @@
-0.0.7 | Attack-aware autoblock, held-M1 suppression, single counter M1, attacker camera lock and safer combat cleanup
+0.0.8 | Predictive threat engine, facing validation, closing-speed checks, configurable counter timing, unknown-animation logger and expanded combat diagnostics
