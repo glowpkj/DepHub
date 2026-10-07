@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T19:25:09.610800+00:00",
-  "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
-  "version": "0.0.27",
+  "generatedAt": "2026-10-07T00:30:21Z",
+  "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
+  "version": "0.0.29",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "6746ae8d30d1c9a496b021edeaa78dffe0599a2c784db183cd6d042fe902d159",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "d8c1991e68797d65b8ef245468e315e0e8558e92bf1424ee6e6b3c8cd97f5073",
+      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "7f9cf431808419d8a8c4b087365408507d610b93beadedf97a360b83f5cf35b5",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "7cedf6ea6f8751765f874acfaabe14c721d1f741b0648e21656f7ea63d6cd0c4",
+      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -51,13 +51,15 @@
         "library/components.lua",
         "library/window.lua",
         "library/content/common.lua",
-        "library/content/bloxfruits.lua"
+        "library/content/bloxfruits.lua",
+        "src/games/features/bloxfruits/fruitvfx.lua",
+        "src/core/updater.lua"
       ]
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "dd2f16c9cb4970e8ee8f4a4f26fe262a80e03b4a5120741ee618a8cce247d74d",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "c5cb2363195b093b2438f97ba9536f92e0f72b10c835af55b58a0211c229d2f2",
+      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -69,13 +71,14 @@
         "src/games/features/tsb/autoblock.lua",
         "src/games/features/tsb/autoblock-v2.lua",
         "src/games/features/tsb/frontend.lua",
-        "src/games/updates/3808081382.txt"
+        "src/games/updates/3808081382.txt",
+        "src/games/features/tsb/autoblock-v3.lua"
       ]
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "1da3a1ce0070158b145228261f12e239aafd6616c40bcc51362db762c24cfe76",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "84ad9942a09a7b8fc1968be0f45342e56a0648deb59870313c7f5a4b07370909",
+      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -103,8 +106,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "bd0aae9db9cbde2db4da43827fddf0ea78c7c51c98c79965cf00a7cf8aa714be",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "46814e1e167ccd591142f140f6de283453256339b82aeb2c519fc24a4e1f0dd6",
+      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -127,13 +130,15 @@
         "library/components.lua",
         "library/window.lua",
         "library/content/common.lua",
-        "library/content/bloxfruits.lua"
+        "library/content/bloxfruits.lua",
+        "src/games/features/bloxfruits/fruitvfx.lua",
+        "src/core/updater.lua"
       ]
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "d91624ed326b1af46d7bb0c7f455acc4d692f86b61696a1f2e93d2c449bec9f1",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "c30389673b40705eed293280553622a0bd85b41074070cbcf65d2612337efbf4",
+      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +153,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "edbaf1bf69f0cf320ec5fec85d615dfb2e063515c914e89690041e3f57c5f7cb",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "09539619e0026db15f67e1c20acc3480626b0bd38f055dbde3b9cfc094a4fcb7",
+      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -181,6 +186,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "3312d52",
+      "Date": "2026-10-07T00:30:21Z",
+      "Changes": [
+        "fix: harden DepHub loader, game lifecycle and regression checks"
+      ]
+    },
+    {
       "Version": "9a15b31",
       "Date": "2026-09-27T16:25:01-03:00",
       "Changes": [
@@ -206,13 +218,6 @@
       "Date": "2026-09-27T16:24:42-03:00",
       "Changes": [
         "chore(noobpiece): bump backend after travel pause adjustment"
-      ]
-    },
-    {
-      "Version": "db45e25",
-      "Date": "2026-09-27T16:24:21-03:00",
-      "Changes": [
-        "design(ui): tighten compact sidebar and navigation labels"
       ]
     }
   ]
