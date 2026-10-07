@@ -1,0 +1,29 @@
+name: DepHub regression
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Get official Luau CLI
+        run: |
+          curl --fail --location --retry 3 https://github.com/luau-lang/luau/releases/download/0.741/luau-ubuntu.zip --output /tmp/luau.zip
+          unzip /tmp/luau.zip -d /tmp/luau
+          chmod +x /tmp/luau/luau /tmp/luau/luau-compile
+      - name: Validate references and versions
+        run: node tests/validate_repo.js
+      - name: Compile Luau
+        run: |
+          find src library diagnostics -name '*.lua' -print0 | xargs -0 /tmp/luau/luau-compile --null DepHub.lua
+      - name: Backend and lifecycle checks
+        run: node tests/run_backend_tests.js /tmp/luau/luau
+      - name: Library checks
+        run: node tests/run_library_tests.js /tmp/luau/luau

@@ -58,6 +58,8 @@ function Factory.new(context)
     local RunService=context.RunService or game:GetService("RunService")
     local UserInputService=game:GetService("UserInputService")
     local Workspace=context.Workspace or game:GetService("Workspace")
+    local okActions,ContextActionService=pcall(game.GetService,game,"ContextActionService")
+    if not okActions then ContextActionService=nil end
     local LocalPlayer=context.LocalPlayer or Players.LocalPlayer
     local AnimationData=type(context.AnimationData)=="table" and context.AnimationData or {}
 
@@ -92,6 +94,7 @@ function Factory.new(context)
         CameraSnapshot=nil,CameraLockActive=false,CounterPending=false,CounterToken=0,ScanAccumulator=0,
         RenderStepName="DepHubTSBCameraV3_"..tostring(LocalPlayer and LocalPlayer.UserId or "local"),RenderBound=false,
         Mouse1Down=false,LocalM1ing=false,LocalNormalTracks=setmetatable({},{__mode="k"}),LocalNormalCount=0,LocalAttackGraceUntil=0,
+        InputGuardBound=false,InputGuardName="DepHubTSBDefense_"..tostring(LocalPlayer and LocalPlayer.UserId or "local"),
         UnknownSeen={},
         Config={
             M1Block=context.M1Block==true,M1AfterBlock=context.M1AfterBlock==true,FaceAttacker=context.FaceAttacker~=false,
@@ -137,7 +140,8 @@ function Factory.new(context)
     function self:_isLocalAttacking() return self:_refreshLocalAttackDebug() end
     function self:_cancelAutomationForLocalAttack(reason)
         self.CounterToken=self.CounterToken+1 self.CounterPending=false
-        if self.BlockActive then self:_releaseBlock(reason or "local attack",true) else self:_restoreCamera() end
+        -- An attack request must never release an active defense.
+        if self.BlockActive then self:_communicate("LeftClickRelease",true) self:_communicate("KeyPress") end
     end
     function self:_setLocalM1ing(value)
         value=value==true
@@ -153,7 +157,12 @@ function Factory.new(context)
         self:_cancelAutomationForLocalAttack("local M1 animation") self:_refreshLocalAttackDebug()
         local connection
         connection=track.Stopped:Connect(function()
-            if connection then pcall(connection.Disconnect,connection) connection=nil end
+            if connection then
+                local index=table.find(self.LocalConnections,connection)
+                if index then table.remove(self.LocalConnections,index) end
+                connection:Disconnect()
+                connection=nil
+            end
             if self.LocalNormalTracks[track] then
                 self.LocalNormalTracks[track]=nil self.LocalNormalCount=math_max(0,self.LocalNormalCount-1)
                 if self.LocalNormalCount==0 then self.LocalAttackGraceUntil=os_clock()+self.Config.AttackGrace end
@@ -169,6 +178,9 @@ function Factory.new(context)
         if self.Destroyed or not self.Enabled or LocalPlayer.Character~=character or not humanoid then return end
         local animator=humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator",8)
         if self.Destroyed or not self.Enabled or LocalPlayer.Character~=character or not animator then return end
+        self.LocalConnections[#self.LocalConnections+1]=humanoid.Died:Connect(function()
+            self:_onLocalCharacterRemoving()
+        end)
         self.LocalM1ing=character:FindFirstChild("M1ing",true)~=nil
         self.LocalConnections[#self.LocalConnections+1]=animator.AnimationPlayed:Connect(function(track) if not self.Destroyed and self.Enabled then self:_trackLocalAnimation(track) end end)
         self.LocalConnections[#self.LocalConnections+1]=character.DescendantAdded:Connect(function(instance) if instance.Name=="M1ing" then self:_setLocalM1ing(true) end end)
@@ -194,8 +206,11 @@ function Factory.new(context)
         if self.Destroyed or not self.Enabled or not self:_localAlive() then return false end
         if self:_isLocalAttacking() then self.DebugInfo.SuppressedCounters=self.DebugInfo.SuppressedCounters+1 return false end
         if not self:_communicate("LeftClick",true) then return false end
-        local token=self.CounterToken
-        task.delay(0.07,function() if self.Destroyed or token~=self.CounterToken then return end self:_communicate("LeftClickRelease",true) end)
+        local character=LocalPlayer.Character
+        local remote=character and character:FindFirstChild("Communicate")
+        task.delay(0.07,function()
+            if remote and remote.Parent then pcall(remote.FireServer,remote,{Goal="LeftClickRelease",Mobile=true}) end
+        end)
         return true
     end
     function self:_destroyDetectionBox()
@@ -235,7 +250,7 @@ function Factory.new(context)
         return {Pass=facingPass and (nowPass or predictionPass),Predicted=not nowPass and predictionPass,Distance=distance,PredictedDistance=predictedDistance,Facing=facing,ClosingSpeed=closingSpeed}
     end
     function self:_beginCameraLock(player,tracker)
-        if self:_isLocalAttacking() or not self.Config.FaceAttacker or not tracker or not tracker.Root or not tracker.Root.Parent then return false end
+        if not self.Config.FaceAttacker or not tracker or not tracker.Root or not tracker.Root.Parent then return false end
         local camera=Workspace.CurrentCamera if not camera then return false end
         if not self.CameraLockActive then self.CameraSnapshot={Camera=camera,CFrame=camera.CFrame} self.CameraLockActive=true self.DebugInfo.CameraLocks=self.DebugInfo.CameraLocks+1 end
         self.BlockTargetPlayer=player self.BlockTargetTracker=tracker return true
@@ -249,7 +264,7 @@ function Factory.new(context)
         end
     end
     function self:_updateCameraLock()
-        if self.Destroyed or not self.Enabled or not self.CameraLockActive or not self.BlockActive or self:_isLocalAttacking() then return end
+        if self.Destroyed or not self.Enabled or not self.CameraLockActive or not self.BlockActive then return end
         local tracker=self.BlockTargetTracker local targetRoot=tracker and tracker.Root local camera=Workspace.CurrentCamera
         if not targetRoot or not targetRoot.Parent or not camera then return end
         local origin=camera.CFrame.Position local target=targetRoot.Position+Vector3.new(0,1.5,0) if (target-origin).Magnitude<0.01 then return end
@@ -275,13 +290,14 @@ function Factory.new(context)
     end
     function self:_pressBlock(duration,source,reason,player,tracker,animationId,metrics)
         if self.Destroyed or not self.Enabled or not self:_localAlive() then return false,false end
-        if self:_isLocalAttacking() then self.DebugInfo.SuppressedBlocks=self.DebugInfo.SuppressedBlocks+1 return false,false end
         local now=os_clock() local hold=clamp(tonumber(duration) or 0.15,0.05,3)
         self.BlockUntil=math_max(self.BlockUntil,now+hold) self.BlockSource=source or self.BlockSource or "unknown" self.BlockTargetPlayer=player or self.BlockTargetPlayer self.BlockTargetTracker=tracker or self.BlockTargetTracker
         self.CounterPending=self.Config.M1AfterBlock==true self.DebugInfo.LastReason=tostring(reason or source or "unknown") self.DebugInfo.LastAnimation=animationId and tostring(animationId) or "none" self.DebugInfo.LastPlayer=player and player.Name or "none"
         if metrics then self.DebugInfo.LastDistance=metrics.Distance or 0 self.DebugInfo.LastPredictedDistance=metrics.PredictedDistance or metrics.Distance or 0 self.DebugInfo.LastFacing=metrics.Facing or 0 self.DebugInfo.LastClosingSpeed=metrics.ClosingSpeed or 0 if metrics.Predicted then self.DebugInfo.PredictionBlocks=self.DebugInfo.PredictionBlocks+1 end end
         if tracker then self:_beginCameraLock(player,tracker) end
         if self.BlockActive then return true,false end
+        -- Release an already-held M1 before requesting F; do not restart it automatically.
+        self:_communicate("LeftClickRelease",true)
         if not self:_communicate("KeyPress") then self.BlockUntil=0 self.BlockSource=nil self.BlockTargetPlayer=nil self.BlockTargetTracker=nil self.CounterPending=false self:_restoreCamera() return false,false end
         self.BlockActive=true self.DebugInfo.Blocks=self.DebugInfo.Blocks+1 return true,true
     end
@@ -291,13 +307,13 @@ function Factory.new(context)
     end
     function self:_activeCount(tracker,set) local count=0 for id in pairs(set) do if (tracker.ActiveIds[id] or 0)>0 then count=count+1 end end return count end
     function self:_checkDashCombo(player,tracker)
-        if not self.Config.DashBlock or self:_isLocalAttacking() or self:_activeCount(tracker,comboIds)<2 then return false end
+        if not self.Config.DashBlock or self:_activeCount(tracker,comboIds)<2 then return false end
         local myRoot=self:_localRoot() if not myRoot then return false end local metrics=self:_threatMetrics(tracker,myRoot,self.Config.SpecialRange,false,true)
         if not metrics or not metrics.Pass then return false end self:_pressBlock(0.7,"dash","combo/dash",player,tracker,nil,metrics) return true
     end
     function self:_handleM1(player,tracker,reason)
-        if not self.Config.M1Block or self:_isLocalAttacking() or not self:_trackerReady(tracker) then return false end
-        local myRoot=self:_localRoot() if not myRoot then return false end local metrics=self:_threatMetrics(tracker,myRoot,self.Config.NormalRange,true,true)
+        if not self.Config.M1Block or not self:_trackerReady(tracker) then return false end
+        local myRoot=self:_localRoot() if not myRoot then return false end local metrics=self:_threatMetrics(tracker,myRoot,self.Config.NormalRange,false,true)
         if not metrics or not metrics.Pass then return false end local ok=self:_pressBlock(0.18,"m1",reason or "M1ing",player,tracker,nil,metrics) if ok then tracker.InsideLast=true end return ok
     end
     function self:_logUnknown(player,tracker,animationId)
@@ -308,9 +324,9 @@ function Factory.new(context)
         print("[DepHub TSB][UNKNOWN] player="..tostring(player and player.Name or "unknown").." id="..tostring(animationId).." distance="..string.format("%.1f",distance))
     end
     function self:_handleAnimation(player,tracker,animationId)
-        if self:_isLocalAttacking() or not self:_trackerReady(tracker) then return end self:_logUnknown(player,tracker,animationId) if self:_checkDashCombo(player,tracker) then return end
+        if not self:_trackerReady(tracker) then return end self:_logUnknown(player,tracker,animationId) if self:_checkDashCombo(player,tracker) then return end
         local myRoot=self:_localRoot() if not myRoot then return end
-        if normalIds[animationId] and self.Config.M1Block then local metrics=self:_threatMetrics(tracker,myRoot,self.Config.NormalRange,true,true) if metrics and metrics.Pass then self:_pressBlock(0.18,"m1","M1 animation",player,tracker,animationId,metrics) end return end
+        if normalIds[animationId] and self.Config.M1Block then local metrics=self:_threatMetrics(tracker,myRoot,self.Config.NormalRange,false,true) if metrics and metrics.Pass then self:_pressBlock(0.18,"m1","M1 animation",player,tracker,animationId,metrics) end return end
         if specialIds[animationId] and self.Config.DashBlock then local metrics=self:_threatMetrics(tracker,myRoot,self.Config.SpecialRange,false,true) if metrics and metrics.Pass then self:_pressBlock(1,"dash","special/dash",player,tracker,animationId,metrics) end return end
         if self.Config.SkillBlock and skillIds[animationId] then local metrics=self:_threatMetrics(tracker,myRoot,self.Config.SkillRange,false,false) if metrics and metrics.Pass then self:_pressBlock(self.Config.SkillHold,"skill","skill",player,tracker,animationId,metrics) end end
     end
@@ -342,38 +358,96 @@ function Factory.new(context)
         if tracker.M1ing then self:_handleM1(player,tracker,"M1ing existing") end
     end
     function self:_queueCharacter(player,binding,character)
-        if not binding then return end binding.Generation=binding.Generation+1 local generation=binding.Generation binding.Character=character self:_destroyTracker(binding) if not character then return end
-        task.spawn(function()
-            local humanoid=character:FindFirstChildWhichIsA("Humanoid") or character:WaitForChild("Humanoid",8) if self.Destroyed or not self.Enabled or binding.Generation~=generation or binding.Character~=character or not humanoid then return end
-            local root=character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart",8) if self.Destroyed or not self.Enabled or binding.Generation~=generation or binding.Character~=character or not root then return end
-            local animator=humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator",8) if self.Destroyed or not self.Enabled or binding.Generation~=generation or binding.Character~=character or not animator then return end
-            self:_attachTracker(player,binding,character,humanoid,root,animator)
-        end)
+        if not binding then return end
+        binding.Generation=binding.Generation+1
+        binding.Character=character
+        disconnectAll(binding.CharacterConnections)
+        self:_destroyTracker(binding)
+        if not character then return end
+        local generation=binding.Generation
+        local function refresh()
+            if self.Destroyed or not self.Enabled or self.PlayerBindings[player]~=binding or binding.Generation~=generation then return end
+            local humanoid=character:FindFirstChildWhichIsA("Humanoid")
+            local root=character:FindFirstChild("HumanoidRootPart")
+            local animator=humanoid and humanoid:FindFirstChildOfClass("Animator")
+            local tracker=binding.Tracker
+            if tracker and tracker.Humanoid==humanoid and tracker.Root==root and tracker.Animator==animator then return end
+            self:_destroyTracker(binding)
+            if humanoid and root and animator then self:_attachTracker(player,binding,character,humanoid,root,animator) end
+        end
+        local pending=false
+        local function schedule(instance)
+            if instance.Name~="HumanoidRootPart" and not instance:IsA("Humanoid") and not instance:IsA("Animator") then return end
+            if pending then return end
+            pending=true
+            task.defer(function() pending=false; refresh() end)
+        end
+        local list=binding.CharacterConnections
+        list[#list+1]=character.DescendantAdded:Connect(schedule)
+        list[#list+1]=character.DescendantRemoving:Connect(schedule)
+        refresh()
     end
     function self:_refreshTrackedCount() local count=0 for player,binding in pairs(self.PlayerBindings) do if player~=LocalPlayer and binding and binding.Tracker and not binding.Tracker.Destroyed then count=count+1 end end self.DebugInfo.TrackedPlayers=count end
     function self:_bindPlayer(player)
-        if not player or player==LocalPlayer or self.PlayerBindings[player] then return end local binding={Player=player,Character=nil,Generation=0,Tracker=nil,Connections={}} self.PlayerBindings[player]=binding
+        if not player or player==LocalPlayer or self.PlayerBindings[player] then return end local binding={Player=player,Character=nil,Generation=0,Tracker=nil,Connections={},CharacterConnections={}} self.PlayerBindings[player]=binding
         binding.Connections[#binding.Connections+1]=player.CharacterAdded:Connect(function(character) self:_queueCharacter(player,binding,character) end)
-        binding.Connections[#binding.Connections+1]=player.CharacterRemoving:Connect(function(character) if binding.Character==character then binding.Generation=binding.Generation+1 binding.Character=nil self:_destroyTracker(binding) self:_refreshTrackedCount() end end)
+        binding.Connections[#binding.Connections+1]=player.CharacterRemoving:Connect(function(character) if binding.Character==character then self:_queueCharacter(player,binding,nil) self:_refreshTrackedCount() end end)
         if player.Character then self:_queueCharacter(player,binding,player.Character) end
     end
-    function self:_unbindPlayer(player) local binding=self.PlayerBindings[player] if not binding then return end self.PlayerBindings[player]=nil binding.Generation=binding.Generation+1 self:_destroyTracker(binding) disconnectAll(binding.Connections) self:_refreshTrackedCount() end
+    function self:_unbindPlayer(player) local binding=self.PlayerBindings[player] if not binding then return end self.PlayerBindings[player]=nil binding.Generation=binding.Generation+1 self:_destroyTracker(binding) disconnectAll(binding.CharacterConnections) disconnectAll(binding.Connections) self:_refreshTrackedCount() end
     function self:_unbindAllPlayers() local list={} for player in pairs(self.PlayerBindings) do list[#list+1]=player end for _,player in ipairs(list) do self:_unbindPlayer(player) end self.DebugInfo.TrackedPlayers=0 end
     function self:_spatialTick()
-        if self:_isLocalAttacking() then return end local myRoot=self:_localRoot() if not myRoot then return end
+        local myRoot=self:_localRoot()
+        if not myRoot or not self:_localAlive() then self:_releaseBlock("local character unavailable",true) return end
+        -- Re-evaluate active attacks, even when an attacker never leaves the range.
+        -- This also retains defense when another attacker is still a threat.
+        local threat=false
         for player,binding in pairs(self.PlayerBindings) do
             local tracker=binding and binding.Tracker
-            if tracker and self:_trackerReady(tracker) then
-                if self.Config.DashBlock and self:_activeCount(tracker,comboIds)>=2 then self:_checkDashCombo(player,tracker) end
-                if self.Config.M1Block then
-                    local metrics=self:_threatMetrics(tracker,myRoot,self.Config.NormalRange,true,true) local inside=metrics and metrics.Pass or false
-                    if inside and not tracker.InsideLast then
-                        if tracker.M1ing then self:_handleM1(player,tracker,"M1ing enter") else for id in pairs(normalIds) do if (tracker.ActiveIds[id] or 0)>0 then self:_pressBlock(0.18,"m1","M1 animation enter",player,tracker,id,metrics) break end end end
+            if tracker and not tracker.Destroyed and self:_trackerReady(tracker) then
+                if self.Config.M1Block and (tracker.M1ing or self:_activeCount(tracker,normalIds)>0) then
+                    if self:_handleM1(player,tracker,"active M1") then threat=true end
+                end
+                if self.Config.DashBlock and self:_checkDashCombo(player,tracker) then threat=true end
+                for id,count in pairs(tracker.ActiveIds) do
+                    local range,source,hold
+                    if count>0 and self.Config.DashBlock and specialIds[id] then
+                        range,source,hold=self.Config.SpecialRange,"dash",1
+                    elseif count>0 and self.Config.SkillBlock and skillIds[id] then
+                        range,source,hold=self.Config.SkillRange,"skill",self.Config.SkillHold
                     end
-                    tracker.InsideLast=inside
-                else tracker.InsideLast=false end
-            elseif tracker then tracker.InsideLast=false end
+                    if range then
+                        local metrics=self:_threatMetrics(tracker,myRoot,range,false,source=="dash")
+                        if metrics and metrics.Pass then
+                            self:_pressBlock(hold,source,"active "..source,player,tracker,id,metrics)
+                            threat=true
+                        end
+                    end
+                end
+            end
         end
+        self.DebugInfo.ThreatActive=threat
+        if not threat and self.BlockActive and os_clock()>=self.BlockUntil then self:_releaseBlock("threat ended",true) end
+    end
+    function self:_bindInputGuard()
+        if self.InputGuardBound then return true end
+        if not ContextActionService then self:_setError("ContextActionService unavailable") return false end
+        local ok,err=pcall(ContextActionService.BindActionAtPriority,ContextActionService,self.InputGuardName,function(_,state)
+            if self.Destroyed or not self.Enabled then return Enum.ContextActionResult.Pass end
+            -- Check current threats on the same input event, before lower priority actions.
+            self:_spatialTick()
+            if self.BlockActive then
+                if state==Enum.UserInputState.Begin then self:_communicate("LeftClickRelease",true) end
+                return Enum.ContextActionResult.Sink
+            end
+            return Enum.ContextActionResult.Pass
+        end,false,Enum.ContextActionPriority.High.Value+1,Enum.UserInputType.MouseButton1)
+        if not ok then self:_setError(err) return false end
+        self.InputGuardBound=true return true
+    end
+    function self:_unbindInputGuard()
+        if self.InputGuardBound and ContextActionService then pcall(ContextActionService.UnbindAction,ContextActionService,self.InputGuardName) end
+        self.InputGuardBound=false
     end
     function self:_onLocalCharacterRemoving()
         self.CharacterToken=self.CharacterToken+1 self.CounterToken=self.CounterToken+1 disconnectAll(self.LocalConnections) self.Mouse1Down=false self.LocalM1ing=false self.LocalNormalCount=0 self.LocalAttackGraceUntil=0
@@ -385,14 +459,13 @@ function Factory.new(context)
         task.spawn(function()
             if self.Destroyed or not self.Enabled or token~=self.CharacterToken or LocalPlayer.Character~=character then return end self:_bindLocalCharacter(character)
             local root=character and (character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart",8)) if self.Destroyed or not self.Enabled or token~=self.CharacterToken or not root then return end
-            local remote=character:FindFirstChild("Communicate") or character:WaitForChild("Communicate",8) self.DebugInfo.Remote=remote and remote:IsA("RemoteEvent") and "ready" or "missing" if self.Config.M1Block then self:_ensureDetectionBox() end
+            local remote=character:FindFirstChild("Communicate") or character:WaitForChild("Communicate",8) self.DebugInfo.Remote=remote and remote:IsA("RemoteEvent") and "ready" or "missing" if self.Config.M1Block and self.Config.ShowDetectionBox then self:_ensureDetectionBox() end
         end)
     end
     function self:_heartbeat(dt)
         if self.Destroyed or not self.Enabled then return end local character=self:_localCharacter() local remote=character and character:FindFirstChild("Communicate") local live=Workspace:FindFirstChild("Live")
         self.DebugInfo.Character=character and character.Name or "none" self.DebugInfo.Remote=remote and remote:IsA("RemoteEvent") and "ready" or "missing" self.DebugInfo.Live=live and "ready" or "missing" self.DebugInfo.ScanHz=self.Config.ScanHz self:_refreshLocalAttackDebug()
-        if self.Config.M1Block and character and character:FindFirstChild("HumanoidRootPart") then self:_ensureDetectionBox() elseif not self.Config.M1Block then self:_destroyDetectionBox() end
-        if self.BlockActive and self:_isLocalAttacking() then self:_cancelAutomationForLocalAttack("local attack during block") end if self.BlockActive and os_clock()>=self.BlockUntil then self:_releaseBlock("timeout",false) end
+        if self.Config.M1Block and self.Config.ShowDetectionBox and character and character:FindFirstChild("HumanoidRootPart") then self:_ensureDetectionBox() else self:_destroyDetectionBox() end
         self.ScanAccumulator=self.ScanAccumulator+(tonumber(dt) or 0) local interval=1/self.Config.ScanHz
         if self.ScanAccumulator>=interval then self.ScanAccumulator=self.ScanAccumulator%interval self:_spatialTick() self:_refreshTrackedCount() end
     end
@@ -400,7 +473,7 @@ function Factory.new(context)
         self.CounterToken=self.CounterToken+1 self.CounterPending=false self:_releaseBlock(reason or "manual reset",true) self.BlockUntil=0 self.BlockSource=nil
         for _,binding in pairs(self.PlayerBindings) do local tracker=binding and binding.Tracker if tracker then tracker.InsideLast=false end end self:_debug(reason or "combat state reset") return true
     end
-    function self:SetM1Block(value) self.Config.M1Block=value==true if not self.Config.M1Block then self:_destroyDetectionBox() if self.BlockActive and self.BlockSource=="m1" then self:_releaseBlock("M1 Block disabled",true) end elseif self.Enabled then self:_ensureDetectionBox() end return true end
+    function self:SetM1Block(value) self.Config.M1Block=value==true if not self.Config.M1Block then self:_destroyDetectionBox() if self.BlockActive and self.BlockSource=="m1" then self:_releaseBlock("M1 Block disabled",true) end elseif self.Enabled and self.Config.ShowDetectionBox then self:_ensureDetectionBox() end return true end
     function self:SetM1AfterBlock(value) self.Config.M1AfterBlock=value==true if not self.Config.M1AfterBlock then self.CounterToken=self.CounterToken+1 self.CounterPending=false end return true end
     function self:SetFaceAttacker(value) self.Config.FaceAttacker=value==true if not self.Config.FaceAttacker then self:_restoreCamera() end return true end
     function self:SetDashBlock(value) self.Config.DashBlock=value==true if not self.Config.DashBlock and self.BlockActive and self.BlockSource=="dash" then self:_releaseBlock("Dash Block disabled",true) end return true end
@@ -420,10 +493,12 @@ function Factory.new(context)
     function self:SetPredictionTime(value) value=tonumber(value) if not value then return false end self.Config.PredictionTime=clamp(value,0,0.35) return true end
     function self:SetPredictionExtra(value) value=tonumber(value) if not value then return false end self.Config.PredictionExtra=clamp(value,0,8) return true end
     function self:SetCounterDelay(value) value=tonumber(value) if not value then return false end self.Config.CounterDelay=clamp(value,0.02,0.35) return true end
-    function self:GetDebugInfo() local output={} for key,value in pairs(self.DebugInfo) do output[key]=value end output.Enabled=self.Enabled output.BlockActive=self.BlockActive output.BlockSource=self.BlockSource or "none" output.CameraLock=self.CameraLockActive output.CounterPending=self.CounterPending output.LocalAttacking=self:_isLocalAttacking() return output end
+    function self:GetDebugInfo() local output={} for key,value in pairs(self.DebugInfo) do output[key]=value end output.Enabled=self.Enabled output.BlockActive=self.BlockActive output.BlockSource=self.BlockSource or "none" output.CameraLock=self.CameraLockActive output.InputGuardBound=self.InputGuardBound output.AttackGuardScope="MouseButton1" output.CounterPending=self.CounterPending output.LocalAttacking=self:_isLocalAttacking() return output end
     function self:GetConfig() local output={} for key,value in pairs(self.Config) do output[key]=value end return output end
     function self:Enable()
-        if self.Destroyed or not LocalPlayer then return false end if self.Enabled then return true end self.Enabled=true self.DebugInfo.Runtime="running" self.ScanAccumulator=0 self:ResetCombatState("runtime started")
+        if self.Destroyed or not LocalPlayer then return false end if self.Enabled then return true end self.Enabled=true
+        if not self:_bindInputGuard() then self.Enabled=false self.DebugInfo.Runtime="input guard unavailable" return false end
+        self.DebugInfo.Runtime="running" self.ScanAccumulator=0 self:ResetCombatState("runtime started")
         self.Connections[#self.Connections+1]=LocalPlayer.CharacterAdded:Connect(function(character) self:_onLocalCharacterAdded(character) end)
         self.Connections[#self.Connections+1]=LocalPlayer.CharacterRemoving:Connect(function() self:_onLocalCharacterRemoving() end)
         self.Connections[#self.Connections+1]=Players.PlayerAdded:Connect(function(player) self:_bindPlayer(player) end)
@@ -436,6 +511,7 @@ function Factory.new(context)
     end
     function self:Disable()
         if self.Destroyed then return false end if not self.Enabled then return true end self.Enabled=false self.DebugInfo.Runtime="idle" self.CharacterToken=self.CharacterToken+1 self.CounterToken=self.CounterToken+1
+        self:_unbindInputGuard()
         disconnectAll(self.Connections) disconnectAll(self.LocalConnections) self:_unbindAllPlayers()
         if self.RenderBound then pcall(RunService.UnbindFromRenderStep,RunService,self.RenderStepName) self.RenderBound=false end
         self.Mouse1Down=false self.LocalM1ing=false self.LocalNormalCount=0 self.LocalAttackGraceUntil=0 self:_releaseBlock("runtime stopped",true) self:_destroyDetectionBox() self.ScanAccumulator=0 self:_refreshLocalAttackDebug() return true

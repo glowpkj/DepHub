@@ -14,7 +14,8 @@ local TeleportService = GetService(game, "TeleportService")
 
 local LocalPlayer = Players.LocalPlayer
 
-local MANIFEST_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/update-manifest.json"
+local sourceBase = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local MANIFEST_URL = sourceBase .. "src/update-manifest.json"
 local SERVERS_URL = "https://games.roblox.com/v1/games/%s/servers/Public?sortOrder=Asc&limit=100"
 local COMPARE_URL = "https://api.github.com/repos/glowpkj/DepHub/compare/%s...%s"
 
@@ -75,6 +76,7 @@ function Updater.new(options)
     self.CancelledVersions = {}
     self.RejectedVersions = {}
     self.Destroyed = false
+    self.Started = false
     self.PendingUpdate = nil
     self.ActionInProgress = false
     return self
@@ -86,6 +88,7 @@ function Updater:FetchVersion()
         return false, source
     end
 
+    if self.Destroyed then return false, "Updater destruido" end
     local decoded, manifest = decode(source)
     if not decoded then
         return false, manifest
@@ -230,9 +233,7 @@ function Updater:Check()
     end
 
     local ok, info = self:FetchVersion()
-    if not ok then
-        return
-    end
+    if not ok or self.Destroyed then return end
 
     local startupAge = os_clock() - self.StartedAt
 
@@ -261,13 +262,12 @@ function Updater:Check()
         return
     end
 
-    self.PendingUpdate = info
+    if not self.Destroyed then self.PendingUpdate = info end
 end
 
 function Updater:Start()
-    if self.Destroyed then
-        return
-    end
+    if self.Destroyed or self.Started then return false end
+    self.Started = true
 
     task.spawn(function()
         task.wait(5)
@@ -292,7 +292,9 @@ function Updater:Destroy()
     end
 
     self.Destroyed = true
+    self.Started = false
     self.PendingUpdate = nil
 end
 
 return Updater
+

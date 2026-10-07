@@ -13,7 +13,7 @@ local LocalPlayer=Players.LocalPlayer
 
 local env=type(getgenv)=="function" and getgenv() or _G
 local STATE_KEY="__DEPHUB_VD"
-local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 local VERSION="0.0.2"
 
 local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
@@ -257,3 +257,4 @@ if not okStart or not started then
 end
 
 return State
+

@@ -42,7 +42,9 @@
       "library/components.lua",
       "library/window.lua",
       "library/content/common.lua",
-      "library/content/bloxfruits.lua"
+      "library/content/bloxfruits.lua",
+      "src/games/features/bloxfruits/fruitvfx.lua",
+      "src/core/updater.lua"
     ]
   },
   "3808081382": {
@@ -58,7 +60,8 @@
       "src/games/features/tsb/autoblock.lua",
       "src/games/features/tsb/autoblock-v2.lua",
       "src/games/features/tsb/frontend.lua",
-      "src/games/updates/3808081382.txt"
+      "src/games/updates/3808081382.txt",
+      "src/games/features/tsb/autoblock-v3.lua"
     ]
   },
   "119048529960596": {
@@ -112,7 +115,9 @@
       "library/components.lua",
       "library/window.lua",
       "library/content/common.lua",
-      "library/content/bloxfruits.lua"
+      "library/content/bloxfruits.lua",
+      "src/games/features/bloxfruits/fruitvfx.lua",
+      "src/core/updater.lua"
     ]
   },
   "6739698191": {
@@ -157,6 +162,22 @@
       "library/window.lua",
       "library/content/common.lua",
       "library/content/noobpiece.lua"
+    ]
+  },
+  "6931042565": {
+    "name": "Volleyball Legends",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/ui-guard.lua",
+      "src/core/updater.lua",
+      "library/compact.lua",
+      "src/games/volleyballlegends.lua",
+      "src/games/features/volleyballlegends/ball-detector.lua",
+      "src/games/features/volleyballlegends/ball-esp.lua",
+      "src/games/features/volleyballlegends/trajectory.lua",
+      "src/games/features/volleyballlegends/frontend.lua",
+      "src/games/updates/6931042565.txt"
     ]
   }
 }

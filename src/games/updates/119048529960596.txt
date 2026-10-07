@@ -1,2 +1,3 @@
+0.0.1 | DropFolder replacement rebind and cancelled stale collection tasks.
 0.0.2 | Instant Cook
 0.0.1 | Auto Farm
