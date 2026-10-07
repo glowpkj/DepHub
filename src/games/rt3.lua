@@ -20,7 +20,7 @@ if type(compiler) ~= "function" then
     return false
 end
 
-local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local BASE_URL = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local function fetch(path)
     local url = BASE_URL .. path
@@ -156,7 +156,13 @@ function runtime:Destroy()
     end
     self.Features = {}
     pcall(AntiAFK.Stop)
+    local handles={Scheduler=self.Scheduler,HealthMonitor=self.HealthMonitor,Dashboard=self.Dashboard,AntiAFK=AntiAFK}
     destroyRuntime(self)
+    if env.__DEPHUB then
+        if env.__DEPHUB.Runtime==self then env.__DEPHUB.Runtime=nil end
+        for name,handle in pairs(handles) do if env.__DEPHUB[name]==handle then env.__DEPHUB[name]=nil end end
+    end
+    if env.__DEPHUB_DASHBOARD==handles.Dashboard then env.__DEPHUB_DASHBOARD=nil end
 end
 env.__DEPHUB.Scheduler = runtime.Scheduler
 env.__DEPHUB.HealthMonitor = runtime.HealthMonitor
@@ -241,3 +247,4 @@ log("Runtime health: " .. tostring(snapshot.Health))
 log("Restaurant Tycoon 3 inicializado com sucesso")
 
 return true
+

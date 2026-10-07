@@ -5,9 +5,12 @@ local AutoAttack={}
 AutoAttack.__index=AutoAttack
 
 function AutoAttack.new()
+    local events=ReplicatedStorage:FindFirstChild("Events") or ReplicatedStorage:WaitForChild("Events",8)
+    local remote=events and (events:FindFirstChild("PlayerAttack") or events:WaitForChild("PlayerAttack",8))
+    assert(remote and remote:IsA("RemoteEvent"),"Noob Piece: Events/PlayerAttack unavailable")
     return setmetatable({
         Player=Players.LocalPlayer,
-        Remote=ReplicatedStorage:WaitForChild("Events"):WaitForChild("PlayerAttack"),
+        Remote=remote,
         Enabled=false,
         FarmEnabled=false,
         FarmReady=false,
@@ -103,3 +106,4 @@ function AutoAttack:Destroy()
 end
 
 return AutoAttack
+

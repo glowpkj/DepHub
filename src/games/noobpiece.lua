@@ -1,6 +1,8 @@
 local Workspace=game:GetService("Workspace")
 local env=type(getgenv)=="function" and getgenv() or _G
-local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local previous=env.__DEPHUB_NOOBPIECE
+if type(previous)=="table" and type(previous.Destroy)=="function" then previous:Destroy() end
+local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local function loadFeature(path)
     local source=game:HttpGet(BASE_URL..path)
@@ -22,7 +24,9 @@ local NpcESP=loadFeature("src/games/features/noobpiece/npcesp.lua")
 local AutoQuest=loadFeature("src/games/features/noobpiece/autoquest.lua")
 
 local backend={
-    Version="0.0.19",
+    Version="0.0.20",
+    Destroyed=false,
+    TeleportToken=0,
     Toggles={
         ChestESP=false,
         IslandESP=false,
@@ -44,28 +48,8 @@ local backend={
     }
 }
 
-backend.Movement=Movement.new(MovementProfile)
-
-backend.ChestESP=ChestESP.new()
-backend.IslandTracker=IslandTracker.new(IslandData,backend.Movement)
-backend.AutoChest=AutoChest.new(backend.Movement)
-backend.AutoAttack=AutoAttack.new()
-backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack,IslandData)
-backend.AutoTeam=AutoTeam.new()
-backend.WanderingGacha=WanderingGacha.new(backend.Movement)
-backend.NpcESP=NpcESP.new()
-backend.AutoQuest=AutoQuest.new(backend.Movement,IslandData,backend.AutoFarm)
-
-backend.AutoChest:SetDelay(backend.Values.AutoChestDelay)
-backend.AutoFarm:SetWeaponCategory(backend.Values.WeaponCategory)
-backend.AutoTeam:SetSelected(backend.Values.SelectedTeam)
-backend.AutoFarm:SetSelectedEnemy(backend.Values.SelectedEnemy)
-backend.AutoQuest:SetSelectedEnemy(backend.Values.SelectedEnemy)
-backend.IslandTracker:Start()
-backend.IslandAvailability=Instance.new("BindableEvent")
-backend.MirageMarker=nil
-
 function backend:_RefreshMirageESP()
+    if self.Destroyed then return end
     local available=Workspace:FindFirstChild("MysteriousIsland")~=nil
 
     if not self.Toggles.IslandESP or not available then
@@ -118,32 +102,15 @@ function backend:_RefreshMirageESP()
     self.MirageMarker=part
 end
 
-backend.IslandWorkspaceConnection=Workspace.ChildAdded:Connect(function(child)
-    if child.Name=="MysteriousIsland" then
-        backend:_RefreshMirageESP()
-        backend.IslandAvailability:Fire(backend:GetIslandNames())
-    end
-end)
-
-backend.IslandWorkspaceRemovingConnection=Workspace.ChildRemoved:Connect(function(child)
-    if child.Name=="MysteriousIsland" then
-        backend:_RefreshMirageESP()
-
-        if backend.Toggles.IslandTeleport and backend.Values.SelectedIsland=="MysteriousIsland" then
-            backend:SetIslandTeleport(false)
-        end
-
-        backend.IslandAvailability:Fire(backend:GetIslandNames())
-    end
-end)
-
 function backend:SetChestESP(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
     self.Toggles.ChestESP=enabled
     self.ChestESP:SetEnabled(enabled)
 end
 
 function backend:SetIslandESP(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
     self.Toggles.IslandESP=enabled
     self.IslandTracker:SetESPEnabled(enabled)
@@ -151,6 +118,7 @@ function backend:SetIslandESP(enabled)
 end
 
 function backend:SetSelectedIsland(name)
+    if self.Destroyed then return false end
     if type(name)~="string" or name=="" then
         return false
     end
@@ -159,8 +127,10 @@ function backend:SetSelectedIsland(name)
 
     if self.Toggles.IslandTeleport then
         self.Movement:CancelOwner("IslandTeleport",true)
+        self.TeleportToken+=1
+        local token=self.TeleportToken
         task.spawn(function()
-            self:TeleportIsland(name)
+            if not self.Destroyed and self.Toggles.IslandTeleport and token==self.TeleportToken then self:TeleportIsland(name) end
         end)
     end
 
@@ -182,6 +152,7 @@ function backend:GetIslandNames()
 end
 
 function backend:TeleportIsland(name)
+    if self.Destroyed then return false end
     name=name or self.Values.SelectedIsland
 
     if type(name)~="string" or name=="" then
@@ -197,8 +168,10 @@ function backend:TeleportIsland(name)
 end
 
 function backend:SetIslandTeleport(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
     self.Toggles.IslandTeleport=enabled
+    self.TeleportToken+=1
 
     if not enabled then
         self.Movement:CancelOwner("IslandTeleport",true)
@@ -212,14 +185,16 @@ function backend:SetIslandTeleport(enabled)
         return false
     end
 
+    local token=self.TeleportToken
     task.spawn(function()
-        self:TeleportIsland(name)
+        if not self.Destroyed and self.Toggles.IslandTeleport and token==self.TeleportToken then self:TeleportIsland(name) end
     end)
 
     return true
 end
 
 function backend:SetAutoChest(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
 
     if enabled and self.Toggles.AutoFarm then
@@ -232,6 +207,7 @@ function backend:SetAutoChest(enabled)
 end
 
 function backend:SetAutoFarm(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
 
     if enabled and self.Toggles.AutoChest then
@@ -244,6 +220,7 @@ function backend:SetAutoFarm(enabled)
 end
 
 function backend:SetSelectedEnemy(name)
+    if self.Destroyed then return false end
     if self.AutoFarm:SetSelectedEnemy(name) then
         self.Values.SelectedEnemy=self.AutoFarm:GetSelectedEnemy()
         self.AutoQuest:SetSelectedEnemy(self.Values.SelectedEnemy)
@@ -262,22 +239,26 @@ function backend:GetSelectedEnemyOption()
 end
 
 function backend:TeleportWanderingGacha()
+    if self.Destroyed then return false end
     return self.WanderingGacha:Teleport()
 end
 
 function backend:SetGachaESP(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
     self.Toggles.GachaESP=enabled
     self.NpcESP:SetEnabled(enabled)
 end
 
 function backend:SetAutoQuest(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
     self.Toggles.AutoQuest=enabled
     self.AutoQuest:SetEnabled(enabled)
 end
 
 function backend:SetWeaponCategory(category)
+    if self.Destroyed then return false end
     if self.AutoFarm:SetWeaponCategory(category) then
         self.Values.WeaponCategory=category
         return true
@@ -287,6 +268,7 @@ function backend:SetWeaponCategory(category)
 end
 
 function backend:SetSelectedTeam(name)
+    if self.Destroyed then return false end
     if self.AutoTeam:SetSelected(name) then
         self.Values.SelectedTeam=name
         return true
@@ -296,6 +278,7 @@ function backend:SetSelectedTeam(name)
 end
 
 function backend:SetAutoTeam(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
     self.Toggles.AutoTeam=enabled
     self.AutoTeam:SetEnabled(enabled)
@@ -306,12 +289,14 @@ function backend:GetTeams()
 end
 
 function backend:SetAutoChestDelay(value)
+    if self.Destroyed then return false end
     value=math.clamp(tonumber(value) or 0.35,0.1,2)
     self.Values.AutoChestDelay=value
     self.AutoChest:SetDelay(value)
 end
 
 function backend:SetAutoAttack(enabled)
+    if self.Destroyed then return false end
     enabled=enabled==true
     self.Toggles.AutoAttack=enabled
     self.AutoAttack:SetEnabled(enabled)
@@ -330,34 +315,73 @@ function backend:GetKnownIslands()
 end
 
 function backend:Destroy()
-    if self.IslandWorkspaceConnection then
-        self.IslandWorkspaceConnection:Disconnect()
+    if self.Destroyed then return end
+    self.Destroyed=true
+    self.TeleportToken+=1
+    for _,name in ipairs({"IslandWorkspaceConnection","IslandWorkspaceRemovingConnection"}) do
+        local connection=self[name]
+        self[name]=nil
+        if connection then connection:Disconnect() end
     end
-
-    if self.IslandWorkspaceRemovingConnection then
-        self.IslandWorkspaceRemovingConnection:Disconnect()
+    for _,name in ipairs({"MirageMarker","IslandAvailability","AutoQuest","NpcESP","WanderingGacha","AutoTeam","AutoFarm","AutoChest","AutoAttack","IslandTracker","ChestESP","Movement"}) do
+        local resource=self[name]
+        if resource and type(resource.Destroy)=="function" then
+            local ok,reason=pcall(resource.Destroy,resource)
+            if not ok then warn("[DepHub Noob Piece] cleanup "..name..": "..tostring(reason)) end
+        elseif typeof(resource)=="Instance" then
+            resource:Destroy()
+        end
+        self[name]=nil
     end
-
-    if self.MirageMarker then
-        self.MirageMarker:Destroy()
-        self.MirageMarker=nil
-    end
-
-    if self.IslandAvailability then
-        self.IslandAvailability:Destroy()
-    end
-
-    self.AutoQuest:Destroy()
-    self.NpcESP:Destroy()
-    self.WanderingGacha:Destroy()
-    self.AutoTeam:Destroy()
-    self.AutoFarm:Destroy()
-    self.AutoChest:Destroy()
-    self.AutoAttack:Destroy()
-    self.Movement:Destroy()
-    self.ChestESP:Destroy()
-    self.IslandTracker:Destroy()
+    if env.__DEPHUB_NOOBPIECE==self then env.__DEPHUB_NOOBPIECE=nil end
+    if env.__DEPHUB and env.__DEPHUB.NoobPiece==self then env.__DEPHUB.NoobPiece=nil end
 end
 
+local ok,reason=pcall(function()
+    backend.Movement=Movement.new(MovementProfile)
+
+    backend.ChestESP=ChestESP.new()
+    backend.IslandTracker=IslandTracker.new(IslandData,backend.Movement)
+    backend.AutoChest=AutoChest.new(backend.Movement)
+    backend.AutoAttack=AutoAttack.new()
+    backend.AutoFarm=AutoFarm.new(backend.Movement,backend.AutoAttack,IslandData)
+    backend.AutoTeam=AutoTeam.new()
+    backend.WanderingGacha=WanderingGacha.new(backend.Movement)
+    backend.NpcESP=NpcESP.new()
+    backend.AutoQuest=AutoQuest.new(backend.Movement,IslandData,backend.AutoFarm)
+
+    backend.AutoChest:SetDelay(backend.Values.AutoChestDelay)
+    backend.AutoFarm:SetWeaponCategory(backend.Values.WeaponCategory)
+    backend.AutoTeam:SetSelected(backend.Values.SelectedTeam)
+    backend.AutoFarm:SetSelectedEnemy(backend.Values.SelectedEnemy)
+    backend.AutoQuest:SetSelectedEnemy(backend.Values.SelectedEnemy)
+    backend.IslandTracker:Start()
+    backend.IslandAvailability=Instance.new("BindableEvent")
+    backend.MirageMarker=nil
+
+    backend.IslandWorkspaceConnection=Workspace.ChildAdded:Connect(function(child)
+        if child.Name=="MysteriousIsland" then
+            backend:_RefreshMirageESP()
+            backend.IslandAvailability:Fire(backend:GetIslandNames())
+        end
+    end)
+
+    backend.IslandWorkspaceRemovingConnection=Workspace.ChildRemoved:Connect(function(child)
+        if child.Name=="MysteriousIsland" then
+            backend:_RefreshMirageESP()
+
+            if backend.Toggles.IslandTeleport and backend.Values.SelectedIsland=="MysteriousIsland" then
+                backend:SetIslandTeleport(false)
+            end
+
+            backend.IslandAvailability:Fire(backend:GetIslandNames())
+        end
+    end)
+
+end)
+if not ok then
+    backend:Destroy()
+    error("Noob Piece initialization failed: "..tostring(reason))
+end
 env.__DEPHUB_NOOBPIECE=backend
 return backend

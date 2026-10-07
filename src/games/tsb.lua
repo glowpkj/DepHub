@@ -12,8 +12,8 @@ local LocalPlayer=Players.LocalPlayer
 
 local env=type(getgenv)=="function" and getgenv() or _G
 local STATE_KEY="__DEPHUB_TSB"
-local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION="0.0.8"
+local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local VERSION="0.0.9"
 
 local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
@@ -152,3 +152,4 @@ end
 local okStart,started=pcall(State.Start,State)
 if not okStart or not started then pcall(State.Destroy,State) return false end
 return State
+

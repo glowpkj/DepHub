@@ -1,1 +1,2 @@
+0.0.9 | Opponent streaming rebind, local death cleanup and paired counter input release.
 0.0.8 | Predictive threat engine, facing validation, closing-speed checks, configurable counter timing, unknown-animation logger and expanded combat diagnostics

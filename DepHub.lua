@@ -10,8 +10,9 @@ local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
-local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.28"
+local sourceRef = tostring(env.__DEPHUB_SOURCE_REF or "main")
+local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
+local VERSION = "0.0.29"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -39,6 +40,8 @@ local function cleanupRuntime()
         env.__DEPHUB_LOADING_INSTANCE = nil
     end
 
+    env.__DEPHUB_UNIVERSAL = nil
+    env.__DEPHUB_FRONTEND = nil
     env.__DEPHUB_UI_MODULES = nil
     env.__DEPHUB_UI_LOADING = nil
 
@@ -64,13 +67,28 @@ local function cleanupRuntime()
     env.__DEPHUB_UI_GUARD = nil
 end
 
+local function sessionHealthy()
+    local state = env.__DEPHUB
+    if type(state) ~= "table" then return false end
+    local frontend = state.Frontend
+    if type(frontend) ~= "table" or frontend.Destroyed then return false end
+    local backend = state.TSB or state.MM2 or state.ViolenceDistrict or state.NoobPiece or state.BloxFruits or state.Universal or state.Runtime
+    return type(backend) == "table" and not backend.Destroyed
+end
+
 local previousState = env[STATE_KEY]
+if type(previousState) == "table" and previousState.status == "running" then
+    log("Inicializacao em andamento. Aguarde antes de executar novamente.")
+    return false
+end
 if env[EXECUTED_KEY]
     and type(previousState) == "table"
     and previousState.status == "success"
     and previousState.Version == VERSION
     and previousState.PlaceId == placeId
-    and previousState.GameId == gameId then
+    and previousState.GameId == gameId
+    and previousState.SourceRef == sourceRef
+    and sessionHealthy() then
     return true
 end
 
@@ -78,11 +96,13 @@ cleanupRuntime()
 env[EXECUTED_KEY] = false
 
 env[STATE_KEY] = {
-    status = "running",startedAt = os.clock(),Version = VERSION,PlaceId = placeId,GameId = gameId,Frontend = "pending"
+    status = "running",startedAt = os.clock(),Version = VERSION,PlaceId = placeId,GameId = gameId,Frontend = "pending",SourceRef = sourceRef
 }
 
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
+env.__DEPHUB.SourceBaseURL = BASE_URL
+local session = env[STATE_KEY]
 env.__DEPHUB.Executor = detectExecutor()
 env.__DEPHUB.Loader = env.__DEPHUB.Loader or {}
 env.__DEPHUB.Loader.State = env[STATE_KEY]
@@ -100,15 +120,16 @@ end
 local function fail(reason)
     local message = tostring(reason or "Falha desconhecida")
     log("Falha: " .. message)
+    if env[STATE_KEY] ~= session then return false end
     cleanupRuntime()
-    env.__DEPHUB.Loader.MarkFailed(message)
+    if env[STATE_KEY] == session then env.__DEPHUB.Loader.MarkFailed(message) end
     return false
 end
 
 local function getCache()
     local cache = env[CACHE_KEY]
-    if type(cache) ~= "table" or cache.Version ~= VERSION or type(cache.Sources) ~= "table" then
-        cache = {Version = VERSION, Sources = {}}
+    if type(cache) ~= "table" or cache.Version ~= VERSION or cache.SourceRef ~= sourceRef or type(cache.Sources) ~= "table" then
+        cache = {Version = VERSION, SourceRef = sourceRef, Sources = {}}
         env[CACHE_KEY] = cache
     end
     return cache.Sources
@@ -116,10 +137,10 @@ end
 
 local function performRequest(url)
     local requestFunctions = {
-        type(request) == "function" and request or nil,
-        type(http_request) == "function" and http_request or nil,
-        type(syn) == "table" and type(syn.request) == "function" and syn.request or nil
     }
+    if type(request) == "function" then requestFunctions[#requestFunctions+1] = request end
+    if type(http_request) == "function" then requestFunctions[#requestFunctions+1] = http_request end
+    if type(syn) == "table" and type(syn.request) == "function" then requestFunctions[#requestFunctions+1] = syn.request end
     local lastError = "Resposta HTTP vazia"
     for attempt = 1, 2 do
         for _, requestFunction in ipairs(requestFunctions) do
@@ -160,8 +181,10 @@ local function compile(source)
 end
 
 local function loadModule(path, useCache)
+    if env[STATE_KEY] ~= session then return false, "Sessao substituida" end
     local okSource, source = httpGet(path, useCache)
     if not okSource then return false, source end
+    if env[STATE_KEY] ~= session then return false, "Sessao substituida" end
     local okCompile, chunk = compile(source)
     if not okCompile then return false, chunk end
     local okRun, result = pcall(chunk)
@@ -263,20 +286,27 @@ if okGuard and type(guardFactory) == "table" and type(guardFactory.new) == "func
     end
 end
 
+if env[STATE_KEY] ~= session then return false end
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
 
 task.defer(function()
+    if env[STATE_KEY] ~= session or session.status ~= "success" then return end
     local ok, updaterModule = loadModule("src/core/updater.lua", false)
     if not ok or type(updaterModule) ~= "table" or type(updaterModule.new) ~= "function" then return end
     local okNew, updater = pcall(function()
         return updaterModule.new({PlaceId = game.PlaceId, GameId = game.GameId, PollInterval = 30, Mode = "serverhop"})
     end)
     if okNew and updater then
+        if env[STATE_KEY] ~= session then
+            if type(updater.Destroy) == "function" then updater:Destroy() end
+            return
+        end
         env.__DEPHUB.Updater = updater
         pcall(updater.Start, updater)
     end
 end)
 
 return true
+

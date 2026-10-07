@@ -12,17 +12,24 @@ local function lower(value)
 end
 
 function AutoQuest.new(movement,islandData,autoFarm)
-    local events=ReplicatedStorage:WaitForChild("Events")
+    local events=ReplicatedStorage:FindFirstChild("Events") or ReplicatedStorage:WaitForChild("Events",8)
+    assert(events,"Noob Piece: Events unavailable")
+    local remotes={}
+    for _,name in ipairs({"NpcInteract","OpenDialog","DialogChoice","QuestUpdate"}) do
+        local remote=events:FindFirstChild(name) or events:WaitForChild(name,8)
+        assert(remote and remote:IsA("RemoteEvent"),"Noob Piece: Events/"..name.." unavailable")
+        remotes[name]=remote
+    end
 
     local self=setmetatable({
         Player=Players.LocalPlayer,
         Movement=movement,
         IslandData=islandData,
         AutoFarm=autoFarm,
-        NpcInteract=events:WaitForChild("NpcInteract"),
-        OpenDialog=events:WaitForChild("OpenDialog"),
-        DialogChoice=events:WaitForChild("DialogChoice"),
-        QuestUpdate=events:WaitForChild("QuestUpdate"),
+        NpcInteract=remotes.NpcInteract,
+        OpenDialog=remotes.OpenDialog,
+        DialogChoice=remotes.DialogChoice,
+        QuestUpdate=remotes.QuestUpdate,
         Enabled=false,
         Token=0,
         SelectedEnemy="Noob",
@@ -505,3 +512,4 @@ function AutoQuest:Destroy()
 end
 
 return AutoQuest
+

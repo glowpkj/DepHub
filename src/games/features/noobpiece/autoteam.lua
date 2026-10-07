@@ -6,9 +6,12 @@ local AutoTeam={}
 AutoTeam.__index=AutoTeam
 
 function AutoTeam.new()
+    local events=ReplicatedStorage:FindFirstChild("Events") or ReplicatedStorage:WaitForChild("Events",8)
+    local remote=events and (events:FindFirstChild("SelectTeam") or events:WaitForChild("SelectTeam",8))
+    assert(remote and remote:IsA("RemoteEvent"),"Noob Piece: Events/SelectTeam unavailable")
     local self=setmetatable({
         Player=Players.LocalPlayer,
-        Remote=ReplicatedStorage:WaitForChild("Events"):WaitForChild("SelectTeam"),
+        Remote=remote,
         Enabled=false,
         Selected="Noob",
         Connections={}
@@ -83,3 +86,4 @@ function AutoTeam:Destroy()
 end
 
 return AutoTeam
+

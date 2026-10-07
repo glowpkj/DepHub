@@ -7,6 +7,8 @@ AutoDropModule.Enabled = false
 
 local dropThread = nil
 local dropConnection = nil
+local boundFolder = nil
+local generation = 0
 local activeDrops = {}
 
 local function processDrop(drop)
@@ -16,9 +18,13 @@ local function processDrop(drop)
     local hrp = character and character:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    activeDrops[drop] = true
-
+    local token = generation
+    activeDrops[drop] = token
     task.spawn(function()
+        if not AutoDropModule.Enabled or token ~= generation or not drop.Parent or localPlayer.Character ~= hrp.Parent then
+            if activeDrops[drop] == token then activeDrops[drop] = nil end
+            return
+        end
         pcall(function()
             local touchInterest = drop:FindFirstChildOfClass("TouchInterest") or drop:FindFirstChild("TouchInterest")
             if touchInterest and firetouchinterest then
@@ -33,18 +39,23 @@ local function processDrop(drop)
         end)
 
         task.wait(0.1)
-        activeDrops[drop] = nil
+        if activeDrops[drop] == token then activeDrops[drop] = nil end
     end)
 end
 
 function AutoDropModule.Start()
     if AutoDropModule.Enabled then return end
     AutoDropModule.Enabled = true
+    generation += 1
 
     dropThread = task.spawn(function()
         while AutoDropModule.Enabled do
             local dropFolder = Workspace:FindFirstChild("DropFolder")
 
+            if dropFolder ~= boundFolder then
+                if dropConnection then dropConnection:Disconnect(); dropConnection = nil end
+                boundFolder = dropFolder
+            end
             if dropFolder then
                 if not dropConnection then
                     dropConnection = dropFolder.ChildAdded:Connect(function(child)
@@ -70,6 +81,8 @@ end
 function AutoDropModule.Stop()
     if not AutoDropModule.Enabled then return end
     AutoDropModule.Enabled = false
+    generation += 1
+    boundFolder = nil
     table.clear(activeDrops)
 
     if dropConnection then
@@ -98,3 +111,4 @@ end
 AutoDropModule.Set = AutoDropModule.Toggle
 
 return AutoDropModule
+

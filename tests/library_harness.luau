@@ -4,10 +4,17 @@ local function signal()
     local event={connections={}}
     function event:Connect(fn) local connection={Connected=true,fn=fn};function connection:Disconnect()self.Connected=false end;self.connections[#self.connections+1]=connection;return connection end
     function event:Fire(...) for _,connection in ipairs(table.clone(self.connections))do if connection.Connected then connection.fn(...)end end end
+    function event:Once(fn)
+        local connection
+        connection=self:Connect(function(...) connection:Disconnect(); fn(...) end)
+        return connection
+    end
     return event
 end
 local Enum=setmetatable({}, {__index=function(t,category)local values=setmetatable({}, {__index=function(s,key)local value={Name=key,__enum=true};rawset(s,key,value);return value end});rawset(t,category,values);return values end})
 local vectorMeta={}
+vectorMeta.__add=function(a,b)return setmetatable({X=a.X+b.X,Y=a.Y+b.Y},vectorMeta)end
+vectorMeta.__div=function(a,b)return setmetatable({X=a.X/b,Y=a.Y/b},vectorMeta)end
 vectorMeta.__sub=function(a,b)return setmetatable({X=a.X-b.X,Y=a.Y-b.Y},vectorMeta)end
 vectorMeta.__index=function(self,key)if key=="Magnitude"then return math.sqrt(self.X*self.X+self.Y*self.Y)end end
 local Vector2={new=function(x,y)return setmetatable({X=x,Y=y},vectorMeta)end}
@@ -105,4 +112,22 @@ old=window;window=Library.new({Mode="RT3",Backend=runtime,Subtitle="RT3"})
 check(old.Destroyed and window.Pages.MAIN and window.Pages.STATUS and window.Pages.CONFIG,"RT3 replaces previous window and mounts content")
 local connections=table.clone(window.Connections);window:Destroy();check(window.Destroyed and window.ScreenGui==nil and state.__DEPHUB_FRONTEND==nil,"destroy releases UI and global handle")
 for _,connection in ipairs(connections)do check(not connection.Connected,"destroy disconnects tracked listener")end
+local Compact=assert(sandbox.loadstring(sources["library/compact.lua"]))()
+local compact=Compact.new({Id="Regression",Title="DEPHUB"})
+local oldCamera=camera
+local newCamera=Instance.new("Camera");newCamera.ViewportSize=Vector2.new(500,500)
+workspace.CurrentCamera=newCamera
+local newSignal=newCamera:GetPropertyChangedSignal("ViewportSize")
+local connected=0
+for _,connection in ipairs(newSignal.connections)do if connection.Connected then connected+=1 end end
+check(connected==1,"compact UI binds replacement camera viewport")
+local oldSignal=oldCamera:GetPropertyChangedSignal("ViewportSize")
+connected=0
+for _,connection in ipairs(oldSignal.connections)do if connection.Connected then connected+=1 end end
+check(connected==0,"compact UI releases old camera viewport listener")
+compact:SetOpen(false)
+check(not compact.Open,"compact window closes with synchronous tween completion")
+compact:Destroy()
+for _,connection in ipairs(newSignal.connections)do check(not connection.Connected,"compact cleanup releases camera viewport listener")end
 print(string.format("PASS %d library checks",passed))
+
