@@ -10,9 +10,10 @@ local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
-local sourceRef = tostring(env.__DEPHUB_SOURCE_REF or "main")
+-- Optional chunk argument lets a one-line loadstring select the same revision for every module.
+local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.30"
+local VERSION = "0.0.31"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -48,7 +49,7 @@ local function cleanupRuntime()
     local state = env.__DEPHUB
     if type(state) == "table" then
         for _, key in ipairs({
-            "Updater","UIGuard","Frontend","BloxFruitsUI","TSBUI","ViolenceDistrictUI","MM2UI",
+            "VolleyballLegendsUI","VolleyballLegends","Updater","UIGuard","Frontend","BloxFruitsUI","TSBUI","ViolenceDistrictUI","MM2UI",
             "BloxFruits","TSB","ViolenceDistrict","MM2","NoobPiece","Universal","Runtime","Window"
         }) do
             local target = state[key]
@@ -57,6 +58,8 @@ local function cleanupRuntime()
         end
     end
 
+    env.__DEPHUB_VOLLEYBALL = nil
+    env.__DEPHUB_VOLLEYBALL_FRONTEND = nil
     env.__DEPHUB_TSB = nil
     env.__DEPHUB_TSB_FRONTEND = nil
     env.__DEPHUB_VD = nil
@@ -72,7 +75,7 @@ local function sessionHealthy()
     if type(state) ~= "table" then return false end
     local frontend = state.Frontend
     if type(frontend) ~= "table" or frontend.Destroyed then return false end
-    local backend = state.TSB or state.MM2 or state.ViolenceDistrict or state.NoobPiece or state.BloxFruits or state.Universal or state.Runtime
+    local backend = state.VolleyballLegends or state.TSB or state.MM2 or state.ViolenceDistrict or state.NoobPiece or state.BloxFruits or state.Universal or state.Runtime
     return type(backend) == "table" and not backend.Destroyed
 end
 
@@ -201,6 +204,8 @@ local okVersion, remoteVersion = httpGet("src/version.txt", false)
 if okVersion then env.__DEPHUB.RemoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION end
 
 local targets = {
+    ["73956553001240"] = {Core = "src/games/volleyballlegends.lua", Frontend = "src/games/features/volleyballlegends/frontend.lua", VolleyballLegends = true},
+    ["6931042565"] = {Core = "src/games/volleyballlegends.lua", Frontend = "src/games/features/volleyballlegends/frontend.lua", VolleyballLegends = true},
     ["994732206"] = {Core = "src/games/bloxfruits.lua"},
     ["85211729168715"] = {Core = "src/games/bloxfruits.lua"},
     ["119048529960596"] = {Core = "src/games/rt3.lua"},
@@ -219,6 +224,7 @@ task.wait()
 
 local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then return fail(coreResult) end
+local isVolleyball = target.VolleyballLegends == true
 local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
 local isVD = target.ViolenceDistrict == true
@@ -232,7 +238,8 @@ elseif type(coreResult) ~= "table" then
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and not isMM2 and not isNoobPiece and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and not isMM2 and not isNoobPiece and not isVolleyball and coreResult or nil
+env.__DEPHUB.VolleyballLegends = isVolleyball and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
 env.__DEPHUB.ViolenceDistrict = isVD and coreResult or nil
 env.__DEPHUB.MM2 = isMM2 and coreResult or nil
@@ -242,13 +249,20 @@ local mode
 local backend
 if target.Universal then mode = "Universal" backend = coreResult
 elseif isRT3 then mode = "RT3" backend = env.__DEPHUB.Runtime
+elseif isVolleyball then mode = "VolleyballLegends" backend = coreResult
 elseif isTSB then mode = "TSB" backend = coreResult
 elseif isVD then mode = "ViolenceDistrict" backend = coreResult
 elseif isMM2 then mode = "MM2" backend = coreResult
 elseif isNoobPiece then mode = "NoobPiece" backend = coreResult
 else mode = "BloxFruits" backend = coreResult end
 
-if isTSB then
+if isVolleyball then
+    env[STATE_KEY].Frontend = "volleyball-compact-1"
+    local okFrontend, frontend = loadModule(target.Frontend, false)
+    if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend Volleyball invalido" or frontend) end
+    env.__DEPHUB.VolleyballLegendsUI = frontend
+    env.__DEPHUB.Frontend = frontend
+elseif isTSB then
     env[STATE_KEY].Frontend = "tsb-compact-3"
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend TSB invalido" or frontend) end
@@ -309,4 +323,3 @@ task.defer(function()
 end)
 
 return true
-

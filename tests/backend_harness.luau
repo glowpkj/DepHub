@@ -43,12 +43,13 @@ function instanceMeta:__newindex(key, value)
     end
 end
 function methods:GetChildren() return table.clone(self._children) end
+function methods:GetFullName() return self.Parent and self.Parent:GetFullName().."."..self.Name or self.Name end
 function methods:FindFirstChild(name) for _, child in ipairs(self._children) do if child.Name == name then return child end end end
 function methods:FindFirstChildWhichIsA(class) return self:FindFirstChildOfClass(class) end
 function methods:GetDescendants() local result={}; for _,child in ipairs(self:GetChildren()) do result[#result+1]=child; for _,descendant in ipairs(child:GetDescendants()) do result[#result+1]=descendant end end; return result end
 function methods:FindFirstChildOfClass(class) for _, child in ipairs(self._children) do if child:IsA(class) then return child end end end
 function methods:WaitForChild(name) return assert(self:FindFirstChild(name), "Unexpected wait: " .. name) end
-function methods:IsA(class) return class == self.ClassName end
+function methods:IsA(class) return class == self.ClassName or class=="BasePart" and (self.ClassName=="Part" or self.ClassName=="MeshPart") end
 function methods:IsDescendantOf(ancestor)
     local parent = self.Parent
     while parent do if parent == ancestor then return true end; parent = parent.Parent end
@@ -131,4 +132,3 @@ local modules = {fruitvfx=vfxContext:Run("src/games/features/bloxfruits/fruitvfx
 -- INSERT_LIFECYCLE_TESTS
 -- INSERT_HEADLESS_TESTS
 print(string.format("PASS %d backend/headless checks", passed))
-

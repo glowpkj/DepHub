@@ -163,5 +163,21 @@
       "library/content/common.lua",
       "library/content/noobpiece.lua"
     ]
+  },
+  "6931042565": {
+    "name": "Volleyball Legends",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/ui-guard.lua",
+      "src/core/updater.lua",
+      "library/compact.lua",
+      "src/games/volleyballlegends.lua",
+      "src/games/features/volleyballlegends/ball-detector.lua",
+      "src/games/features/volleyballlegends/ball-esp.lua",
+      "src/games/features/volleyballlegends/trajectory.lua",
+      "src/games/features/volleyballlegends/frontend.lua",
+      "src/games/updates/6931042565.txt"
+    ]
   }
 }
