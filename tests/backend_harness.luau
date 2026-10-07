@@ -17,6 +17,11 @@ local function signal()
             if connection.Connected then connection.fn(...) end
         end
     end
+    function event:Once(fn)
+        local connection
+        connection=self:Connect(function(...) connection:Disconnect(); fn(...) end)
+        return connection
+    end
     return event
 end
 local Color3 = {}
@@ -39,6 +44,8 @@ function instanceMeta:__newindex(key, value)
 end
 function methods:GetChildren() return table.clone(self._children) end
 function methods:FindFirstChild(name) for _, child in ipairs(self._children) do if child.Name == name then return child end end end
+function methods:FindFirstChildWhichIsA(class) return self:FindFirstChildOfClass(class) end
+function methods:GetDescendants() local result={}; for _,child in ipairs(self:GetChildren()) do result[#result+1]=child; for _,descendant in ipairs(child:GetDescendants()) do result[#result+1]=descendant end end; return result end
 function methods:FindFirstChildOfClass(class) for _, child in ipairs(self._children) do if child:IsA(class) then return child end end end
 function methods:WaitForChild(name) return assert(self:FindFirstChild(name), "Unexpected wait: " .. name) end
 function methods:IsA(class) return class == self.ClassName end
@@ -70,10 +77,10 @@ end})
 -- INSERT_SOURCES
 local function sandbox(placeId, gameId)
     local player = Instance.new("Player")
-    player.CharacterAdded, player.CameraMaxZoomDistance = signal(), 128
+    player.CharacterAdded, player.CharacterRemoving, player.CameraMaxZoomDistance = signal(), signal(), 128
     local players = {LocalPlayer=player, PlayerAdded=signal(), PlayerRemoving=signal()}
     function players:GetPlayers() return {player} end
-    local run = {RenderStepped=signal(), Stepped=signal()}
+    local run = {RenderStepped=signal(), Stepped=signal(), Heartbeat=signal()}
     local input = {InputBegan=signal(), InputEnded=signal()}
     local teleport = {Calls=0}
     function teleport:Teleport() self.Calls += 1 end
@@ -121,5 +128,7 @@ local vfxContext = sandbox()
 local player = vfxContext.Player
 local modules = {fruitvfx=vfxContext:Run("src/games/features/bloxfruits/fruitvfx.lua")}
 -- INSERT_FRUIT_VFX_TESTS
+-- INSERT_LIFECYCLE_TESTS
 -- INSERT_HEADLESS_TESTS
 print(string.format("PASS %d backend/headless checks", passed))
+

@@ -153,7 +153,12 @@ function Factory.new(context)
         self:_cancelAutomationForLocalAttack("local M1 animation") self:_refreshLocalAttackDebug()
         local connection
         connection=track.Stopped:Connect(function()
-            if connection then pcall(connection.Disconnect,connection) connection=nil end
+            if connection then
+                local index=table.find(self.LocalConnections,connection)
+                if index then table.remove(self.LocalConnections,index) end
+                connection:Disconnect()
+                connection=nil
+            end
             if self.LocalNormalTracks[track] then
                 self.LocalNormalTracks[track]=nil self.LocalNormalCount=math_max(0,self.LocalNormalCount-1)
                 if self.LocalNormalCount==0 then self.LocalAttackGraceUntil=os_clock()+self.Config.AttackGrace end
@@ -169,6 +174,9 @@ function Factory.new(context)
         if self.Destroyed or not self.Enabled or LocalPlayer.Character~=character or not humanoid then return end
         local animator=humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator",8)
         if self.Destroyed or not self.Enabled or LocalPlayer.Character~=character or not animator then return end
+        self.LocalConnections[#self.LocalConnections+1]=humanoid.Died:Connect(function()
+            self:_onLocalCharacterRemoving()
+        end)
         self.LocalM1ing=character:FindFirstChild("M1ing",true)~=nil
         self.LocalConnections[#self.LocalConnections+1]=animator.AnimationPlayed:Connect(function(track) if not self.Destroyed and self.Enabled then self:_trackLocalAnimation(track) end end)
         self.LocalConnections[#self.LocalConnections+1]=character.DescendantAdded:Connect(function(instance) if instance.Name=="M1ing" then self:_setLocalM1ing(true) end end)
@@ -194,8 +202,11 @@ function Factory.new(context)
         if self.Destroyed or not self.Enabled or not self:_localAlive() then return false end
         if self:_isLocalAttacking() then self.DebugInfo.SuppressedCounters=self.DebugInfo.SuppressedCounters+1 return false end
         if not self:_communicate("LeftClick",true) then return false end
-        local token=self.CounterToken
-        task.delay(0.07,function() if self.Destroyed or token~=self.CounterToken then return end self:_communicate("LeftClickRelease",true) end)
+        local character=LocalPlayer.Character
+        local remote=character and character:FindFirstChild("Communicate")
+        task.delay(0.07,function()
+            if remote and remote.Parent then pcall(remote.FireServer,remote,{Goal="LeftClickRelease",Mobile=true}) end
+        end)
         return true
     end
     function self:_destroyDetectionBox()
@@ -342,22 +353,43 @@ function Factory.new(context)
         if tracker.M1ing then self:_handleM1(player,tracker,"M1ing existing") end
     end
     function self:_queueCharacter(player,binding,character)
-        if not binding then return end binding.Generation=binding.Generation+1 local generation=binding.Generation binding.Character=character self:_destroyTracker(binding) if not character then return end
-        task.spawn(function()
-            local humanoid=character:FindFirstChildWhichIsA("Humanoid") or character:WaitForChild("Humanoid",8) if self.Destroyed or not self.Enabled or binding.Generation~=generation or binding.Character~=character or not humanoid then return end
-            local root=character:FindFirstChild("HumanoidRootPart") or character:WaitForChild("HumanoidRootPart",8) if self.Destroyed or not self.Enabled or binding.Generation~=generation or binding.Character~=character or not root then return end
-            local animator=humanoid:FindFirstChildOfClass("Animator") or humanoid:WaitForChild("Animator",8) if self.Destroyed or not self.Enabled or binding.Generation~=generation or binding.Character~=character or not animator then return end
-            self:_attachTracker(player,binding,character,humanoid,root,animator)
-        end)
+        if not binding then return end
+        binding.Generation=binding.Generation+1
+        binding.Character=character
+        disconnectAll(binding.CharacterConnections)
+        self:_destroyTracker(binding)
+        if not character then return end
+        local generation=binding.Generation
+        local function refresh()
+            if self.Destroyed or not self.Enabled or self.PlayerBindings[player]~=binding or binding.Generation~=generation then return end
+            local humanoid=character:FindFirstChildWhichIsA("Humanoid")
+            local root=character:FindFirstChild("HumanoidRootPart")
+            local animator=humanoid and humanoid:FindFirstChildOfClass("Animator")
+            local tracker=binding.Tracker
+            if tracker and tracker.Humanoid==humanoid and tracker.Root==root and tracker.Animator==animator then return end
+            self:_destroyTracker(binding)
+            if humanoid and root and animator then self:_attachTracker(player,binding,character,humanoid,root,animator) end
+        end
+        local pending=false
+        local function schedule(instance)
+            if instance.Name~="HumanoidRootPart" and not instance:IsA("Humanoid") and not instance:IsA("Animator") then return end
+            if pending then return end
+            pending=true
+            task.defer(function() pending=false; refresh() end)
+        end
+        local list=binding.CharacterConnections
+        list[#list+1]=character.DescendantAdded:Connect(schedule)
+        list[#list+1]=character.DescendantRemoving:Connect(schedule)
+        refresh()
     end
     function self:_refreshTrackedCount() local count=0 for player,binding in pairs(self.PlayerBindings) do if player~=LocalPlayer and binding and binding.Tracker and not binding.Tracker.Destroyed then count=count+1 end end self.DebugInfo.TrackedPlayers=count end
     function self:_bindPlayer(player)
-        if not player or player==LocalPlayer or self.PlayerBindings[player] then return end local binding={Player=player,Character=nil,Generation=0,Tracker=nil,Connections={}} self.PlayerBindings[player]=binding
+        if not player or player==LocalPlayer or self.PlayerBindings[player] then return end local binding={Player=player,Character=nil,Generation=0,Tracker=nil,Connections={},CharacterConnections={}} self.PlayerBindings[player]=binding
         binding.Connections[#binding.Connections+1]=player.CharacterAdded:Connect(function(character) self:_queueCharacter(player,binding,character) end)
-        binding.Connections[#binding.Connections+1]=player.CharacterRemoving:Connect(function(character) if binding.Character==character then binding.Generation=binding.Generation+1 binding.Character=nil self:_destroyTracker(binding) self:_refreshTrackedCount() end end)
+        binding.Connections[#binding.Connections+1]=player.CharacterRemoving:Connect(function(character) if binding.Character==character then self:_queueCharacter(player,binding,nil) self:_refreshTrackedCount() end end)
         if player.Character then self:_queueCharacter(player,binding,player.Character) end
     end
-    function self:_unbindPlayer(player) local binding=self.PlayerBindings[player] if not binding then return end self.PlayerBindings[player]=nil binding.Generation=binding.Generation+1 self:_destroyTracker(binding) disconnectAll(binding.Connections) self:_refreshTrackedCount() end
+    function self:_unbindPlayer(player) local binding=self.PlayerBindings[player] if not binding then return end self.PlayerBindings[player]=nil binding.Generation=binding.Generation+1 self:_destroyTracker(binding) disconnectAll(binding.CharacterConnections) disconnectAll(binding.Connections) self:_refreshTrackedCount() end
     function self:_unbindAllPlayers() local list={} for player in pairs(self.PlayerBindings) do list[#list+1]=player end for _,player in ipairs(list) do self:_unbindPlayer(player) end self.DebugInfo.TrackedPlayers=0 end
     function self:_spatialTick()
         if self:_isLocalAttacking() then return end local myRoot=self:_localRoot() if not myRoot then return end

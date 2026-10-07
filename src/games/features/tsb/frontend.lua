@@ -6,7 +6,7 @@ local pcall=pcall
 
 local RunService=game:GetService("RunService")
 local env=type(getgenv)=="function" and getgenv() or _G
-local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local previous=env.__DEPHUB_TSB_FRONTEND
 if type(previous)=="table" and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
@@ -88,3 +88,4 @@ env.__DEPHUB_TSB_FRONTEND=UI
 env.__DEPHUB=env.__DEPHUB or {}
 env.__DEPHUB.TSBUI=UI
 return UI
+

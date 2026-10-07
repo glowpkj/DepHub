@@ -11,7 +11,8 @@ local UserInputService=game:GetService("UserInputService")
 local Workspace=game:GetService("Workspace")
 
 local LocalPlayer=Players.LocalPlayer or Players.PlayerAdded:Wait()
-local PlayerGui=LocalPlayer:WaitForChild("PlayerGui")
+local PlayerGui=LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui",15)
+assert(PlayerGui,"DepHub: PlayerGui unavailable")
 local env=type(getgenv)=="function" and getgenv() or _G
 
 local Library={Version="1.0.0"}
@@ -196,12 +197,16 @@ function Library.new(options)
     end
 
     updateScale()
-    if Workspace.CurrentCamera then
-        track(Workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale))
+    local cameraConnection
+    local function bindCamera()
+        if cameraConnection then cameraConnection:Disconnect(); cameraConnection=nil end
+        if window.Destroyed then return end
+        local camera=Workspace.CurrentCamera
+        if camera then cameraConnection=camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateScale) end
+        updateScale()
     end
-    track(Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(function()
-        task.defer(updateScale)
-    end))
+    bindCamera()
+    track(Workspace:GetPropertyChangedSignal("CurrentCamera"):Connect(bindCamera))
 
     local function makeLabel(parent,text,size,height,transparency)
         local label=Instance.new("TextLabel")
@@ -488,11 +493,10 @@ function Library.new(options)
             OpenButton.Text="OPEN"
             currentTween=TweenService:Create(Body,TweenInfo.new(.14,Enum.EasingStyle.Quart,Enum.EasingDirection.In),{Size=UDim2.new(1,0,0,0)})
             local tween=currentTween
-            tween:Play()
-            task.spawn(function()
-                tween.Completed:Wait()
+            tween.Completed:Once(function()
                 if not self.Destroyed and not self.Open and currentTween==tween then Body.Visible=false end
             end)
+            tween:Play()
         end
         return true
     end
@@ -538,6 +542,7 @@ function Library.new(options)
         self.Destroyed=true
         if currentTween then pcall(currentTween.Cancel,currentTween) end
         disconnectAll(self.Connections)
+        if cameraConnection then cameraConnection:Disconnect(); cameraConnection=nil end
         self.Controls={}
         if Gui then pcall(Gui.Destroy,Gui) end
         if Windows[id]==self then Windows[id]=nil end
@@ -560,3 +565,4 @@ function Library.DestroyAll()
 end
 
 return Library
+

@@ -16,7 +16,8 @@ local RunService = GetService(game, "RunService")
 local Dashboard = {}
 Dashboard.__index = Dashboard
 
-local RELEASES_BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/src/games/updates/"
+local sourceBase = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local RELEASES_BASE_URL = sourceBase .. "src/games/updates/"
 
 local function safeCall(callback, fallback)
     local ok, result = pcall(callback)
@@ -236,3 +237,4 @@ function Dashboard:Destroy()
 end
 
 return Dashboard
+
