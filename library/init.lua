@@ -1,9 +1,9 @@
 local environment = type(getgenv)=="function" and getgenv() or _G
-local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 local libraryVersion=environment.__DEPHUB and environment.__DEPHUB.Version or "standalone"
 local cache=environment.__DEPHUB_LIBRARY_CACHE
-if type(cache)~="table" or cache.__Version~=libraryVersion then
-    cache={__Version=libraryVersion}
+if type(cache)~="table" or cache.__Version~=libraryVersion or cache.__SourceBaseURL~=BASE_URL then
+    cache={__Version=libraryVersion,__SourceBaseURL=BASE_URL}
     environment.__DEPHUB_LIBRARY_CACHE=cache
 end
 local requestNonce=tostring(math.floor(os.clock()*1000000))
@@ -59,8 +59,9 @@ function Library.new(options)
 end
 
 function Library.clearCache()
-    environment.__DEPHUB_LIBRARY_CACHE={__Version=libraryVersion}
+    environment.__DEPHUB_LIBRARY_CACHE={__Version=libraryVersion,__SourceBaseURL=BASE_URL}
     cache=environment.__DEPHUB_LIBRARY_CACHE
 end
 
 return Library
+

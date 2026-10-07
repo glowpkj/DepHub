@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-09-27T19:25:09.610800+00:00",
-  "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
-  "version": "0.0.27",
+  "generatedAt": "2026-10-07T01:03:37.717Z",
+  "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+  "version": "0.0.31",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "6746ae8d30d1c9a496b021edeaa78dffe0599a2c784db183cd6d042fe902d159",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "bde5f8f6d5d08dd3242b03d4c8032387c3bfd30f1352fee72717d091fabd8986",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "7f9cf431808419d8a8c4b087365408507d610b93beadedf97a360b83f5cf35b5",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "5be8b75599442c55124733aa3033f582fc32fc2d2873a038417aa1875918d38c",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -51,13 +51,15 @@
         "library/components.lua",
         "library/window.lua",
         "library/content/common.lua",
-        "library/content/bloxfruits.lua"
+        "library/content/bloxfruits.lua",
+        "src/games/features/bloxfruits/fruitvfx.lua",
+        "src/core/updater.lua"
       ]
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "dd2f16c9cb4970e8ee8f4a4f26fe262a80e03b4a5120741ee618a8cce247d74d",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "ba8622caa779ed3aee9e618b0ff570e86154c6991fb907fcb2dee383a6ecc86e",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -69,13 +71,14 @@
         "src/games/features/tsb/autoblock.lua",
         "src/games/features/tsb/autoblock-v2.lua",
         "src/games/features/tsb/frontend.lua",
-        "src/games/updates/3808081382.txt"
+        "src/games/updates/3808081382.txt",
+        "src/games/features/tsb/autoblock-v3.lua"
       ]
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "1da3a1ce0070158b145228261f12e239aafd6616c40bcc51362db762c24cfe76",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "3c02f921d33526f94c44a2f0b441a07b64f668a616de484f6bcab3c12e49c043",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -103,8 +106,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "bd0aae9db9cbde2db4da43827fddf0ea78c7c51c98c79965cf00a7cf8aa714be",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "90583882463f2b3fcb9af8ba3f1667f67e472594792f335b687e3fbddf482934",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -127,13 +130,15 @@
         "library/components.lua",
         "library/window.lua",
         "library/content/common.lua",
-        "library/content/bloxfruits.lua"
+        "library/content/bloxfruits.lua",
+        "src/games/features/bloxfruits/fruitvfx.lua",
+        "src/core/updater.lua"
       ]
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "d91624ed326b1af46d7bb0c7f455acc4d692f86b61696a1f2e93d2c449bec9f1",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "66646a240219a45d5fa6afea7db714049c780b9ff31f0ab1eed11623fd4308aa",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -148,8 +153,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "edbaf1bf69f0cf320ec5fec85d615dfb2e063515c914e89690041e3f57c5f7cb",
-      "commit": "9a15b31373146b351ac8f9e8a180926a41d1afa0",
+      "version": "7d860f63522f4913326959e122f4e458317196288bcd36eb850e300554414882",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -177,9 +182,48 @@
         "library/content/common.lua",
         "library/content/noobpiece.lua"
       ]
+    },
+    "6931042565": {
+      "name": "Volleyball Legends",
+      "version": "89dfc251d8590055d306dad3edb68646d1f2c8fa4c50fa950c903cf89827947a",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/ui-guard.lua",
+        "src/core/updater.lua",
+        "library/compact.lua",
+        "src/games/volleyballlegends.lua",
+        "src/games/features/volleyballlegends/ball-detector.lua",
+        "src/games/features/volleyballlegends/ball-esp.lua",
+        "src/games/features/volleyballlegends/trajectory.lua",
+        "src/games/features/volleyballlegends/frontend.lua",
+        "src/games/updates/6931042565.txt"
+      ]
     }
   },
   "recentUpdates": [
+    {
+      "Version": "e640a3a",
+      "Date": "2026-10-07T01:03:37.717Z",
+      "Changes": [
+        "Volleyball Legends: Ball ESP, projectile trajectory and landing marker"
+      ]
+    },
+    {
+      "Version": "be6e6e7",
+      "Date": "2026-10-07T00:48:04.173Z",
+      "Changes": [
+        "TSB: one Auto Block toggle and defense priority over manual M1"
+      ]
+    },
+    {
+      "Version": "3312d52",
+      "Date": "2026-10-07T00:30:21Z",
+      "Changes": [
+        "fix: harden DepHub loader, game lifecycle and regression checks"
+      ]
+    },
     {
       "Version": "9a15b31",
       "Date": "2026-09-27T16:25:01-03:00",
@@ -192,27 +236,6 @@
       "Date": "2026-09-27T16:24:57-03:00",
       "Changes": [
         "chore: bump loader to 0.0.27"
-      ]
-    },
-    {
-      "Version": "48a4c15",
-      "Date": "2026-09-27T16:24:46-03:00",
-      "Changes": [
-        "chore: bump DepHub to 0.0.27"
-      ]
-    },
-    {
-      "Version": "c23f4a9",
-      "Date": "2026-09-27T16:24:42-03:00",
-      "Changes": [
-        "chore(noobpiece): bump backend after travel pause adjustment"
-      ]
-    },
-    {
-      "Version": "db45e25",
-      "Date": "2026-09-27T16:24:21-03:00",
-      "Changes": [
-        "design(ui): tighten compact sidebar and navigation labels"
       ]
     }
   ]

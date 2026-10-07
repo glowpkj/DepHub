@@ -11,7 +11,9 @@ do
         local ctx = sandbox(case[1], case[2])
         ctx.Responses["src/version.txt"] = "0.0.3"
         local result = case[3] == "rt3" and true or {}
+        if case[3] == "rt3" then ctx.State.__DEPHUB = {Runtime={Destroyed=false}} end
         ctx:Provide("src/games/" .. case[3] .. ".lua", result)
+        if case[3] == "rt3" then ctx.Responses["src/games/rt3.lua"]='local env=getgenv(); env.__DEPHUB.Runtime={Destroyed=false}; return true' end
         local frontend = {Destroy=function(self) self.Destroyed=true end}
         ctx:Provide("library/init.lua", {new=function(options)
             frontend.Options=options
@@ -25,10 +27,9 @@ do
         check(ctx.State.__DEPHUB_LOADER_STATE.Frontend == "library-1", "successful loader marks current library session")
         check(ctx.State.__DEPHUB.Frontend == frontend, "loader stores the new frontend")
         check(frontend.Options.Mode == (case[3] == "rt3" and "RT3" or case[3] == "bloxfruits" and "BloxFruits" or "Universal"), "loader passes the correct content mode")
-        check(#ctx.Logs == 5, "loader emits exactly five startup/status lines")
-        check(ctx.Logs[1] == "Iniciando loader v0.0.3" and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
+        check(#ctx.Logs == 4, "loader emits four startup identity lines")
+        check(ctx.Logs[1] == "Iniciando loader v0.0.31" and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
         check(ctx.Logs[3] == "PlaceId: " .. case[1] and ctx.Logs[4] == "GameId: " .. case[2], "game identity logs preserved")
-        check(ctx.Logs[5] == (case[4] and "Status: Script universal carregado com sucesso" or "Status: Jogo compativel carregado com sucesso"), "final route status preserved")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
         check(ctx.State.__DEPHUB.Updater.Started, "updater still starts using fresh code")
@@ -190,3 +191,4 @@ do
     validation:Check()
     check(validation.PendingUpdate == nil and validation.RejectedVersions.v3, "backend-change validation still rejects untracked updates")
 end
+

@@ -158,38 +158,53 @@ function Factory.new(context)
 
     function self:_watchPlayer(player)
         if self.PlayerConnections[player] then return end
-        local list={}
-        self.PlayerConnections[player]=list
-
+        local binding={Connections={},CharacterConnections={},BackpackConnections={}}
+        self.PlayerConnections[player]=binding
+        local pending=false
         local function rescan()
+            if pending then return end
+            pending=true
             task.defer(function()
-                if self.Enabled and not self.Destroyed then self:Scan() end
+                pending=false
+                if self.Enabled and not self.Destroyed and self.PlayerConnections[player]==binding then self:Scan() end
             end)
         end
-
-        list[#list+1]=player.CharacterAdded:Connect(function(character)
+        local function bindCharacter(character)
+            disconnectAll(binding.CharacterConnections)
+            if character then
+                local list=binding.CharacterConnections
+                list[#list+1]=character.ChildAdded:Connect(rescan)
+                list[#list+1]=character.ChildRemoved:Connect(rescan)
+            end
             rescan()
-            list[#list+1]=character.ChildAdded:Connect(rescan)
-            list[#list+1]=character.ChildRemoved:Connect(rescan)
-        end)
-        list[#list+1]=player.CharacterRemoving:Connect(rescan)
-
-        local backpack=player:FindFirstChildOfClass("Backpack")
-        if backpack then
-            list[#list+1]=backpack.ChildAdded:Connect(rescan)
-            list[#list+1]=backpack.ChildRemoved:Connect(rescan)
         end
-
-        if player.Character then
-            list[#list+1]=player.Character.ChildAdded:Connect(rescan)
-            list[#list+1]=player.Character.ChildRemoved:Connect(rescan)
+        local function bindBackpack(backpack)
+            disconnectAll(binding.BackpackConnections)
+            binding.Backpack=backpack
+            if backpack then
+                local list=binding.BackpackConnections
+                list[#list+1]=backpack.ChildAdded:Connect(rescan)
+                list[#list+1]=backpack.ChildRemoved:Connect(rescan)
+            end
+            rescan()
         end
+        local list=binding.Connections
+        list[#list+1]=player.CharacterAdded:Connect(bindCharacter)
+        list[#list+1]=player.CharacterRemoving:Connect(function() bindCharacter(nil) end)
+        list[#list+1]=player.ChildAdded:Connect(function(child) if child:IsA("Backpack") then bindBackpack(child) end end)
+        list[#list+1]=player.ChildRemoved:Connect(function(child) if child==binding.Backpack then bindBackpack(nil) end end)
+        bindCharacter(player.Character)
+        bindBackpack(player:FindFirstChildOfClass("Backpack"))
     end
 
     function self:_unwatchPlayer(player)
-        local list=self.PlayerConnections[player]
+        local binding=self.PlayerConnections[player]
         self.PlayerConnections[player]=nil
-        disconnectAll(list)
+        if binding then
+            disconnectAll(binding.Connections)
+            disconnectAll(binding.CharacterConnections)
+            disconnectAll(binding.BackpackConnections)
+        end
         if self.Murder==player then self:_setMurder(nil) end
         if self.Sheriff==player then self:_setSheriff(nil) end
         if self.LastSheriff==player then
@@ -258,3 +273,4 @@ function Factory.new(context)
 end
 
 return Factory
+

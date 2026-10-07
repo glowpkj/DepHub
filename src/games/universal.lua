@@ -42,10 +42,10 @@ local function characterParts()
 end
 
 local State = {
-    Destroyed = false, Connections = {}, FeatureConnections = {}, ESPObjects = {}, Keys = {},
+    Destroyed = false, Connections = {}, FeatureConnections = {}, PlayerConnections = {}, ESPObjects = {}, Keys = {}, ChatToken = 0,
     Values = {WalkSpeed = 16, JumpPower = 50, FlySpeed = 70, ESPRange = 2000, ESPTextSize = 14, ESPColor = Color3.fromRGB(90, 170, 255), AimbotFOV = 180, AimPart = "Head", ChatMessage = "DepHub Universal", ChatInterval = 5},
     Toggles = {WalkSpeed = false, Jump = false, Fly = false, Noclip = false, ESP = false, ESPNames = true, ESPDistance = true, ESPHealth = true, TeamCheck = false, TeamColors = true, Chams = true, Fullbright = false, InfiniteZoom = false, Aimbot = false, ChatLoop = false},
-    TeleportTool = nil, FlyVelocity = nil, FlyGyro = nil, OriginalCollisions = {}, OriginalLighting = nil, OriginalMovement = {}, OriginalZoom = LocalPlayer.CameraMaxZoomDistance
+    TeleportTool = nil, FlyVelocity = nil, FlyGyro = nil, OriginalCollisions = {}, OriginalLighting = nil, OriginalMovement = setmetatable({}, {__mode="k"}), OriginalZoom = LocalPlayer.CameraMaxZoomDistance
 }
 env[STATE_KEY] = State
 env.__DEPHUB = env.__DEPHUB or {}
@@ -63,6 +63,7 @@ function State:ClearFeature(name)
 end
 
 function State:ApplyMovement()
+    if self.Destroyed then return end
     local _, humanoid = characterParts()
     if not humanoid then return end
     local original = self.OriginalMovement[humanoid]
@@ -128,6 +129,7 @@ function State:SetFly(enabled)
     local list = {}; self.FeatureConnections.Fly = list
     connect(list, RunService.RenderStepped, function()
         local camera, direction = Workspace.CurrentCamera, Vector3.zero
+        if self.Destroyed or not camera or LocalPlayer.Character ~= root.Parent then return end
         if self.Keys.W then direction += camera.CFrame.LookVector end
         if self.Keys.S then direction -= camera.CFrame.LookVector end
         if self.Keys.A then direction -= camera.CFrame.RightVector end
@@ -143,7 +145,9 @@ function State:CreateTeleportTool()
     if self.TeleportTool then pcall(self.TeleportTool.Destroy, self.TeleportTool) end
     local tool = Instance.new("Tool")
     tool.Name, tool.RequiresHandle, tool.CanBeDropped, tool.ToolTip = "DepHub Click TP", false, false, "Equipe e clique para teleportar"
-    tool.Parent = LocalPlayer:FindFirstChildOfClass("Backpack") or LocalPlayer:WaitForChild("Backpack")
+    local backpack = LocalPlayer:FindFirstChildOfClass("Backpack") or LocalPlayer:WaitForChild("Backpack",8)
+    if self.Destroyed or not backpack then tool:Destroy(); return false end
+    tool.Parent = backpack
     self.TeleportTool = tool
     connect(self.Connections, tool.Activated, function()
         local _, _, root = characterParts()
@@ -162,7 +166,7 @@ end
 
 function State:CreateESP(player)
     self:RemoveESP(player)
-    if player == LocalPlayer or not self.Toggles.ESP then return end
+    if self.Destroyed or player == LocalPlayer or not self.Toggles.ESP then return end
     local character = player.Character
     local head = character and character:FindFirstChild("Head")
     if not head then return end
@@ -238,7 +242,14 @@ function State:SendChat()
     local ok = pcall(function()
         local channels = TextChatService:FindFirstChild("TextChannels")
         local general = channels and (channels:FindFirstChild("RBXGeneral") or channels:FindFirstChildWhichIsA("TextChannel"))
-        if general then general:SendAsync(message) else ReplicatedStorage:WaitForChild("DefaultChatSystemChatEvents"):WaitForChild("SayMessageRequest"):FireServer(message, "All") end
+        if general then
+            general:SendAsync(message)
+        else
+            local events = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+            local remote = events and events:FindFirstChild("SayMessageRequest")
+            if not remote then error("Chat indisponivel") end
+            remote:FireServer(message, "All")
+        end
     end)
     if not ok then self:Notify("O chat deste jogo não aceitou a mensagem.", "Error") end
     return ok
@@ -248,7 +259,17 @@ function State:SetChatLoop(enabled)
     enabled = enabled == true
     if self.Toggles.ChatLoop == enabled then return end
     self.Toggles.ChatLoop = enabled
-    if enabled then task.spawn(function() while not self.Destroyed and self.Toggles.ChatLoop do self:SendChat(); task.wait(math.max(3, self.Values.ChatInterval)) end end) end
+    if self.Destroyed then self.Toggles.ChatLoop = false; return end
+    self.ChatToken += 1
+    local token = self.ChatToken
+    if enabled then
+        task.spawn(function()
+            while not self.Destroyed and self.Toggles.ChatLoop and token == self.ChatToken do
+                self:SendChat()
+                task.wait(math.max(3, tonumber(self.Values.ChatInterval) or 5))
+            end
+        end)
+    end
 end
 
 function State:ServerHop()
@@ -284,6 +305,8 @@ end
 function State:Destroy()
     if self.Destroyed then return end
     self.Destroyed, self.Toggles.ChatLoop = true, false
+    self.ChatToken += 1
+    for player, list in pairs(self.PlayerConnections) do disconnectAll(list.CharacterConnections); disconnectAll(list); self.PlayerConnections[player] = nil end
     self:StopFly(); self:SetNoclip(false); self:SetESP(false); self:SetFullbright(false)
     for humanoid, original in pairs(self.OriginalMovement) do
         if humanoid and humanoid.Parent then humanoid.WalkSpeed, humanoid.JumpPower, humanoid.UseJumpPower = original.WalkSpeed, original.JumpPower, original.UseJumpPower end
@@ -307,9 +330,11 @@ connect(State.Connections, UIS.InputEnded, function(input)
     local key = input.KeyCode
     if key == Enum.KeyCode.W then State.Keys.W = nil elseif key == Enum.KeyCode.S then State.Keys.S = nil elseif key == Enum.KeyCode.A then State.Keys.A = nil elseif key == Enum.KeyCode.D then State.Keys.D = nil elseif key == Enum.KeyCode.Space then State.Keys.Space = nil elseif key == Enum.KeyCode.LeftControl then State.Keys.Ctrl = nil end
 end)
-connect(State.Connections, RunService.RenderStepped, function()
+local espElapsed=0
+connect(State.Connections, RunService.RenderStepped, function(dt)
     if State.Destroyed then return end
-    State:UpdateESP()
+    espElapsed+=tonumber(dt) or 0
+    if espElapsed>=0.1 then espElapsed=espElapsed%0.1; State:UpdateESP() end
     if State.Toggles.WalkSpeed or State.Toggles.Jump then State:ApplyMovement() end
     if State.Toggles.Aimbot and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local target = State:GetAimTarget()
@@ -317,9 +342,58 @@ connect(State.Connections, RunService.RenderStepped, function()
         if target then camera.CFrame = CFrame.lookAt(camera.CFrame.Position, target.Position) end
     end
 end)
-connect(State.Connections, Players.PlayerAdded, function(player) connect(State.Connections, player.CharacterAdded, function() task.wait(0.5); State:CreateESP(player) end) end)
-for _, player in ipairs(Players:GetPlayers()) do if player ~= LocalPlayer then connect(State.Connections, player.CharacterAdded, function() task.wait(0.5); State:CreateESP(player) end) end end
-connect(State.Connections, Players.PlayerRemoving, function(player) State:RemoveESP(player) end)
-connect(State.Connections, LocalPlayer.CharacterAdded, function() task.wait(0.5); State:ApplyMovement(); if State.Toggles.Fly then State:SetFly(true) end end)
+local function watchPlayer(player)
+    if player == LocalPlayer or State.PlayerConnections[player] then return end
+    local list = {}
+    local characterConnections = {}
+    list.CharacterConnections = characterConnections
+    State.PlayerConnections[player] = list
+    local function bindCharacter(character)
+        disconnectAll(characterConnections)
+        State:RemoveESP(player)
+        if not character then return end
+        local function refresh(instance)
+            if instance and instance.Name ~= "Head" and instance.Name ~= "HumanoidRootPart" then return end
+            task.defer(function()
+                if not State.Destroyed and player.Character == character and State.PlayerConnections[player] == list then State:CreateESP(player) end
+            end)
+        end
+        connect(characterConnections, character.ChildAdded, refresh)
+        connect(characterConnections, character.ChildRemoved, refresh)
+        refresh()
+    end
+    connect(list, player.CharacterAdded, bindCharacter)
+    connect(list, player.CharacterRemoving, function() bindCharacter(nil) end)
+    bindCharacter(player.Character)
+end
+connect(State.Connections, Players.PlayerAdded, watchPlayer)
+for _, player in ipairs(Players:GetPlayers()) do watchPlayer(player) end
+connect(State.Connections, Players.PlayerRemoving, function(player)
+    State:RemoveESP(player)
+    local list = State.PlayerConnections[player]
+    if list then disconnectAll(list.CharacterConnections); disconnectAll(list); State.PlayerConnections[player] = nil end
+end)
+local localCharacterConnections={}
+connect(State.Connections, LocalPlayer.CharacterAdded, function(character)
+    disconnectAll(localCharacterConnections)
+    local function refresh()
+        if State.Destroyed or LocalPlayer.Character ~= character then return end
+        State:ApplyMovement()
+        if State.Toggles.Fly and not State.FlyVelocity then State:SetFly(true) end
+    end
+    if character then connect(localCharacterConnections,character.ChildAdded,refresh) end
+    task.defer(refresh)
+end)
+connect(State.Connections, LocalPlayer.CharacterRemoving, function()
+    disconnectAll(localCharacterConnections)
+    State:StopFly()
+    State.Keys = {}
+    State.OriginalCollisions = {}
+end)
+local originalDestroy=State.Destroy
+function State:Destroy()
+    disconnectAll(localCharacterConnections)
+    originalDestroy(self)
+end
 
 return State

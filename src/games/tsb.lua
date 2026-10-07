@@ -12,8 +12,8 @@ local LocalPlayer=Players.LocalPlayer
 
 local env=type(getgenv)=="function" and getgenv() or _G
 local STATE_KEY="__DEPHUB_TSB"
-local BASE_URL="https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION="0.0.8"
+local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local VERSION="0.0.10"
 
 local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
@@ -104,7 +104,17 @@ local function setValue(self,key,method,value)
     return true
 end
 
-function State:SetAutoBlock(value) return setToggle(self,"AutoBlock","SetM1Block",value,true) end
+function State:SetAutoBlock(value)
+    if self.Destroyed then return false end
+    value=value==true
+    -- One master switch; manual attacks remain manual, never queued as counters.
+    local feature=self.Features and self.Features.AutoBlock
+    if not feature then return false end
+    feature:SetM1AfterBlock(false)
+    feature:SetM1Block(value) feature:SetDashBlock(value) feature:SetSkillBlock(value)
+    self.Toggles.AutoBlock=value self.Toggles.DashBlock=value self.Toggles.SkillBlock=value self.Toggles.M1AfterBlock=false
+    return syncRuntime(self)
+end
 function State:SetM1AfterBlock(value) return setToggle(self,"M1AfterBlock","SetM1AfterBlock",value,false) end
 function State:SetFaceAttacker(value) return setToggle(self,"FaceAttacker","SetFaceAttacker",value,false) end
 function State:SetDashBlock(value) return setToggle(self,"DashBlock","SetDashBlock",value,true) end
@@ -152,3 +162,4 @@ end
 local okStart,started=pcall(State.Start,State)
 if not okStart or not started then pcall(State.Destroy,State) return false end
 return State
+

@@ -29,7 +29,7 @@ local LegendarySwordDealer = NPCs and NPCs:FindFirstChild("Legendary Sword Deale
 
 local env = type(getgenv) == "function" and getgenv() or _G
 local STATE_KEY = "__DEPHUB_BLOXFRUITS"
-local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+local BASE_URL = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 local VERSION = "0.0.2"
 local previous = type(env[STATE_KEY]) == "table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
@@ -304,3 +304,4 @@ if not ok or not started then
     return false
 end
 return State
+

@@ -11,7 +11,8 @@ local UserInputService=game:GetService("UserInputService")
 local RunService=game:GetService("RunService")
 
 local LocalPlayer=Players.LocalPlayer
-local PlayerGui=LocalPlayer:WaitForChild("PlayerGui")
+local PlayerGui=LocalPlayer:FindFirstChildOfClass("PlayerGui") or LocalPlayer:WaitForChild("PlayerGui",15)
+assert(PlayerGui,"DepHub: PlayerGui unavailable")
 local env=type(getgenv)=="function" and getgenv() or _G
 
 local function resolveUIParent()
@@ -776,3 +777,4 @@ env.__DEPHUB=env.__DEPHUB or {}
 env.__DEPHUB.ViolenceDistrictUI=UI
 
 return UI
+
