@@ -12,6 +12,7 @@ local probes={
     TSB={{"Workspace","Live"},{"Character","Communicate"}}
 }
 local routes={
+    [73956553001240]="VolleyballLegends",[6931042565]="VolleyballLegends",
     [994732206]="BloxFruits",[85211729168715]="BloxFruits",
     [119048529960596]="RT3",[84822469255086]="NoobPiece",
     [10449761463]="TSB",[3808081382]="TSB",
@@ -39,6 +40,19 @@ local backend=env.__DEPHUB and (env.__DEPHUB[mode] or mode=="RT3" and env.__DEPH
 if type(backend)=="table" then
     report.BackendVersion=backend.Version or "unversioned"
     report.BackendDestroyed=backend.Destroyed==true
+end
+if mode=="VolleyballLegends" then
+    report.ClientBalls={}
+    for _,object in ipairs(Workspace:GetChildren()) do
+        if object.Name:sub(1,12)=="CLIENT_BALL_" then
+            local parts={}
+            for _,part in ipairs(object:GetDescendants()) do
+                if part.Name=="Cube.001" then parts[#parts+1]={Class=part.ClassName,BasePart=part:IsA("BasePart")} end
+            end
+            report.ClientBalls[#report.ClientBalls+1]={Name=object.Name,Parts=parts}
+        end
+    end
+    if type(backend)=="table" and type(backend.GetDebugInfo)=="function" then report.BallTracking=backend:GetDebugInfo() end
 end
 local output=HttpService:JSONEncode(report)
 print("[DepHub compatibility] "..output)

@@ -68,6 +68,9 @@ function validateFeatureDirectory(gameId, directory, requiredFiles) {
   }
 }
 
+validateFeatureDirectory('6931042565', 'src/games/features/volleyballlegends', [
+  'src/core/updater.lua', 'library/compact.lua', 'src/games/volleyballlegends.lua'
+]);
 validateFeatureDirectory('3808081382', 'src/games/features/tsb', [
   'src/core/updater.lua',
   'library/compact.lua',

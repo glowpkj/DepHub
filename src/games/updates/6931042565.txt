@@ -1,0 +1,1 @@
+0.0.1 | Dynamic client-ball detector, Ball ESP, projectile curve and collision/landing marker. Visuals only.
