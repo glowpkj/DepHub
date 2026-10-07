@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-07T00:30:21Z",
-  "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
-  "version": "0.0.29",
+  "generatedAt": "2026-10-07T00:48:04.173Z",
+  "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
+  "version": "0.0.30",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "d8c1991e68797d65b8ef245468e315e0e8558e92bf1424ee6e6b3c8cd97f5073",
-      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
+      "version": "e40ab84f41853d110949fcabe4895fe9c2717f5f47a89fdeac4dcd37882bec5e",
+      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "7cedf6ea6f8751765f874acfaabe14c721d1f741b0648e21656f7ea63d6cd0c4",
-      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
+      "version": "2805f5bf02e025b36b87b59c3e5b76a5ebedf70c1131e26a7ff265db0b8c9886",
+      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -58,8 +58,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "c5cb2363195b093b2438f97ba9536f92e0f72b10c835af55b58a0211c229d2f2",
-      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
+      "version": "13bddbfec26370157b63995741ddb9d8d86a5dddef16dbb7d4645c3b3dab279b",
+      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -77,8 +77,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "84ad9942a09a7b8fc1968be0f45342e56a0648deb59870313c7f5a4b07370909",
-      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
+      "version": "412b18071856e6a51054dd361d0392b5c39069a931863beca00d07250c921248",
+      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -106,8 +106,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "46814e1e167ccd591142f140f6de283453256339b82aeb2c519fc24a4e1f0dd6",
-      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
+      "version": "ea6a3daf536f94edbe2fd9d62f62c7b25ad83afe70b2b2948ed98950b83f3c36",
+      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -137,8 +137,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "c30389673b40705eed293280553622a0bd85b41074070cbcf65d2612337efbf4",
-      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
+      "version": "6dab27c86bdbdb21be0f1d449c8bab2b1c8f31d1192a33de9a2e0e6a4ffc1ba9",
+      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -153,8 +153,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "09539619e0026db15f67e1c20acc3480626b0bd38f055dbde3b9cfc094a4fcb7",
-      "commit": "3312d52b920a7e2dd0d8135cd63fd92b6a02668f",
+      "version": "b09c8d760acb75f36a8209f847ba8d8d5c7c02ebca8ee9c7f7a1de143e3ca69a",
+      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -186,6 +186,13 @@
   },
   "recentUpdates": [
     {
+      "Version": "be6e6e7",
+      "Date": "2026-10-07T00:48:04.173Z",
+      "Changes": [
+        "TSB: one Auto Block toggle and defense priority over manual M1"
+      ]
+    },
+    {
       "Version": "3312d52",
       "Date": "2026-10-07T00:30:21Z",
       "Changes": [
@@ -211,13 +218,6 @@
       "Date": "2026-09-27T16:24:46-03:00",
       "Changes": [
         "chore: bump DepHub to 0.0.27"
-      ]
-    },
-    {
-      "Version": "c23f4a9",
-      "Date": "2026-09-27T16:24:42-03:00",
-      "Changes": [
-        "chore(noobpiece): bump backend after travel pause adjustment"
       ]
     }
   ]
