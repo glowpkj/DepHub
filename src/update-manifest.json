@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-07T00:48:04.173Z",
-  "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
-  "version": "0.0.30",
+  "generatedAt": "2026-10-07T01:03:37.717Z",
+  "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+  "version": "0.0.31",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "e40ab84f41853d110949fcabe4895fe9c2717f5f47a89fdeac4dcd37882bec5e",
-      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
+      "version": "bde5f8f6d5d08dd3242b03d4c8032387c3bfd30f1352fee72717d091fabd8986",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "2805f5bf02e025b36b87b59c3e5b76a5ebedf70c1131e26a7ff265db0b8c9886",
-      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
+      "version": "5be8b75599442c55124733aa3033f582fc32fc2d2873a038417aa1875918d38c",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -58,8 +58,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "13bddbfec26370157b63995741ddb9d8d86a5dddef16dbb7d4645c3b3dab279b",
-      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
+      "version": "ba8622caa779ed3aee9e618b0ff570e86154c6991fb907fcb2dee383a6ecc86e",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -77,8 +77,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "412b18071856e6a51054dd361d0392b5c39069a931863beca00d07250c921248",
-      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
+      "version": "3c02f921d33526f94c44a2f0b441a07b64f668a616de484f6bcab3c12e49c043",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -106,8 +106,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "ea6a3daf536f94edbe2fd9d62f62c7b25ad83afe70b2b2948ed98950b83f3c36",
-      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
+      "version": "90583882463f2b3fcb9af8ba3f1667f67e472594792f335b687e3fbddf482934",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -137,8 +137,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "6dab27c86bdbdb21be0f1d449c8bab2b1c8f31d1192a33de9a2e0e6a4ffc1ba9",
-      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
+      "version": "66646a240219a45d5fa6afea7db714049c780b9ff31f0ab1eed11623fd4308aa",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -153,8 +153,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "b09c8d760acb75f36a8209f847ba8d8d5c7c02ebca8ee9c7f7a1de143e3ca69a",
-      "commit": "be6e6e7089fc8add1f50bd44a495e14d5b98d855",
+      "version": "7d860f63522f4913326959e122f4e458317196288bcd36eb850e300554414882",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -182,9 +182,34 @@
         "library/content/common.lua",
         "library/content/noobpiece.lua"
       ]
+    },
+    "6931042565": {
+      "name": "Volleyball Legends",
+      "version": "89dfc251d8590055d306dad3edb68646d1f2c8fa4c50fa950c903cf89827947a",
+      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/ui-guard.lua",
+        "src/core/updater.lua",
+        "library/compact.lua",
+        "src/games/volleyballlegends.lua",
+        "src/games/features/volleyballlegends/ball-detector.lua",
+        "src/games/features/volleyballlegends/ball-esp.lua",
+        "src/games/features/volleyballlegends/trajectory.lua",
+        "src/games/features/volleyballlegends/frontend.lua",
+        "src/games/updates/6931042565.txt"
+      ]
     }
   },
   "recentUpdates": [
+    {
+      "Version": "e640a3a",
+      "Date": "2026-10-07T01:03:37.717Z",
+      "Changes": [
+        "Volleyball Legends: Ball ESP, projectile trajectory and landing marker"
+      ]
+    },
     {
       "Version": "be6e6e7",
       "Date": "2026-10-07T00:48:04.173Z",
@@ -211,13 +236,6 @@
       "Date": "2026-09-27T16:24:57-03:00",
       "Changes": [
         "chore: bump loader to 0.0.27"
-      ]
-    },
-    {
-      "Version": "48a4c15",
-      "Date": "2026-09-27T16:24:46-03:00",
-      "Changes": [
-        "chore: bump DepHub to 0.0.27"
       ]
     }
   ]
