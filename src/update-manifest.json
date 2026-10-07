@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-07T01:03:37.717Z",
-  "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+  "generatedAt": "2026-10-07T01:14:22.904897+00:00",
+  "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
   "version": "0.0.31",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "bde5f8f6d5d08dd3242b03d4c8032387c3bfd30f1352fee72717d091fabd8986",
-      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "5be8b75599442c55124733aa3033f582fc32fc2d2873a038417aa1875918d38c",
-      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -59,7 +59,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "ba8622caa779ed3aee9e618b0ff570e86154c6991fb907fcb2dee383a6ecc86e",
-      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -78,7 +78,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "3c02f921d33526f94c44a2f0b441a07b64f668a616de484f6bcab3c12e49c043",
-      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -107,7 +107,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "90583882463f2b3fcb9af8ba3f1667f67e472594792f335b687e3fbddf482934",
-      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -138,7 +138,7 @@
     "6739698191": {
       "name": "Violence District",
       "version": "66646a240219a45d5fa6afea7db714049c780b9ff31f0ab1eed11623fd4308aa",
-      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -154,7 +154,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "7d860f63522f4913326959e122f4e458317196288bcd36eb850e300554414882",
-      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -186,7 +186,7 @@
     "6931042565": {
       "name": "Volleyball Legends",
       "version": "89dfc251d8590055d306dad3edb68646d1f2c8fa4c50fa950c903cf89827947a",
-      "commit": "e640a3afcc5c1539ea0708e6f72ff94f3747c27c",
+      "commit": "9267cc849f718465789e46ad5f7bade268dba09a",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -205,37 +205,37 @@
   "recentUpdates": [
     {
       "Version": "e640a3a",
-      "Date": "2026-10-07T01:03:37.717Z",
+      "Date": "2026-10-06T22:03:21-03:00",
       "Changes": [
-        "Volleyball Legends: Ball ESP, projectile trajectory and landing marker"
+        "feat(volleyball): dynamic Ball ESP and reusable trajectory and landing visuals"
       ]
     },
     {
       "Version": "be6e6e7",
-      "Date": "2026-10-07T00:48:04.173Z",
+      "Date": "2026-10-06T21:47:49-03:00",
       "Changes": [
-        "TSB: one Auto Block toggle and defense priority over manual M1"
+        "fix(tsb): single auto block toggle and defense priority over manual M1"
       ]
     },
     {
       "Version": "3312d52",
-      "Date": "2026-10-07T00:30:21Z",
+      "Date": "2026-10-06T21:30:06-03:00",
       "Changes": [
         "fix: harden DepHub loader, game lifecycle and regression checks"
       ]
     },
     {
-      "Version": "9a15b31",
-      "Date": "2026-09-27T16:25:01-03:00",
+      "Version": "930158a",
+      "Date": "2026-10-03T16:38:08-03:00",
       "Changes": [
-        "docs: record Noob Piece pause and library redesign"
+        "chore: bump DepHub to 0.0.28"
       ]
     },
     {
-      "Version": "5532b81",
-      "Date": "2026-09-27T16:24:57-03:00",
+      "Version": "95deb90",
+      "Date": "2026-10-03T16:37:52-03:00",
       "Changes": [
-        "chore: bump loader to 0.0.27"
+        "chore: bump loader to 0.0.28 for TSB v3"
       ]
     }
   ]
