@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring(env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.29"
+local VERSION = "0.0.30"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
