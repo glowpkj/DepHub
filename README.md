@@ -51,3 +51,15 @@ Para testar uma revisão isolada, o launcher pode definir temporariamente `getge
 - Arquivos faltantes adicionados ao controle de atualização; testes e diagnóstico atualizados.
 
 Não foram substituídos protocolos dos jogos nem recalibrados alcance/timings de combate. AutoFarm e InstantCook do RT3 ainda contêm movimentos diretos legados: teste individualmente antes de combinar automações. A integração completa deles com ownership de movimento exige teste real e uma tarefa dedicada.
+
+## TSB em 0.0.30 (backend 0.0.10)
+
+A interface do TSB tem apenas Auto Block. Ele liga os detectores existentes de M1, dash e skills; não dispara contra-ataques. O block não é mais cancelado por clique/estado de M1 local e é renovado enquanto ataques conhecidos permanecem ativos no alcance. M1 usa o alcance configurado sem a caixa adicional que reduzia o limite efetivo à metade. Os tempos e IDs existentes foram mantidos.
+
+Uma ação de ContextActionService com prioridade acima de High retém MouseButton1 enquanto o block está ativo. O M1 já segurado recebe LeftClickRelease antes do pedido de F. Depois da ameaça e do hold existente, o clique passa novamente; nenhum ataque é enfileirado para disparar sozinho. A ação é removida ao desligar/destruir o backend. Se ela não puder ser instalada, a ativação falha.
+
+Limites: KeyPress não é confirmação de defesa pelo servidor. ContextActionService não garante travar scripts de input que ignorem o processamento do Roblox. A trava cobre MouseButton1; teclas de skills, gamepad e botões mobile ainda não foram validados. O catálogo não informa quais skills são unblockable nem o fim exato de cada hitbox; término de animação mais hold existente é somente uma aproximação. Não há garantia de 100% de bloqueio ou de uma janela perfeitamente segura.
+
+Teste em sessão controlada: habilite o único toggle, segure M1 enquanto outro jogador aplica a sequência completa; confirme que não há ataque local durante a defesa e que um novo clique funciona ao terminar. Repita com duas ameaças, dash, morte/respawn, reexecução e toggle desligado. Se M1 ainda sair durante o block, reporte o ataque e o input: isso exige observar o caminho real do jogo, sem inventar hooks ou remotes.
+
+API oficial de input: https://create.roblox.com/docs/reference/engine/classes/ContextActionService

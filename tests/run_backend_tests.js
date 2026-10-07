@@ -9,7 +9,8 @@ if (!luau) throw new Error('Usage: node tests/run_backend_tests.js /path/to/luau
 const files = ['DepHub.lua', 'src/games/bloxfruits.lua', 'src/games/universal.lua',
   'src/games/rt3.lua', 'src/core/runtime.lua', 'src/core/updater.lua',
   'src/games/features/bloxfruits/fruitvfx.lua', 'src/games/noobpiece.lua',
-  'src/games/features/mm2/roletracker.lua', 'src/games/features/tsb/autoblock-v3.lua'];
+  'src/games/features/mm2/roletracker.lua', 'src/games/features/tsb/autoblock-v3.lua',
+  'src/games/tsb.lua', 'src/games/features/tsb/frontend.lua'];
 const manifestConfig = JSON.parse(fs.readFileSync(path.join(root, '.github/dephub-games.json'), 'utf8'));
 for (const game of Object.values(manifestConfig)) {
   for (const file of game.files) {
@@ -44,7 +45,7 @@ const sources = 'local sources = {\n' + files.map(file =>
 const harness = fs.readFileSync(path.join(__dirname, 'backend_harness.luau'), 'utf8')
   .replace('-- INSERT_SOURCES', () => sources)
   .replace('-- INSERT_FRUIT_VFX_TESTS', () => fs.readFileSync(path.join(__dirname, 'fruit_vfx_tests.luau'), 'utf8'))
-  .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8'))
+  .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8'))
   .replace('-- INSERT_HEADLESS_TESTS', () => fs.readFileSync(path.join(__dirname, 'headless_tests.luau'), 'utf8'));
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'dephub-backend-test-'));
 const file = path.join(temp, 'test.luau');
@@ -59,4 +60,3 @@ try {
   if (fs.existsSync(file)) fs.unlinkSync(file);
   fs.rmdirSync(temp);
 }
-
