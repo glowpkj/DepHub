@@ -1,2 +1,3 @@
 AOTR 0.1.0: Ripper, skill/classic farm, inconclusive account diagnostic, lifecycle and restoration; runtime validation pending.
 Frontend migrated to the shared Linoria library.
+AOTR 0.1.1: reversible farm noclip, configurable travel speed, tween cancellation and stable target selection.

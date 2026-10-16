@@ -30,6 +30,8 @@ for _,entry in ipairs({{"Titan Ripper","TitanRipper"},{"Skill Autofarm","SkillAu
  local key=entry[2]
  UI:AddToggle(entry[1],backend:GetToggle(key),function(v) return backend:SetToggle(key,v) end)
 end
+UI:AddToggle("Classic Farm Noclip",backend:GetToggle("ClassicNoclip"),function(v) return backend:SetToggle("ClassicNoclip",v) end)
+UI:AddSlider("Travel Speed (studs/s)",50,2000,50,backend.Values.TravelSpeed or 1000,function(v) return backend:SetTravelSpeed(v) end)
 UI:AddSection("DIAGNOSTICS")
 UI:AddButton("CHECK SHADOWBAN",function() return backend:CheckShadowBan() and "DIAGNOSTIC REQUESTED" or "BUSY / UNAVAILABLE" end)
 UI:AddButton("PRINT GAME STATUS",function() local s=backend:GetStatus();print("[DepHub/AOTR]\n"..s);return "STATUS PRINTED" end)

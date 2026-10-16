@@ -5,7 +5,11 @@ function Module.new(ctx)
     local self={Jobs={},States={},Enabled={},Destroyed=false,CheckBusy=false,CheckResult="Disabled: not requested"}
     local effects,tracks={},{}
     local priorCharacterEffects={}
-    local mover=ctx.Movement.new()
+    local mover=ctx.Movement.new(ctx)
+    self.Movement=mover
+    function self:SetMovementSpeed(value) return mover:SetSpeed(value) end
+    function self:SetNoclip(value) return mover:SetNoclip(value) end
+    function self:PauseMovement() mover:Stop() end
     local ripperCharacter=nil
     local function state(name,value) self.States[name]=value end
     local function invoke(...)
@@ -138,7 +142,7 @@ function Module.new(ctx)
         return "Running: skill "..step[1].." requested (server unconfirmed)"
     end
     local function classicTick(job)
-        if job.Character~=ctx.Player.Character then mover:Stop();job.Character=ctx.Player.Character;job.NextAttack=0 end
+        if job.Character~=ctx.Player.Character then mover:Stop();job.Character=ctx.Player.Character;job.NextAttack=0;job.Target=nil end
         local root=ctx.Targets.Alive(job.Character)
         if not root then mover:Stop();return "Waiting: alive character" end
         if root.Anchored or job.Character:GetAttribute("IFrames")==true then mover:Stop();return "Waiting: character unavailable / IFrames" end
@@ -162,9 +166,19 @@ function Module.new(ctx)
             invoke("Blades","Full_Reload","Right",refill)
             return "Waiting: full reload requested / HUD confirmation"
         end
-        local target,distance=ctx.Targets.Select(ctx.Workspace,root)
+        local target=job.Target
+        local folder=path(ctx.Workspace,"Titans")
+        local humanoid=target and target.Model:FindFirstChildOfClass("Humanoid")
+        if target and (not target.Part.Parent or target.Model.Parent~=folder or not humanoid or humanoid.Health<=0
+            or (target.Boss and ctx.Targets.Marker(target.Model)~=target.Part)) then target=nil end
+        local distance
+        if not target then target,distance=ctx.Targets.Select(ctx.Workspace,root) end
+        job.Target=target
         if not target then mover:Stop();return distance end
-        mover:Move(root,target.Part,target.Boss and 195 or 75)
+        mover:Move(root,target.Part,target.Boss and 195 or 75,target.Model)
+        -- Recheck the live target/root immediately before sending an attack.
+        if not target.Part.Parent or not target.Model.Parent then mover:Stop();return "Waiting: target removed" end
+        distance=(root.Position-target.Part.Position).Magnitude
         if ctx.Now()<(job.NextAttack or 0) then return "Running: moving toward "..target.Model.Name end
         if distance>(target.Boss and 250 or 175) then return "Running: approaching target" end
         job.NextAttack=ctx.Now()+1
