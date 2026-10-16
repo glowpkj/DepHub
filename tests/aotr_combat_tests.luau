@@ -2,10 +2,14 @@
 local cf={}
 local cfMeta={}
 function cf.new(position) return setmetatable({Position=position},cfMeta) end
+cf.lookAt=cf.new
+function cfMeta.__add(a,b) return cf.new(a.Position+b) end
 function cfMeta.__mul(a,b) return cf.new(a.Position+b.Position) end
 function cfMeta.__index(a,key)
+    if key=="Rotation" then return cf.new(vectors.new(0,0,0)) end
     if key=="ToObjectSpace" then return function(_,b) return cf.new(b.Position-a.Position) end end
 end
+
 local function aotrContext()
     local ctx=sandbox()
     ctx.Time=0;ctx.Fibers={};ctx.Cancelled=0
@@ -32,7 +36,19 @@ local function aotrContext()
             end
         end
     end
-    ctx.Services.TweenService={}
+    ctx.Tweens={}
+    ctx.Env.TweenInfo={new=function(duration)return {Duration=duration}end}
+    ctx.Services.TweenService={Create=function(_,object,info,values)
+        local tween={Object=object,Info=info,Values=values,Completed=signal()}
+        function tween:Play()self.PlaybackState=Enum.PlaybackState.Playing end
+        function tween:Cancel()self.PlaybackState=Enum.PlaybackState.Cancelled;self.Cancelled=true;self.Completed:Fire(self.PlaybackState)end
+        function tween:Finish()
+            self.Object.CFrame=self.Values.CFrame;self.Object.Position=self.Values.CFrame.Position
+            self.PlaybackState=Enum.PlaybackState.Completed;self.Completed:Fire(self.PlaybackState)
+        end
+        ctx.Tweens[#ctx.Tweens+1]=tween
+        return tween
+    end}
     ctx.Player.Name="Tester";ctx.Player.Idled=signal()
     function ctx:Object(class,name,parent)
         local item=Instance.new(class);item.Name=name;item.Parent=parent;return item
@@ -40,11 +56,11 @@ local function aotrContext()
     function ctx:Character()
         local char=self:Object("Model","Character",self.Player)
         local root=self:Object("Part","HumanoidRootPart",char)
-        root.Position=vectors.new(0,0,0);root.CFrame=cf.new(root.Position)
+        root.CanCollide=true;root.Position=vectors.new(0,0,0);root.CFrame=cf.new(root.Position)
         root.AssemblyLinearVelocity=vectors.new(4,0,0);root.AssemblyAngularVelocity=vectors.new(0,2,0)
-        local hum=self:Object("Humanoid","Humanoid",char);hum.Health=100
+        local hum=self:Object("Humanoid","Humanoid",char);hum.Health=100;hum.AutoRotate=true
         local rig=self:Object("Model","Rig_Tester",char)
-        local blade=self:Object("Part","Blade_1",self:Object("Folder","LeftHand",rig));blade.Transparency=0
+        local blade=self:Object("Part","Blade_1",self:Object("Folder","LeftHand",rig));blade.Transparency=0;blade.CanCollide=false
         self.Player.Character=char
         return char,root,hum,blade
     end
@@ -131,27 +147,27 @@ do
     local wall=ctx:Object("Part","Wall",map);wall.CanCollide=true
     local backend=ctx:Backend()
     backend:SetToggle("ClassicAutofarm",true);ctx:Step(0)
-    check(root:FindFirstChild("DepHub_AOTR_FarmPosition")~=nil,"AOTR classic farm creates its own mover")
+    check(root:FindFirstChild("DepHub_AOTR_FarmHold")~=nil,"AOTR classic farm creates its own mover")
     check(#ctx.Calls==2 and ctx.Calls[1][1]=="Attacks" and ctx.Calls[2][2]=="Register","AOTR classic farm uses observed attack contract")
     local prior=#ctx.Calls
     backend:SetToggle("ClassicAutofarm",false);ctx:Step(2)
-    check(#ctx.Calls==prior and root:FindFirstChild("DepHub_AOTR_FarmPosition")==nil,"AOTR classic disable cancels sends and removes movers")
+    check(#ctx.Calls==prior and root:FindFirstChild("DepHub_AOTR_FarmHold")==nil,"AOTR classic disable cancels sends and removes movers")
     check(root.AssemblyLinearVelocity.X==4,"AOTR classic cleanup restores captured local velocity")
     check(oldBV.Parent==root and oldBV.MaxForce.X==9 and wall.Parent==map and wall.CanCollide,"AOTR classic farm preserves game movers, map and collisions")
     backend:SetToggle("ClassicAutofarm",true);ctx:Step(0)
     hum.Health=0;ctx:Step(0.2)
-    check(root:FindFirstChild("DepHub_AOTR_FarmPosition")==nil,"AOTR death stops movement before respawn")
+    check(root:FindFirstChild("DepHub_AOTR_FarmHold")==nil,"AOTR death stops movement before respawn")
     ctx.Player.CharacterRemoving:Fire(char)
     local newChar,newRoot=ctx:Character();ctx.Player.CharacterAdded:Fire(newChar);ctx:Step(0)
-    check(newRoot:FindFirstChild("DepHub_AOTR_FarmPosition")~=nil and root:FindFirstChild("DepHub_AOTR_FarmPosition")==nil,"AOTR classic resumes on new root without stale mover")
+    check(newRoot:FindFirstChild("DepHub_AOTR_FarmHold")~=nil and root:FindFirstChild("DepHub_AOTR_FarmHold")==nil,"AOTR classic resumes on new root without stale mover")
     backend:Destroy();ctx:Step(2)
-    check(newRoot:FindFirstChild("DepHub_AOTR_FarmPosition")==nil,"AOTR unload removes new-character mover")
+    check(newRoot:FindFirstChild("DepHub_AOTR_FarmHold")==nil,"AOTR unload removes new-character mover")
 end
 
 do
     local ctx=aotrContext();local _,root=ctx:Character();ctx:Titan("Titan",vectors.new(10,0,0));ctx.RemoteError=true
     local backend=ctx:Backend();backend:SetToggle("ClassicAutofarm",true);ctx:Step(0)
-    check(backend.Combat.States.ClassicAutofarm:find("Error:",1,true)==1 and root:FindFirstChild("DepHub_AOTR_FarmPosition")==nil,"AOTR remote failure restores movement and reports Error")
+    check(backend.Combat.States.ClassicAutofarm:find("Error:",1,true)==1 and root:FindFirstChild("DepHub_AOTR_FarmHold")==nil,"AOTR remote failure restores movement and reports Error")
     check(not backend.Destroyed and backend:SetToggle("NapeVisible",true),"AOTR isolated combat error preserves the hub")
     backend:Destroy()
 end
@@ -269,4 +285,62 @@ do
     check(backend.Destroyed and not last.Connected and next(replacement.Combat.Enabled)==nil,"AOTR backend restart destroys previous workers and starts with all combat off")
     replacement:Destroy()
     methods.FindFirstChild=oldFind;methods.IsA=oldIsA
+end
+
+
+do
+    local ctx=aotrContext();local char,root,_,blade=ctx:Character()
+    local model,target=ctx:Titan("Far",vectors.new(1000,0,0))
+    local backend=ctx:Backend()
+    check(root.CanCollide and not blade.CanCollide and #ctx.Tweens==0,"AOTR noclip preference has no effects before farm starts")
+    backend:SetToggle("ClassicAutofarm",true);ctx:Step(0)
+    local first=ctx.Tweens[1]
+    check(first~=nil and math.abs(first.Info.Duration-math.sqrt(1000^2+75^2)/1000)<0.000001,"AOTR travel duration follows distance divided by configured speed")
+    check(not root.CanCollide and not blade.CanCollide,"AOTR noclip affects character parts and preserves false originals")
+    check(not char:FindFirstChildOfClass("Humanoid").AutoRotate,"AOTR travel suppresses competing humanoid rotation")
+    ctx:Step(0.2);ctx:Step(0.2)
+    check(#ctx.Tweens==1 and not first.Cancelled,"AOTR stationary target does not restart tween every farm tick")
+    target.Position=vectors.new(1002,0,0);ctx:Step(0.2)
+    check(#ctx.Tweens==1,"AOTR small target jitter does not restart travel")
+    local limb=ctx:Object("Part","NewLimb",char);limb.CanCollide=true
+    root.CanCollide=true;ctx.Services.RunService.Stepped:Fire(0,0.016)
+    check(not limb.CanCollide and not root.CanCollide,"AOTR noclip enforces new parts and game collision resets before physics")
+    limb.Parent=ctx.Services.Workspace;ctx.Services.RunService.Stepped:Fire(0,0.016)
+    check(limb.CanCollide,"AOTR dropped character parts recover collisions immediately")
+    check(backend:SetToggle("ClassicNoclip",false) and root.CanCollide and not blade.CanCollide,"AOTR noclip can be disabled independently while moving")
+    backend:SetToggle("ClassicNoclip",true)
+    check(backend:SetTravelSpeed(2000) and first.Cancelled,"AOTR speed change cancels previous tween")
+    ctx:Step(0.2)
+    local second=ctx.Tweens[#ctx.Tweens]
+    check(second~=first and math.abs(second.Info.Duration-math.sqrt(1002^2+75^2)/2000)<0.000001,"AOTR new tween immediately uses updated speed")
+    first.Completed:Fire(Enum.PlaybackState.Completed)
+    check(backend.Combat.Movement.Tween==second,"AOTR stale completion cannot replace current movement")
+    check(not backend:SetTravelSpeed(0/0) and not backend:SetTravelSpeed(math.huge) and not backend:SetTravelSpeed(2001) and not backend:SetTravelSpeed(49),"AOTR speed rejects invalid and out of range values")
+    backend:SetToggle("ClassicAutofarm",false)
+    check(second.Cancelled and root.CanCollide and not blade.CanCollide and backend.Combat.Movement.Step==nil,"AOTR disable cancels tween, restores original collisions and disconnects physics handler")
+    check(root:FindFirstChild("DepHub_AOTR_FarmHold")==nil and root.AssemblyLinearVelocity.X==4,"AOTR disable releases hold and restores velocity")
+    check(char:FindFirstChildOfClass("Humanoid").AutoRotate,"AOTR disable restores humanoid rotation state")
+    backend:SetToggle("ClassicAutofarm",true);ctx:Step(0)
+    ctx.Player.CharacterRemoving:Fire(char)
+    check(root.CanCollide and backend.Combat.Movement.Root==nil,"AOTR respawn restores old character collision state")
+    backend:Destroy()
+end
+
+do
+    local ctx=aotrContext();local _,root=ctx:Character()
+    local model=ctx:Titan("Locked",vectors.new(100,0,0))
+    local backend=ctx:Backend();backend:SetToggle("ClassicAutofarm",true);ctx:Step(0)
+    local closer=ctx:Titan("Closer",vectors.new(1,0,0));ctx:Step(0.2)
+    check(backend.Combat.Jobs.ClassicAutofarm.Target.Model==model,"AOTR holds live target instead of oscillating between nearby titans")
+    model:FindFirstChildOfClass("Humanoid").Health=0
+    ctx.Services.RunService.Stepped:Fire(0,0.016)
+    check(root.CanCollide and backend.Combat.Movement.Root==nil,"AOTR target death releases movement even before next attack worker tick")
+    ctx:Step(0.2)
+    check(backend.Combat.Jobs.ClassicAutofarm.Target.Model==closer,"AOTR dead target is replaced by a live target")
+    local gas=ctx:Object("Folder","GasTanks",ctx:Object("Folder","Unclimbable",ctx.Services.Workspace))
+    local refill=ctx:Object("Part","Refill",gas);refill.Position=vectors.new(200,0,0);refill.CFrame=cf.new(refill.Position)
+    check(backend:TeleportToRefill() and backend.Combat.Movement.Root==nil and root.CanCollide,"AOTR manual refill immediately releases farm movement and noclip ownership")
+    check(math.abs(ctx.Tweens[#ctx.Tweens].Info.Duration-0.2)<0.000001,"AOTR manual refill uses configured travel speed instead of old 225")
+    backend:CancelTeleport();check(backend.TeleportTween==nil,"AOTR manual refill remains cancellable")
+    backend:Destroy()
 end

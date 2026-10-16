@@ -6,7 +6,7 @@ local player=Players.LocalPlayer
 local env=type(getgenv)=="function" and getgenv() or _G
 local old=env.__DEPHUB_AOTR
 if type(old)=="table" and type(old.Destroy)=="function" then pcall(old.Destroy,old) end
-local M={Version="0.1.0",Destroyed=false,Toggles={TitanESP=false,NapeVisible=false,NapeExtend=false,ErenExtend=false,AutoBladeRefill=false,AutoGrabEscape=false,AntiInjury=false,AutoRetry=false,AntiAFK=false,TitanRipper=false,SkillAutofarm=false,ClassicAutofarm=false},Values={NapeMultiplier=1},Connections={},Highlights={},LastError="none"}
+local M={Version="0.1.1",Destroyed=false,Toggles={TitanESP=false,NapeVisible=false,NapeExtend=false,ErenExtend=false,AutoBladeRefill=false,AutoGrabEscape=false,AntiInjury=false,AutoRetry=false,AntiAFK=false,TitanRipper=false,SkillAutofarm=false,ClassicAutofarm=false,ClassicNoclip=true},Values={NapeMultiplier=1,TravelSpeed=1000},Connections={},Highlights={},LastError="none"}
 local function warnError(message)
  local nextError=tostring(message)
  if M.LastError~=nextError then warn("[DepHub/AOTR] "..nextError) end
@@ -32,7 +32,7 @@ local targets=loadFeature("targets")
 local movement=loadFeature("movement")
 local combat=loadFeature("combat")
 if targets and movement and combat then
- M.Combat=combat.new({Player=player,Workspace=Workspace,ReplicatedStorage=game:GetService("ReplicatedStorage"),Targets=targets,Movement=movement,Properties=M.Properties,Warn=warnError,Now=os.clock,
+ M.Combat=combat.new({Player=player,Workspace=Workspace,ReplicatedStorage=game:GetService("ReplicatedStorage"),RunService=game:GetService("RunService"),TweenService=TweenService,Targets=targets,Movement=movement,Properties=M.Properties,Warn=warnError,Now=os.clock,
   CancelTeleport=function() M:CancelTeleport() end,
   FindRefill=function() return M:FindRefill() end,
   IsTeleporting=function() return M.TeleportTween and M.TeleportTween.PlaybackState==Enum.PlaybackState.Playing end})
@@ -106,6 +106,11 @@ function M:SetToggle(name,value)
  if self.Destroyed or self.Toggles[name]==nil then return false end
  value=value==true
  if self.Toggles[name]==value then return true end
+ if name=="ClassicNoclip" then
+  if not self.Combat then return false end
+  local ok,result=pcall(self.Combat.SetNoclip,self.Combat,value)
+  if not ok or result==false then warnError(result);return false end
+ end
  if name=="TitanRipper" or name=="SkillAutofarm" or name=="ClassicAutofarm" then
   if not self.Combat then warnError("Combat dependencies unavailable");return false end
   local ok,result=pcall(self.Combat.SetToggle,self.Combat,name,value)
@@ -122,6 +127,13 @@ function M:SetToggle(name,value)
  return true
 end
 function M:GetToggle(name) return self.Toggles[name]==true end
+function M:SetTravelSpeed(value)
+ value=tonumber(value)
+ if self.Destroyed or not value or value~=value or value<50 or value>2000 or not self.Combat then return false end
+ if not self.Combat:SetMovementSpeed(value) then return false end
+ self.Values.TravelSpeed=value
+ return true
+end
 function M:CheckShadowBan()
  if self.Destroyed or not self.Combat then return false end
  return self.Combat:CheckShadowBan()
@@ -155,9 +167,12 @@ function M:TeleportToRefill()
  local root=child(character(),"HumanoidRootPart")
  local refill=self:FindRefill()
  if not root or not root:IsA("BasePart") or not refill then warnError("Root or GasTanks.Refill unavailable");return false end
+ local humanoid=character() and character():FindFirstChildOfClass("Humanoid")
+ if root.Anchored or not humanoid or humanoid.Health<=0 then warnError("Character unavailable for refill travel");return false end
  self:CancelTeleport()
+ if self.Combat then self.Combat:PauseMovement() end
  local distance=(root.Position-refill.Position).Magnitude
- local tween=TweenService:Create(root,TweenInfo.new(math.max(0.1,distance/225),Enum.EasingStyle.Linear),{CFrame=refill.CFrame+Vector3.new(0,3,0)})
+ local tween=TweenService:Create(root,TweenInfo.new(math.max(0.03,distance/self.Values.TravelSpeed),Enum.EasingStyle.Linear),{CFrame=refill.CFrame+Vector3.new(0,3,0)})
  tween:Play()
  self.TeleportTween=tween
  return true
@@ -183,7 +198,7 @@ function M:GetStatus()
   end
   assistance=assistance.."\nShadowBan: "..self.Combat.CheckResult
  end
- return "AOTR "..self.Version.." | PlaceId: "..tostring(game.PlaceId).." | GameId: "..tostring(game.GameId).."\ntitans: "..tostring(#titans())..
+ return "AOTR "..self.Version.." | speed: "..self.Values.TravelSpeed.." studs/s | farm noclip: "..tostring(self.Toggles.ClassicNoclip).."\nPlaceId: "..tostring(game.PlaceId).." | GameId: "..tostring(game.GameId).."\ntitans: "..tostring(#titans())..
   "\nhotbar: "..(hotbar and "found" or "missing")..
   "\nrefill: "..(self:FindRefill() and "found" or "missing")..
   "\nblade hud: "..(descendants(top,"Blade") and "found" or "missing")..

@@ -2,6 +2,10 @@
 
 Framework client-side Luau com loader, backends separados por jogo e frontend exclusivamente Linoria.
 
+## AOT:R — movimento 0.0.36
+
+Classic Autofarm recebeu noclip com restauração e movimento por tween, com velocidade configurável de 50 a 2.000 studs/s (padrão 1.000). Esse teto é local e não confirma o máximo aceito pelo servidor. Veja AOTR_MOVEMENT_UPDATE.md para testes e detalhes.
+
 ## Frontend Linoria — 0.0.35
 
 Todos os modos usam a fonte de [Linoria solicitada](https://github.com/ro0ti/Roblox-Scripting-UI/tree/main/Linoria%20Lib): Universal, Blox Fruits, RT3, Noob Piece, MM2, TSB, Violence District, Volleyball Legends e AOT:R. Os componentes, janela, biblioteca compacta e UI própria de Violence District foram removidos. As definições dos controles ficam em src/frontend e nos frontends dos jogos, mas a renderização é exclusivamente Linoria.
@@ -13,7 +17,7 @@ A cópia do diretório indicado é antiga e usa CreateWindow com título string,
 Teste a branch de desenvolvimento com um único loader:
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/codex/aotr-integration/DepHub.lua?ui=0.0.35"))("codex/aotr-integration")
+loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/codex/aotr-integration/DepHub.lua?ui=0.0.36"))("codex/aotr-integration")
 ```
 
 ## Estrutura
