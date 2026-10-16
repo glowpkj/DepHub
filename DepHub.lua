@@ -49,7 +49,7 @@ local function cleanupRuntime()
     local state = env.__DEPHUB
     if type(state) == "table" then
         for _, key in ipairs({
-            "VolleyballLegendsUI","VolleyballLegends","Updater","UIGuard","Frontend","BloxFruitsUI","TSBUI","ViolenceDistrictUI","MM2UI",
+            "AOTRUI","AOTR","VolleyballLegendsUI","VolleyballLegends","Updater","UIGuard","Frontend","BloxFruitsUI","TSBUI","ViolenceDistrictUI","MM2UI",
             "BloxFruits","TSB","ViolenceDistrict","MM2","NoobPiece","Universal","Runtime","Window"
         }) do
             local target = state[key]
@@ -65,6 +65,8 @@ local function cleanupRuntime()
     env.__DEPHUB_VD = nil
     env.__DEPHUB_VD_FRONTEND = nil
     env.__DEPHUB_MM2 = nil
+    env.__DEPHUB_AOTR = nil
+    env.__DEPHUB_AOTR_FRONTEND = nil
     env.__DEPHUB_MM2_FRONTEND = nil
     env.__DEPHUB_NOOBPIECE = nil
     env.__DEPHUB_UI_GUARD = nil
@@ -75,7 +77,7 @@ local function sessionHealthy()
     if type(state) ~= "table" then return false end
     local frontend = state.Frontend
     if type(frontend) ~= "table" or frontend.Destroyed then return false end
-    local backend = state.VolleyballLegends or state.TSB or state.MM2 or state.ViolenceDistrict or state.NoobPiece or state.BloxFruits or state.Universal or state.Runtime
+    local backend = state.AOTR or state.VolleyballLegends or state.TSB or state.MM2 or state.ViolenceDistrict or state.NoobPiece or state.BloxFruits or state.Universal or state.Runtime
     return type(backend) == "table" and not backend.Destroyed
 end
 
@@ -218,7 +220,10 @@ local targets = {
     ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true}
 }
 
-local target = targets[placeId] or targets[gameId] or {Core = "src/games/universal.lua", Universal = true}
+-- AOT:R uses name-based detection until the exact universe/place IDs are confirmed.
+local gameName = tostring(game.Name or ""):lower()
+local isAOTRName = gameName:find("attack on titan") ~= nil and gameName:find("revolution") ~= nil
+local target = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "src/games/aotr.lua", Frontend = "src/games/features/aotr/frontend.lua", AOTR = true}) or {Core = "src/games/universal.lua", Universal = true}
 if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait()
 
@@ -229,6 +234,7 @@ local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
 local isVD = target.ViolenceDistrict == true
 local isMM2 = target.MM2 == true
+local isAOTR = target.AOTR == true
 local isNoobPiece = target.NoobPiece == true
 
 if isRT3 then
@@ -238,11 +244,12 @@ elseif type(coreResult) ~= "table" then
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and not isMM2 and not isNoobPiece and not isVolleyball and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isVD and not isMM2 and not isAOTR and not isNoobPiece and not isVolleyball and coreResult or nil
 env.__DEPHUB.VolleyballLegends = isVolleyball and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
 env.__DEPHUB.ViolenceDistrict = isVD and coreResult or nil
 env.__DEPHUB.MM2 = isMM2 and coreResult or nil
+env.__DEPHUB.AOTR = isAOTR and coreResult or nil
 env.__DEPHUB.NoobPiece = isNoobPiece and coreResult or nil
 
 local mode
@@ -253,6 +260,7 @@ elseif isVolleyball then mode = "VolleyballLegends" backend = coreResult
 elseif isTSB then mode = "TSB" backend = coreResult
 elseif isVD then mode = "ViolenceDistrict" backend = coreResult
 elseif isMM2 then mode = "MM2" backend = coreResult
+elseif isAOTR then mode = "AOTR" backend = coreResult
 elseif isNoobPiece then mode = "NoobPiece" backend = coreResult
 else mode = "BloxFruits" backend = coreResult end
 
@@ -273,6 +281,12 @@ elseif isVD then
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend Violence District invalido" or frontend) end
     env.__DEPHUB.ViolenceDistrictUI = frontend
+    env.__DEPHUB.Frontend = frontend
+elseif isAOTR then
+    env[STATE_KEY].Frontend = "aotr-compact-1"
+    local okFrontend, frontend = loadModule(target.Frontend, false)
+    if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend AOTR invalido" or frontend) end
+    env.__DEPHUB.AOTRUI = frontend
     env.__DEPHUB.Frontend = frontend
 elseif isMM2 then
     env[STATE_KEY].Frontend = "mm2-compact-2"
