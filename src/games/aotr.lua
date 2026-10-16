@@ -6,20 +6,37 @@ local player=Players.LocalPlayer
 local env=type(getgenv)=="function" and getgenv() or _G
 local old=env.__DEPHUB_AOTR
 if type(old)=="table" and type(old.Destroy)=="function" then pcall(old.Destroy,old) end
-local M={Destroyed=false,Toggles={TitanESP=false,NapeVisible=false,NapeExtend=false,ErenExtend=false,AutoBladeRefill=false,AutoGrabEscape=false,AntiInjury=false,AutoRetry=false,AntiAFK=false},Values={NapeMultiplier=1},Connections={},Originals={},Highlights={},LastError="none"}
+local M={Version="0.1.0",Destroyed=false,Toggles={TitanESP=false,NapeVisible=false,NapeExtend=false,ErenExtend=false,AutoBladeRefill=false,AutoGrabEscape=false,AntiInjury=false,AutoRetry=false,AntiAFK=false,TitanRipper=false,SkillAutofarm=false,ClassicAutofarm=false},Values={NapeMultiplier=1},Connections={},Highlights={},LastError="none"}
 local function warnError(message)
  local nextError=tostring(message)
  if M.LastError~=nextError then warn("[DepHub/AOTR] "..nextError) end
  M.LastError=nextError
 end
 local base=(env.__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local okHelpers,helpers=pcall(function()
- local source=game:HttpGet(base.."src/games/features/aotr/assistance.lua")
- local chunk,err=loadstring(source)
- assert(chunk,err)
- return chunk().new({Player=player,Warn=warnError})
-end)
-if okHelpers and type(helpers)=="table" then M.Assistance=helpers else warnError("Assistance unavailable: "..tostring(helpers)) end
+local function loadFeature(name)
+ local ok,result=pcall(function()
+  local source=game:HttpGet(base.."src/games/features/aotr/"..name..".lua?aotr="..M.Version)
+  local chunk,err=loadstring(source);assert(chunk,err)
+  local module=chunk();assert(type(module)=="table","Invalid module: "..name)
+  return module
+ end)
+ if not ok then warnError(name..": "..tostring(result));return nil end
+ return result
+end
+local properties=loadFeature("properties")
+if not properties then return false end
+M.Properties=properties.new(warnError)
+local assistance=loadFeature("assistance")
+if assistance then M.Assistance=assistance.new({Player=player,Warn=warnError}) end
+local targets=loadFeature("targets")
+local movement=loadFeature("movement")
+local combat=loadFeature("combat")
+if targets and movement and combat then
+ M.Combat=combat.new({Player=player,Workspace=Workspace,ReplicatedStorage=game:GetService("ReplicatedStorage"),Targets=targets,Movement=movement,Properties=M.Properties,Warn=warnError,Now=os.clock,
+  CancelTeleport=function() M:CancelTeleport() end,
+  FindRefill=function() return M:FindRefill() end,
+  IsTeleporting=function() return M.TeleportTween and M.TeleportTween.PlaybackState==Enum.PlaybackState.Playing end})
+end
 local function child(parent,name) return parent and parent:FindFirstChild(name) end
 local function descendants(parent,name)
  if not parent then return nil end
@@ -45,44 +62,22 @@ end
 local function nape(model)
  return child(child(child(model,"Hitboxes"),"Hit"),"Nape")
 end
-local function remember(part)
- if not M.Originals[part] then
-  M.Originals[part]={Size=part.Size,Transparency=part.Transparency}
- end
-end
-local function restore()
- for part,values in pairs(M.Originals) do
-  if part and part.Parent then
-   pcall(function() part.Size=values.Size;part.Transparency=values.Transparency end)
-  end
- end
- M.Originals={}
-end
 function M:Refresh()
  if self.Destroyed then return end
- local desired={}
+ local visual,eren={},{}
  for _,model in ipairs(titans()) do
   local part=nape(model)
   if part and part:IsA("BasePart") then
    if self.Toggles.NapeVisible or self.Toggles.NapeExtend then
-    desired[part]=true
-    remember(part)
-    local original=self.Originals[part]
-    part.Transparency=self.Toggles.NapeVisible and 0.65 or original.Transparency
-    part.Size=self.Toggles.NapeExtend and original.Size*(self.Values.NapeMultiplier or 1) or original.Size
-   elseif self.Originals[part] then
-    local original=self.Originals[part]
-    part.Size=original.Size;part.Transparency=original.Transparency
-    self.Originals[part]=nil
+    visual[part]={}
+    if self.Toggles.NapeVisible then visual[part].Transparency=0.65 end
+    if self.Toggles.NapeExtend then visual[part].Size=self.Properties:Original(part,"Size")*(self.Values.NapeMultiplier or 1) end
    end
   end
   if model.Name=="Attack_Titan" and self.Toggles.ErenExtend then
-   local marker=child(model,"Marker")
-   local hit=child(child(model,"Hitboxes"),"Hit")
-   local target=marker and (marker:IsA("Highlight") or marker:IsA("BillboardGui") or marker:IsA("SelectionBox")) and marker.Adornee
-   if target and hit and target:IsA("BasePart") and target:IsDescendantOf(hit) then
-    remember(target);desired[target]=true
-    target.Size=Vector3.new(95,95,95);target.Transparency=0.94
+   local target=targets and targets.Marker(model)
+   if target then
+    eren[target]={Size=Vector3.new(95,95,95),Transparency=0.94}
    end
   end
   local highlight=self.Highlights[model]
@@ -99,15 +94,8 @@ function M:Refresh()
    end
   elseif highlight then highlight:Destroy();self.Highlights[model]=nil end
  end
- for part,original in pairs(self.Originals) do
-  if not desired[part] then
-   if part.Parent then
-    local ok,err=pcall(function() part.Size=original.Size;part.Transparency=original.Transparency end)
-    if not ok then warnError(err) end
-   end
-   self.Originals[part]=nil
-  end
- end
+ self.Properties:Set("Visual",visual,10)
+ self.Properties:Set("Eren",eren,20)
  for model,highlight in pairs(self.Highlights) do
   if model.Parent~=titanFolder() or not self.Toggles.TitanESP then
    pcall(function() highlight:Destroy() end);self.Highlights[model]=nil
@@ -118,9 +106,15 @@ function M:SetToggle(name,value)
  if self.Destroyed or self.Toggles[name]==nil then return false end
  value=value==true
  if self.Toggles[name]==value then return true end
+ if name=="TitanRipper" or name=="SkillAutofarm" or name=="ClassicAutofarm" then
+  if not self.Combat then warnError("Combat dependencies unavailable");return false end
+  local ok,result=pcall(self.Combat.SetToggle,self.Combat,name,value)
+  if not ok or result==false then warnError(result);return false end
+ end
  if name=="AutoBladeRefill" or name=="AutoGrabEscape" or name=="AntiInjury" or name=="AutoRetry" or name=="AntiAFK" then
   if not self.Assistance then warnError("Assistance module unavailable");return false end
-  if not self.Assistance:SetToggle(name,value) then return false end
+  local ok,result=pcall(self.Assistance.SetToggle,self.Assistance,name,value)
+  if not ok or result==false then warnError(result);return false end
  end
  self.Toggles[name]=value==true
  local ok,err=pcall(function() self:Refresh() end)
@@ -128,10 +122,16 @@ function M:SetToggle(name,value)
  return true
 end
 function M:GetToggle(name) return self.Toggles[name]==true end
+function M:CheckShadowBan()
+ if self.Destroyed or not self.Combat then return false end
+ return self.Combat:CheckShadowBan()
+end
 function M:SetNapeMultiplier(value)
  value=tonumber(value)
  if self.Destroyed or not value or value~=value or value<0 or value>2 then return false end
- self.Values.NapeMultiplier=value;self:Refresh();return true
+ self.Values.NapeMultiplier=value
+ local ok,err=pcall(self.Refresh,self);if not ok then warnError(err) end
+ return ok
 end
 function M:FindRefill()
  for _,rootName in ipairs({"Unclimbable","Climbable"}) do
@@ -176,7 +176,14 @@ function M:GetStatus()
    if self.Toggles[name] then assistance=assistance.."\n"..name..": "..tostring(self.Assistance.States[name] or "starting") end
   end
  end
- return "PlaceId: "..tostring(game.PlaceId).." | GameId: "..tostring(game.GameId).."\ntitans: "..tostring(#titans())..
+ if self.Combat then
+  for _,name in ipairs({"TitanRipper","SkillAutofarm","ClassicAutofarm"}) do
+   local key=name=="TitanRipper" and "Ripper" or name
+   assistance=assistance.."\n"..name..": "..tostring(self.Combat.States[key] or "Disabled")
+  end
+  assistance=assistance.."\nShadowBan: "..self.Combat.CheckResult
+ end
+ return "AOTR "..self.Version.." | PlaceId: "..tostring(game.PlaceId).." | GameId: "..tostring(game.GameId).."\ntitans: "..tostring(#titans())..
   "\nhotbar: "..(hotbar and "found" or "missing")..
   "\nrefill: "..(self:FindRefill() and "found" or "missing")..
   "\nblade hud: "..(descendants(top,"Blade") and "found" or "missing")..
@@ -188,9 +195,10 @@ function M:Destroy()
  if self.RefreshTask then pcall(task.cancel,self.RefreshTask);self.RefreshTask=nil end
  self:CancelTeleport()
  if self.Assistance then self.Assistance:Destroy() end
+ if self.Combat then self.Combat:Destroy() end
  for _,connection in ipairs(self.Connections) do pcall(function() connection:Disconnect() end) end
  for _,highlight in pairs(self.Highlights) do pcall(function() highlight:Destroy() end) end
- restore()
+ self.Properties:Destroy()
  self.Highlights={}
  if env.__DEPHUB_AOTR==self then env.__DEPHUB_AOTR=nil end
  if env.__DEPHUB and env.__DEPHUB.AOTR==self then env.__DEPHUB.AOTR=nil end

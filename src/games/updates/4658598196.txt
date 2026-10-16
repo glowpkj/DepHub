@@ -1,1 +1,1 @@
-AOTR: initial assistance integration; runtime testing pending.
+AOTR 0.1.0: Ripper, skill/classic farm, inconclusive account diagnostic, lifecycle and restoration; runtime validation pending.

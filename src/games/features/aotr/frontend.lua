@@ -12,10 +12,10 @@ local okLibrary,Library=pcall(compiled)
 if not okLibrary or type(Library)~="table" or type(Library.new)~="function" then return false end
 local UI=Library.new({Id="AOTR",Title="DEPHUB",Subtitle="ATTACK ON TITAN: REVOLUTION",Accent=Color3.fromRGB(111,238,190),Width=310,Height=490,Open=true})
 UI:AddSection("TITANS")
-UI:AddToggle("Titan ESP",false,function(v) return backend:SetToggle("TitanESP",v) end)
-UI:AddToggle("Nape Visible",false,function(v) return backend:SetToggle("NapeVisible",v) end)
-local _,settings=UI:AddFeature("Nape Extend",false,function(v) return backend:SetToggle("NapeExtend",v) end)
-UI:AddSlider("Nape Multiplier",0,2,0.1,1,function(v) return backend:SetNapeMultiplier(v) end,settings)
+UI:AddToggle("Titan ESP",backend:GetToggle("TitanESP"),function(v) return backend:SetToggle("TitanESP",v) end)
+UI:AddToggle("Nape Visible",backend:GetToggle("NapeVisible"),function(v) return backend:SetToggle("NapeVisible",v) end)
+local _,settings=UI:AddFeature("Nape Extend",backend:GetToggle("NapeExtend"),function(v) return backend:SetToggle("NapeExtend",v) end)
+UI:AddSlider("Nape Multiplier",0,2,0.1,backend.Values.NapeMultiplier,function(v) return backend:SetNapeMultiplier(v) end,settings)
 UI:AddToggle("Extend Eren Weakpoint",backend:GetToggle("ErenExtend"),function(v) return backend:SetToggle("ErenExtend",v) end)
 UI:AddSection("ASSISTANCE - UNTESTED")
 for _,entry in ipairs({{"Auto Grab Escape","AutoGrabEscape"},{"Blade Refill","AutoBladeRefill"},{"Anti-Injury (client)","AntiInjury"},{"Auto Retry","AutoRetry"},{"Anti-AFK","AntiAFK"}}) do
@@ -25,12 +25,15 @@ end
 UI:AddSection("MOVEMENT")
 UI:AddButton("TELEPORT TO REFILL",function() return backend:TeleportToRefill() and "TELEPORTING" or "REFILL NOT FOUND" end)
 UI:AddButton("CANCEL TELEPORT",function() backend:CancelTeleport();return "CANCELLED" end)
-UI:AddSection("PENDING VALIDATION")
-local pending=UI:AddStatus("NOT IMPLEMENTED",nil,104)
-pending:Set("Titan Ripper / Skill Autofarm\nClassic Autofarm\nCheck ShadowBan: inconclusive\nSee AOTR_INTEGRATION_REPORT.md")
+UI:AddSection("COMBAT - UNTESTED")
+for _,entry in ipairs({{"Titan Ripper","TitanRipper"},{"Skill Autofarm","SkillAutofarm"},{"Classic Autofarm","ClassicAutofarm"}}) do
+ local key=entry[2]
+ UI:AddToggle(entry[1],backend:GetToggle(key),function(v) return backend:SetToggle(key,v) end)
+end
 UI:AddSection("DIAGNOSTICS")
+UI:AddButton("CHECK SHADOWBAN",function() return backend:CheckShadowBan() and "DIAGNOSTIC REQUESTED" or "BUSY / UNAVAILABLE" end)
 UI:AddButton("PRINT GAME STATUS",function() local s=backend:GetStatus();print("[DepHub/AOTR]\n"..s);return "STATUS PRINTED" end)
-local status=UI:AddStatus("GAME STATUS - UNTESTED",nil,250)
+local status=UI:AddStatus("GAME STATUS - UNTESTED",nil,420)
 status:Set(backend:GetStatus())
 local alive=true
 local statusTask=task.spawn(function()

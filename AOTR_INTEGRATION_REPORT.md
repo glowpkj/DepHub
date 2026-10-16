@@ -1,98 +1,131 @@
-# AOT:R — integração inicial para testes individuais
+# DepHub — AOT:R: revisão para testes individuais
 
-Data: 15/10/2026. Base inspecionada: `e6fffa4` do repositório glowpkj/DepHub.
-Entrada analisada: `aotr_corrigido_v3.luau` (78.690 bytes). O script antigo não é executado nem baixado pelo DepHub.
+Data: 15/10/2026. Branch: `codex/aotr-integration`.
+Base desta revisão: `696f106c843745d53d1b294aa20480e4874a6c56`.
+Loader: 0.0.34. Backend AOTR: 0.1.0.
+Referência: `aotr_corrigido_v3.luau`, 78.690 bytes, analisado por inspeção; nunca executado pelo hub.
 
-## Estado da entrega
+## Evidência e significado dos estados
 
-**Implementado** significa que há lógica conectada à interface. **Verificado estaticamente** significa inspeção, compilação e validação de referências. Os testes automatizados usam substitutos das APIs Roblox e não validam física, replicação, permissões de executor ou respostas do servidor. **Nenhum recurso foi testado em execução dentro do Roblox.**
+O usuário confirmou que a versão inicial da branch abriu o DepHub dentro do Roblox. Essa evidência confirma a abertura inicial; não confirma cada toggle nem a execução dos novos recursos desta revisão.
 
-Esta é uma integração inicial parcial. Ripper, os dois autofarms e a checagem de shadow ban não estão implementados; a interface os identifica como pendentes, sem toggles falsos.
+Nesta revisão, **implementado** significa lógica real conectada a um controle. **Verificado estaticamente** significa inspeção, compilação e testes com substitutos das APIs Roblox. **Nenhum dos recursos novos foi testado por este agente no Roblox.** Física, replicação, efeitos de habilidades, contratos de remotes e permissões do executor continuam sujeitos aos testes do usuário.
 
-| Recurso | Código entregue | Teste individual no Roblox / condição de sucesso |
-|---|---|---|
-| Titan ESP | Preservado; um Highlight próprio por modelo com Hitboxes, limpeza independente | Ativar, gerar outro Titan, desativar. Apenas Highlights DepHub devem desaparecer. Repetir dez vezes sem duplicação. |
-| Nape Visible | Preservado; restaura transparência capturada | Alternar com Extend ligado e desligado; transparência deve voltar ao valor observado antes de ativar. |
-| Nape Extend | Preservado; escala relativa ao tamanho original | Testar 0, 1 e 2; desativar restaura tamanho real, sem valores fixos antigos. Zero mantém a faixa anterior, mas torna a parte de tamanho zero. |
-| Multiplicador | Validação 0–2, rejeita NaN e infinito | Mover slider, observar tamanho e confirmar restauração. A escala relativa existente foi preservada; o antigo usava cubo de 60 studs. |
-| Extend Eren Weakpoint | Novo; amplia somente BasePart apontada por Marker.Adornee, dentro do Hit do próprio boss | Em raid, ativar e mudar fase/alvo. O alvo anterior deve voltar ao tamanho original. Desligar deve restaurar tudo. |
-| Teleport to Refill | Preservado; agora cancela tween anterior, oferece cancelamento e cancela no respawn/unload | Encontrar GasTanks.Refill, iniciar, cancelar no caminho; repetir botão e reiniciar hub sem movimento residual. |
-| Blade Refill | Novo; solicita GET("Blades", "Reload") com lâmina invisível, sets disponíveis e sem IFrames | Gastar lâmina com toggle ligado. Ver status, retorno visual e consumo real. Sem HUD não deve ocorrer erro fatal nem alteração fictícia do texto. Timeout de 30 s por episódio. |
-| Auto Grab Escape | Parcial: escuta Buttons.ChildAdded e envia POST("Attacks", "Slash_Escape") | Sofrer grab e confirmar escape real. Criar outros botões para detectar falso positivo. A origem do evento ainda precisa de confirmação. Não destrói UI nem registra ataque extra. |
-| Anti-Injury | Parcial: retira lesões locais da pasta, retém referências e restaura ao desligar | Sofrer lesão, ligar e desligar; confirmar pasta e efeito real. Não garante remoção da lesão no servidor. No respawn, não restaura lesões antigas no novo personagem. |
-| Auto Retry | Novo; opção independente, uma solicitação por tela visível de recompensas | Finalizar missão, ativar, observar voto/reinício; desligar antes da próxima tela. STARTING e (0/0) bloqueiam solicitação. Textos atuais/localizados precisam ser confirmados. |
-| Anti-AFK | Novo; uma conexão própria a Idled usa VirtualUser | Ativar, aguardar idle e conferir ausência de erros; desligar e confirmar desconexão. Depende de permissão de VirtualUser. Não desativa conexões de outros scripts. |
-| Diagnóstico | PlaceId, GameId, Titans, HUD, refill, estados dos auxiliares e último erro | Abrir no lobby e missão; ausências devem aparecer como waiting/missing sem bloquear UI. |
+Os diagnósticos usam Disabled, Waiting, Running e Error. Running descreve trabalho local ou solicitação enviada, sem afirmar dano, kill, recarga ou missão concluída. Todos os toggles começam desligados. Após respawn, somente os que o usuário já havia ligado retomam; reiniciar o backend encerra os anteriores e começa com todos desligados.
 
-## Pendências e prioridade recomendada
+## Estado real de cada função
 
-1. **P0: abertura e desligamento.** Testar loader no lobby e missão, reinício, fechamento real da UI, respawn e entrada tardia de Workspace.Titans. Recolher PlaceId/GameId e diagnóstico local se algo falhar. Fechar/destruir UI encerra o backend; apenas minimizar mantém recursos ativos.
-2. **P1: base visual e movimento.** Testar ESP, Nape Visible/Extend combinados, Eren e cancelamento de teleporte. Confirmar hierarquia e restauração antes de automação.
-3. **P1: assistência.** Testar recarga, escape, lesões, retry e idle separadamente. Confirmar contratos dos remotes e significado dos campos, sem assumir que uma solicitação enviada foi aceita.
-4. **P2: Titan Ripper — pendente.** No anexo observa Parts `<nome>_Steel`, `_Thrust`, `_RIP`, amplia skill/napes, move hitboxes e congela animações. Precisa de controle de propriedade de cada alteração e restauração compatível com movimento do Titan; posições fixas antigas não são restauração correta. Nenhuma parte dessa rotina está ligada à UI nova.
-5. **P2: Skill Autofarm — pendente.** No anexo chama S_Skills/Usage com IDs 108, 14, 23, 14 e depende do Ripper, ícones e cooldowns no Hotbar. Confirmar IDs/equipamento/cooldowns antes de integrar. Não basta repetir remotes para declarar farm pronto.
-6. **P3: autofarm clássico — pendente.** No anexo usa BodyPosition, BV, BG, movimentação acima do alvo e Hitboxes/Register; também apaga Climbable e quase todo Unclimbable e desliga colisões sem restauração. Exige reimplementação do movimento e seleção de alvos, preservando mapa e física existente. Não foi transplantado.
-7. **Check ShadowBan — pendente/inconclusivo.** O anexo faz GET(Data, Get), percorre chaves e conclui banimento por substring blacklist, ignorando dois nomes. Nil, chaves não string e valores não interpretados tornam a conclusão inválida. Não há diagnóstico confiável sem conhecer o contrato atual. Nenhum dado da conta é consultado ou enviado por esta integração.
+| Função | Entrega e limite real |
+|---|---|
+| Titan ESP | Implementado e preservado. Um Highlight próprio por Titan válido; não remove Highlights de outros scripts. Sem teste novo no jogo. |
+| Nape Visible | Implementado e preservado. Transparência original restaurada; compõe com outros recursos. |
+| Nape Extend / multiplicador | Implementado e preservado. Escala relativa ao tamanho original, intervalo 0–2; rejeita NaN/infinito. Zero continua permitido pela interface anterior. |
+| Extend Eren Weakpoint | Implementado. Usa somente Marker.Adornee BasePart dentro do Hit do próprio boss. Troca de marcador restaura alvo anterior; prioridade própria sobre extensão comum. |
+| Teleport to Refill | Implementado e preservado. Mantém botão de cancelamento, cancela tween anterior e no respawn/unload. Farm aguarda enquanto o tween está Playing. |
+| Titan Ripper | Implementado. Detecta efeitos locais Tester_Steel/Thrust/RIP pelo nome real do jogador, amplia efeito e napes comuns por até 2 s, move napes ao efeito e pausa animações. Restaura dimensões, transparência, velocidade exata das animações e posição relativa à cabeça em movimento. Não modifica boss. Efeitos identificados antes de respawn não são reutilizados no novo personagem. Precisa confirmar esses modelos/efeitos na versão atual do jogo. |
+| Skill Autofarm | Implementado. Sequência 108 → 14 → 23 → 14, pausas 0,1 / 2,5 / 0,1 / 0,5 s, equipamentos e cooldown checados a cada passo. Slots desconhecidos são pulados com Waiting. Compartilha Ripper com referência de uso própria, sem desligar o toggle independente. A associação de ícones aos IDs é inferida das três habilidades do anexo e precisa de confirmação no jogo; SkillId explícito tem evidência mais forte. Não promete completar missão. |
+| Autofarm clássico | Implementado. Seleciona Titan vivo próximo ou weakpoint ativo de boss; usa BodyPosition/BodyGyro próprios, offsets 75/195 e destino limitado por passo; envia Slash e Hitboxes/Register a distância limitada, no máximo uma vez por segundo. Usa velocidade local observada, sem números aleatórios de dano/velocidade. Faz ciclo de Full_Reload Left/Right perto de GasTanks.Refill quando o HUD confirma zero sets; recarga normal com sets disponíveis fica a cargo do toggle Blade Refill. Não apaga mapa, não desativa colisões e não altera BV/BG do jogo. Contratos e movimento precisam de teste real. |
+| Check ShadowBan | Consulta assíncrona real GET(Data, Get), botão independente e timeout de 15 s, sem imprimir valores da conta. Respostas nil, inesperadas ou tabelas com nomes blacklist produzem diagnóstico **inconclusivo**. Nenhum resultado definitivo de banimento é implementado: o contrato atual é desconhecido. Isso é uma limitação deliberada, não um placeholder. |
+| Auto Grab Escape | Implementado com disparo conservador, mas **contrato de detecção ainda parcial**. Não usa mais qualquer Buttons.ChildAdded. Só solicita Slash_Escape diante de Grabbed/IsGrabbed booleano true no Character ou BoolValue Grabbed true. Um pedido por episódio. Esses indicadores candidatos não foram comprovados pelo anexo; se não existirem no jogo, permanece Waiting e precisa de evidência de runtime para concluir a detecção. Não destrói UI nem dispara ataque adicional. |
+| Anti-Injury | Implementado no cliente com restauração recuperável. Retira objetos da pasta mantendo referência, restaura na pasta original ao desligar ou remover Character, não migra lesões para outro personagem e não destrói deliberadamente lesões originais. Objetos/pastas destruídos externamente não podem ser reconstruídos com garantia. Remoção real da lesão no servidor não é comprovada. |
+| Blade Refill | Implementado e revisado. Renova Character/Blade/HUD, aceita IFrames=false, respeita sets disponíveis e limite de 30 s de tentativas por episódio. Não falsifica texto do HUD. RPC bloqueada pode manter o worker aguardando até toggle off/respawn; UI permanece independente. |
+| Auto Retry | Implementado e revisado. Exige Retry.Title efetivamente visível e formato numérico de votos; ignora STARTING, (0/0) e formatos desconhecidos. Uma solicitação por episódio visível, inclusive diante de erro remoto, sem repetição arbitrária. Texto localizado exige confirmação. |
+| Anti-AFK | Implementado e revisado. Conexão própria a Idled, refeita no respawn e encerrada no toggle off/unload. Não desconecta handlers de outros scripts; depende da permissão de VirtualUser. |
+| Diagnósticos | Implementado. Identifica revisão do backend, referências, erro recente, estados dos três recursos de combate e resultado da consulta. Prints e dados permanecem locais. |
 
-## Arquitetura e arquivos
+## Arquitetura e composição de propriedades
 
-- `DepHub.lua`: versão 0.0.32; rotas AOTR por PlaceId 13379208636 e GameId 4658598196; fallback de nome anterior preservado. As rotas dos outros jogos foram mantidas.
-- `src/games/aotr.lua`: fachada de estado e recursos visuais; carrega assistência usando SourceBaseURL da mesma revisão; valida números e gerencia tween, tarefa, Highlights e originais.
-- `src/games/features/aotr/assistance.lua`: novo módulo com jobs próprios por recurso, referências renovadas por tick e cancelamento/limpeza ao desligar. Falha de download não impede a UI visual; ativação do auxiliar retorna false e registra erro.
-- `src/games/features/aotr/frontend.lua`: categorias Titans, Assistance, Movement, Pending Validation e Diagnostics, usando exclusivamente library/compact.lua. Defaults de automação desligados, sem carregar preferências antigas. Destruição cancela status e backend; substituição apenas do frontend preserva backend.
-- `.github/dephub-games.json`: nova entrada pelo universo, incluindo todos os módulos e marcador de atualização.
-- `src/games/updates/4658598196.txt`: novo marcador.
-- `src/version.txt`: sincronizado em 0.0.32.
-- `tests/aotr_tests.luau`: novos testes comportamentais de roteamento sem nome, referências ausentes/não Titan, restauração, marcador, idempotência, lesões e cleanup.
-- `tests/run_backend_tests.js`: inclui fontes e testes AOTR.
-- `tests/headless_tests.luau`: expectativa da versão atualizada.
-- `tests/validate_repo.js`: exige rastreamento de todos os módulos AOTR no manifesto.
-- `AOTR_INTEGRATION_REPORT.md`: este relatório.
+- `src/games/features/aotr/properties.lua`: novo registro de propriedades por dono e prioridade. Visual comum tem prioridade 10, Eren 20 e Ripper 30. Desligar um dono reaplica os demais; o último restaura o valor original. Ripper fornece restauração de CFrame relativa à cabeça para acompanhar deslocamento do Titan. Não escreve material ou cor.
+- `targets.lua`: novo módulo para saúde, raiz, Titans vivos e validação de Marker.Adornee; boss sem marcador válido não é atacado por fallback arbitrário.
+- `movement.lua`: novo componente de movimento. Cria e destrói apenas seus próprios movers e restaura velocidades capturadas. Não altera CanCollide nem objetos BV/BG existentes. Em física real, mola/replicação e autoridade do servidor podem rejeitar o movimento.
+- `combat.lua`: novos controladores independentes, uma tarefa por recurso, uso compartilhado do Ripper entre dois donos, tratamento de erro isolado, gestão de respawn e consulta assíncrona. Cancelar encerra espera local; uma mensagem já enviada ao servidor não pode ser desfeita.
+- `assistance.lua`: indicadores de grab conservadores; idempotência; cancelamento de jobs no CharacterRemoving e recriação somente de recursos já ligados no CharacterAdded; restauração das lesões; reload e retry sem falsificar interface.
+- `src/games/aotr.lua`: fachada existente mantida; integra módulos, propriedades e diagnósticos. Backend anterior é destruído ao reiniciar.
+- `frontend.lua`: usa a mesma biblioteca compacta. Mantém Titans, Assistance, Movement e Diagnostics; substitui o aviso de pendências pela seção Combat com três toggles reais e adiciona botão de consulta em Diagnostics. Nenhuma biblioteca nova ou UI Tekkit.
 
-`library/compact.lua`, os módulos MM2/TSB e `src/core/updater.lua` foram lidos e preservados. O updater já usa GameId como ManifestId e a entrada nova atende esse contrato. `src/update-manifest.json` é gerado pelo workflow ao publicar em main; não foi preenchido manualmente com hashes fictícios.
+O loader só recebeu versão 0.0.34 e parâmetro de revisão nas URLs de download para invalidar respostas antigas. O roteamento existente por GameId 4658598196 foi preservado. Não foi reescrito e a manutenção do loader principal em main não faz parte desta entrega.
 
-## Correções e limitações do anexo
+## Arquivos criados ou modificados
 
-- Blade não é acessado diretamente em Frame sem checagem: procura recursivamente e valida o texto Sets; não falsifica número de recargas na interface.
-- Evita pairs(nil) e o acesso a Hitboxes de Highlight, filtrando modelos e checando cada nível.
-- Guarda tamanho/transparência reais em vez de restaurar constantes 15/9/11 ou 10/20/10. Eren e Nape compartilham composição no refresh para não sobrescrever estados independentes.
-- Rejeita multiplicadores inválidos, NaN e infinito. Material e cor não são alterados.
-- Não preserva referências únicas de Character, blade, HUD, pasta de lesões ou remotes entre respawns; procura novamente. Titans pode aparecer após inicialização.
-- Jobs são cancelados ao desligar, evitando múltiplos loops. Uma chamada remota já enviada não pode ser desfeita no servidor; cancelar encerra a espera local. RemoteFunction bloqueada não gera novas tarefas a cada tick.
-- Polling visual é de 1 s; auxiliares usam 0,5–1 s. Mudanças rápidas do Marker podem ser percebidas apenas no próximo refresh.
-- Anti-Injury é uma adaptação reversível local, diferente da destruição permanente do anexo. Objetos já destruídos externamente podem não ser restauráveis; erro é diagnosticado.
-- O anexo também tem UI Tekkit, arraste/RightShift, persistência em arquivo, ajuste de Atmosphere, avisos de recompensas e cópia de link Discord. Esses comportamentos não foram importados; não integram os recursos pedidos e alterariam UI/ambiente global.
-- Nesta versão específica do anexo não foram encontradas URLs de webhook: o único link externo literal é Discord. Nenhum webhook, telemetria, envio de itens ou coleta de dados foi adicionado. Downloads adicionais limitam-se ao novo módulo do próprio DepHub pela base já existente.
+Criados:
 
-## Caminhos a confirmar no jogo atual
+- src/games/features/aotr/properties.lua
+- src/games/features/aotr/targets.lua
+- src/games/features/aotr/movement.lua
+- src/games/features/aotr/combat.lua
+- tests/aotr_combat_tests.luau
 
-- Workspace.Titans / `<Model>.Hitboxes.Hit.Nape`.
-- Attack_Titan.Marker.Adornee e Hitboxes.Hit (Marker aceito como BillboardGui, Highlight ou SelectionBox).
-- Workspace.Unclimbable ou Climbable / ancestral GasTanks / BasePart Refill.
-- Character.Rig_<PlayerName>.LeftHand.Blade_1, Character.Injuries, atributo IFrames.
-- PlayerGui.Interface.HUD.Main.Top / descendente Blade / Sets.
-- PlayerGui.Interface.Buttons.ChildAdded: ainda não comprova que cada filho representa grab.
-- PlayerGui.Interface.Rewards.Main.Info.Main.Buttons.Retry.Title e visibilidade dos ancestrais.
-- ReplicatedStorage.Assets.Remotes.GET (RemoteFunction) e POST (RemoteEvent), com os argumentos indicados acima.
-- VirtualUser disponível/permissões do ambiente.
+Modificados:
 
-IDs conferidos na página oficial Roblox: https://www.roblox.com/games/13379208636/Attack-on-Titan-Revolution e resultado oficial com universeId=4658598196. O teste automatizado cobre missão com PlaceId diferente e GameId conhecido; isso não substitui abrir uma missão real.
+- src/games/aotr.lua
+- src/games/features/aotr/assistance.lua
+- src/games/features/aotr/frontend.lua
+- DepHub.lua
+- src/version.txt
+- .github/dephub-games.json
+- src/games/updates/4658598196.txt
+- tests/aotr_tests.luau
+- tests/headless_tests.luau (somente expectativa de versão)
+- tests/run_backend_tests.js
+- AOTR_INTEGRATION_REPORT.md
 
-## Validação realizada
+A configuração do manifesto rastreia todos os módulos novos. src/update-manifest.json é gerado pelo workflow de main; não foi alterado manualmente nesta branch. Biblioteca compacta, updater e implementação dos outros jogos permaneceram intactos.
 
-- Validação do repositório e referências: passou em v0.0.32.
-- Compilação Luau dos 77 arquivos Lua em src, library, diagnostics e loader: passou.
-- Backend/headless/ciclo de vida: 296 verificações passaram, incluindo AOTR e regressões existentes.
-- Biblioteca: 71 verificações passaram.
-- Revisão do diff e espaços: sem erros. Biblioteca e implementação de outros jogos não foram alteradas.
-- Roblox: **não executado**. Visual da UI, aceitação de remotes, efeitos de gameplay, executor e replicação permanecem sem teste.
+## Erros e comportamentos antigos corrigidos
 
-## Como testar a revisão publicada
+- Ripper antigo restaurava velocidade de animação fixa 1 e posição estimada Head.Position - (2,5,0). Agora captura velocidade real e transformação relativa; também restaura tamanho do efeito.
+- Extensão e Ripper podiam desfazer alterações um do outro. Agora compartilham composição por propriedade, mantendo os toggles independentes.
+- Farm antigo destruía Climbable/Unclimbable, reutilizava BV/BG e alterava colisões sem restauração. Esses efeitos foram excluídos; há movimento próprio e limpeza.
+- Seleção antiga podia manter nape anterior ou acessar Highlight como Model. A seleção nova é refeita em cada passo, valida modelos vivos e não mantém alvo inválido.
+- Skill farm antigo tinha eventos concorrentes e referência única a cooldowns de HUD. Agora há um único worker, sequência com atrasos canceláveis e renovação dos slots.
+- Grab antigo disparava em qualquer filho de Buttons. Agora não depende desse evento genérico; falta confirmar o indicador atual do jogo.
+- Anti-Injury antigo destruía lesões; a integração inicial ainda destruía referências de personagem anterior. Agora restaura quando recuperável e apenas solta referências irrecuperáveis, registrando limitação.
+- Retry podia repetir em estados STARTING ou texto desconhecido. Agora filtra formato e evita duplicação por episódio.
+- Check ShadowBan antigo usava pairs em resposta desconhecida e inferia banimento pelo nome de campos. A consulta nova faz validação de tipo e não declara safe/banned.
+- Nenhum webhook, coleta de dados, link Discord, ajuste de Atmosphere, persistência Tekkit ou execução do anexo foi importado.
 
-Ao testar uma branch, passar seu nome como argumento do loader para que a UI e a assistência venham da mesma revisão:
+## Dependências e suposições que exigem Roblox
+
+1. Workspace.Titans e modelos com Humanoid vivo; Hitboxes.Hit.Nape; Attack_Titan.Marker.Adornee.
+2. Ripper: BaseParts diretamente em Workspace com nomes <jogador>_Steel, _Thrust ou _RIP; Fake.Head para restauração de nape e Animator do Humanoid para velocidade de tracks. Napes sem cabeça válida não são movidas.
+3. Skills: PlayerGui.Interface.HUD.Main.Top.7.Hotbar, slots contendo Skill, atributo SkillId ou Inner.Icon, Cooldown como GuiObject. Associações legadas: 108 ↔ ícone 15216496277, 14 ↔ 15215073606, 23 ↔ 15215081865. Precisam de confirmação; slots sem identificação/cooldown não são acionados.
+4. Remotes em ReplicatedStorage.Assets.Remotes: GET RemoteFunction e POST RemoteEvent. Contratos usados: S_Skills/Usage/ID; Attacks/Slash/true; Hitboxes/Register/part/velocidade/0; Blades/Reload; Blades/Full_Reload/Left ou Right/refill; Functions/Retry/Add; Attacks/Slash_Escape; Data/Get. Todos são do anexo, sem confirmação atual do servidor.
+5. Character.Rig_<nome>.LeftHand.Blade_1, Character.Injuries, HumanoidRootPart, IFrames e HUD Blade.Sets. Full reload exige zero sets e distância local <=20 studs de Refill dentro de GasTanks em Climbable/Unclimbable.
+6. Grabbed/IsGrabbed booleanos ou BoolValue Grabbed são candidatos defensivos, não caminhos comprovados no anexo. Precisamos do indicador real para finalizar essa parte sem falsos positivos.
+7. Rewards.Main.Info.Main.Buttons.Retry.Title, formato (n/n), visibilidade de ancestrais e estados STARTING/(0/0).
+8. VirtualUser e permissão do executor. BodyPosition/BodyGyro são usados para manter o modelo físico legado com escopo próprio; podem não funcionar com a autoridade física atual.
+
+## Plano de teste no jogo
+
+1. Abrir a revisão abaixo no lobby e numa missão. Confirmar log v0.0.34 e diagnóstico AOTR 0.1.0. Todos os toggles devem iniciar desligados.
+2. ESP, Visible e Extend: ativar um de cada vez, testar slider 0/1/2, novos Titans e alternância combinada. Desligar tudo restaura os valores observados originalmente.
+3. Eren: ativar durante raid, acompanhar troca de Marker, desligar durante troca. Weakpoint anterior deve restaurar; alvo fora do próprio boss deve ser ignorado.
+4. Ripper: ativar, usar uma habilidade que gere efeito reconhecido, observar janela de 2 s; testar sem Fake.Head/Animator para verificar Waiting/segurança. Desligar durante o efeito, mover Titan durante o efeito e testar com Nape Extend ligado. Confirmar restauração de velocidade das animações.
+5. Skill farm: equipar as três habilidades de referência, observar identificação dos slots, cooldown e sequência. Desequipar/trocar slot durante execução; deve aguardar/pular sem erro fatal. Desligar durante atraso, ligar repetidamente, morrer e reaparecer. Verificar efeitos reais e associação ícone/ID antes de concluir funcionamento.
+6. Farm clássico: ambiente com rota acessível e um Titan vivo; observar movimento e solicitações, aproximar-se de boss com Marker, retirar marcador e confirmar ausência de alvo. Esgotar sets para testar deslocamento ao refill e Full_Reload; confirmar HUD real. Ativar Blade Refill para recargas com stock. Desligar durante movimento, usar teleporte manual e respawn. Mapa, colisões e BV/BG devem permanecer intactos. Sem caminho livre, mover pode ficar bloqueado; não há destruição do cenário ou planejamento de rota.
+7. ShadowBan: clicar uma vez, repetir enquanto ocupado, testar resposta/erro. Deve terminar em inconclusivo ou Error, sem conclusão de banimento e sem imprimir conteúdo de conta. Em 15 s de espera deve informar timeout.
+8. Grab: ligar e criar outros botões na UI; não deve enviar escape. Sofrer grab real, observar Waiting e verificar se os indicadores candidatos existem. Se não houver detecção, enviar o diagnóstico e a estrutura/atributo real observado, sem assumir sucesso.
+9. Anti-Injury: gerar lesão, ligar/desligar, conferir retorno na mesma pasta; remover Character enquanto ligado. Novo personagem não deve receber lesões antigas. Conferir separadamente se há efeito no servidor.
+10. Blade Refill: zero/alguns sets, Blade ausente, IFrames true/false, trocar lâmina, respawn e desativar durante tentativa. Não alterar texto do HUD artificialmente.
+11. Retry: recompensa visível, oculta, STARTING e (0/0); verificar uma solicitação por episódio, não declarar sucesso antes de voto/reinício real.
+12. Anti-AFK: ativar, aguardar Idled, desativar, respawn e reiniciar. Conferir permissões e ausência de múltiplos handlers.
+13. Reiniciar o hub com vários recursos ligados: UI/backend anteriores devem ser encerrados. Verificar ausência de movers/Highlights/tarefas residuais e todos os novos toggles desligados.
+
+## Validação automática desta revisão
+
+- Validação do repositório, versões e manifesto: passou em 0.0.34.
+- Compilação dos 81 arquivos Lua de src, library, diagnostics e loader: passou.
+- 356 verificações backend/headless/ciclo de vida: passaram, incluindo 60 novas verificações AOTR sobre a base de 296.
+- 71 verificações da biblioteca: passaram.
+- Revisão de diff e espaços: sem erros.
+- Casos novos incluem: seleção viva/boss, nenhuma automação inicial, idempotência, composição/remoção de layers, restauração com cabeça em movimento, animações, erro remoto isolado, morte/respawn/reinício, movers próprios, mapa intacto, skills desconhecidas/cooldown, uso compartilhado de Ripper, cancelamento em atraso, grab falso positivo, lesões recuperáveis, query desconhecida/nil/timeout/retry, recarga sem alterar HUD, full reload com limite e voto único de retry.
+
+Esses testes não verificam física ou protocolo real do servidor. A abertura inicial foi confirmada pelo usuário; recursos novos dependem dos testes acima.
+
+## Loader exato da branch publicada
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/codex/aotr-integration/DepHub.lua"))("codex/aotr-integration")
+loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/codex/aotr-integration/DepHub.lua?aotr=0.0.34"))("codex/aotr-integration")
 ```
 
-Não executar o anexo Tekkit em paralelo. Começar com todos os recursos desligados, ativar um por vez e registrar nome do toggle, lobby/missão, diagnóstico e erro. Depois testar as combinações visuais, repetição de toggles, respawn e reinicialização.
+O parâmetro evita reutilizar o loader antigo; o argumento fixa a mesma branch para os módulos. Testar sem executar o Tekkit em paralelo. Esta entrega atualiza apenas a branch de desenvolvimento e não faz merge em main.
