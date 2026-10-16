@@ -82,6 +82,9 @@ validateFeatureDirectory('66654135', 'src/games/features/mm2', [
   'src/games/mm2.lua',
   'src/games/features/mm2/playerteleport.lua'
 ]);
+validateFeatureDirectory('4658598196', 'src/games/features/aotr', [
+  'src/core/updater.lua', 'library/compact.lua', 'src/games/aotr.lua'
+]);
 
 if (!loader.includes('["142823291"]') || !loader.includes('["66654135"]') || !loader.includes('src/games/mm2.lua')) {
   fail('MM2 loader routing is incomplete');

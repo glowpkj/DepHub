@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.31"
+local VERSION = "0.0.32"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -206,6 +206,8 @@ local okVersion, remoteVersion = httpGet("src/version.txt", false)
 if okVersion then env.__DEPHUB.RemoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION end
 
 local targets = {
+    ["13379208636"] = {Core = "src/games/aotr.lua", Frontend = "src/games/features/aotr/frontend.lua", AOTR = true},
+    ["4658598196"] = {Core = "src/games/aotr.lua", Frontend = "src/games/features/aotr/frontend.lua", AOTR = true},
     ["73956553001240"] = {Core = "src/games/volleyballlegends.lua", Frontend = "src/games/features/volleyballlegends/frontend.lua", VolleyballLegends = true},
     ["6931042565"] = {Core = "src/games/volleyballlegends.lua", Frontend = "src/games/features/volleyballlegends/frontend.lua", VolleyballLegends = true},
     ["994732206"] = {Core = "src/games/bloxfruits.lua"},
@@ -220,7 +222,8 @@ local targets = {
     ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true}
 }
 
--- AOT:R uses name-based detection until the exact universe/place IDs are confirmed.
+-- AOT:R routes lobby by PlaceId and mission places by universe GameId.
+-- Source: https://www.roblox.com/games/13379208636/Attack-on-Titan-Revolution
 local gameName = tostring(game.Name or ""):lower()
 local isAOTRName = gameName:find("attack on titan") ~= nil and gameName:find("revolution") ~= nil
 local target = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "src/games/aotr.lua", Frontend = "src/games/features/aotr/frontend.lua", AOTR = true}) or {Core = "src/games/universal.lua", Universal = true}
