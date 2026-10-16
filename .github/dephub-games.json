@@ -179,5 +179,19 @@
       "src/games/features/volleyballlegends/frontend.lua",
       "src/games/updates/6931042565.txt"
     ]
+  },
+  "4658598196": {
+    "name": "Attack on Titan Revolution",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/ui-guard.lua",
+      "src/core/updater.lua",
+      "library/compact.lua",
+      "src/games/aotr.lua",
+      "src/games/features/aotr/assistance.lua",
+      "src/games/features/aotr/frontend.lua",
+      "src/games/updates/4658598196.txt"
+    ]
   }
 }
