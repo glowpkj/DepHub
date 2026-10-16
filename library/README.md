@@ -1,44 +1,30 @@
-# DepHub Library
+# DepHub — Linoria
 
-The library is split into reusable modules instead of one standalone script.
+`linoria.lua` is the only frontend rendering library. It is based on the source requested at:
+https://github.com/ro0ti/Roblox-Scripting-UI/tree/main/Linoria%20Lib
 
-## Structure
+Original file: `Linoria Lib/Linoria Lib Source.lua`.
+Original blob: `5ce532748c72ffe021112be612cc1b4da14a6ab8`.
 
-- `init.lua` loads and caches the library modules, replaces an older DepHub window and mounts the selected game content.
-- `theme.lua` is the single color/theme source.
-- `utils.lua` contains lifecycle-aware UI helpers, text creation, tweening and formatting.
-- `components.lua` implements sections, labels, buttons, toggles, sliders, dropdowns, inputs, keybinds and RGB colors.
-- `window.lua` owns the screen, sidebar, pages, navigation, dragging, notifications, responsive behavior and cleanup.
-- `content/*.lua` connects the components to Universal, Blox Fruits and Restaurant Tycoon 3 backends.
+The previous init/theme/utils/components/window/compact modules and content directory have been removed. Game definitions now live under `src/frontend`; they bind backend actions to native Linoria controls and do not render a separate UI.
 
-The normal entry point is `DepHub.lua`; it initializes the selected backend first and then calls `Library.new` with the correct mode. The resulting window is available at:
+Normal hub entry point: `DepHub.lua`. The selected frontend is `getgenv().__DEPHUB.Frontend`; its native Linoria instance is `.Library`.
 
-```lua
-getgenv().__DEPHUB.Frontend
-```
-
-## Window API
+## Native API for standalone scripts
 
 ```lua
-local page = window:CreateTab("TOOLS", "TOOLS")
-local section = window:CreateSection(page, "MOVEMENT")
-
-window:CreateToggle(section, {
-    Title = "FEATURE",
-    Description = "DESCRIPTION",
-    Default = false,
-    Callback = function(enabled) end
-})
-
-window:Notify("TITLE", "MESSAGE", 3, "Success")
-window:OpenPage("TOOLS")
-window:SetOpen(false)
-window:Destroy()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/codex/aotr-integration/library/linoria.lua"))()
+local Window = Library:CreateWindow("DEPHUB")
+local Main = Window:AddTab("Main")
+local Group = Main:AddLeftGroupbox("Features")
+local Toggle = Group:AddToggle("Example", { Text = "Example", Default = false })
+Toggle:OnChanged(function() print(Toggle.Value) end)
+Window:SetVisible(true)
+-- Library:Unload() releases this library instance.
 ```
 
-Every value component returns a wrapper with `GetValue()` and `SetValue(value, silent)`.
-Dropdowns also provide `GetValues()` and `SetValues(values, selected, silent)`. Sections
-provide `SetVisible(bool)`. All callbacks are protected; errors are shown as notifications.
+This particular source expects a string title, rather than the options table shown in a newer example. Color/key addons return their parent label; access the picker through `Library.Options[id]`. Native OnChanged invokes its callback on registration; the DepHub adapter suppresses that initial call to prevent starting features automatically.
 
-The window adapts its width, sidebar, padding and control layout to the current camera
-viewport. `RightControl` toggles it by default and can be changed from the Config tab.
+Local source fixes add owned connection/task cleanup, Unload/OnUnload, visibility control, corrected input/dropdown callbacks, normal cursor use and scrolling columns. See `LINORIA_MIGRATION_REPORT.md` at the repository root for provenance, tests and runtime limitations.
+
+RightControl is the default hub menu key. Use the native key picker to change it, and the Unload button to stop both UI and backend. ThemeManager/SaveManager and configuration autoload are not imported.
