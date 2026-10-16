@@ -191,7 +191,11 @@
       "src/games/aotr.lua",
       "src/games/features/aotr/assistance.lua",
       "src/games/features/aotr/frontend.lua",
-      "src/games/updates/4658598196.txt"
+      "src/games/updates/4658598196.txt",
+      "src/games/features/aotr/properties.lua",
+      "src/games/features/aotr/targets.lua",
+      "src/games/features/aotr/movement.lua",
+      "src/games/features/aotr/combat.lua"
     ]
   }
 }

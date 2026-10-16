@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.32"
+local VERSION = "0.0.34"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -172,7 +172,7 @@ end
 local function httpGet(path, useCache)
     local cache = getCache()
     if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
-    local ok, result = performRequest(BASE_URL .. path)
+    local ok, result = performRequest(BASE_URL .. path .. "?dephub=" .. VERSION)
     if not ok then return false, result end
     if useCache ~= false then cache[path] = result end
     return true, result

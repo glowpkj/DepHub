@@ -6,7 +6,7 @@ const cp = require('node:child_process');
 const root = path.resolve(__dirname, '..');
 const luau = process.argv[2];
 if (!luau) throw new Error('Usage: node tests/run_backend_tests.js /path/to/luau');
-const files = ['src/games/aotr.lua', 'src/games/features/aotr/assistance.lua', 'DepHub.lua', 'src/games/bloxfruits.lua', 'src/games/universal.lua',
+const files = ['src/games/features/aotr/properties.lua', 'src/games/features/aotr/targets.lua', 'src/games/features/aotr/movement.lua', 'src/games/features/aotr/combat.lua', 'src/games/aotr.lua', 'src/games/features/aotr/assistance.lua', 'DepHub.lua', 'src/games/bloxfruits.lua', 'src/games/universal.lua',
   'src/games/rt3.lua', 'src/core/runtime.lua', 'src/core/updater.lua',
   'src/games/features/bloxfruits/fruitvfx.lua', 'src/games/noobpiece.lua',
   'src/games/features/mm2/roletracker.lua', 'src/games/features/tsb/autoblock-v3.lua',
@@ -47,7 +47,7 @@ const sources = 'local sources = {\n' + files.map(file =>
 const harness = fs.readFileSync(path.join(__dirname, 'backend_harness.luau'), 'utf8')
   .replace('-- INSERT_SOURCES', () => sources)
   .replace('-- INSERT_FRUIT_VFX_TESTS', () => fs.readFileSync(path.join(__dirname, 'fruit_vfx_tests.luau'), 'utf8'))
-  .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'volleyball_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_tests.luau'), 'utf8'))
+  .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'volleyball_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_combat_tests.luau'), 'utf8'))
   .replace('-- INSERT_HEADLESS_TESTS', () => fs.readFileSync(path.join(__dirname, 'headless_tests.luau'), 'utf8'));
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'dephub-backend-test-'));
 const file = path.join(temp, 'test.luau');

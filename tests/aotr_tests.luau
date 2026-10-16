@@ -14,6 +14,7 @@ do
     ctx.Player.Name="Tester"
     ctx.Player.Idled=signal()
     ctx.Responses["src/games/features/aotr/assistance.lua"]=sources["src/games/features/aotr/assistance.lua"]
+    for _,name in ipairs({"properties","targets","movement","combat"}) do local p="src/games/features/aotr/"..name..".lua";ctx.Responses[p]=sources[p] end
     local function object(class,name,parent)
         local item=Instance.new(class);item.Name=name;item.Parent=parent;return item
     end
