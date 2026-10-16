@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-16T01:13:30.678640+00:00",
-  "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
-  "version": "0.0.31",
+  "generatedAt": "2026-10-16T01:33:44.176703+00:00",
+  "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+  "version": "0.0.32",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "2d114939fd77ed5060740d586100b7b7276cddfe71117bebbb05ced11c829a55",
-      "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
+      "version": "598ec06e4de86b1a12052a57cdab42c82ae0d5d18a031347ac84f74b160ff659",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "bc6022ce0fae14d70894b060a51b0b57ee9a97eeddc9491a8f150a8c9495f8c2",
-      "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
+      "version": "934908f2e1fd2356c330b915f2a104e32da23b5d4ed850a3f81a2a7e7ac10088",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -58,8 +58,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "32c7e3faad927f4f8446cbc25e69b7fe58f783b54b4c0f037e66a11c9520b6f5",
-      "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
+      "version": "538a3248c86caef74fb02dee6b27392733849615910e8f150505160a9a26959a",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -77,8 +77,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "26eba28920bd1455d8b05b37706d711ce0fd84010e9fdfad9b0c9bc9fdcdb9dc",
-      "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
+      "version": "63f10aaa7515c5ac426dd137eb1e0901738caacafc7b8196b71063f78c28452b",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -106,8 +106,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "b4908ffadcef97e3ed04f7d3929ebc5ac2a9d247c24a134ffb52e8525501df18",
-      "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
+      "version": "36a6cb25a8c8b180c8d97173ceea4e586b67a1f2b90fb9f46a818cb5d36bba1b",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -137,8 +137,8 @@
     },
     "6739698191": {
       "name": "Violence District",
-      "version": "108b57711928e320c50f6642bb9d4ca50ce1f66e36500e7561a2cb4c69d0b3bf",
-      "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
+      "version": "54d188048d58db599131fa46e3321510ef574dd01afa2913772aab727538455f",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -153,8 +153,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "eed473411982c0da21a5962cec4aaa724cc221582cb079e0e3380ed9758095ca",
-      "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
+      "version": "fe046dd3af5eb6d73b907caf222e091273819494d9b2dada6aee87d603181fac",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -185,8 +185,8 @@
     },
     "6931042565": {
       "name": "Volleyball Legends",
-      "version": "646e368307566730edefefe00ded23a37b7afc990f9b3b2d8d39e59923fc8e4d",
-      "commit": "b2bb58a3d33eda4766f131414c1250126806723e",
+      "version": "d797594fd7273fe025ae4aa53aaac2419a3c269092581dc1106b7cf8d48471fa",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -200,9 +200,32 @@
         "src/games/features/volleyballlegends/frontend.lua",
         "src/games/updates/6931042565.txt"
       ]
+    },
+    "4658598196": {
+      "name": "Attack on Titan Revolution",
+      "version": "7fc5f13a1f55490e72fe3b80ba97d80d1375853fa15d641a1c695a57e8437bb6",
+      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/ui-guard.lua",
+        "src/core/updater.lua",
+        "library/compact.lua",
+        "src/games/aotr.lua",
+        "src/games/features/aotr/assistance.lua",
+        "src/games/features/aotr/frontend.lua",
+        "src/games/updates/4658598196.txt"
+      ]
     }
   },
   "recentUpdates": [
+    {
+      "Version": "696f106",
+      "Date": "2026-10-15T22:29:58-03:00",
+      "Changes": [
+        "Integrate initial AOTR assistance, ID routing and lifecycle cleanup"
+      ]
+    },
     {
       "Version": "b2bb58a",
       "Date": "2026-10-15T22:13:22-03:00",
@@ -211,31 +234,24 @@
       ]
     },
     {
+      "Version": "0b61c61",
+      "Date": "2026-10-15T22:13:12-03:00",
+      "Changes": [
+        "feat(aotr): add compact DepHub frontend"
+      ]
+    },
+    {
+      "Version": "ad0e9f9",
+      "Date": "2026-10-15T22:13:09-03:00",
+      "Changes": [
+        "feat(aotr): add defensive titan features and diagnostics"
+      ]
+    },
+    {
       "Version": "e640a3a",
       "Date": "2026-10-06T22:03:21-03:00",
       "Changes": [
         "feat(volleyball): dynamic Ball ESP and reusable trajectory and landing visuals"
-      ]
-    },
-    {
-      "Version": "be6e6e7",
-      "Date": "2026-10-06T21:47:49-03:00",
-      "Changes": [
-        "fix(tsb): single auto block toggle and defense priority over manual M1"
-      ]
-    },
-    {
-      "Version": "3312d52",
-      "Date": "2026-10-06T21:30:06-03:00",
-      "Changes": [
-        "fix: harden DepHub loader, game lifecycle and regression checks"
-      ]
-    },
-    {
-      "Version": "930158a",
-      "Date": "2026-10-03T16:38:08-03:00",
-      "Changes": [
-        "chore: bump DepHub to 0.0.28"
       ]
     }
   ]
