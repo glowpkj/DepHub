@@ -15,7 +15,7 @@ do
         ctx:Provide("src/games/" .. case[3] .. ".lua", result)
         if case[3] == "rt3" then ctx.Responses["src/games/rt3.lua"]='local env=getgenv(); env.__DEPHUB.Runtime={Destroyed=false}; return true' end
         local frontend = {Destroy=function(self) self.Destroyed=true end}
-        ctx:Provide("library/init.lua", {new=function(options)
+        ctx:Provide("src/frontend/main.lua", {new=function(options)
             frontend.Options=options
             return frontend
         end})
@@ -24,11 +24,11 @@ do
         end})
         ctx.State.__DEPHUB_SOURCE_CACHE = {["src/core/updater.lua"]='error("stale updater")'}
         check(ctx:Run("DepHub.lua") == true, "loader succeeds for route " .. case[3])
-        check(ctx.State.__DEPHUB_LOADER_STATE.Frontend == "library-1", "successful loader marks current library session")
+        check(ctx.State.__DEPHUB_LOADER_STATE.Frontend == "library-linoria-1", "successful loader marks current library session")
         check(ctx.State.__DEPHUB.Frontend == frontend, "loader stores the new frontend")
         check(frontend.Options.Mode == (case[3] == "rt3" and "RT3" or case[3] == "bloxfruits" and "BloxFruits" or "Universal"), "loader passes the correct content mode")
         check(#ctx.Logs == 4, "loader emits four startup identity lines")
-        check(ctx.Logs[1] == "Iniciando loader v0.0.34" and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
+        check(ctx.Logs[1] == "Iniciando loader v0.0.35" and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
         check(ctx.Logs[3] == "PlaceId: " .. case[1] and ctx.Logs[4] == "GameId: " .. case[2], "game identity logs preserved")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
@@ -47,7 +47,7 @@ do
     local backend = {Destroyed=false, Destroy=function(self) self.Destroyed=true end}
     libraryFailure.Responses["src/version.txt"] = "0.0.3"
     libraryFailure:Provide("src/games/universal.lua", backend)
-    libraryFailure:Provide("library/init.lua", false)
+    libraryFailure:Provide("src/frontend/main.lua", false)
     check(libraryFailure:Run("DepHub.lua") == false and backend.Destroyed, "invalid library fails loader and cleans initialized backend")
     local ctx = sandbox()
     local removed = {}
@@ -60,7 +60,7 @@ do
     ctx.State.__DEPHUB_LOADER_STATE = {status="success"}
     ctx.Responses["src/version.txt"] = "0.0.3"
     ctx:Provide("src/games/universal.lua", {})
-    ctx:Provide("library/init.lua", {new=function() return {} end})
+    ctx:Provide("src/frontend/main.lua", {new=function() return {} end})
     check(ctx:Run("DepHub.lua") == true, "old UI session migrates without duplicate-success guard blocking it")
     check(removed.Loading and removed.Frontend and removed.Universal and removed.Updater and removed.Runtime and removed.Window, "migration destroys legacy handles despite missing Blox Fruits keys")
     check(ctx.State.__DEPHUB_UI_MODULES == nil and ctx.State.__DEPHUB_UI_LOADING == nil and ctx.State.__DEPHUB.Window == nil, "legacy frontend handles cleared")

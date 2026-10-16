@@ -69,21 +69,21 @@ function validateFeatureDirectory(gameId, directory, requiredFiles) {
 }
 
 validateFeatureDirectory('6931042565', 'src/games/features/volleyballlegends', [
-  'src/core/updater.lua', 'library/compact.lua', 'src/games/volleyballlegends.lua'
+  'src/core/updater.lua', 'library/linoria.lua', 'src/games/volleyballlegends.lua'
 ]);
 validateFeatureDirectory('3808081382', 'src/games/features/tsb', [
   'src/core/updater.lua',
-  'library/compact.lua',
+  'library/linoria.lua',
   'src/games/tsb.lua'
 ]);
 validateFeatureDirectory('66654135', 'src/games/features/mm2', [
   'src/core/updater.lua',
-  'library/compact.lua',
+  'library/linoria.lua',
   'src/games/mm2.lua',
   'src/games/features/mm2/playerteleport.lua'
 ]);
 validateFeatureDirectory('4658598196', 'src/games/features/aotr', [
-  'src/core/updater.lua', 'library/compact.lua', 'src/games/aotr.lua'
+  'src/core/updater.lua', 'library/linoria.lua', 'src/games/aotr.lua'
 ]);
 
 if (!loader.includes('["142823291"]') || !loader.includes('["66654135"]') || !loader.includes('src/games/mm2.lua')) {
@@ -94,9 +94,28 @@ if (exists('src/games/features/mm2/evade.lua')) {
   fail('Retired MM2 evade module still exists');
 }
 
-const compact = read('library/compact.lua');
-for (const api of ['AddSection', 'AddToggle', 'AddFeature', 'AddSlider', 'AddButton', 'AddStatus']) {
-  if (!compact.includes(api)) fail(`Shared compact library missing API: ${api}`);
+const native = read('library/linoria.lua');
+for (const api of ['CreateWindow', 'AddTab', 'AddToggle', 'AddSlider', 'AddDropdown', 'Unload']) {
+  if (!native.includes(api)) fail(`Linoria missing API: ${api}`);
+}
+for (const legacy of ['compact.lua', 'init.lua', 'components.lua', 'theme.lua', 'utils.lua', 'window.lua']) {
+  if (exists('library/' + legacy)) fail('Retired UI still exists: ' + legacy);
+}
+for (const game of Object.values(manifestConfig)) {
+  for (const required of ['library/linoria.lua', 'src/frontend/linoria.lua']) {
+    if (!game.files.includes(required)) fail(`Game missing shared Linoria dependency: ${required}`);
+  }
+}
+function luaFiles(directory) {
+  return fs.readdirSync(directory, {withFileTypes:true}).flatMap(entry => {
+    const file=path.join(directory,entry.name);
+    return entry.isDirectory()?luaFiles(file):file.endsWith('.lua')?[file]:[];
+  });
+}
+for (const file of [path.join(root,'DepHub.lua'), ...luaFiles(path.join(root,'src'))]) {
+  const source=fs.readFileSync(file,'utf8');
+  if (/library\/(compact|init|theme|components|window|utils|content)/.test(source)) fail('Retired UI dependency in ' + file);
+  if ((file.endsWith('frontend.lua') || file.includes(path.join('src','frontend'))) && /Instance\.new\(/.test(source)) fail('Custom UI rendering outside Linoria: ' + file);
 }
 
 const legacyUi = path.join(root, 'src/ui');

@@ -1,13 +1,28 @@
 # DepHub
 
-Framework client-side Luau com loader, backends separados por jogo e biblioteca própria de UI.
+Framework client-side Luau com loader, backends separados por jogo e frontend exclusivamente Linoria.
+
+## Frontend Linoria — 0.0.35
+
+Todos os modos usam a fonte de [Linoria solicitada](https://github.com/ro0ti/Roblox-Scripting-UI/tree/main/Linoria%20Lib): Universal, Blox Fruits, RT3, Noob Piece, MM2, TSB, Violence District, Volleyball Legends e AOT:R. Os componentes, janela, biblioteca compacta e UI própria de Violence District foram removidos. As definições dos controles ficam em src/frontend e nos frontends dos jogos, mas a renderização é exclusivamente Linoria.
+
+RightControl abre/fecha o menu; a tecla pode ser escolhida no seletor nativo. O botão Descarregar DepHub encerra interface e backend. Não há carregamento automático de configs nem ativação de recursos durante a montagem dos controles.
+
+A cópia do diretório indicado é antiga e usa CreateWindow com título string, não a tabela do exemplo. Ela recebeu Unload/OnUnload, rastreamento de conexões/tarefas, correções de callbacks e colunas com rolagem. Não importa ThemeManager ou SaveManager externos. Consulte LINORIA_MIGRATION_REPORT.md para origem e limitações.
+
+Teste a branch de desenvolvimento com um único loader:
+
+```lua
+loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/codex/aotr-integration/DepHub.lua?ui=0.0.35"))("codex/aotr-integration")
+```
 
 ## Estrutura
 
 - `DepHub.lua`: seleção por PlaceId/GameId, carregamento, estado da sessão e cleanup.
 - `src/core`: serviços compartilhados, movimento com owner/prioridade, dashboard e updater.
 - `src/games`: APIs dos backends; `features/<jogo>` contém as implementações específicas.
-- `library`: componentes, janela com HOME fixa, adaptadores de conteúdo e biblioteca compacta.
+- `library/linoria.lua`: fonte Linoria indicada pelo usuário, com correções de ciclo de vida.
+- `src/frontend`: integração Linoria e definições de conteúdo dos jogos; sem renderizador próprio.
 - `.github/dephub-games.json`: arquivos que participam do hash de atualização de cada jogo.
 - `diagnostics/compatibility.lua`: diagnóstico somente de leitura das dependências já usadas pelos backends.
 
@@ -65,13 +80,13 @@ Teste em sessão controlada: habilite o único toggle, segure M1 enquanto outro 
 API oficial de input: https://create.roblox.com/docs/reference/engine/classes/ContextActionService
 # Volleyball Legends — DepHub 0.0.31
 
-Implementação visual em Luau, integrada ao loader DepHub e à biblioteca compacta existente. Não há Auto Receive, Auto Block, chamadas de remotes ou automação de jogo neste módulo. Backend 0.0.1. Ball ESP, Trajectory Predictor e Debug começam desligados.
+Implementação visual em Luau, integrada ao loader DepHub e ao frontend Linoria atual. Não há Auto Receive, Auto Block, chamadas de remotes ou automação de jogo neste módulo. Backend 0.0.1. Ball ESP, Trajectory Predictor e Debug começam desligados.
 
 ## Arquivos
 
 Novos: backend `src/games/volleyballlegends.lua`; módulos `src/games/features/volleyballlegends/ball-detector.lua`, `ball-esp.lua`, `trajectory.lua` e `frontend.lua`; nota `src/games/updates/6931042565.txt`; testes `tests/volleyball_tests.luau`.
 
-Integração: `DepHub.lua`, `src/version.txt`, `.github/dephub-games.json`, `src/update-manifest.json`, `diagnostics/compatibility.lua`, `README.md` e infraestrutura de testes. A UI é `library/compact.lua`, reutilizada sem alterações.
+Integração: `DepHub.lua`, `src/version.txt`, `.github/dephub-games.json`, `src/update-manifest.json`, `diagnostics/compatibility.lua`, `README.md` e infraestrutura de testes. A UI atual é `library/linoria.lua`, conectada por `src/frontend/linoria.lua`.
 
 O PlaceId 73956553001240 foi confirmado na página oficial do jogo; a API pública do Roblox confirmou GameId 6931042565. O sufixo de CLIENT_BALL nunca é fixado no código de produção.
 

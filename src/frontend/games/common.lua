@@ -13,6 +13,8 @@ function Common.mount(window, backend, environment)
     })
     window:CreateButton(interface, {Title="ESCONDER INTERFACE", Callback=function() window:SetOpen(false) end})
 
+    window:CreateButton(interface, {Title="DESCARREGAR DEPHUB", Callback=function() window:Destroy() end})
+
     local configuration = window:CreateSection(page, "CONFIGURAÇÃO")
     if backend and type(backend.SaveConfig)=="function" then
         window:CreateButton(configuration, {Title="SALVAR CONFIGURAÇÃO", Callback=function()

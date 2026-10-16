@@ -4,13 +4,13 @@ if type(backend)~="table" then return false end
 local previous=env.__DEPHUB_AOTR_FRONTEND
 if type(previous)=="table" and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous,true) end
 local base=env.__DEPHUB.SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local ok,source=pcall(function() return game:HttpGet(base.."library/compact.lua") end)
+local ok,source=pcall(function() return game:HttpGet(base.."src/frontend/linoria.lua?ui=0.1.0") end)
 if not ok then return false end
 local okCompile,compiled=pcall(loadstring,source)
 if not okCompile or type(compiled)~="function" then return false end
 local okLibrary,Library=pcall(compiled)
 if not okLibrary or type(Library)~="table" or type(Library.new)~="function" then return false end
-local UI=Library.new({Id="AOTR",Title="DEPHUB",Subtitle="ATTACK ON TITAN: REVOLUTION",Accent=Color3.fromRGB(111,238,190),Width=310,Height=490,Open=true})
+local UI=Library.new({Backend=backend,Id="AOTR",Title="DEPHUB",Subtitle="ATTACK ON TITAN: REVOLUTION",Accent=Color3.fromRGB(111,238,190),Width=310,Height=490,Open=true})
 UI:AddSection("TITANS")
 UI:AddToggle("Titan ESP",backend:GetToggle("TitanESP"),function(v) return backend:SetToggle("TitanESP",v) end)
 UI:AddToggle("Nape Visible",backend:GetToggle("NapeVisible"),function(v) return backend:SetToggle("NapeVisible",v) end)
@@ -48,7 +48,7 @@ function UI:Destroy(preserveBackend)
  alive=false
  if statusTask then pcall(task.cancel,statusTask);statusTask=nil end
  if not preserveBackend then backend:Destroy() end
- pcall(destroy,self)
+ pcall(destroy,self,preserveBackend)
  if env.__DEPHUB_AOTR_FRONTEND==self then env.__DEPHUB_AOTR_FRONTEND=nil end
  if env.__DEPHUB and env.__DEPHUB.AOTRUI==self then env.__DEPHUB.AOTRUI=nil end
 end

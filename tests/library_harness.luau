@@ -29,16 +29,19 @@ function Color3.fromRGB(r,g,b)return Color3.new(r/255,g/255,b/255)end
 local originalTypeof=typeof
 local function typeof(value)if type(value)=="table"and value.__color then return"Color3"elseif type(value)=="table"and value.__enum then return"EnumItem"end;return originalTypeof(value)end
 local TweenInfo={new=function()return{}end}
-local task={spawn=function(fn,...)return fn(...)end,defer=function(fn,...)return fn(...)end,delay=function()end,cancel=function()end,wait=function()end}
-local events={InputBegan=true,InputChanged=true,InputEnded=true,MouseEnter=true,MouseLeave=true,MouseButton1Click=true,FocusLost=true,AncestryChanged=true,Changed=true,OnTeleport=true}
+local queued={}
+local task={spawn=function(fn,...) local thread=type(fn)=="thread" and fn or coroutine.create(fn);queued[#queued+1]=thread;return thread end,defer=function(fn,...)return fn(...)end,delay=function()end,cancel=function(thread) if type(thread)=="thread" and coroutine.status(thread)~="dead" then coroutine.close(thread) end end,wait=function()coroutine.yield()end}
+local events={InputBegan=true,InputChanged=true,InputEnded=true,MouseEnter=true,MouseLeave=true,MouseButton1Click=true,FocusLost=true,AncestryChanged=true,Changed=true,OnTeleport=true,DescendantRemoving=true,Destroying=true}
 local gui={Frame=true,ScrollingFrame=true,TextLabel=true,TextButton=true,TextBox=true}
 local methods,meta={},{}
 function meta:__index(key)
     if methods[key]then return methods[key]end
     if key=="AbsoluteSize"then return self._props.TestSize or Vector2.new(410,62)end
+    if key=="AbsoluteContentSize"then return Vector2.new(200,400)end
     if key=="AbsolutePosition"then return self._props.TestPosition or Vector2.new(0,0)end
     if events[key]then self._signals[key]=self._signals[key]or signal();return self._signals[key]end
-    return self._props[key]
+    if self._props[key]~=nil then return self._props[key] end
+    for _,child in ipairs(self._children)do if child.Name==key then return child end end
 end
 function meta:__newindex(key,value)
     if key=="Parent"then local old=self._props.Parent;if old then local index=table.find(old._children,self);if index then table.remove(old._children,index)end end;self._props.Parent=value;if value then value._children[#value._children+1]=self end
@@ -51,7 +54,15 @@ function methods:FindFirstChild(name)for _,child in ipairs(self._children)do if 
 function methods:FindFirstChildOfClass(class)for _,child in ipairs(self._children)do if child:IsA(class)then return child end end end
 function methods:WaitForChild(name)return assert(self:FindFirstChild(name),"Missing "..name)end
 function methods:GetPropertyChangedSignal(key)self._signals[key]=self._signals[key]or signal();return self._signals[key]end
-function methods:Destroy()for _,child in ipairs(self:GetChildren())do child:Destroy()end;for _,event in pairs(self._signals)do for _,connection in ipairs(event.connections)do connection:Disconnect()end end;self.Parent=nil end
+function methods:TweenSize(value)self.Size=value end
+function methods:TweenPosition(value)self.Position=value end
+function methods:Clone()
+    local props=table.clone(self._props);props.Parent=nil
+    local result=setmetatable({_props=props,_children={},_signals={}},meta)
+    for _,child in ipairs(self:GetChildren())do local cloned=child:Clone();cloned.Parent=result end
+    return result
+end
+function methods:Destroy()if self._signals.Destroying then self._signals.Destroying:Fire()end;for _,child in ipairs(self:GetChildren())do child:Destroy()end;for _,event in pairs(self._signals)do for _,connection in ipairs(event.connections)do connection:Disconnect()end end;self.Parent=nil end
 local Instance={}
 function Instance.new(class)return setmetatable({_props={ClassName=class,Name=class,Visible=true,Size=UDim2.fromOffset(0,0),Position=UDim2.fromOffset(0,0),Text=""},_children={},_signals={}},meta)end
 local player=Instance.new("Player");player.Name,player.CameraMaxZoomDistance="Tester",128
@@ -62,72 +73,134 @@ local input=Instance.new("UserInputService")
 local players={LocalPlayer=player,PlayerAdded=signal()}
 local tween={}
 function tween:Create(object,_,properties)local completed=signal();return{Completed=completed,Play=function()for key,value in pairs(properties)do object[key]=value end;completed:Fire()end,Cancel=function()end}end
-local services={Players=players,Workspace=workspace,UserInputService=input,TweenService=tween}
+local core=Instance.new("CoreGui")
+local run={RenderStepped=signal(),Heartbeat=signal()}
+function run.RenderStepped:Wait()coroutine.yield()end
+function player:GetMouse()return {X=0,Y=0,Icon=""}end
+function input:IsMouseButtonPressed()return false end
+function input:IsKeyDown()return false end
+local textService={GetTextSize=function(_,text,size) return Vector2.new(#text*(size or 14)/2,20) end}
+local services={Players=players,Workspace=workspace,UserInputService=input,TweenService=tween,CoreGui=core,RunService=run,TextService=textService}
 local state={}
 local game={JobId="job-test"}
 function game:GetService(name)return assert(services[name],name)end
 -- INSERT_SOURCES
 function game:HttpGet(url)local path=url:gsub("^https://raw.githubusercontent.com/glowpkj/DepHub/main/",""):gsub("%?.*$","");return assert(sources[path],path)end
-local sandbox=setmetatable({game=game,workspace=workspace,Instance=Instance,Enum=Enum,Vector2=Vector2,UDim=UDim,UDim2=UDim2,Color3=Color3,TweenInfo=TweenInfo,task=task,typeof=typeof,getgenv=function()return state end},{__index=getfenv(0)})
+function Color3.toHSV(c)
+    local max,min=math.max(c.R,c.G,c.B),math.min(c.R,c.G,c.B);local diff=max-min;local hue=0
+    if diff>0 then if max==c.R then hue=((c.G-c.B)/diff)%6 elseif max==c.G then hue=(c.B-c.R)/diff+2 else hue=(c.R-c.G)/diff+4 end;hue=hue/6 end
+    return hue,max==0 and 0 or diff/max,max
+end
+function Color3.fromHSV(h,s,v)
+    local k=h*6;local i=math.floor(k);local f=k-i;local p,q,t=v*(1-s),v*(1-f*s),v*(1-(1-f)*s)
+    local values={{v,t,p},{q,v,p},{p,v,t},{p,q,v},{t,p,v},{v,p,q}};local rgb=values[i%6+1];return Color3.new(unpack(rgb))
+end
+colorMeta.__index={ToHex=function(c)return string.format("%02X%02X%02X",math.floor(c.R*255+.5),math.floor(c.G*255+.5),math.floor(c.B*255+.5))end}
+local sequence={new=function(...)return {...}end}
+local logs={}
+local sandbox=setmetatable({ColorSequence=sequence,ColorSequenceKeypoint=sequence,NumberSequence=sequence,NumberSequenceKeypoint=sequence,print=function()end,warn=function(message)logs[#logs+1]=message end,game=game,workspace=workspace,Instance=Instance,Enum=Enum,Vector2=Vector2,UDim=UDim,UDim2=UDim2,Color3=Color3,TweenInfo=TweenInfo,task=task,typeof=typeof,getgenv=function()return state end},{__index=getfenv(0)})
 function sandbox.loadstring(source)local fn,err=loadstring(source);if fn then setfenv(fn,sandbox)end;return fn,err end
-local init=assert(sandbox.loadstring(sources["library/init.lua"]));local Library=init()
-
+local function module(path)return assert(sandbox.loadstring(sources[path]))()end
+local Adapter=module("src/frontend/linoria.lua")
+local Main=module("src/frontend/main.lua")
+local mountCalls=0
 local universal={Values={WalkSpeed=16,JumpPower=50,FlySpeed=70,ESPRange=2000,ESPTextSize=14,ESPColor=Color3.fromRGB(90,170,255),AimbotFOV=180,AimPart="Head",ChatMessage="Hi",ChatInterval=5},Toggles={WalkSpeed=false,Jump=false,Fly=false,Noclip=false,ESP=false,ESPNames=true,ESPHealth=true,ESPDistance=true,Chams=true,TeamColors=true,TeamCheck=false,Fullbright=false,InfiniteZoom=false,Aimbot=false,ChatLoop=false}}
-for _,name in ipairs({"ApplyMovement","SetWalkSpeedEnabled","SetJumpEnabled","SetFly","SetNoclip","CreateTeleportTool","SetESP","SetFullbright","SetInfiniteZoom","SetChatLoop","Rejoin","ServerHop","RunDex"})do universal[name]=function()end end
-function universal:SendChat()return true end
-local window=Library.new({Mode="Universal",Backend=universal,Subtitle="UNIVERSAL"})
-check(window.ScreenGui.Parent==playerGui and window.CurrentPage=="HOME","library creates and opens its window")
-for _,name in ipairs({"MAIN","VISUAL","AIM","CHAT","SERVER","CONFIG"})do check(window.Pages[name]~=nil,"Universal content mounts "..name)end
-check(#window.Responsive>20,"real Universal controls are registered")
-local custom=window:CreateTab("TEST","TEST");local section=window:CreateSection(custom,"COMPONENTS")
-local calls=0;local toggle=window:CreateToggle(section,{Title="Toggle",Default=false,Callback=function()calls+=1 end});toggle:SetValue(true);check(toggle:GetValue()and calls==1,"toggle setter and callback")
-toggle:SetValue(false,true);check(calls==1,"toggle silent setter")
-local slider=window:CreateSlider(section,{Title="Slider",Min=10,Max=20,Default=15,Callback=function()end});slider:SetValue(99,true);check(slider:GetValue()==20,"slider clamps values")
-local dropdown=window:CreateDropdown(section,{Title="Dropdown",Values={"A","B"},Default="A",Callback=function()end});check(dropdown:SetValue("B",true)and dropdown:GetValue()=="B","dropdown selects valid value")
-dropdown:SetValues({"X","Y","Z"},"Y",true);check(#dropdown:GetValues()==3 and dropdown:GetValue()=="Y","dropdown rebuilds dependent values")
-dropdown.Button.MouseButton1Click:Fire();check(dropdown.Menu.Visible and dropdown.Instance.Size.Y.Offset>70,"dropdown expands inside layout")
-local box=window:CreateInput(section,{Title="Input",Default="A",Callback=function()end});box:SetValue("B",true);check(box:GetValue()=="B","input setter")
-local colorCalls=0;local color=window:CreateColor(section,{Title="Color",Default=Color3.fromRGB(1,2,3),Callback=function()colorCalls+=1 end});color.Boxes[1].Text="12";color.Boxes[2].Text="34";color.Boxes[3].Text="56";color.Button.MouseButton1Click:Fire();check(math.abs(color:GetValue().G-34/255)<0.001 and colorCalls==1,"RGB color editor applies arbitrary color")
-window:OpenPage("TEST");check(custom.Instance.Visible and not window.Pages.HOME.Instance.Visible,"tab navigation switches pages")
-camera.ViewportSize=Vector2.new(390,844);check(window.Compact and window.MainFrame.Size.X.Offset==370,"phone viewport enables compact layout")
-check(box.Instance.Size.Y.Offset==112 and box.Box.Size.X.Scale==1,"compact input reflows below label")
-window:SetOpen(false);window.ToggleButton.MouseButton1Click:Fire();check(window:IsOpen(),"floating button reopens window")
-input.InputBegan:Fire({KeyCode=Enum.KeyCode.RightControl,UserInputType=Enum.UserInputType.Keyboard},false);check(not window:IsOpen(),"configured keyboard shortcut toggles window");window:SetOpen(true)
-window.ToggleButton.TestSize=Vector2.new(56,56)
-window.ToggleButton.InputBegan:Fire({UserInputType=Enum.UserInputType.MouseButton1,Position=Vector2.new(20,20)})
-input.InputChanged:Fire({UserInputType=Enum.UserInputType.MouseMovement,Position=Vector2.new(100,90)})
-input.InputEnded:Fire({UserInputType=Enum.UserInputType.MouseButton1,Position=Vector2.new(100,90)})
-check(window.ToggleButton.Position.X.Offset>=8 and window.SuppressToggleClick,"floating button drags without toggling window")
-window:SafeCall(function()error("expected")end);check(#window.Notifications:GetChildren()>1,"callback errors become notifications")
+for _,name in ipairs({"ApplyMovement","SetWalkSpeedEnabled","SetJumpEnabled","SetFly","SetNoclip","CreateTeleportTool","SetESP","SetFullbright","SetInfiniteZoom","SetChatLoop","Rejoin","ServerHop","RunDex"})do universal[name]=function()mountCalls+=1 end end
+function universal:SendChat()mountCalls+=1;return true end
+function universal:Destroy()self.Destroyed=true end
+local window=Main.new({Mode="Universal",Backend=universal,Title="DEPHUB",Subtitle="UNIVERSAL"})
+check(window.Library.ScreenGui.Parent==playerGui and window:IsOpen(),"actual Linoria mounts visible under PlayerGui")
+check(mountCalls==0,"registering OnChanged does not start backend actions")
+for _,name in ipairs({"MAIN","VISUAL","AIM","CHAT","SERVER","CONFIG"})do check(window.Pages[name]~=nil,"Universal preserves tab "..name)end
+check(window.Library.CreateWindow~=nil and sources["library/compact.lua"]==nil,"Linoria is the only renderer")
+local section=window:CreateSection(window:CreateTab("TEST","Test"),"Controls")
+local calls=0
+local toggle=window:CreateToggle(section,{Title="Toggle",Default=false,Callback=function()calls+=1 end})
+check(calls==0,"native initial callback is suppressed")
+toggle:SetValue(true);check(calls==1 and toggle:GetValue(),"native toggle reaches backend once")
+toggle:SetValue(false,true);check(calls==1 and not toggle:GetValue(),"silent toggle updates native UI without callback")
+local rejected=window:CreateToggle(section,{Title="Rejected",Default=false,Callback=function()return false end})
+check(not rejected:SetValue(true) and rejected:GetValue()==false,"backend rejection rolls native toggle back")
+local failed=window:CreateToggle(section,{Title="Failed",Default=false,Callback=function()error("expected failure")end})
+check(not failed:SetValue(true) and not failed:GetValue() and not window.Destroyed,"callback exception does not destroy UI")
+local slider=window:CreateSlider(section,{Title="Slider",Min=0,Max=2,Default=1,Step=0.1,Callback=function()calls+=1 end})
+slider:SetValue(9,true);check(slider:GetValue()==2 and calls==1,"native slider clamps and respects silent updates")
+check(not slider:SetValue(0/0) and not slider:SetValue(math.huge),"slider rejects NaN and infinity")
+local dropdown=window:CreateDropdown(section,{Title="Dropdown",Values={"A","B"},Default="A",Callback=function()calls+=1 end})
+check(dropdown:GetValue()=="A","native dropdown selects default by index")
+dropdown:SetValue("B");check(dropdown:GetValue()=="B" and calls==2,"native dropdown invokes updated callback once")
+dropdown:SetValues({"X","Y"},"Y",true)
+check(dropdown:GetValue()=="Y" and #dropdown:GetValues()==2 and calls==2,"dependent dropdown rebuild is silent and preserves selected value")
+check(not dropdown:SetValue("missing"),"dropdown rejects missing values")
+local inputControl=window:CreateInput(section,{Title="Input",Default="old",Callback=function(value)check(value=="new","input callback observes new value")end})
+inputControl:SetValue("new");check(inputControl:GetValue()=="new","native input uses corrected value ordering")
+local colors=0
+local color=window:CreateColor(section,{Title="Color",Default=Color3.fromRGB(1,2,3),Callback=function()colors+=1 end})
+color:SetValue(Color3.fromRGB(12,34,56));check(colors==1 and math.abs(color:GetValue().G-34/255)<0.001,"native color picker calls once with updated RGB")
+local status=window:AddStatus("STATUS");status:Set("line one\nline two\nline three")
+check(status.Raw.TextLabel.Text:find("line three",1,true)~=nil and status.Raw.TextLabel.Size.Y.Offset>=45,"status uses multiline native Linoria label")
+window:SetOpen(false);check(not window:IsOpen(),"window hides through native holder")
+window:SetOpen(true);check(window:IsOpen(),"window reopens through native holder")
+local menuKey
+for _,option in pairs(window.Library.Options)do if option.Type=="KeyPicker"then menuKey=option;break end end
+check(menuKey~=nil,"menu uses native Linoria key picker")
+menuKey:DoClick();check(not window:IsOpen(),"native menu key action hides window")
+menuKey:DoClick();check(window:IsOpen(),"native menu key action reopens window")
+local conns=table.clone(window.Library.Connections)
+local threads={};for thread in pairs(window.Library.Threads)do threads[#threads+1]=thread end
+window:Destroy();window:Destroy()
+check(window.Destroyed and universal.Destroyed and state.__DEPHUB_LINORIA==nil,"unload is idempotent and destroys backend")
+check(window.Library.ScreenGui.Parent==nil and next(window.Library.Registry)==nil,"unload removes Linoria gui and registry")
+for _,connection in ipairs(conns)do check(not connection.Connected,"unload disconnects Linoria-owned subscription")end
+for _,thread in ipairs(threads)do check(coroutine.status(thread)=="dead","unload cancels queued native tasks")end
+check(not toggle:SetValue(true) and not status:Set("late"),"late updates after unload are rejected")
 
-local old=window
-local fruitVFX={GetFruits=function()return{"Rumble"}end,GetColors=function()return{"Original","Roxo"}end,Apply=function()return true,"Applied"end,Restore=function()return true,"Restored"end}
+local fruitVFX={GetFruits=function()return{"Rumble","Dough"}end,GetColors=function(_,fruit)return fruit=="Rumble" and {"Original","Roxo"}or{"Original","Azul"}end,Apply=function()return true,"requested"end,Restore=function()return true,"restored"end}
 local blox={Features={FruitVFX=fruitVFX},Toggles={},Values={}}
 function blox:GetDashLength()return 1 end;function blox:GetToggle()return false end;function blox:SetToggle()return true end;function blox:SetDashLength()return true end;function blox:GetPreferredTeam()return"Pirates"end;function blox:SetPreferredTeam()return true end;function blox:SaveConfig()return true end
-window=Library.new({Mode="BloxFruits",Backend=blox,Subtitle="BLOX FRUITS"})
-check(old.Destroyed and window.Pages.MAIN and window.Pages.VISUAL and window.Pages.CONFIG,"Blox Fruits replaces previous window and mounts content")
+window=Main.new({Mode="BloxFruits",Backend=blox})
+check(window.Pages.MAIN and window.Pages.VISUAL and window.Pages.CONFIG,"Blox Fruits mounts on Linoria")
+window.Controls["FRUTA COMPATÍVEL"]:SetValue("Dough")
+check(window.Controls["COR / SKIN"]:GetValues()[2]=="Azul","Blox Fruits keeps dependent fruit/color controls")
+window:Destroy()
 local runtime={Features={},GetSnapshot=function()return{Health="Healthy",Dashboard={Ping=20,FPS=60,ScriptVersion="1"}}end}
-for _,name in ipairs({"AutoFarm","InstantCook","AutoDrop","AutoFarmFriends"})do runtime.Features[name]={Enabled=false,Toggle=function()end}end
-old=window;window=Library.new({Mode="RT3",Backend=runtime,Subtitle="RT3"})
-check(old.Destroyed and window.Pages.MAIN and window.Pages.STATUS and window.Pages.CONFIG,"RT3 replaces previous window and mounts content")
-local connections=table.clone(window.Connections);window:Destroy();check(window.Destroyed and window.ScreenGui==nil and state.__DEPHUB_FRONTEND==nil,"destroy releases UI and global handle")
-for _,connection in ipairs(connections)do check(not connection.Connected,"destroy disconnects tracked listener")end
-local Compact=assert(sandbox.loadstring(sources["library/compact.lua"]))()
-local compact=Compact.new({Id="Regression",Title="DEPHUB"})
-local oldCamera=camera
-local newCamera=Instance.new("Camera");newCamera.ViewportSize=Vector2.new(500,500)
-workspace.CurrentCamera=newCamera
-local newSignal=newCamera:GetPropertyChangedSignal("ViewportSize")
-local connected=0
-for _,connection in ipairs(newSignal.connections)do if connection.Connected then connected+=1 end end
-check(connected==1,"compact UI binds replacement camera viewport")
-local oldSignal=oldCamera:GetPropertyChangedSignal("ViewportSize")
-connected=0
-for _,connection in ipairs(oldSignal.connections)do if connection.Connected then connected+=1 end end
-check(connected==0,"compact UI releases old camera viewport listener")
-compact:SetOpen(false)
-check(not compact.Open,"compact window closes with synchronous tween completion")
-compact:Destroy()
-for _,connection in ipairs(newSignal.connections)do check(not connection.Connected,"compact cleanup releases camera viewport listener")end
-print(string.format("PASS %d library checks",passed))
+for _,name in ipairs({"AutoFarm","InstantCook","AutoDrop","AutoFarmFriends"})do runtime.Features[name]={Enabled=false,Toggle=function()mountCalls+=1 end}end
+window=Main.new({Mode="RT3",Backend=runtime})
+check(window.Pages.MAIN and window.Pages.STATUS and window.Pages.CONFIG,"RT3 preserves automation and status controls on Linoria")
+window:Destroy()
+local noob={}
+for _,name in ipairs({"GetIslandNames","GetEnemyTypes","GetTeams"})do noob[name]=function()return{"A","B"}end end
+noob.GetToggle=function()return false end
+noob.GetValue=function(_,name)if name=="AutoChestDelay"then return .2 elseif name=="WeaponCategory"then return"Fists"else return"A"end end
+noob.GetSelectedEnemyOption=function()return"A"end
+noob.SetSelectedIsland=function()end
+noob.ConnectIslandAvailabilityChanged=function(self,fn)self.Listener=fn;self.Event=signal();self.Connection=self.Event:Connect(fn);return self.Connection end
+window=Main.new({Mode="NoobPiece",Backend=noob})
+check(window.Pages.ESP and window.Pages.FARM and window.Pages.CONFIG,"Noob Piece preserves game tabs on Linoria")
+noob.Listener({"B"});check(window.Controls.ILHA:GetValue()=="B","Noob Piece updates island dropdown from backend signal")
+window:Destroy()
+check(not noob.Connection.Connected,"frontend unload disconnects dynamic backend island listener")
 
+for _,gameCase in ipairs({{"tsb","TSB","__DEPHUB_TSB_FRONTEND"},{"volleyballlegends","VolleyballLegends","__DEPHUB_VOLLEYBALL_FRONTEND"},{"mm2","MM2","__DEPHUB_MM2_FRONTEND"},{"violencedistrict","ViolenceDistrict","__DEPHUB_VD_FRONTEND"},{"aotr","AOTR","__DEPHUB_AOTR_FRONTEND"}})do
+    local backend={Values={NapeMultiplier=1},Destroyed=false}
+    backend.GetToggle=function()return false end
+    backend.GetValue=function()return nil end
+    backend.GetStatus=function()return"Waiting: test"end
+    backend.Destroy=function(self)self.Destroyed=true end
+    state.__DEPHUB=state.__DEPHUB or {};state.__DEPHUB[gameCase[2]]=backend
+    local mounted=module("src/games/features/"..gameCase[1].."/frontend.lua")
+    check(type(mounted)=="table" and mounted.Library~=nil and mounted:IsOpen(),gameCase[2].." mounts actual Linoria frontend")
+    check(not backend.Destroyed,gameCase[2].." mounting does not destroy active backend")
+    local native=mounted.Library
+    native:Unload()
+    check(mounted.Destroyed and backend.Destroyed and state[gameCase[3]]==nil,gameCase[2].." native unload cleans backend and global handles")
+end
+
+local saved={external=true};state.Options=saved
+window=Adapter.new({Id="Reload",Title="DEPHUB"})
+local old=window
+window=Adapter.new({Id="Reload",Title="DEPHUB"})
+check(old.Destroyed and old.Library.Unloaded,"reloading replaces previous native Linoria session")
+window.Library.ScreenGui:Destroy()
+check(window.Destroyed and state.Options==saved,"external GUI destruction triggers cleanup and restores prior globals")
+print(string.format("PASS %d Linoria integration checks",passed))
