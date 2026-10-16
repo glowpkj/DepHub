@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.34"
+local VERSION = "0.0.35"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -94,6 +94,8 @@ if env[EXECUTED_KEY]
     and previousState.GameId == gameId
     and previousState.SourceRef == sourceRef
     and sessionHealthy() then
+    local frontend=env.__DEPHUB.Frontend
+    if type(frontend.SetOpen)=="function" then pcall(frontend.SetOpen,frontend,true) end
     return true
 end
 
@@ -268,39 +270,39 @@ elseif isNoobPiece then mode = "NoobPiece" backend = coreResult
 else mode = "BloxFruits" backend = coreResult end
 
 if isVolleyball then
-    env[STATE_KEY].Frontend = "volleyball-compact-1"
+    env[STATE_KEY].Frontend = "volleyball-linoria-1"
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend Volleyball invalido" or frontend) end
     env.__DEPHUB.VolleyballLegendsUI = frontend
     env.__DEPHUB.Frontend = frontend
 elseif isTSB then
-    env[STATE_KEY].Frontend = "tsb-compact-3"
+    env[STATE_KEY].Frontend = "tsb-linoria-1"
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend TSB invalido" or frontend) end
     env.__DEPHUB.TSBUI = frontend
     env.__DEPHUB.Frontend = frontend
 elseif isVD then
-    env[STATE_KEY].Frontend = "vd-compact-1"
+    env[STATE_KEY].Frontend = "vd-linoria-1"
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend Violence District invalido" or frontend) end
     env.__DEPHUB.ViolenceDistrictUI = frontend
     env.__DEPHUB.Frontend = frontend
 elseif isAOTR then
-    env[STATE_KEY].Frontend = "aotr-compact-1"
+    env[STATE_KEY].Frontend = "aotr-linoria-1"
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend AOTR invalido" or frontend) end
     env.__DEPHUB.AOTRUI = frontend
     env.__DEPHUB.Frontend = frontend
 elseif isMM2 then
-    env[STATE_KEY].Frontend = "mm2-compact-2"
+    env[STATE_KEY].Frontend = "mm2-linoria-1"
     local okFrontend, frontend = loadModule(target.Frontend, false)
     if not okFrontend or type(frontend) ~= "table" then return fail(okFrontend and "Frontend MM2 invalido" or frontend) end
     env.__DEPHUB.MM2UI = frontend
     env.__DEPHUB.Frontend = frontend
 else
-    env[STATE_KEY].Frontend = "library-1"
+    env[STATE_KEY].Frontend = "library-linoria-1"
     local subtitles = {Universal = "UNIVERSAL", BloxFruits = "BLOX FRUITS", RT3 = "RESTAURANT TYCOON 3", NoobPiece = "NOOB PIECE"}
-    local okLibrary, Library = loadModule("library/init.lua", false)
+    local okLibrary, Library = loadModule("src/frontend/main.lua", false)
     if not okLibrary or type(Library) ~= "table" or type(Library.new) ~= "function" then return fail(okLibrary and "Library invalida" or Library) end
     local okFrontend, frontend = pcall(Library.new, {Mode = mode, Backend = backend, Title = "DEPHUB", Subtitle = subtitles[mode]})
     if not okFrontend or type(frontend) ~= "table" then return fail(frontend) end

@@ -8,19 +8,19 @@ local env=type(getgenv)=="function" and getgenv() or _G
 local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local previous=env.__DEPHUB_MM2_FRONTEND
-if type(previous)=="table" and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
+if type(previous)=="table" and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous,true) end
 
 local Backend=env.__DEPHUB and env.__DEPHUB.MM2
 if type(Backend)~="table" then return false end
 
-local okSource,source=pcall(function() return game:HttpGet(BASE_URL.."library/compact.lua") end)
+local okSource,source=pcall(function() return game:HttpGet(BASE_URL.."src/frontend/linoria.lua?ui=0.1.0") end)
 if not okSource or type(source)~="string" or #source==0 then return false end
 local okCompile,chunk=pcall(loadstring,source)
 if not okCompile or type(chunk)~="function" then return false end
 local okLibrary,Library=pcall(chunk)
 if not okLibrary or type(Library)~="table" or type(Library.new)~="function" then return false end
 
-local UI=Library.new({
+local UI=Library.new({Backend=Backend,
     Id="MM2",
     Title="DEPHUB",
     Subtitle="MURDER MYSTERY 2",
@@ -98,11 +98,11 @@ statusConnection=RunService.Heartbeat:Connect(function(dt)
 end)
 
 local baseDestroy=UI.Destroy
-function UI:Destroy()
+function UI:Destroy(preserveBackend)
     if self.Destroyed then return end
     alive=false
     if statusConnection then pcall(statusConnection.Disconnect,statusConnection) statusConnection=nil end
-    pcall(baseDestroy,self)
+    pcall(baseDestroy,self,preserveBackend)
     if env.__DEPHUB_MM2_FRONTEND==self then env.__DEPHUB_MM2_FRONTEND=nil end
     if env.__DEPHUB and env.__DEPHUB.MM2UI==self then env.__DEPHUB.MM2UI=nil end
 end

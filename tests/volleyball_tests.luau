@@ -34,7 +34,7 @@ do
     ctx.State.__DEPHUB_SOURCE_REF="stale-ref"
     ctx.Responses["src/version.txt"]="0.0.31"
     ctx:Provide("src/games/universal.lua",{})
-    ctx:Provide("library/init.lua",{new=function() return {} end})
+    ctx:Provide("src/frontend/main.lua",{new=function() return {} end})
     check(assert(ctx.Env.loadstring(sources["DepHub.lua"]))("main")==true,"DepHub one-line loader accepts source revision as a chunk argument")
     check(ctx.State.__DEPHUB.SourceBaseURL=="https://raw.githubusercontent.com/glowpkj/DepHub/main/" and ctx.State.__DEPHUB_SOURCE_REF=="stale-ref","DepHub explicit loader revision overrides stale global without mutating it")
 end
@@ -164,7 +164,7 @@ do
     local ui={Destroyed=false,Toggles={}}
     function ui:AddToggle(name,initial,fn) self.Toggles[#self.Toggles+1]={Name=name,Initial=initial,Fn=fn} end
     function ui:Destroy() self.Destroyed=true end
-    ctx:Provide("library/compact.lua",{new=function() return ui end})
+    ctx:Provide("src/frontend/linoria.lua",{new=function() return ui end})
     check(ctx:Run("src/games/features/volleyballlegends/frontend.lua")==ui and #ui.Toggles==3,"Volleyball frontend uses shared UI for two visual toggles and debug")
     ui:Destroy()
     check(ctx.State.__DEPHUB_VOLLEYBALL_FRONTEND==nil,"Volleyball UI teardown clears its global handle")

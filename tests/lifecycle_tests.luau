@@ -4,7 +4,7 @@ do
     local backend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
     local frontend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
     ctx:Provide("src/games/universal.lua",backend)
-    ctx:Provide("library/init.lua",{new=function() frontend.Destroyed=false; backend.Destroyed=false; return frontend end})
+    ctx:Provide("src/frontend/main.lua",{new=function() frontend.Destroyed=false; backend.Destroyed=false; return frontend end})
     local updaterCreations=0
     ctx:Provide("src/core/updater.lua",{new=function() updaterCreations+=1; return {Start=function() end} end})
     check(ctx:Run("DepHub.lua")==true,"initial loader session starts")

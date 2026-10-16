@@ -1,3 +1,5 @@
+> Nota de frontend 0.0.35: AOT:R agora usa exclusivamente Linoria. As referências à interface compacta abaixo descrevem a revisão anterior. O backend AOTR 0.1.0 permanece preservado. Veja LINORIA_MIGRATION_REPORT.md e use o loader da versão 0.0.35 para testar a interface atual.
+
 # DepHub — AOT:R: revisão para testes individuais
 
 Data: 15/10/2026. Branch: `codex/aotr-integration`.
@@ -125,7 +127,7 @@ Esses testes não verificam física ou protocolo real do servidor. A abertura in
 ## Loader exato da branch publicada
 
 ```lua
-loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/codex/aotr-integration/DepHub.lua?aotr=0.0.34"))("codex/aotr-integration")
+loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/codex/aotr-integration/DepHub.lua?ui=0.0.35"))("codex/aotr-integration")
 ```
 
 O parâmetro evita reutilizar o loader antigo; o argumento fixa a mesma branch para os módulos. Testar sem executar o Tekkit em paralelo. Esta entrega atualiza apenas a branch de desenvolvimento e não faz merge em main.

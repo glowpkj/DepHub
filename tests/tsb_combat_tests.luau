@@ -69,7 +69,7 @@ do
     local ui={Destroyed=false,Toggles={}}
     function ui:AddToggle(name,value,callback) self.Toggles[#self.Toggles+1]={Name=name,Value=value,Callback=callback} end
     function ui:Destroy() self.Destroyed=true end
-    ctx:Provide("library/compact.lua",{new=function() return ui end})
+    ctx:Provide("src/frontend/linoria.lua",{new=function() return ui end})
     check(ctx:Run("src/games/features/tsb/frontend.lua")==ui and #ui.Toggles==1,"TSB frontend exposes exactly one toggle and no extra controls")
     check(ui.Toggles[1].Name=="Auto Block","TSB single toggle is Auto Block")
     check(ui.Toggles[1].Callback(true) and feature.Enabled and feature.M1 and feature.Dash and feature.Skill,"TSB single toggle enables all existing block detectors")

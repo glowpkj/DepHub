@@ -49,7 +49,8 @@ function Content.mount(window,backend)
         end
     })
 
-    backend:ConnectIslandAvailabilityChanged(function(values)
+    local islandConnection=backend:ConnectIslandAvailabilityChanged(function(values)
+        if window.Destroyed then return end
         local selected=backend:GetValue("SelectedIsland")
 
         if not table.find(values,selected) then
@@ -66,6 +67,7 @@ function Content.mount(window,backend)
 
         islandDropdown:SetValues(values,selected,true)
     end)
+    if islandConnection then window.Connections[#window.Connections+1]=islandConnection end
 
     local chestFarm=window:CreateSection(espPage,"AUTO BAU")
 

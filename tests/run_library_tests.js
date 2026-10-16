@@ -7,7 +7,7 @@ const luau=process.argv[2];
 if(!luau) throw new Error('Usage: node tests/run_library_tests.js /path/to/luau');
 function quote(value){let eq='=';while(value.includes(']'+eq+']'))eq+='=';return '['+eq+'['+value+']'+eq+']';}
 function files(dir){return fs.readdirSync(dir,{withFileTypes:true}).flatMap(entry=>{const file=path.join(dir,entry.name);return entry.isDirectory()?files(file):file.endsWith('.lua')?[file]:[];});}
-const paths=files(path.join(root,'library')).map(file=>path.relative(root,file).replaceAll('\\','/'));
+const paths=[...files(path.join(root,'library')), ...files(path.join(root,'src/frontend')), ...files(path.join(root,'src/games/features')).filter(file=>file.endsWith('frontend.lua'))].map(file=>path.relative(root,file).replaceAll('\\','/'));
 const sources='local sources={\n'+paths.map(file=>`[ ${quote(file)} ]=${quote(fs.readFileSync(path.join(root,file),'utf8'))},`).join('\n')+'\n}';
 const harness=fs.readFileSync(path.join(__dirname,'library_harness.luau'),'utf8').replace('-- INSERT_SOURCES',()=>sources);
 const temp=fs.mkdtempSync(path.join(os.tmpdir(),'dephub-library-test-'));const file=path.join(temp,'test.luau');
