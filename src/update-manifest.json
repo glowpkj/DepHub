@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-19T01:37:19.130Z",
-  "commit": "local",
+  "generatedAt": "2026-10-19T01:37:30.851501+00:00",
+  "commit": "d43145727af788c0e6c3711d837b1fada946eac3",
   "version": "0.0.37",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "c026b85c826e459b94c29f42467a14acce44aab8fe97e16bdc5bc64b3fd4fb8e",
-      "commit": "local",
+      "version": "b4bca5d44cffdc3832e8f463ce2ba7961be08846ce08704be7dd743f525d4e52",
+      "commit": "d43145727af788c0e6c3711d837b1fada946eac3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -25,8 +25,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "8fdadd9af80a90496d27448133a04b8284f53247309f26c367e382a1e4271d7c",
-      "commit": "local",
+      "version": "23167cf3865ef9da644b3b893268927c7d4e5a066d8017de07aa3f90eb34b844",
+      "commit": "d43145727af788c0e6c3711d837b1fada946eac3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "a7fc84a4f933598bfef8a9f444809c05f57d0a0cf9a19ac96af80d451aa10fe4",
-      "commit": "local",
+      "version": "329fab2b2767fcd65ede5217eb17e9cef9833d31148613867efe197dcdede4a7",
+      "commit": "d43145727af788c0e6c3711d837b1fada946eac3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -69,8 +69,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "f03a757f32166795fd3f4a114093ef3dd18aa764ca27d7e3598794ab29c19c61",
-      "commit": "local",
+      "version": "6b2f238cb9b04695b72e87f7268c6056cee46a6207712765634a8ae8b9f4903e",
+      "commit": "d43145727af788c0e6c3711d837b1fada946eac3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,8 +91,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "4afddeb90d67df2b3225e91546d2ab89595d83e4420692078cd42fec39091ceb",
-      "commit": "local",
+      "version": "d5c0f4837229aed3bf27df4a2d75b6f20d491393f4e75093c200131466421e64",
+      "commit": "d43145727af788c0e6c3711d837b1fada946eac3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -118,8 +118,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "16cf0f62de8f67e4c3ca40e19dd8f6bde95f7e984e1329823073372eb4213fa1",
-      "commit": "local",
+      "version": "4eefc24287f0c8a33eb7082f4aaeae0482eee2cd71e2ea444164c7b1ac792516",
+      "commit": "d43145727af788c0e6c3711d837b1fada946eac3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -143,8 +143,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "5708b74654438504ff549fc99906e36572d64ac6449cea9b72e58109c2e08d63",
-      "commit": "local",
+      "version": "5ecbd055c6535550fa4e6e802886e25fe0a2c9815ee35e9436c6c1a828cd57f9",
+      "commit": "d43145727af788c0e6c3711d837b1fada946eac3",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -156,5 +156,41 @@
       ]
     }
   },
-  "recentUpdates": []
+  "recentUpdates": [
+    {
+      "Version": "d431457",
+      "Date": "2026-10-18T22:37:19-03:00",
+      "Changes": [
+        "feat: new panel frontend and release pipeline"
+      ]
+    },
+    {
+      "Version": "904975f",
+      "Date": "2026-10-18T21:46:50-03:00",
+      "Changes": [
+        "chore: finalize session build (UI removed, anti-detection, BF autofarm, publish tooling)"
+      ]
+    },
+    {
+      "Version": "696f106",
+      "Date": "2026-10-15T22:29:58-03:00",
+      "Changes": [
+        "Integrate initial AOTR assistance, ID routing and lifecycle cleanup"
+      ]
+    },
+    {
+      "Version": "b2bb58a",
+      "Date": "2026-10-15T22:13:22-03:00",
+      "Changes": [
+        "feat(aotr): register module and compact frontend in DepHub loader"
+      ]
+    },
+    {
+      "Version": "ad0e9f9",
+      "Date": "2026-10-15T22:13:09-03:00",
+      "Changes": [
+        "feat(aotr): add defensive titan features and diagnostics"
+      ]
+    }
+  ]
 }
