@@ -31,6 +31,9 @@ local env = type(getgenv) == "function" and getgenv() or _G
 local STATE_KEY = "__DEPHUB_BLOXFRUITS"
 local BASE_URL = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 local VERSION = "0.0.3"
+-- Backend-facing log: the loader installs __DEPHUB.Log so a failed internal
+-- load is reported with its path and error instead of a bare `return false`.
+local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env.__DEPHUB.Log or function() end
 local previous = type(env[STATE_KEY]) == "table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
 
@@ -131,7 +134,10 @@ end
 
 local baseContext = {LocalPlayer = LocalPlayer, Players = Players, Workspace = Workspace, Connect = connect, DisconnectAll = disconnectAll, Destroy = destroy, GetRoot = getRoot, GetPlayer = getPlayer, GetHumanoid = getHumanoid, HealthText = healthText, IsProtectionName = isProtectionName, HasProtection = hasProtection, TeamColor = teamColor, ChangeSetting = ChangeSetting}
 local configOk, config = loadModule("src/games/features/bloxfruits/config.lua", baseContext)
-if not configOk then return false end
+if not configOk then
+    report("BloxFruits: config falhou: " .. tostring(config))
+    return false
+end
 config:Load({PlayerESP = false, FruitESP = false, UnbreakableAll = false, DashCustomizer = false, FlashstepNoCooldown = false, WaterWalking = false, AutoJoinTeam = true, DashLength = 1, PreferredTeam = "Pirates", BladeHits = false, AutoFarm = false})
 
 -- Pure-data quest/rarity tables. Loaded separately because quests.lua returns a
@@ -188,6 +194,7 @@ local features = {}
 for name, path in pairs(featurePaths) do
     local ok, feature = loadModule(path, baseContext)
     if not ok then
+        report("BloxFruits: feature " .. tostring(name) .. " (" .. tostring(path) .. ") falhou: " .. tostring(feature))
         for _, loaded in pairs(features) do pcall(loaded.Destroy, loaded) end
         pcall(config.Destroy, config)
         if env[STATE_KEY] == State then env[STATE_KEY] = nil end
@@ -337,9 +344,13 @@ function State:Start()
     return true
 end
 
-if not LocalPlayer then return false end
+if not LocalPlayer then
+    report("BloxFruits: LocalPlayer ausente")
+    return false
+end
 local ok, started = pcall(State.Start, State)
 if not ok or not started then
+    report("BloxFruits: State.Start falhou: " .. tostring(started))
     pcall(State.Destroy, State)
     return false
 end

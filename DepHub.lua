@@ -123,6 +123,9 @@ env[STATE_KEY] = {
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
 env.__DEPHUB.SourceBaseURL = BASE_URL
+-- Backends report internal failures here so a silent `return false` becomes a
+-- concrete reason in the console instead of a bare "Falha desconhecida".
+env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 
 env.__DEPHUB.Debug = function()
@@ -260,7 +263,9 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait()
 
 local okCore, coreResult = loadModule(target.Core, false)
-if not okCore then return fail(coreResult) end
+if not okCore then
+    return fail("Core " .. tostring(target.Core) .. " falhou: " .. tostring(coreResult))
+end
 local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
 local isMM2 = target.MM2 == true
@@ -270,7 +275,7 @@ local isNoobPiece = target.NoobPiece == true
 if isRT3 then
     if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
 elseif type(coreResult) ~= "table" then
-    return fail(coreResult)
+    return fail("Core " .. tostring(target.Core) .. " retornou " .. typeof(coreResult) .. " (" .. tostring(coreResult) .. ")")
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil

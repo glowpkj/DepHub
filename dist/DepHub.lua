@@ -4663,6 +4663,9 @@ local env = type(getgenv) == "function" and getgenv() or _G
 local STATE_KEY = "__DEPHUB_BLOXFRUITS"
 local BASE_URL = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 local VERSION = "0.0.3"
+-- Backend-facing log: the loader installs __DEPHUB.Log so a failed internal
+-- load is reported with its path and error instead of a bare `return false`.
+local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env.__DEPHUB.Log or function() end
 local previous = type(env[STATE_KEY]) == "table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
 
@@ -4763,7 +4766,10 @@ end
 
 local baseContext = {LocalPlayer = LocalPlayer, Players = Players, Workspace = Workspace, Connect = connect, DisconnectAll = disconnectAll, Destroy = destroy, GetRoot = getRoot, GetPlayer = getPlayer, GetHumanoid = getHumanoid, HealthText = healthText, IsProtectionName = isProtectionName, HasProtection = hasProtection, TeamColor = teamColor, ChangeSetting = ChangeSetting}
 local configOk, config = loadModule("src/games/features/bloxfruits/config.lua", baseContext)
-if not configOk then return false end
+if not configOk then
+    report("BloxFruits: config falhou: " .. tostring(config))
+    return false
+end
 config:Load({PlayerESP = false, FruitESP = false, UnbreakableAll = false, DashCustomizer = false, FlashstepNoCooldown = false, WaterWalking = false, AutoJoinTeam = true, DashLength = 1, PreferredTeam = "Pirates", BladeHits = false, AutoFarm = false})
 
 -- Pure-data quest/rarity tables. Loaded separately because quests.lua returns a
@@ -4820,6 +4826,7 @@ local features = {}
 for name, path in pairs(featurePaths) do
     local ok, feature = loadModule(path, baseContext)
     if not ok then
+        report("BloxFruits: feature " .. tostring(name) .. " (" .. tostring(path) .. ") falhou: " .. tostring(feature))
         for _, loaded in pairs(features) do pcall(loaded.Destroy, loaded) end
         pcall(config.Destroy, config)
         if env[STATE_KEY] == State then env[STATE_KEY] = nil end
@@ -4969,9 +4976,13 @@ function State:Start()
     return true
 end
 
-if not LocalPlayer then return false end
+if not LocalPlayer then
+    report("BloxFruits: LocalPlayer ausente")
+    return false
+end
 local ok, started = pcall(State.Start, State)
 if not ok or not started then
+    report("BloxFruits: State.Start falhou: " .. tostring(started))
     pcall(State.Destroy, State)
     return false
 end
@@ -15870,12 +15881,27 @@ AOTR: initial assistance integration; runtime testing pending.
 -- executors expose HttpGet only as a global, and writing a DataModel member
 -- that does not exist errors. Resolve bundled paths from the in-memory table
 -- first, then fall back to whatever fetch primitive the executor provides.
+--
+-- Published on every shared environment a dynamically-compiled module can
+-- see: backends and features are compiled with loadstring and run outside
+-- this chunk, so a chunk-local resolver would be invisible to them. On a real
+-- executor getgenv(), _G and the chunk environment are the same table; in a
+-- test harness they can differ, so all three are written.
+local __dephubEnvs = {_G}
+if type(getgenv) == "function" then
+    local shared = getgenv()
+    if type(shared) == "table" then __dephubEnvs[#__dephubEnvs + 1] = shared end
+end
 local globalHttpGet = (type(HttpGet) == "function") and HttpGet or nil
-local function __dephubHttpGet(url)
+local function __dephubResolve(url)
     if type(url) ~= "string" then return nil end
     local clean = url:match("^[^?]*") or url
     local rel = clean:match("DepHub/[^/]+/(.+)$")
     if rel and type(BUNDLED_SOURCES[rel]) == "string" then return BUNDLED_SOURCES[rel] end
+    for _, shared in ipairs(__dephubEnvs) do
+        local table_ = shared.__DEPHUB_BUNDLED_SOURCES
+        if type(table_) == "table" and rel and type(table_[rel]) == "string" then return table_[rel] end
+    end
     if type(globalHttpGet) == "function" then return globalHttpGet(url) end
     local memberOk, member = pcall(function() return game.HttpGet end)
     if memberOk and type(member) == "function" then
@@ -15883,6 +15909,14 @@ local function __dephubHttpGet(url)
         if ok then return result end
     end
     return nil
+end
+local __dephubHttpGet = __dephubResolve
+-- Publish to every shared environment so loadstring-compiled modules resolve
+-- the rewritten call sites without a setfenv.
+for _, shared in ipairs(__dephubEnvs) do
+    shared.__dephubHttpGet = __dephubResolve
+    shared.__DEPHUB_HTTP_GET = __dephubResolve
+    shared.__DEPHUB_BUNDLED_SOURCES = BUNDLED_SOURCES
 end
 
 
@@ -16049,6 +16083,9 @@ env[STATE_KEY] = {
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
 env.__DEPHUB.SourceBaseURL = BASE_URL
+-- Backends report internal failures here so a silent `return false` becomes a
+-- concrete reason in the console instead of a bare "Falha desconhecida".
+env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 
 env.__DEPHUB.Debug = function()
@@ -16188,7 +16225,9 @@ if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait()
 
 local okCore, coreResult = loadModule(target.Core, false)
-if not okCore then return fail(coreResult) end
+if not okCore then
+    return fail("Core " .. tostring(target.Core) .. " falhou: " .. tostring(coreResult))
+end
 local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
 local isMM2 = target.MM2 == true
@@ -16198,7 +16237,7 @@ local isNoobPiece = target.NoobPiece == true
 if isRT3 then
     if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
 elseif type(coreResult) ~= "table" then
-    return fail(coreResult)
+    return fail("Core " .. tostring(target.Core) .. " retornou " .. typeof(coreResult) .. " (" .. tostring(coreResult) .. ")")
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
