@@ -91,18 +91,19 @@ end
 
 local function buildBloxFruits(b)
     return {
-        {Name = "Jogador", Glyph = "◫", Controls = {
+        {Name = "Jogador", Glyph = "◫", Intro = "Controle as funções do seu personagem.", Search = "Encontrar uma opção...", Controls = {
             toggle(b, "PlayerESP", "ESP de jogadores", "Realça outros jogadores pelo corpo."),
             toggle(b, "FruitESP", "ESP de frutas", "Marca frutas próximas com um realce."),
             toggle(b, "AutoFarm", "Autofarm", "Segue a quest ativa e ataca o alvo automaticamente."),
             toggle(b, "BladeHits", "Blade Hits", "Ataque por remote com cadência limitada."),
             toggle(b, "AutoJoinTeam", "Entrar em time", "Entra no time preferido ao spawnar."),
         }},
-        {Name = "Movimento", Glyph = "◎", Controls = {
+        {Name = "Movimento", Glyph = "◎", Intro = "Ajuste velocidade e deslocamento.", Search = "Encontrar uma opção...", Controls = {
             toggle(b, "DashCustomizer", "Dash personalizado", "Ajusta a distância do dash."),
             toggle(b, "FlashstepNoCooldown", "Flashstep sem cooldown", "Ignora o cooldown do dash."),
             toggle(b, "WaterWalking", "Andar na água", "Permite caminhar sobre a água."),
             {Type = "slider", Name = "DashLength", Title = "Distância do dash", Min = 1, Max = 10, Step = 1,
+                Format = function(v) return tostring(v) .. " u" end,
                 Get = function()
                     if type(b.Values) == "table" and type(b.Values.DashLength) == "number" then return b.Values.DashLength end
                     return 1
@@ -112,7 +113,7 @@ local function buildBloxFruits(b)
                     if type(b.SetDashLength) == "function" then call(b.SetDashLength, b, value) end
                 end},
         }},
-        {Name = "Universo", Glyph = "☷", Controls = {
+        {Name = "Universo", Glyph = "☷", Intro = "Extras que valem para toda a sessão.", Search = "Encontrar uma opção...", Controls = {
             toggle(b, "UnbreakableAll", "Unbreakable em todos", "Aplica a proteção de quebra a todos."),
             {Type = "action", Name = "ServerHop", Title = "Trocar de servidor", Button = "Trocar", Run = function()
                 if type(b.ServerHop) == "function" then call(b.ServerHop, b) end
@@ -124,7 +125,7 @@ end
 
 local function buildUniversal(b)
     return {
-        {Name = "Jogador", Glyph = "◫", Controls = {
+        {Name = "Jogador", Glyph = "◫", Intro = "Funções gerais do personagem.", Search = "Encontrar uma opção...", Controls = {
             customToggle(b, "WalkSpeed", "Velocidade", "Aumenta a velocidade de caminhada.", "WalkSpeed", "SetWalkSpeedEnabled"),
             customToggle(b, "Jump", "Pulo alto", "Aumenta a força do pulo.", "Jump", "SetJumpEnabled"),
             customToggle(b, "Fly", "Voar", "Voo simples com controles de WASD.", "Fly", "SetFly"),
@@ -134,20 +135,20 @@ local function buildUniversal(b)
             customToggle(b, "AntiFling", "Anti-fling", "Impede que jogadores te arremessem.", "AntiFling", "SetAntiFling"),
             customToggle(b, "AntiVoid", "Anti-void", "Resgata você antes de cair no vazio.", "AntiVoid", "SetAntiVoid"),
         }},
-        {Name = "Visual", Glyph = "◎", Controls = {
+        {Name = "Visual", Glyph = "◎", Intro = "Escolha como as informações aparecem.", Search = "Encontrar uma opção...", Controls = {
             customToggle(b, "ESP", "ESP", "Caixas em volta dos jogadores.", "ESP", "SetESP"),
             customToggle(b, "Chams", "Chams", "Realce colorido por time.", "Chams", nil),
             customToggle(b, "Fullbright", "Fullbright", "Ilumina o mapa inteiro.", "Fullbright", "SetFullbright"),
             customToggle(b, "InfiniteZoom", "Zoom infinito", "Remove o limite de zoom.", "InfiniteZoom", "SetInfiniteZoom"),
             customToggle(b, "Tracers", "Tracers", "Linhas até os jogadores.", "Tracers", "SetTracers"),
         }},
-        {Name = "Combate", Glyph = "✧", Controls = {
+        {Name = "Combate", Glyph = "✧", Intro = "Mira e alvos.", Search = "Encontrar uma opção...", Controls = {
             customToggle(b, "Aimbot", "Aimbot", "Mira suave (LERP) no alvo mais próximo.", "Aimbot", nil),
             customToggle(b, "SilentAim", "Silent aim", "Redireciona o tiro sem mover a câmera.", "SilentAim", "SetSilentAim"),
             customToggle(b, "TeamCheck", "Checar time", "Ignora aliados.", "TeamCheck", nil),
             customToggle(b, "TeamColors", "Cores por time", "Usa a cor do time no realce.", "TeamColors", nil),
         }},
-        {Name = "Diversos", Glyph = "☷", Controls = {
+        {Name = "Ajustes", Glyph = "☷", Intro = "Preferências e sessão.", Search = "Encontrar uma opção...", Controls = {
             customToggle(b, "ChatLoop", "Chat loop", "Repete uma mensagem no chat.", "ChatLoop", "SetChatLoop"),
             {Type = "action", Name = "ServerHop", Title = "Trocar de servidor", Button = "Trocar", Run = function()
                 if type(b.ServerHop) == "function" then call(b.ServerHop, b) end
@@ -184,7 +185,7 @@ local function buildGeneric(b)
         controls[#controls + 1] = {Type = "notice", Text = "Nenhum recurso publicado por este backend."}
     end
     return {
-        {Name = "Recursos", Glyph = "◫", Controls = controls},
+        {Name = "Recursos", Glyph = "◫", Intro = "Recursos publicados por este backend.", Search = "Encontrar uma opção...", Controls = controls},
     }
 end
 
@@ -212,7 +213,7 @@ function PanelHost.Mount(env, PanelFactory)
         -- No backend (unknown game without fallback). Still show a stub panel so
         -- the user sees the interface exists, with an explanatory notice.
         local panel = PanelFactory.new({Title = "DepHub", GameName = game.Name, StartOpen = false})
-        local tab = panel:CreateTab("Estado", "!")
+        local tab = panel:CreateTab({Name = "Estado", Glyph = "!"})
         panel:AddNotice(tab, "Nenhum backend ativo para este jogo. Modo: " .. mode)
         env.__DEPHUB.Frontend = panel
         return panel
@@ -232,7 +233,12 @@ function PanelHost.Mount(env, PanelFactory)
     end
 
     for _, tabSpec in ipairs(tabs) do
-        local tab = panel:CreateTab(tabSpec.Name, tabSpec.Glyph)
+        local tab = panel:CreateTab({
+            Name = tabSpec.Name,
+            Glyph = tabSpec.Glyph,
+            Intro = tabSpec.Intro,
+            Search = tabSpec.Search,
+        })
         for _, control in ipairs(tabSpec.Controls or {}) do
             local kind = control.Type
             if kind == "toggle" then
@@ -250,10 +256,9 @@ function PanelHost.Mount(env, PanelFactory)
                 local value = control.Min or 0
                 local okGet, current = call(control.Get)
                 if okGet and type(current) == "number" then value = current end
-                panel:AddSlider(tab, control.Title, control.Help, control.Min, control.Max, control.Step, value,
-                    function(next)
-                        call(control.Set, next)
-                    end)
+                panel:AddSlider(tab, control.Title, control.Min, control.Max, control.Step, value,
+                    function(next) call(control.Set, next) end,
+                    control.Format)
             elseif kind == "dropdown" then
                 local value = nil
                 local okGet, current = call(control.Get)

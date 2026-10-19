@@ -571,18 +571,19 @@ end
 
 local function buildBloxFruits(b)
     return {
-        {Name = "Jogador", Glyph = "◫", Controls = {
+        {Name = "Jogador", Glyph = "◫", Intro = "Controle as funções do seu personagem.", Search = "Encontrar uma opção...", Controls = {
             toggle(b, "PlayerESP", "ESP de jogadores", "Realça outros jogadores pelo corpo."),
             toggle(b, "FruitESP", "ESP de frutas", "Marca frutas próximas com um realce."),
             toggle(b, "AutoFarm", "Autofarm", "Segue a quest ativa e ataca o alvo automaticamente."),
             toggle(b, "BladeHits", "Blade Hits", "Ataque por remote com cadência limitada."),
             toggle(b, "AutoJoinTeam", "Entrar em time", "Entra no time preferido ao spawnar."),
         }},
-        {Name = "Movimento", Glyph = "◎", Controls = {
+        {Name = "Movimento", Glyph = "◎", Intro = "Ajuste velocidade e deslocamento.", Search = "Encontrar uma opção...", Controls = {
             toggle(b, "DashCustomizer", "Dash personalizado", "Ajusta a distância do dash."),
             toggle(b, "FlashstepNoCooldown", "Flashstep sem cooldown", "Ignora o cooldown do dash."),
             toggle(b, "WaterWalking", "Andar na água", "Permite caminhar sobre a água."),
             {Type = "slider", Name = "DashLength", Title = "Distância do dash", Min = 1, Max = 10, Step = 1,
+                Format = function(v) return tostring(v) .. " u" end,
                 Get = function()
                     if type(b.Values) == "table" and type(b.Values.DashLength) == "number" then return b.Values.DashLength end
                     return 1
@@ -592,7 +593,7 @@ local function buildBloxFruits(b)
                     if type(b.SetDashLength) == "function" then call(b.SetDashLength, b, value) end
                 end},
         }},
-        {Name = "Universo", Glyph = "☷", Controls = {
+        {Name = "Universo", Glyph = "☷", Intro = "Extras que valem para toda a sessão.", Search = "Encontrar uma opção...", Controls = {
             toggle(b, "UnbreakableAll", "Unbreakable em todos", "Aplica a proteção de quebra a todos."),
             {Type = "action", Name = "ServerHop", Title = "Trocar de servidor", Button = "Trocar", Run = function()
                 if type(b.ServerHop) == "function" then call(b.ServerHop, b) end
@@ -604,7 +605,7 @@ end
 
 local function buildUniversal(b)
     return {
-        {Name = "Jogador", Glyph = "◫", Controls = {
+        {Name = "Jogador", Glyph = "◫", Intro = "Funções gerais do personagem.", Search = "Encontrar uma opção...", Controls = {
             customToggle(b, "WalkSpeed", "Velocidade", "Aumenta a velocidade de caminhada.", "WalkSpeed", "SetWalkSpeedEnabled"),
             customToggle(b, "Jump", "Pulo alto", "Aumenta a força do pulo.", "Jump", "SetJumpEnabled"),
             customToggle(b, "Fly", "Voar", "Voo simples com controles de WASD.", "Fly", "SetFly"),
@@ -614,20 +615,20 @@ local function buildUniversal(b)
             customToggle(b, "AntiFling", "Anti-fling", "Impede que jogadores te arremessem.", "AntiFling", "SetAntiFling"),
             customToggle(b, "AntiVoid", "Anti-void", "Resgata você antes de cair no vazio.", "AntiVoid", "SetAntiVoid"),
         }},
-        {Name = "Visual", Glyph = "◎", Controls = {
+        {Name = "Visual", Glyph = "◎", Intro = "Escolha como as informações aparecem.", Search = "Encontrar uma opção...", Controls = {
             customToggle(b, "ESP", "ESP", "Caixas em volta dos jogadores.", "ESP", "SetESP"),
             customToggle(b, "Chams", "Chams", "Realce colorido por time.", "Chams", nil),
             customToggle(b, "Fullbright", "Fullbright", "Ilumina o mapa inteiro.", "Fullbright", "SetFullbright"),
             customToggle(b, "InfiniteZoom", "Zoom infinito", "Remove o limite de zoom.", "InfiniteZoom", "SetInfiniteZoom"),
             customToggle(b, "Tracers", "Tracers", "Linhas até os jogadores.", "Tracers", "SetTracers"),
         }},
-        {Name = "Combate", Glyph = "✧", Controls = {
+        {Name = "Combate", Glyph = "✧", Intro = "Mira e alvos.", Search = "Encontrar uma opção...", Controls = {
             customToggle(b, "Aimbot", "Aimbot", "Mira suave (LERP) no alvo mais próximo.", "Aimbot", nil),
             customToggle(b, "SilentAim", "Silent aim", "Redireciona o tiro sem mover a câmera.", "SilentAim", "SetSilentAim"),
             customToggle(b, "TeamCheck", "Checar time", "Ignora aliados.", "TeamCheck", nil),
             customToggle(b, "TeamColors", "Cores por time", "Usa a cor do time no realce.", "TeamColors", nil),
         }},
-        {Name = "Diversos", Glyph = "☷", Controls = {
+        {Name = "Ajustes", Glyph = "☷", Intro = "Preferências e sessão.", Search = "Encontrar uma opção...", Controls = {
             customToggle(b, "ChatLoop", "Chat loop", "Repete uma mensagem no chat.", "ChatLoop", "SetChatLoop"),
             {Type = "action", Name = "ServerHop", Title = "Trocar de servidor", Button = "Trocar", Run = function()
                 if type(b.ServerHop) == "function" then call(b.ServerHop, b) end
@@ -664,7 +665,7 @@ local function buildGeneric(b)
         controls[#controls + 1] = {Type = "notice", Text = "Nenhum recurso publicado por este backend."}
     end
     return {
-        {Name = "Recursos", Glyph = "◫", Controls = controls},
+        {Name = "Recursos", Glyph = "◫", Intro = "Recursos publicados por este backend.", Search = "Encontrar uma opção...", Controls = controls},
     }
 end
 
@@ -692,7 +693,7 @@ function PanelHost.Mount(env, PanelFactory)
         -- No backend (unknown game without fallback). Still show a stub panel so
         -- the user sees the interface exists, with an explanatory notice.
         local panel = PanelFactory.new({Title = "DepHub", GameName = game.Name, StartOpen = false})
-        local tab = panel:CreateTab("Estado", "!")
+        local tab = panel:CreateTab({Name = "Estado", Glyph = "!"})
         panel:AddNotice(tab, "Nenhum backend ativo para este jogo. Modo: " .. mode)
         env.__DEPHUB.Frontend = panel
         return panel
@@ -712,7 +713,12 @@ function PanelHost.Mount(env, PanelFactory)
     end
 
     for _, tabSpec in ipairs(tabs) do
-        local tab = panel:CreateTab(tabSpec.Name, tabSpec.Glyph)
+        local tab = panel:CreateTab({
+            Name = tabSpec.Name,
+            Glyph = tabSpec.Glyph,
+            Intro = tabSpec.Intro,
+            Search = tabSpec.Search,
+        })
         for _, control in ipairs(tabSpec.Controls or {}) do
             local kind = control.Type
             if kind == "toggle" then
@@ -730,10 +736,9 @@ function PanelHost.Mount(env, PanelFactory)
                 local value = control.Min or 0
                 local okGet, current = call(control.Get)
                 if okGet and type(current) == "number" then value = current end
-                panel:AddSlider(tab, control.Title, control.Help, control.Min, control.Max, control.Step, value,
-                    function(next)
-                        call(control.Set, next)
-                    end)
+                panel:AddSlider(tab, control.Title, control.Min, control.Max, control.Step, value,
+                    function(next) call(control.Set, next) end,
+                    control.Format)
             elseif kind == "dropdown" then
                 local value = nil
                 local okGet, current = call(control.Get)
@@ -2239,132 +2244,299 @@ return Updater
     ["src/frontend/init.lua"] = [[
 -- DepHub panel library.
 --
--- Roblox translation of the authored interface mockup. It builds the same
--- monochrome window: a fixed panel with a draggable header, macOS-style window
--- buttons, a section sidebar, scrollable content, and the control set (toggle,
--- checkbox, slider, dropdown, text field, colour trigger, action buttons,
--- notices, collapsible groups). A toast and a confirmation modal complete it.
+-- Faithful Luau port of the authored interface mockup (proposta-02.html +
+-- dephub.css). It rebuilds the same monochrome window with Roblox GUI
+-- instances: the fixed 840x560 shell, the draggable header with the brand mark,
+-- the current-game caption, the three macOS-style window buttons, the 160px
+-- section nav, per-page headings, the search field, and the full control set
+-- (field, toggle, checkbox, range, input group, choice trigger, colour trigger,
+-- action, keybind, notice, collapsible, button group), plus the toast and the
+-- confirmation dialog.
 --
--- The panel is pure presentation. It never touches the game: callers hand it a
--- spec (tabs -> sections -> components) and receive callbacks when a control
--- changes. The loader wires those callbacks to a backend's State.
+-- The library is pure presentation: callers hand it a spec and receive
+-- callbacks. src/core/panel-host.lua binds those callbacks to a backend.
 --
--- Naming note: the ScreenGui is named with "dephub" so src/core/ui-guard keeps
--- it enabled, on top and parented to gethui().
+-- The ScreenGui is named with "dephub" so src/core/ui-guard keeps it enabled,
+-- on top and parented to gethui().
 --
--- Modules here are loaded as plain chunks by the bundle (no require), so this
--- file is self-contained: the theme tokens are inlined below. src/core/theme.lua
--- mirrors the same values as the standalone reference.
+-- Modules load as plain chunks (no require), so the theme tokens below are
+-- inlined; src/frontend/theme.lua mirrors the same values as the reference.
 
--- Inlined theme tokens (kept in lockstep with src/core/theme.lua).
+-- ---------------------------------------------------------------------------
+-- Theme (kept in lockstep with src/frontend/theme.lua)
+-- ---------------------------------------------------------------------------
 local Theme = {}
-Theme.Accent = {r = 188, g = 188, b = 188}
-Theme.Bg = {r = 9, g = 9, b = 9}
-Theme.Surface = {r = 16, g = 16, b = 16}
-Theme.Line = {r = 37, g = 37, b = 37}
-Theme.Text = {r = 222, g = 222, b = 222}
-Theme.Muted = {r = 154, g = 154, b = 154}
-Theme.Quiet = {r = 119, g = 119, b = 119}
+local function rgb(r, g, b) return {r = r, g = g, b = b} end
 
-Theme.PanelWidth = 840
-Theme.PanelHeight = 560
-Theme.PanelRadius = 12
-Theme.PanelBorder = {r = 44, g = 44, b = 44}
-Theme.HeaderHeight = 100
-Theme.FooterHeight = 40
-Theme.SidebarWidth = 160
+Theme.Accent = rgb(188, 188, 188)
+Theme.Bg = rgb(9, 9, 9)
+Theme.Surface = rgb(16, 16, 16)
+Theme.Line = rgb(37, 37, 37)
+Theme.Text = rgb(222, 222, 222)
+Theme.Muted = rgb(154, 154, 154)
+Theme.Quiet = rgb(119, 119, 119)
 
-Theme.BrandAccent = {r = 209, g = 209, b = 209}
-Theme.BrandInk = {r = 23, g = 23, b = 23}
-Theme.LeftPad = 24
+Theme.Left = 24
 Theme.BrandTop = 20
+Theme.Header = 100
+Theme.Footer = 40
+Theme.MinWidth = 840
+Theme.MinHeight = 560
+Theme.WindowRadius = 12
+Theme.WindowBorder = rgb(44, 44, 44)
 
-Theme.CloseButton = {r = 255, g = 96, b = 88}
-Theme.MinButton = {r = 254, g = 188, b = 46}
-Theme.MaxButton = {r = 40, g = 200, b = 64}
+Theme.MarkBg = rgb(209, 209, 209)
+Theme.MarkInk = rgb(23, 23, 23)
+Theme.MarkSize = 30
+Theme.MarkRadius = 7
+Theme.BrandHeight = 30
 
-Theme.NavBorder = {r = 28, g = 28, b = 28}
-Theme.NavIdle = {r = 146, g = 146, b = 146}
-Theme.NavActiveBg = {r = 26, g = 26, b = 26}
-Theme.NavActiveText = {r = 227, g = 227, b = 227}
-Theme.NavHoverBg = {r = 22, g = 22, b = 22}
+Theme.GameTop = 64
+Theme.GameGap = 7
+Theme.GameIndicator = 4
+Theme.GameIndicatorColor = rgb(153, 153, 153)
+Theme.GameNameColor = rgb(160, 160, 160)
+Theme.GameNameFont = 11
 
-Theme.MainBg = {r = 12, g = 12, b = 12}
-Theme.RowBg = {r = 17, g = 17, b = 17}
-Theme.RowHoverBg = {r = 22, g = 22, b = 22}
-Theme.SectionLabel = {r = 153, g = 153, b = 153}
-Theme.Heading = {r = 222, g = 222, b = 222}
-Theme.HelpText = {r = 146, g = 146, b = 146}
+Theme.WindowButtonsRight = 16
+Theme.WindowButtonsTop = 13
+Theme.WindowButtonW = 30
+Theme.WindowButtonH = 44
+Theme.WindowDot = 13
+Theme.CloseDot = rgb(255, 96, 88)
+Theme.MinDot = rgb(254, 188, 46)
+Theme.MaxDot = rgb(40, 200, 64)
 
-Theme.FieldBg = {r = 17, g = 17, b = 17}
-Theme.FieldBorder = {r = 51, g = 51, b = 51}
-Theme.FieldFocusBg = {r = 22, g = 22, b = 22}
-Theme.ToggleOff = {r = 48, g = 48, b = 48}
-Theme.ToggleOffBorder = {r = 68, g = 68, b = 68}
-Theme.ToggleKnobOff = {r = 148, g = 148, b = 148}
-Theme.ToggleKnobOn = {r = 34, g = 34, b = 34}
-Theme.ActionBg = {r = 29, g = 29, b = 29}
-Theme.ActionBorder = {r = 58, g = 58, b = 58}
-Theme.ActionHoverBg = {r = 39, g = 39, b = 39}
-Theme.ActionHoverBorder = {r = 90, g = 90, b = 90}
-Theme.PrimaryBg = {r = 204, g = 204, b = 204}
-Theme.PrimaryInk = {r = 22, g = 22, b = 22}
+Theme.NavWidth = 160
+Theme.NavBorder = rgb(28, 28, 28)
+Theme.NavPadV = 20
+Theme.NavPadH = 10
+Theme.NavGap = 7
+Theme.NavItemMinH = 44
+Theme.NavItemPadV = 11
+Theme.NavItemPadH = 10
+Theme.NavItemRadius = 6
+Theme.NavItemGap = 9
+Theme.NavIdle = rgb(146, 146, 146)
+Theme.NavActiveBg = rgb(26, 26, 26)
+Theme.NavActiveText = rgb(227, 227, 227)
+Theme.NavHoverBg = rgb(22, 22, 22)
+Theme.NavHoverText = rgb(221, 221, 221)
+Theme.NavGlyphColor = rgb(138, 138, 138)
+Theme.NavGlyphWidth = 20
+Theme.NavGlyphFont = 17
+Theme.NavFont = 12
+Theme.NavBg = rgb(9, 9, 9)
 
-Theme.FooterBorder = {r = 34, g = 34, b = 34}
-Theme.FooterText = {r = 139, g = 139, b = 139}
+Theme.MainBg = rgb(12, 12, 12)
+Theme.MainPadTop = 25
+Theme.MainPadX = 26
+Theme.MainPadBottom = 30
+Theme.ScrollBar = rgb(58, 58, 58)
 
-Theme.ToastBg = {r = 21, g = 21, b = 21}
-Theme.ToastBorder = {r = 58, g = 58, b = 58}
-Theme.ToastError = {r = 121, g = 80, b = 80}
-Theme.ModalBg = {r = 18, g = 18, b = 18}
-Theme.ModalBorder = {r = 66, g = 66, b = 66}
-Theme.NoticeBg = {r = 17, g = 17, b = 17}
+Theme.H1Size = 21
+Theme.IntroSize = 11
+Theme.IntroColor = rgb(150, 150, 150)
+Theme.HeadingGap = 22
+
+Theme.SectionLabel = rgb(153, 153, 153)
+Theme.SectionLabelSize = 9
+Theme.SectionLabelMarginTop = 25
+Theme.SectionLabelMarginBottom = 11
+
+Theme.FieldBg = rgb(17, 17, 17)
+Theme.FieldBorder = rgb(51, 51, 51)
+Theme.FieldText = rgb(221, 221, 221)
+Theme.FieldPlaceholder = rgb(129, 129, 129)
+Theme.FieldFocusBg = rgb(22, 22, 22)
+Theme.FieldFocusBorder = rgb(119, 119, 119)
+Theme.FieldRadius = 6
+Theme.FieldPadV = 11
+Theme.FieldPadH = 12
+Theme.FieldMinH = 42
+Theme.FieldFont = 12
+Theme.SearchBg = rgb(15, 15, 15)
+Theme.SearchBorder = rgb(41, 41, 41)
+
+Theme.RowBg = rgb(17, 17, 17)
+Theme.RowHoverBg = rgb(22, 22, 22)
+Theme.RowGap = 14
+Theme.RowMinH = 61
+Theme.RowPad = 14
+Theme.RowRadius = 6
+Theme.RowMarginBottom = 4
+Theme.RowLabel = rgb(206, 206, 206)
+Theme.RowLabelFont = 12
+Theme.HelpColor = rgb(146, 146, 146)
+Theme.HelpFont = 10
+Theme.HelpMarginTop = 6
+
+Theme.ToggleW = 34
+Theme.ToggleH = 21
+Theme.ToggleRadius = 20
+Theme.ToggleBg = rgb(48, 48, 48)
+Theme.ToggleBorder = rgb(68, 68, 68)
+Theme.ToggleKnob = rgb(148, 148, 148)
+Theme.ToggleKnobSize = 13
+Theme.ToggleKnobInset = 3
+Theme.ToggleKnobOn = rgb(34, 34, 34)
+Theme.ToggleShift = 13
+Theme.CheckboxSize = 17
+
+Theme.RangeBg = rgb(17, 17, 17)
+Theme.RangePadTop = 15
+Theme.RangePadX = 14
+Theme.RangePadBottom = 4
+Theme.RangeRadius = 6
+Theme.RangeLabel = rgb(204, 204, 204)
+Theme.RangeOutput = rgb(170, 170, 170)
+Theme.RangeOutputSize = 11
+Theme.RangeTrackHeight = 5
+Theme.RangeTrackMarginTop = 22
+Theme.RangeTrackMarginBottom = 18
+
+Theme.GroupBg = rgb(17, 17, 17)
+Theme.GroupPad = 14
+Theme.GroupRadius = 6
+Theme.GroupLabel = rgb(176, 176, 176)
+Theme.GroupLabelSize = 11
+Theme.GroupLabelMargin = 9
+Theme.GroupFieldBg = rgb(12, 12, 12)
+
+Theme.NoticeBg = rgb(17, 17, 17)
+Theme.NoticePad = 14
+Theme.NoticeRadius = 6
+Theme.NoticeColor = rgb(153, 153, 153)
+Theme.NoticeSize = 11
+Theme.NoticeStrong = rgb(204, 204, 204)
+Theme.NoticeMarginY = 21
+
+Theme.ActionBg = rgb(29, 29, 29)
+Theme.ActionText = rgb(204, 204, 204)
+Theme.ActionBorder = rgb(58, 58, 58)
+Theme.ActionHoverBg = rgb(39, 39, 39)
+Theme.ActionHoverBorder = rgb(90, 90, 90)
+Theme.ActionRadius = 6
+Theme.ActionMinH = 38
+Theme.ActionPadV = 9
+Theme.ActionPadH = 12
+Theme.ActionFont = 11
+Theme.PrimaryBg = rgb(204, 204, 204)
+Theme.PrimaryText = rgb(22, 22, 22)
+Theme.PrimaryHoverBg = rgb(224, 224, 224)
+Theme.ButtonGroupGap = 8
+Theme.ButtonGroupMarginY = 15
+Theme.ButtonGroupMinW = 90
+
+Theme.DetailsBg = rgb(16, 16, 16)
+Theme.DetailsBorder = rgb(44, 44, 44)
+Theme.DetailsRadius = 6
+Theme.DetailsPad = 14
+Theme.DetailsMarginTop = 20
+Theme.SummaryColor = rgb(184, 184, 184)
+Theme.SummaryMinH = 24
+
+Theme.TriggerBg = rgb(27, 27, 27)
+Theme.TriggerBorder = rgb(59, 59, 59)
+Theme.TriggerText = rgb(197, 197, 197)
+Theme.TriggerHoverBg = rgb(36, 36, 36)
+Theme.TriggerHoverBorder = rgb(85, 85, 85)
+Theme.TriggerMinH = 38
+Theme.TriggerRadius = 6
+Theme.TriggerFont = 11
+Theme.SwatchSize = 16
+Theme.SwatchRadius = 4
+Theme.ColorCodeFont = 10
+
+Theme.MenuBg = rgb(23, 23, 23)
+Theme.MenuBorder = rgb(59, 59, 59)
+Theme.MenuRadius = 8
+Theme.MenuPad = 5
+Theme.MenuMinW = 155
+Theme.MenuMaxH = 220
+Theme.MenuItemMinH = 37
+Theme.MenuItemPadV = 10
+Theme.MenuItemPadH = 11
+Theme.MenuItemColor = rgb(170, 170, 170)
+Theme.MenuItemSelBg = rgb(40, 40, 40)
+Theme.MenuItemSelText = rgb(238, 238, 238)
+Theme.MenuFont = 11
+
+Theme.FooterBorder = rgb(34, 34, 34)
+Theme.FooterBg = rgb(9, 9, 9)
+Theme.FooterText = rgb(139, 139, 139)
+Theme.FooterFont = 9
+Theme.FooterPadV = 11
+Theme.FooterPadH = 22
+Theme.FooterBrandColor = rgb(153, 153, 153)
+Theme.FooterBrandSize = 8
+Theme.FooterKeyColor = rgb(170, 170, 170)
+Theme.FooterKeyBorder = rgb(51, 51, 51)
+Theme.FooterKeyRadius = 3
+Theme.FooterKeyPadV = 3
+Theme.FooterKeyPadH = 5
+
+Theme.ToastBg = rgb(21, 21, 21)
+Theme.ToastBorder = rgb(58, 58, 58)
+Theme.ToastErrorBorder = rgb(121, 80, 80)
+Theme.ToastRadius = 9
+Theme.ToastPad = 16
+Theme.ToastWidth = 310
+Theme.ToastBottom = 22
+Theme.ToastRight = 22
+Theme.ToastTitleSize = 12
+Theme.ToastBodySize = 11
+Theme.ToastBodyColor = rgb(170, 170, 170)
+
+Theme.DialogBg = rgb(18, 18, 18)
+Theme.DialogBorder = rgb(66, 66, 66)
+Theme.DialogRadius = 12
+Theme.DialogPad = 25
+Theme.DialogWidth = 390
+Theme.DialogH2Size = 18
+Theme.DialogBodyColor = rgb(170, 170, 170)
+Theme.DialogBodySize = 12
+
+Theme.Duration = {
+    Fast = 0.18, Background = 0.20, Knob = 0.25, Toast = 0.30,
+    Modal = 0.25, Menu = 0.18, Morph = 1.05,
+}
 
 function Theme.Color(token)
     if token == nil then return Color3.fromRGB(255, 255, 255) end
     return Color3.fromRGB(token.r, token.g, token.b)
 end
-
-function Theme.px(n)
-    return UDim2.fromOffset(n, n)
-end
-
-local Panel = {}
-Panel.__index = Panel
+function Theme.px(n) return UDim2.fromOffset(n, n) end
+function Theme.off(x, y) return UDim2.fromOffset(x, y) end
 
 -- ---------------------------------------------------------------------------
 -- Construction helpers
 -- ---------------------------------------------------------------------------
-
-local function NewInstance(class, props)
+local function new(class, props)
     local instance = Instance.new(class)
     for key, value in pairs(props or {}) do
-        if key ~= "Parent" then
-            instance[key] = value
-        end
+        if key ~= "Parent" then instance[key] = value end
     end
-    if props and props.Parent then
-        instance.Parent = props.Parent
-    end
+    if props and props.Parent then instance.Parent = props.Parent end
     return instance
 end
 
 local function corner(instance, radius)
-    NewInstance("UICorner", {CornerRadius = UDim.new(0, radius or 0), Parent = instance})
+    new("UICorner", {CornerRadius = UDim.new(0, radius or 0), Parent = instance})
     return instance
 end
 
-local function stroke(instance, colour, thickness)
-    NewInstance("UIStroke", {
+local function stroke(instance, colour, thickness, transparency)
+    return new("UIStroke", {
         Color = Theme.Color(colour or Theme.Line),
         Thickness = thickness or 1,
+        Transparency = transparency or 0,
         Parent = instance,
     })
-    return instance
 end
 
-local function padding(instance, top, right, bottom, left)
-    NewInstance("UIPadding", {
+local function pad(instance, top, right, bottom, left)
+    new("UIPadding", {
         PaddingTop = UDim.new(0, top or 0),
         PaddingRight = UDim.new(0, right or top or 0),
         PaddingBottom = UDim.new(0, bottom or top or 0),
@@ -2374,76 +2546,78 @@ local function padding(instance, top, right, bottom, left)
     return instance
 end
 
-local function text(instance, label, size, colour, bold)
-    instance.Text = label or ""
+-- Apply text properties and return the label so callers can chain.
+local function label(instance, value, size, colour, font)
+    instance.Text = value or ""
     instance.TextSize = size or 12
     instance.TextColor3 = Theme.Color(colour or Theme.Text)
-    instance.Font = bold and Enum.Font.GothamBold or Enum.Font.Gotham
+    instance.Font = font or Enum.Font.Gotham
     instance.TextXAlignment = Enum.TextXAlignment.Left
     instance.BackgroundTransparency = 1
     return instance
 end
 
+local function flex(parent, fill, gap, order)
+    return new("UIListLayout", {
+        FillDirection = fill or Enum.FillDirection.Vertical,
+        Padding = UDim.new(0, gap or 0),
+        SortOrder = order or Enum.SortOrder.LayoutOrder,
+        Parent = parent,
+    })
+end
+
 -- ---------------------------------------------------------------------------
 -- Factory
 -- ---------------------------------------------------------------------------
+local Panel = {}
+Panel.__index = Panel
 
--- config = {
---   Title      = string (header brand, defaults "DepHub"),
---   GameName   = string (current-game caption),
---   Hotkey     = Enum.KeyCode (default Insert),
---   StartOpen  = boolean,
--- }
 function Panel.new(config)
     config = config or {}
     local self = setmetatable({}, Panel)
 
     self.Destroyed = false
     self.Connections = {}
-    self.Animations = {}
     self.Tabs = {}
     self.TabOrder = {}
-    self.Components = {}
     self.Open = config.StartOpen ~= false
     self.Expanded = false
     self.Minimized = false
     self.Hotkey = config.Hotkey or Enum.KeyCode.Insert
-    self.OnHotkeyChanged = nil
+    self.Order = 0
+    self.Components = {}
 
     local Players = game:GetService("Players")
     self.LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
-
-    local function connect(signal, callback)
+    self._connect = function(signal, callback)
         if not signal then return nil end
         local connection = signal:Connect(callback)
         self.Connections[#self.Connections + 1] = connection
         return connection
     end
-    self._connect = connect
 
-    self:_buildGui(config)
+    self:_buildScreen(config)
+    self:_buildWindow(config)
     self:_buildHeader(config)
-    self:_buildSidebar()
-    self:_buildContent()
+    self:_buildLayout()
     self:_buildFooter()
     self:_buildToast()
-    self:_buildModal()
+    self:_buildDialog()
     self:_bindHotkey()
-
     self:_applyLayout()
+
     return self
 end
 
 -- ---------------------------------------------------------------------------
--- Root screen gui
+-- Screen + window shell
 -- ---------------------------------------------------------------------------
-function Panel:_buildGui(config)
-    local Players = game:GetService("Players")
+function Panel:_buildScreen(config)
     local localPlayer = self.LocalPlayer
     local parent = localPlayer:FindFirstChildOfClass("PlayerGui") or localPlayer:WaitForChild("PlayerGui", 15)
 
-    local screen = NewInstance("ScreenGui", {
-        Name = "DepHubPanel",           -- "dephub" keeps ui-guard protecting it
+    local screen = new("ScreenGui", {
+        Name = "DepHubPanel",                 -- "dephub" keeps ui-guard on it
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         DisplayOrder = 2147483647,
@@ -2452,280 +2626,297 @@ function Panel:_buildGui(config)
         Parent = parent,
     })
     self.ScreenGui = screen
-
-    local function guard(signal, callback)
-        return self._connect(signal, callback)
-    end
-    guard(screen:GetPropertyChangedSignal("Enabled"), function()
+    self._connect(screen:GetPropertyChangedSignal("Enabled"), function()
         if not self.Destroyed and self.Open and not screen.Enabled then
             screen.Enabled = true
         end
     end)
+end
 
-    -- The window: fixed, centred, 840x560. Positioned by _applyLayout.
-    local window = NewInstance("Frame", {
+function Panel:_buildWindow(config)
+    -- .rectangle: width min(840, 100vw-32), height min(560, 100dvh-100)
+    local window = new("Frame", {
         Name = "Window",
         BackgroundColor3 = Theme.Color(Theme.Bg),
         BorderSizePixel = 0,
         ClipsDescendants = true,
         Active = true,
-        Parent = screen,
+        Parent = self.ScreenGui,
     })
-    corner(window, Theme.PanelRadius)
-    stroke(window, Theme.PanelBorder, 1)
+    corner(window, Theme.WindowRadius)
+    stroke(window, Theme.WindowBorder, 1)
     self.Window = window
 
-    -- Everything except the header lives inside, so the header can be dragged
-    -- independently and the body clips under it.
-    local body = NewInstance("Frame", {
+    -- The body holds layout + footer below the fixed header.
+    local body = new("Frame", {
         Name = "Body",
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 1, -Theme.HeaderHeight),
-        Position = UDim2.new(0, 0, 0, Theme.HeaderHeight),
+        Size = UDim2.new(1, 0, 1, -Theme.Header),
+        Position = UDim2.fromOffset(0, Theme.Header),
         Parent = window,
     })
     self.Body = body
 end
 
 -- ---------------------------------------------------------------------------
--- Header (brand, current game, window buttons)
+-- Header
 -- ---------------------------------------------------------------------------
 function Panel:_buildHeader(config)
-    local window = self.Window
-    local header = NewInstance("Frame", {
+    local header = new("Frame", {
         Name = "Header",
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, Theme.HeaderHeight),
+        Size = UDim2.new(1, 0, 0, Theme.Header),
         Position = UDim2.fromOffset(0, 0),
         Active = true,
-        Parent = window,
+        Parent = self.Window,
     })
     self.Header = header
-    NewInstance("Frame", {
-        Name = "Underline",
-        BackgroundColor3 = Theme.Color(Theme.Line),
+    -- border-bottom: 1px solid var(--line)
+    new("Frame", {
+        Name = "BottomBorder",
+        BackgroundColor3 = Theme.Color(Theme.HeaderBorder),
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, 1),
         Position = UDim2.new(0, 0, 1, -1),
         Parent = header,
     })
 
-    -- Brand: mark + name
-    local brand = NewInstance("Frame", {
+    -- Brand: mark + morph-name, at left:24 top:20 height:30
+    local brand = new("Frame", {
         Name = "Brand",
         BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(220, 30),
-        Position = UDim2.fromOffset(Theme.LeftPad, Theme.BrandTop),
+        Size = UDim2.fromOffset(220, Theme.BrandHeight),
+        Position = UDim2.fromOffset(Theme.Left, Theme.BrandTop),
         Parent = header,
     })
-    local mark = NewInstance("Frame", {
+    local mark = new("Frame", {
         Name = "Mark",
-        BackgroundColor3 = Theme.Color(Theme.BrandAccent),
+        BackgroundColor3 = Theme.Color(Theme.MarkBg),
         BorderSizePixel = 0,
-        Size = Theme.px(30),
+        Size = Theme.px(Theme.MarkSize),
         Parent = brand,
     })
-    corner(mark, 7)
-    text(NewInstance("TextLabel", {
+    corner(mark, Theme.MarkRadius)
+    -- The mark holds the DepHub "D" glyph (the mockup's inline SVG, drawn as text).
+    label(new("TextLabel", {
         Name = "Glyph",
-        Size = UDim2.new(1, 0, 1, 0),
+        Size = UDim2.fromScale(1, 1),
         TextScaled = true,
         TextXAlignment = Enum.TextXAlignment.Center,
-        Parent = mark,
-    }), "D", 16, Theme.BrandInk, true)
-    text(NewInstance("TextLabel", {
-        Name = "Title",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, -40, 1, 0),
-        Position = UDim2.fromOffset(40, 0),
         TextYAlignment = Enum.TextYAlignment.Center,
-        Parent = brand,
-    }), config.Title or "DepHub", 15, Theme.Text, true)
+        Parent = mark,
+    }), "D", 18, Theme.MarkInk, Enum.Font.GothamBold)
 
-    -- Current game caption
-    local gameRow = NewInstance("Frame", {
+    label(new("TextLabel", {
+        Name = "Name",
+        Size = UDim2.new(1, -38, 1, 0),
+        Position = UDim2.fromOffset(38, 0),
+        TextYAlignment = Enum.TextYAlignment.Center,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        Parent = brand,
+    }), config.Title or "DepHub", 15, Theme.Text, Enum.Font.GothamBold)
+
+    -- Current game: left:24 top:64, gap:7, 4x4 dot + name
+    local gameRow = new("Frame", {
         Name = "CurrentGame",
         BackgroundTransparency = 1,
         Size = UDim2.new(1, -48, 0, 16),
-        Position = UDim2.fromOffset(Theme.LeftPad, 64),
+        Position = UDim2.fromOffset(Theme.Left, Theme.GameTop),
         Parent = header,
     })
-    local indicator = NewInstance("Frame", {
+    local indicator = new("Frame", {
         Name = "Indicator",
-        BackgroundColor3 = Theme.Color(Theme.Quiet),
+        BackgroundColor3 = Theme.Color(Theme.GameIndicatorColor),
         BorderSizePixel = 0,
-        Size = Theme.px(4),
+        Size = Theme.px(Theme.GameIndicator),
         Position = UDim2.fromOffset(0, 6),
         Parent = gameRow,
     })
     corner(indicator, 2)
-    self.GameLabel = text(NewInstance("TextLabel", {
+    self.GameLabel = label(new("TextLabel", {
         Name = "GameName",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, -14, 1, 0),
-        Position = UDim2.fromOffset(14, 0),
+        Size = UDim2.new(1, -11, 1, 0),
+        Position = UDim2.fromOffset(11, 0),
         TextTruncate = Enum.TextTruncate.AtEnd,
         TextYAlignment = Enum.TextYAlignment.Center,
         Parent = gameRow,
-    }), config.GameName or "Aguardando jogo", 11, Theme.Muted, false)
+    }), config.GameName or "Jogo atual", Theme.GameNameFont, Theme.GameNameColor)
 
-    -- Window buttons: three traffic lights
-    local buttons = NewInstance("Frame", {
+    -- Window buttons: right:16 top:13, each 30x44 with a 13px dot that only
+    -- reveals its colour on hover (matching .window-buttons button::before).
+    local buttons = new("Frame", {
         Name = "WindowButtons",
         BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(120, 40),
-        Position = UDim2.new(1, -128, 0, 13),
+        Size = UDim2.fromOffset(Theme.WindowButtonW * 3, Theme.WindowButtonH),
+        Position = UDim2.new(1, -Theme.WindowButtonsRight - Theme.WindowButtonW * 3, 0, Theme.WindowButtonsTop),
         Parent = header,
     })
     local specs = {
-        {Name = "Close", Colour = Theme.CloseButton, Label = "×"},
-        {Name = "Minimize", Colour = Theme.MinButton, Label = "−"},
-        {Name = "Expand", Colour = Theme.MaxButton, Label = "⤢"},
+        {Name = "Close", Colour = Theme.CloseDot, Glyph = "×", Action = function() self:SetOpen(false) end},
+        {Name = "Minimize", Colour = Theme.MinDot, Glyph = "−", Action = function() self:ToggleMinimize() end},
+        {Name = "Expand", Colour = Theme.MaxDot, Glyph = "⤢", Action = function() self:ToggleExpand() end},
     }
     self.WindowButtons = {}
     for index, spec in ipairs(specs) do
-        local dot = NewInstance("TextButton", {
+        local button = new("TextButton", {
             Name = spec.Name,
-            BackgroundColor3 = Theme.Color(spec.Colour),
-            BorderSizePixel = 0,
+            BackgroundTransparency = 1,
             Text = "",
-            Size = Theme.px(13),
-            Position = UDim2.fromOffset((index - 1) * 34, 13),
+            Size = UDim2.fromOffset(Theme.WindowButtonW, Theme.WindowButtonH),
+            Position = UDim2.fromOffset((index - 1) * Theme.WindowButtonW, 0),
             AutoButtonColor = false,
             Parent = buttons,
         })
-        corner(dot, 7)
-        text(dot, spec.Label, 12, {r = 0, g = 0, b = 0}, false)
-        dot.TextTransparency = 1
-        dot.TextYAlignment = Enum.TextYAlignment.Center
-        dot.TextXAlignment = Enum.TextXAlignment.Center
-        self.WindowButtons[spec.Name] = dot
-    end
+        local dot = new("Frame", {
+            Name = "Dot",
+            BackgroundColor3 = Theme.Color(spec.Colour),
+            BorderSizePixel = 0,
+            Size = Theme.px(Theme.WindowDot),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            Position = UDim2.fromScale(0.5, 0.5),
+            Parent = button,
+        })
+        corner(dot, Theme.WindowDot / 2)
+        local glyph = label(new("TextLabel", {
+            Name = "Glyph",
+            Size = UDim2.fromScale(1, 1),
+            TextXAlignment = Enum.TextXAlignment.Center,
+            TextYAlignment = Enum.TextYAlignment.Center,
+            TextTransparency = 1,
+            Parent = button,
+        }), spec.Glyph, 14, {r = 0, g = 0, b = 0}, Enum.Font.GothamBold)
 
-    self._connect(self.WindowButtons.Close.MouseButton1Click, function()
-        self:SetOpen(false)
-    end)
-    self._connect(self.WindowButtons.Minimize.MouseButton1Click, function()
-        self:ToggleMinimize()
-    end)
-    self._connect(self.WindowButtons.Expand.MouseButton1Click, function()
-        self:ToggleExpand()
-    end)
+        self._connect(button.MouseEnter, function()
+            glyph.TextTransparency = 0.33
+            dot.Size = Theme.px(Theme.WindowDot + 2)
+        end)
+        self._connect(button.MouseLeave, function()
+            glyph.TextTransparency = 1
+            dot.Size = Theme.px(Theme.WindowDot)
+        end)
+        self._connect(button.MouseButton1Click, spec.Action)
+        self.WindowButtons[spec.Name] = button
+    end
 end
 
 -- ---------------------------------------------------------------------------
--- Sidebar (section navigation)
+-- Layout: nav + main
 -- ---------------------------------------------------------------------------
-function Panel:_buildSidebar()
-    local sidebar = NewInstance("Frame", {
-        Name = "Sidebar",
-        BackgroundColor3 = Theme.Color(Theme.Bg),
-        BorderSizePixel = 0,
-        Size = UDim2.new(0, Theme.SidebarWidth, 1, -Theme.FooterHeight),
+function Panel:_buildLayout()
+    local layout = new("Frame", {
+        Name = "Layout",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, -Theme.Footer),
         Parent = self.Body,
     })
-    NewInstance("Frame", {
+    self.Layout = layout
+
+    -- nav: 160px, border-right 1px #1c1c1c, padding 20 10, gap 7
+    local nav = new("Frame", {
+        Name = "Nav",
+        BackgroundColor3 = Theme.Color(Theme.NavBg),
+        BorderSizePixel = 0,
+        Size = UDim2.new(0, Theme.NavWidth, 1, 0),
+        Parent = layout,
+    })
+    new("Frame", {
         Name = "Divider",
         BackgroundColor3 = Theme.Color(Theme.NavBorder),
         BorderSizePixel = 0,
         Size = UDim2.new(0, 1, 1, 0),
         Position = UDim2.new(1, -1, 0, 0),
-        Parent = sidebar,
+        Parent = nav,
     })
-    padding(sidebar, 20, 10, 20, 10)
-
-    local list = NewInstance("Frame", {
+    local navList = new("Frame", {
         Name = "List",
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 1, 0),
-        Parent = sidebar,
+        Parent = nav,
     })
-    NewInstance("UIListLayout", {
-        FillDirection = Enum.FillDirection.Vertical,
-        Padding = UDim.new(0, 7),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = list,
-    })
-    self.NavList = list
-    self.Sidebar = sidebar
-end
+    pad(nav, Theme.NavPadV, Theme.NavPadH, Theme.NavPadV, Theme.NavPadH)
+    flex(navList, Enum.FillDirection.Vertical, Theme.NavGap)
+    self.Nav = nav
+    self.NavList = navList
 
--- ---------------------------------------------------------------------------
--- Content area
--- ---------------------------------------------------------------------------
-function Panel:_buildContent()
-    local content = NewInstance("ScrollingFrame", {
-        Name = "Content",
+    -- main: fluid, bg #0c0c0c, padding 25 26 30, scrollable
+    local main = new("ScrollingFrame", {
+        Name = "Main",
         BackgroundColor3 = Theme.Color(Theme.MainBg),
         BorderSizePixel = 0,
-        Size = UDim2.new(1, -Theme.SidebarWidth, 1, -Theme.FooterHeight),
-        Position = UDim2.fromOffset(Theme.SidebarWidth, 0),
+        Size = UDim2.new(1, -Theme.NavWidth, 1, 0),
+        Position = UDim2.fromOffset(Theme.NavWidth, 0),
         CanvasSize = UDim2.new(0, 0, 0, 0),
         AutomaticCanvasSize = Enum.AutomaticSize.Y,
         ScrollBarThickness = 4,
-        ScrollBarImageColor3 = Theme.Color({r = 58, g = 58, b = 58}),
+        ScrollBarImageColor3 = Theme.Color(Theme.ScrollBar),
         ScrollingDirection = Enum.ScrollingDirection.Y,
-        Parent = self.Body,
+        Parent = layout,
     })
-    padding(content, 25, 26, 30, 26)
-    local layout = NewInstance("UIListLayout", {
-        FillDirection = Enum.FillDirection.Vertical,
-        Padding = UDim.new(0, 0),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = content,
+    pad(main, Theme.MainPadTop, Theme.MainPadX, Theme.MainPadBottom, Theme.MainPadX)
+    local mainList = new("Frame", {
+        Name = "Stack",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        Parent = main,
     })
-    self.Content = content
-    self.ContentLayout = layout
+    flex(mainList, Enum.FillDirection.Vertical, 0)
+    self.Main = main
+    self.MainStack = mainList
 end
 
 -- ---------------------------------------------------------------------------
 -- Footer
 -- ---------------------------------------------------------------------------
 function Panel:_buildFooter()
-    local footer = NewInstance("Frame", {
+    local footer = new("Frame", {
         Name = "Footer",
-        BackgroundColor3 = Theme.Color(Theme.Bg),
+        BackgroundColor3 = Theme.Color(Theme.FooterBg),
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, Theme.FooterHeight),
-        Position = UDim2.new(0, 0, 1, -Theme.FooterHeight),
+        Size = UDim2.new(1, 0, 0, Theme.Footer),
+        Position = UDim2.new(0, 0, 1, -Theme.Footer),
         Parent = self.Body,
     })
-    NewInstance("Frame", {
-        Name = "Divider",
+    new("Frame", {
+        Name = "TopBorder",
         BackgroundColor3 = Theme.Color(Theme.FooterBorder),
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, 1),
         Parent = footer,
     })
-    padding(footer, 11, 22, 11, 22)
-    text(NewInstance("TextLabel", {
+    pad(footer, Theme.FooterPadV, Theme.FooterPadH, Theme.FooterPadV, Theme.FooterPadH)
+
+    label(new("TextLabel", {
         Name = "Brand",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(0, 120, 1, 0),
+        Size = UDim2.fromOffset(110, 1),
         TextYAlignment = Enum.TextYAlignment.Center,
         Parent = footer,
-    }), "D / DEPHUB", 9, Theme.FooterText, false)
+    }), "D / DEPHUB", Theme.FooterBrandSize, Theme.FooterBrandColor)
 
-    self.StatusLabel = text(NewInstance("TextLabel", {
+    self.StatusLabel = label(new("TextLabel", {
         Name = "Status",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, -240, 1, 0),
-        Position = UDim2.fromOffset(120, 0),
+        Size = UDim2.new(1, -220, 1, 0),
+        Position = UDim2.fromOffset(110, 0),
         TextTruncate = Enum.TextTruncate.AtEnd,
         TextXAlignment = Enum.TextXAlignment.Center,
         TextYAlignment = Enum.TextYAlignment.Center,
         Parent = footer,
-    }), "DepHub", 9, Theme.FooterText, false)
+    }), "Prévia de interface", Theme.FooterFont, Theme.FooterText)
 
-    self.KeyLabel = text(NewInstance("TextLabel", {
+    local key = new("Frame", {
         Name = "Key",
         BackgroundTransparency = 1,
-        Size = UDim2.new(0, 90, 1, 0),
-        Position = UDim2.new(1, -90, 0, 0),
+        Size = UDim2.fromOffset(60, 1),
+        Position = UDim2.new(1, -60, 0, 0),
+        Parent = footer,
+    })
+    self.KeyLabel = label(new("TextLabel", {
+        Name = "KeyText",
+        Size = UDim2.fromScale(1, 1),
         TextXAlignment = Enum.TextXAlignment.Right,
         TextYAlignment = Enum.TextYAlignment.Center,
-        Parent = footer,
-    }), "INSERT", 9, Theme.FooterText, false)
+        Parent = key,
+    }), "INSERT", 9, Theme.FooterKeyColor, Enum.Font.Code)
     self.Footer = footer
 end
 
@@ -2733,111 +2924,110 @@ end
 -- Toast
 -- ---------------------------------------------------------------------------
 function Panel:_buildToast()
-    local toast = NewInstance("Frame", {
+    local toast = new("Frame", {
         Name = "Toast",
         BackgroundColor3 = Theme.Color(Theme.ToastBg),
-        BackgroundTransparency = 0.06,
+        BackgroundTransparency = 0.07,
         BorderSizePixel = 0,
-        Size = UDim2.fromOffset(310, 0),
+        Size = UDim2.fromOffset(Theme.ToastWidth, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        Position = UDim2.new(1, -22, 1, -22),
+        Position = UDim2.new(1, -Theme.ToastRight, 1, -Theme.ToastBottom + 40),
         AnchorPoint = Vector2.new(1, 1),
         Visible = false,
         ZIndex = 100,
         Parent = self.ScreenGui,
     })
-    corner(toast, 9)
-    stroke(toast, Theme.ToastBorder, 1)
-    padding(toast, 16, 16, 16, 16)
-    NewInstance("UIListLayout", {
-        Padding = UDim.new(0, 7),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = toast,
-    })
-    self.ToastTitle = text(NewInstance("TextLabel", {
+    corner(toast, Theme.ToastRadius)
+    local toastStroke = stroke(toast, Theme.ToastBorder, 1)
+    pad(toast, Theme.ToastPad, Theme.ToastPad, Theme.ToastPad, Theme.ToastPad)
+    flex(toast, Enum.FillDirection.Vertical, 7)
+
+    self.ToastTitle = label(new("TextLabel", {
         Name = "Title",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 16),
+        Size = UDim2.new(1, 0, 0, 15),
         LayoutOrder = 1,
         Parent = toast,
-    }), "", 12, Theme.Text, true)
-    self.ToastMessage = text(NewInstance("TextLabel", {
+    }), "", Theme.ToastTitleSize, Theme.Text, Enum.Font.GothamMedium)
+
+    self.ToastMessage = label(new("TextLabel", {
         Name = "Message",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 16),
+        Size = UDim2.new(1, 0, 0, 14),
         AutomaticSize = Enum.AutomaticSize.Y,
         TextWrapped = true,
         TextYAlignment = Enum.TextYAlignment.Top,
         LayoutOrder = 2,
         Parent = toast,
-    }), "", 11, Theme.Muted, false)
+    }), "", Theme.ToastBodySize, Theme.ToastBodyColor)
+
     self.Toast = toast
-    self.ToastStroke = toast:FindFirstChildOfClass("UIStroke")
-    self._toastToken = 0
+    self.ToastStroke = toastStroke
+    self.ToastToken = 0
 end
 
 -- ---------------------------------------------------------------------------
--- Confirmation modal
+-- Confirmation dialog
 -- ---------------------------------------------------------------------------
-function Panel:_buildModal()
-    local overlay = NewInstance("Frame", {
-        Name = "ModalOverlay",
+function Panel:_buildDialog()
+    local overlay = new("Frame", {
+        Name = "DialogOverlay",
         BackgroundColor3 = Color3.fromRGB(0, 0, 0),
-        BackgroundTransparency = 0.35,
+        BackgroundTransparency = 0.31,
         BorderSizePixel = 0,
         Size = UDim2.fromScale(1, 1),
         Visible = false,
         ZIndex = 200,
         Parent = self.ScreenGui,
     })
-    local dialog = NewInstance("Frame", {
+    local dialog = new("Frame", {
         Name = "Dialog",
-        BackgroundColor3 = Theme.Color(Theme.ModalBg),
+        BackgroundColor3 = Theme.Color(Theme.DialogBg),
         BorderSizePixel = 0,
-        Size = UDim2.fromOffset(390, 0),
+        Size = UDim2.fromOffset(Theme.DialogWidth, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         AnchorPoint = Vector2.new(0.5, 0.5),
         Position = UDim2.fromScale(0.5, 0.5),
         ZIndex = 201,
         Parent = overlay,
     })
-    corner(dialog, 12)
-    stroke(dialog, Theme.ModalBorder, 1)
-    padding(dialog, 25, 25, 25, 25)
-    NewInstance("UIListLayout", {
-        Padding = UDim.new(0, 12),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = dialog,
-    })
-    self.ModalTitle = text(NewInstance("TextLabel", {
+    corner(dialog, Theme.DialogRadius)
+    stroke(dialog, Theme.DialogBorder, 1)
+    pad(dialog, Theme.DialogPad, Theme.DialogPad, Theme.DialogPad, Theme.DialogPad)
+
+    self.DialogTitle = label(new("TextLabel", {
         Name = "Title",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 22),
-        LayoutOrder = 1,
+        Size = UDim2.new(1, 0, 0, 24),
+        TextYAlignment = Enum.TextYAlignment.Top,
         Parent = dialog,
-    }), "Confirmar ação?", 18, Theme.Text, false)
-    self.ModalMessage = text(NewInstance("TextLabel", {
+    }), "Confirmar ação?", Theme.DialogH2Size, Theme.Text, Enum.Font.GothamMedium)
+    self.DialogTitle.Position = UDim2.fromOffset(0, 0)
+
+    self.DialogMessage = label(new("TextLabel", {
         Name = "Message",
-        BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         TextWrapped = true,
         TextYAlignment = Enum.TextYAlignment.Top,
-        LayoutOrder = 2,
         Parent = dialog,
-    }), "", 12, Theme.Muted, false)
+    }), "", Theme.DialogBodySize, Theme.DialogBodyColor)
+    self.DialogMessage.Position = UDim2.fromOffset(0, 38)
 
-    local group = NewInstance("Frame", {
+    local group = new("Frame", {
         Name = "Buttons",
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 38),
-        LayoutOrder = 3,
+        Size = UDim2.new(1, 0, 0, Theme.ActionMinH),
         Parent = dialog,
     })
-    self.ModalOverlay = overlay
-    self.Modal = dialog
-    self._modalButtons = group
-    self._modalConfirm = nil
+    -- Position by an absolute layout so AutomaticSize on the dialog still fits.
+    new("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, Theme.ButtonGroupGap),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = group,
+    })
+    group.Position = UDim2.fromOffset(0, 0)
+    self.Dialog = dialog
+    self.DialogOverlay = overlay
+    self.DialogButtons = group
 end
 
 -- ---------------------------------------------------------------------------
@@ -2858,28 +3048,21 @@ end
 -- ---------------------------------------------------------------------------
 function Panel:_applyLayout()
     local window = self.Window
+    window.AnchorPoint = Vector2.new(0.5, 0.5)
     if self.Minimized then
-        window.Size = UDim2.new(0, Theme.PanelWidth, 0, Theme.HeaderHeight + 1)
+        window.Size = UDim2.fromOffset(Theme.MinWidth, Theme.Header + 1)
+        window.Position = UDim2.fromScale(0.5, 0.5)
     elseif self.Expanded then
         window.Size = UDim2.new(1, -32, 1, -92)
+        window.AnchorPoint = Vector2.new(0, 0)
         window.Position = UDim2.fromOffset(16, 76)
     else
-        window.Size = UDim2.fromOffset(Theme.PanelWidth, Theme.PanelHeight)
+        window.Size = UDim2.fromOffset(Theme.MinWidth, Theme.MinHeight)
         window.Position = UDim2.fromScale(0.5, 0.5)
-        window.AnchorPoint = Vector2.new(0.5, 0.5)
     end
-    if not self.Expanded then
-        window.AnchorPoint = Vector2.new(0.5, 0.5)
-    end
-    if self.Minimized then
-        self.Sidebar.Visible = false
-        self.Content.Visible = false
-        self.Footer.Visible = false
-    else
-        self.Sidebar.Visible = true
-        self.Content.Visible = true
-        self.Footer.Visible = true
-    end
+    local show = not self.Minimized
+    self.Layout.Visible = show
+    self.Footer.Visible = show
 end
 
 function Panel:SetOpen(open)
@@ -2902,104 +3085,133 @@ function Panel:ToggleExpand()
 end
 
 function Panel:SetGame(name)
-    if self.GameLabel and type(name) == "string" then
-        self.GameLabel.Text = name
-    end
+    if self.GameLabel and type(name) == "string" then self.GameLabel.Text = name end
 end
 
 function Panel:SetStatus(text)
-    if self.StatusLabel and type(text) == "string" then
-        self.StatusLabel.Text = text
-    end
+    if self.StatusLabel and type(text) == "string" then self.StatusLabel.Text = text end
 end
 
 -- ---------------------------------------------------------------------------
--- Tabs
+-- Page scaffolding
 -- ---------------------------------------------------------------------------
 
--- CreateTab(name, glyph) -> {Name, Page, Button}
--- The first tab created becomes active.
-function Panel:CreateTab(name, glyph)
-    assert(type(name) == "string" and #name > 0, "CreateTab needs a name")
+function Panel:_next()
+    self.Order = (self.Order or 0) + 1
+    return self.Order
+end
+
+-- CreateTab(spec) -> {Name, Page, Button, Label}
+-- spec = {Name, Glyph, Intro, Search} (Search renders the filter field the
+-- mockup shows at the top of the Jogador page).
+function Panel:CreateTab(spec)
+    if type(spec) == "string" then spec = {Name = spec} end
+    assert(type(spec.Name) == "string" and #spec.Name > 0, "CreateTab needs a Name")
 
     local index = #self.TabOrder + 1
-    local page = NewInstance("Frame", {
-        Name = name,
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        Visible = #self.TabOrder == 0,
-        Parent = self.Content,
-    })
-    NewInstance("UIListLayout", {
-        FillDirection = Enum.FillDirection.Vertical,
-        Padding = UDim.new(0, 0),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = page,
-    })
+    local first = index == 1
 
-    local button = NewInstance("TextButton", {
-        Name = name,
-        BackgroundColor3 = (#self.TabOrder == 0) and Theme.Color(Theme.NavActiveBg) or Theme.Color(Theme.Bg),
-        BackgroundTransparency = (#self.TabOrder == 0) and 0 or 1,
+    -- nav button: min-height 44, padding 11 10, gap 9, radius 6
+    local button = new("TextButton", {
+        Name = spec.Name,
+        BackgroundColor3 = Theme.Color(first and Theme.NavActiveBg or Theme.NavBg),
+        BackgroundTransparency = first and 0 or 1,
         BorderSizePixel = 0,
         AutoButtonColor = false,
-        Size = UDim2.new(1, 0, 0, 44),
+        Size = UDim2.new(1, 0, 0, Theme.NavItemMinH),
         LayoutOrder = index,
         Text = "",
         Parent = self.NavList,
     })
-    corner(button, 6)
-    text(NewInstance("TextLabel", {
+    corner(button, Theme.NavItemRadius)
+
+    local glyph = label(new("TextLabel", {
         Name = "Glyph",
-        BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(20, 0),
-        Position = UDim2.fromOffset(10, 0),
-        TextSize = 17,
+        Size = UDim2.fromOffset(Theme.NavGlyphWidth, 1),
+        Position = UDim2.fromOffset(Theme.NavItemPadH, 0),
         TextXAlignment = Enum.TextXAlignment.Center,
         TextYAlignment = Enum.TextYAlignment.Center,
-        TextColor3 = Theme.Color(Theme.NavIdle),
         Parent = button,
-    }), glyph or "•", 17, Theme.NavIdle, false).Size = UDim2.new(0, 20, 1, 0)
-    local label = NewInstance("TextLabel", {
-        Name = "Label",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, -40, 1, 0),
-        Position = UDim2.fromOffset(39, 0),
-        TextYAlignment = Enum.TextYAlignment.Center,
-        Parent = button,
-    })
-    label.Text = name
-    label.Font = Enum.Font.Gotham
-    label.TextSize = 12
-    label.TextXAlignment = Enum.TextXAlignment.Left
-    label.TextColor3 = Theme.Color(Theme.NavIdle)
+    }), spec.Glyph or "•", Theme.NavGlyphFont, first and Theme.NavActiveText or Theme.NavGlyphColor)
+    glyph.Size = UDim2.new(0, Theme.NavGlyphWidth, 1, 0)
 
-    local tab = {Name = name, Page = page, Button = button, Label = label, Glyph = button:FindFirstChild("Glyph")}
-    self.Tabs[name] = tab
-    self.TabOrder[#self.TabOrder + 1] = tab
+    local text = label(new("TextLabel", {
+        Name = "Text",
+        Size = UDim2.new(1, -(Theme.NavItemPadH * 2 + Theme.NavGlyphWidth + Theme.NavItemGap), 1, 0),
+        Position = UDim2.fromOffset(Theme.NavItemPadH + Theme.NavGlyphWidth + Theme.NavItemGap, 0),
+        TextYAlignment = Enum.TextYAlignment.Center,
+        TextTruncate = Enum.TextTruncate.AtEnd,
+        Parent = button,
+    }), spec.Name, Theme.NavFont, first and Theme.NavActiveText or Theme.NavIdle)
+
+    -- page: a heading (h1 + intro), optional search, then the stack
+    local page = new("Frame", {
+        Name = spec.Name,
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        Visible = first,
+        Parent = self.MainStack,
+    })
+    flex(page, Enum.FillDirection.Vertical, 0)
+
+    local heading = new("Frame", {
+        Name = "Heading",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 40),
+        LayoutOrder = self:_next(),
+        Parent = page,
+    })
+    label(new("TextLabel", {
+        Name = "Title",
+        Size = UDim2.new(1, 0, 0, 25),
+        TextYAlignment = Enum.TextYAlignment.Top,
+        Parent = heading,
+    }), spec.Name, Theme.H1Size, Theme.Text, Enum.Font.GothamMedium)
+    if spec.Intro then
+        label(new("TextLabel", {
+            Name = "Intro",
+            Size = UDim2.new(1, 0, 0, 15),
+            Position = UDim2.fromOffset(0, 28),
+            TextYAlignment = Enum.TextYAlignment.Top,
+            Parent = heading,
+        }), spec.Intro, Theme.IntroSize, Theme.IntroColor)
+    end
+
+    local stack = new("Frame", {
+        Name = "Stack",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 0),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        LayoutOrder = self:_next(),
+        Parent = page,
+    })
+    flex(stack, Enum.FillDirection.Vertical, 0)
+
+    local tab = {Name = spec.Name, Page = page, Button = button, Stack = stack, Label = text, Glyph = glyph, Active = first}
+
+    if spec.Search then
+        tab.Search = self:AddSearch(tab, spec.Search)
+    end
 
     self._connect(button.MouseEnter, function()
         if not tab.Active then
             button.BackgroundTransparency = 0
             button.BackgroundColor3 = Theme.Color(Theme.NavHoverBg)
-            label.TextColor3 = Theme.Color(Theme.Heading)
+            text.TextColor3 = Theme.Color(Theme.NavHoverText)
         end
     end)
     self._connect(button.MouseLeave, function()
         if not tab.Active then
             button.BackgroundTransparency = 1
-            label.TextColor3 = Theme.Color(Theme.NavIdle)
-            if tab.Glyph then tab.Glyph.TextColor3 = Theme.Color(Theme.NavIdle) end
+            text.TextColor3 = Theme.Color(Theme.NavIdle)
+            glyph.TextColor3 = Theme.Color(Theme.NavGlyphColor)
         end
     end)
-    self._connect(button.MouseButton1Click, function()
-        self:SelectTab(name)
-    end)
+    self._connect(button.MouseButton1Click, function() self:SelectTab(spec.Name) end)
 
-    if #self.TabOrder == 1 then
-        tab.Active = true
-    end
+    self.Tabs[spec.Name] = tab
+    self.TabOrder[#self.TabOrder + 1] = tab
     return tab
 end
 
@@ -3011,162 +3223,170 @@ function Panel:SelectTab(name)
         tab.Active = active
         tab.Page.Visible = active
         tab.Button.BackgroundTransparency = active and 0 or 1
-        tab.Button.BackgroundColor3 = Theme.Color(active and Theme.NavActiveBg or Theme.Bg)
+        tab.Button.BackgroundColor3 = Theme.Color(active and Theme.NavActiveBg or Theme.NavBg)
         tab.Label.TextColor3 = Theme.Color(active and Theme.NavActiveText or Theme.NavIdle)
-        if tab.Glyph then
-            tab.Glyph.TextColor3 = Theme.Color(active and Theme.NavActiveText or Theme.NavIdle)
-        end
+        tab.Glyph.TextColor3 = Theme.Color(active and Theme.NavActiveText or Theme.NavGlyphColor)
     end
     return target
 end
 
--- ---------------------------------------------------------------------------
--- Section building blocks
--- ---------------------------------------------------------------------------
+-- A search field at the top of a page, matching .field.search.
+function Panel:AddSearch(tab, placeholder)
+    local page = tab.Stack or tab.Page
+    local field = new("TextBox", {
+        Name = "Search",
+        BackgroundColor3 = Theme.Color(Theme.SearchBg),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, Theme.FieldMinH),
+        LayoutOrder = self:_next(),
+        Text = "",
+        PlaceholderText = placeholder or "Encontrar uma opção...",
+        PlaceholderColor3 = Theme.Color(Theme.FieldPlaceholder),
+        Font = Enum.Font.Gotham,
+        TextSize = Theme.FieldFont,
+        TextColor3 = Theme.Color(Theme.FieldText),
+        TextXAlignment = Enum.TextXAlignment.Left,
+        ClearTextOnFocus = false,
+        Parent = page,
+    })
+    corner(field, Theme.FieldRadius)
+    stroke(field, Theme.SearchBorder, 1)
+    pad(field, 0, Theme.FieldPadH, 0, Theme.FieldPadH)
 
-local function labelBlock(parent, title, help, order)
-    local box = NewInstance("Frame", {
+    local wrapper = {Instance = field, Rows = {}}
+    function wrapper:Get() return field.Text end
+    function wrapper:Set(value) field.Text = tostring(value or "") end
+    function wrapper:Register(row, searchText)
+        self.Rows[#self.Rows + 1] = {Row = row, Text = string.lower(searchText or "")}
+    end
+    self._connect(field:GetPropertyChangedSignal("Text"), function()
+        local query = string.lower(field.Text)
+        for _, entry in ipairs(wrapper.Rows) do
+            local visible = query == "" or string.find(entry.Text, query, 1, true) ~= nil
+            entry.Row.Visible = visible
+        end
+    end)
+    self.Components[#self.Components + 1] = wrapper
+    return wrapper
+end
+
+-- AddSection(tab, text): the uppercase .section-label.
+function Panel:AddSection(tab, text)
+    local stack = tab.Stack or tab.Page
+    local result = label(new("TextLabel", {
+        Name = "SectionLabel",
+        Size = UDim2.new(1, 0, 0, 12),
+        LayoutOrder = self:_next(),
+        Parent = stack,
+    }), string.upper(text or ""), Theme.SectionLabelSize, Theme.SectionLabel)
+    result.TextXAlignment = Enum.TextXAlignment.Left
+    return result
+end
+
+-- Internal: a .row with a left label block and a right control slot.
+function Panel:_row(tab, title, help, order, opts)
+    opts = opts or {}
+    local stack = tab.Stack or tab.Page
+    local row = new("Frame", {
+        Name = title or "Row",
+        BackgroundColor3 = Theme.Color(Theme.RowBg),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, Theme.RowMinH),
+        AutomaticSize = Enum.AutomaticSize.Y,
+        LayoutOrder = order or self:_next(),
+        Parent = stack,
+    })
+    corner(row, Theme.RowRadius)
+    pad(row, Theme.RowPad, Theme.RowPad, Theme.RowPad, Theme.RowPad)
+    new("UISizeConstraint", {
+        Name = "MinHeight",
+        MinSize = Vector2.new(0, Theme.RowMinH),
+        MaxSize = Vector2.new(math.huge, math.huge),
+        Parent = row,
+    })
+
+    -- left block: label + optional help
+    local block = new("Frame", {
         Name = "Labels",
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 0),
+        Size = UDim2.new(1, opts.Full and 0 or -150, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        LayoutOrder = order or 1,
-        Parent = parent,
+        Parent = row,
     })
-    NewInstance("UIListLayout", {
-        Padding = UDim.new(0, 6),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = box,
-    })
-    local label = text(NewInstance("TextLabel", {
+    flex(block, Enum.FillDirection.Vertical, Theme.HelpMarginTop)
+    label(new("TextLabel", {
         Name = "Title",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 16),
+        Size = UDim2.new(1, 0, 0, 14),
         AutomaticSize = Enum.AutomaticSize.Y,
         TextWrapped = true,
         TextYAlignment = Enum.TextYAlignment.Top,
         LayoutOrder = 1,
-        Parent = box,
-    }), title or "", 12, Theme.Heading, false)
-    local helpLabel
+        Parent = block,
+    }), title or "", Theme.RowLabelFont, Theme.RowLabel)
     if help and #help > 0 then
-        helpLabel = text(NewInstance("TextLabel", {
+        label(new("TextLabel", {
             Name = "Help",
-            BackgroundTransparency = 1,
-            Size = UDim2.new(1, 0, 0, 14),
+            Size = UDim2.new(1, 0, 0, 12),
             AutomaticSize = Enum.AutomaticSize.Y,
             TextWrapped = true,
             TextYAlignment = Enum.TextYAlignment.Top,
             LayoutOrder = 2,
-            Parent = box,
-        }), help, 10, Theme.HelpText, false)
+            Parent = block,
+        }), help, Theme.HelpFont, Theme.HelpColor)
     end
-    return box, label, helpLabel
-end
 
--- AddSection(tab, label) -> adds a small uppercase section header.
-function Panel:AddSection(tab, label)
-    local title = type(tab) == "table" and tab.Page or tab
-    local header = text(NewInstance("TextLabel", {
-        Name = "SectionLabel",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 14),
-        LayoutOrder = (self._order or 0) + 1,
-        Parent = title,
-    }), string.upper(label or ""), 9, Theme.SectionLabel, false)
-    header.TextXAlignment = Enum.TextXAlignment.Left
-    self._order = (self._order or 0) + 1
-    return header
-end
-
--- Row(frame with title/help + right-hand control). Returns row frame, the
--- left-hand labels block and the right-hand slot Frame where a control goes.
--- Layout mirrors the CSS: .row is flex/space-between, labels take the left and
--- the control sits on the right.
-function Panel:_row(tab, title, help, order)
-    local page = tab.Page or tab
-    local row = NewInstance("Frame", {
-        Name = title or "Row",
-        BackgroundColor3 = Theme.Color(Theme.RowBg),
-        BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 61),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        LayoutOrder = order,
-        ClipsDescendants = false,
-        Parent = page,
-    })
-    corner(row, 6)
-    padding(row, 14, 14, 14, 14)
-
-    local labels = labelBlock(row, title, help, 1)
-    labels.Size = UDim2.new(1, -170, 0, 0)
-    labels.Position = UDim2.fromOffset(0, 0)
-
-    local slot = NewInstance("Frame", {
+    local slot = new("Frame", {
         Name = "Control",
         BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(160, 0),
+        Size = UDim2.fromOffset(150, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         AnchorPoint = Vector2.new(1, 0.5),
         Position = UDim2.new(1, 0, 0.5, 0),
         Parent = row,
     })
-    -- The row keeps the CSS min-height (61px) but grows if the labels wrap.
-    NewInstance("UISizeConstraint", {
-        Name = "MinHeight",
-        MinSize = Vector2.new(0, 61),
-        MaxSize = Vector2.new(math.huge, math.huge),
-        Parent = row,
-    })
-    return row, labels, slot
+    return row, block, slot
 end
 
 -- ---------------------------------------------------------------------------
 -- Controls
 -- ---------------------------------------------------------------------------
 
-function Panel:_next(page)
-    self._order = (self._order or 0) + 1
-    return self._order
-end
-
--- AddToggle(tab, title, help, value, callback) -> {Set, Get, Instance}
+-- AddToggle(tab, title, help, value, callback)
 function Panel:AddToggle(tab, title, help, value, callback)
-    local order = self:_next(tab)
+    local order = self:_next()
     local row, _, slot = self:_row(tab, title, help, order)
     local on = value == true
 
-    local toggle = NewInstance("TextButton", {
+    -- .toggle: 34x21 radius 20, knob 13 at 3,3 that shifts 13px
+    local toggle = new("TextButton", {
         Name = "Toggle",
-        BackgroundColor3 = Theme.Color(on and Theme.Accent or Theme.ToggleOff),
+        BackgroundColor3 = Theme.Color(on and Theme.Accent or Theme.ToggleBg),
         BorderSizePixel = 0,
-        Size = UDim2.fromOffset(34, 21),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        Size = Theme.px(Theme.ToggleW, Theme.ToggleH),
         AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, 0, 0.5, 0),
         AutoButtonColor = false,
         Text = "",
         Parent = slot,
     })
-    corner(toggle, 11)
-    stroke(toggle, on and Theme.Accent or Theme.ToggleOffBorder, 1)
-    local knob = NewInstance("Frame", {
+    corner(toggle, Theme.ToggleRadius)
+    local toggleStroke = stroke(toggle, on and Theme.Accent or Theme.ToggleBorder, 1)
+    local knob = new("Frame", {
         Name = "Knob",
-        BackgroundColor3 = Theme.Color(on and Theme.ToggleKnobOn or Theme.ToggleKnobOff),
+        BackgroundColor3 = Theme.Color(on and Theme.ToggleKnobOn or Theme.ToggleKnob),
         BorderSizePixel = 0,
-        Size = Theme.px(13),
-        Position = UDim2.fromOffset(on and 18 or 3, 3),
+        Size = Theme.px(Theme.ToggleKnobSize),
+        Position = UDim2.fromOffset(on and (Theme.ToggleKnobInset + Theme.ToggleShift) or Theme.ToggleKnobInset, Theme.ToggleKnobInset),
         Parent = toggle,
     })
-    corner(knob, 7)
+    corner(knob, Theme.ToggleKnobSize / 2)
 
     local control = {}
-    local busy = false
     local function render()
-        toggle.BackgroundColor3 = Theme.Color(on and Theme.Accent or Theme.ToggleOff)
-        local s = toggle:FindFirstChildOfClass("UIStroke")
-        if s then s.Color = Theme.Color(on and Theme.Accent or Theme.ToggleOffBorder) end
-        knob.BackgroundColor3 = Theme.Color(on and Theme.ToggleKnobOn or Theme.ToggleKnobOff)
-        knob.Position = UDim2.fromOffset(on and 18 or 3, 3)
+        toggle.BackgroundColor3 = Theme.Color(on and Theme.Accent or Theme.ToggleBg)
+        toggleStroke.Color = Theme.Color(on and Theme.Accent or Theme.ToggleBorder)
+        knob.BackgroundColor3 = Theme.Color(on and Theme.ToggleKnobOn or Theme.ToggleKnob)
+        knob.Position = UDim2.fromOffset(on and (Theme.ToggleKnobInset + Theme.ToggleShift) or Theme.ToggleKnobInset, Theme.ToggleKnobInset)
     end
     function control:Get() return on end
     function control:Set(next, silent)
@@ -3174,61 +3394,49 @@ function Panel:AddToggle(tab, title, help, value, callback)
         if next == on then return on end
         on = next
         render()
-        if not silent and callback then
-            if busy then return on end
-            busy = true
-            local ok, err = pcall(callback, on)
-            busy = false
-            if not ok and type(warn) == "function" then warn("[DepHub panel] toggle callback: " .. tostring(err)) end
-        end
+        if not silent and callback then pcall(callback, on) end
         return on
     end
-
-    self._connect(toggle.MouseButton1Click, function()
-        control:Set(not on)
-    end)
+    self._connect(toggle.MouseButton1Click, function() control:Set(not on) end)
     control.Instance = toggle
     control.Row = row
     self.Components[#self.Components + 1] = control
+    if tab.Search then tab.Search:Register(row, title) end
     return control
 end
 
--- AddCheckbox: a plain square checkbox (indeterminate-free), used for the
--- "remember preferences" style rows.
+-- AddCheckbox(tab, title, help, value, callback): the 17px .checkbox
 function Panel:AddCheckbox(tab, title, help, value, callback)
-    local order = self:_next(tab)
+    local order = self:_next()
     local row, _, slot = self:_row(tab, title, help, order)
     local on = value == true
 
-    local box = NewInstance("TextButton", {
+    local box = new("TextButton", {
         Name = "Checkbox",
-        BackgroundColor3 = Theme.Color(Theme.FieldBg),
+        BackgroundColor3 = Theme.Color(on and Theme.Accent or Theme.FieldBg),
         BorderSizePixel = 0,
-        Size = Theme.px(17),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        Size = Theme.px(Theme.CheckboxSize),
         AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, 0, 0.5, 0),
         AutoButtonColor = false,
         Text = "",
         Parent = slot,
     })
     corner(box, 3)
-    stroke(box, on and Theme.Accent or Theme.FieldBorder, 1)
-    local tick = text(NewInstance("TextLabel", {
+    local boxStroke = stroke(box, on and Theme.Accent or Theme.FieldBorder, 1)
+    local tick = label(new("TextLabel", {
         Name = "Tick",
-        BackgroundTransparency = 1,
         Size = UDim2.fromScale(1, 1),
-        TextYAlignment = Enum.TextYAlignment.Center,
         TextXAlignment = Enum.TextXAlignment.Center,
+        TextYAlignment = Enum.TextYAlignment.Center,
         Parent = box,
-    }), "✓", 12, Theme.BrandInk, true)
+    }), "✓", 12, Theme.MarkInk, Enum.Font.GothamBold)
     tick.Visible = on
-    tick.TextColor3 = Theme.Color(Theme.BrandInk)
 
     local control = {}
     local function render()
         box.BackgroundColor3 = Theme.Color(on and Theme.Accent or Theme.FieldBg)
-        local s = box:FindFirstChildOfClass("UIStroke")
-        if s then s.Color = Theme.Color(on and Theme.Accent or Theme.FieldBorder) end
+        boxStroke.Color = Theme.Color(on and Theme.Accent or Theme.FieldBorder)
         tick.Visible = on
     end
     function control:Get() return on end
@@ -3240,55 +3448,75 @@ function Panel:AddCheckbox(tab, title, help, value, callback)
         if not silent and callback then pcall(callback, on) end
         return on
     end
-    self._connect(box.MouseButton1Click, function()
-        control:Set(not on)
-    end)
+    self._connect(box.MouseButton1Click, function() control:Set(not on) end)
     control.Instance = box
     control.Row = row
     self.Components[#self.Components + 1] = control
+    if tab.Search then tab.Search:Register(row, title) end
     return control
 end
 
--- AddSlider(tab, title, help, min, max, step, value, callback) -> {Set,Get}
-function Panel:AddSlider(tab, title, help, min, max, step, value, callback)
-    local order = self:_next(tab)
-    local row, _, _ = self:_row(tab, title, help, order)
-    -- Sliders take the full width under the label block, like the CSS .range.
-    row.Size = UDim2.new(1, 0, 0, 92)
-    row:FindFirstChild("Control"):Destroy()
-
+-- AddSlider(tab, title, min, max, step, value, callback, format)
+-- Builds the .range block: label + output row on top, a 5px track below.
+function Panel:AddSlider(tab, title, min, max, step, value, callback, format)
+    local stack = tab.Stack or tab.Page
     local minV = tonumber(min) or 0
     local maxV = tonumber(max) or 100
     local stepV = tonumber(step) or 1
     local current = math.clamp(tonumber(value) or minV, minV, maxV)
+    format = format or function(v) return tostring(v) end
 
-    local readout = text(NewInstance("TextLabel", {
-        Name = "Readout",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 14),
-        Position = UDim2.new(0, 0, 0, 30),
-        TextXAlignment = Enum.TextXAlignment.Right,
-        Parent = row,
-    }), tostring(current), 11, Theme.Muted, false)
-
-    local track = NewInstance("Frame", {
-        Name = "Track",
-        BackgroundColor3 = Theme.Color(Theme.ToggleOff),
+    local block = new("Frame", {
+        Name = title or "Range",
+        BackgroundColor3 = Theme.Color(Theme.RangeBg),
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 5),
-        Position = UDim2.new(0, 0, 0, 62),
-        Parent = row,
+        Size = UDim2.new(1, 0, 0, 66),
+        LayoutOrder = self:_next(),
+        Parent = stack,
     })
-    corner(track, 3)
-    local fill = NewInstance("Frame", {
+    corner(block, Theme.RangeRadius)
+    pad(block, Theme.RangePadTop, Theme.RangePadX, Theme.RangePadBottom, Theme.RangePadX)
+
+    local head = new("Frame", {
+        Name = "Head",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, 16),
+        Parent = block,
+    })
+    label(new("TextLabel", {
+        Name = "Title",
+        Size = UDim2.new(1, -70, 1, 0),
+        TextYAlignment = Enum.TextYAlignment.Center,
+        Parent = head,
+    }), title or "", 12, Theme.RangeLabel)
+    local readout = label(new("TextLabel", {
+        Name = "Output",
+        Size = UDim2.fromOffset(70, 1),
+        Position = UDim2.new(1, -70, 0, 0),
+        TextXAlignment = Enum.TextXAlignment.Right,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        Parent = head,
+    }), format(current), Theme.RangeOutputSize, Theme.RangeOutput)
+    readout.Size = UDim2.new(0, 70, 1, 0)
+
+    local track = new("Frame", {
+        Name = "Track",
+        BackgroundColor3 = Theme.Color(Theme.ToggleBg),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, 0, 0, Theme.RangeTrackHeight),
+        Position = UDim2.fromOffset(0, Theme.RangeTrackMarginTop),
+        Parent = block,
+    })
+    corner(track, Theme.RangeTrackHeight / 2)
+    local fill = new("Frame", {
         Name = "Fill",
         BackgroundColor3 = Theme.Color(Theme.Accent),
         BorderSizePixel = 0,
         Size = UDim2.fromScale((current - minV) / math.max(maxV - minV, 1e-6), 1),
         Parent = track,
     })
-    corner(fill, 3)
-    local knob = NewInstance("Frame", {
+    corner(fill, Theme.RangeTrackHeight / 2)
+    local knob = new("Frame", {
         Name = "Knob",
         BackgroundColor3 = Theme.Color(Theme.Accent),
         BorderSizePixel = 0,
@@ -3298,12 +3526,11 @@ function Panel:AddSlider(tab, title, help, min, max, step, value, callback)
         Parent = track,
     })
     corner(knob, 7)
-
-    local hitbox = NewInstance("TextButton", {
+    local hitbox = new("TextButton", {
         Name = "Hitbox",
         BackgroundTransparency = 1,
         Text = "",
-        Size = UDim2.new(1, 0, 0, 24),
+        Size = UDim2.new(1, 0, 1, 24),
         Position = UDim2.new(0, 0, 0.5, 0),
         AnchorPoint = Vector2.new(0, 0.5),
         AutoButtonColor = false,
@@ -3319,7 +3546,7 @@ function Panel:AddSlider(tab, title, help, min, max, step, value, callback)
         local alpha = (v - minV) / math.max(maxV - minV, 1e-6)
         fill.Size = UDim2.fromScale(alpha, 1)
         knob.Position = UDim2.new(alpha, 0, 0.5, 0)
-        readout.Text = tostring(v)
+        readout.Text = format(v)
     end
     function control:Get() return current end
     function control:Set(v, silent)
@@ -3332,16 +3559,16 @@ function Panel:AddSlider(tab, title, help, min, max, step, value, callback)
     end
 
     local dragging = false
-    local function updateFromInput(px)
-        local trackAbs = track.AbsolutePosition.X
-        local trackW = math.max(track.AbsoluteSize.X, 1)
-        local alpha = math.clamp((px - trackAbs) / trackW, 0, 1)
+    local function fromX(px)
+        local absX = track.AbsolutePosition.X
+        local width = math.max(track.AbsoluteSize.X, 1)
+        local alpha = math.clamp((px - absX) / width, 0, 1)
         control:Set(minV + alpha * (maxV - minV))
     end
     self._connect(hitbox.InputBegan, function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
-            updateFromInput(input.Position.X)
+            fromX(input.Position.X)
         end
     end)
     self._connect(hitbox.InputEnded, function(input)
@@ -3351,192 +3578,194 @@ function Panel:AddSlider(tab, title, help, min, max, step, value, callback)
     end)
     self._connect(game:GetService("UserInputService").InputChanged, function(input)
         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            updateFromInput(input.Position.X)
+            fromX(input.Position.X)
         end
     end)
 
     control.Instance = track
-    control.Row = row
+    control.Block = block
     render(current)
     self.Components[#self.Components + 1] = control
+    if tab.Search then tab.Search:Register(block, title) end
     return control
 end
 
--- AddDropdown(tab, title, help, options, value, callback) -> {Set,Get}
--- options is an array of strings; value is the initially selected string.
+-- AddDropdown(tab, title, help, options, value, callback)
+-- Uses the .choice-trigger button + floating .choice-menu from the mockup.
 function Panel:AddDropdown(tab, title, help, options, value, callback)
-    local order = self:_next(tab)
+    local order = self:_next()
     local row, _, slot = self:_row(tab, title, help, order)
     options = options or {}
-
     local current = value
     if current == nil and #options > 0 then current = options[1] end
 
-    local trigger = NewInstance("TextButton", {
-        Name = "Trigger",
-        BackgroundColor3 = Theme.Color({r = 27, g = 27, b = 27}),
+    local trigger = new("TextButton", {
+        Name = "ChoiceTrigger",
+        BackgroundColor3 = Theme.Color(Theme.TriggerBg),
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 38),
-        Position = UDim2.new(1, 0, 0.5, 0),
-        AnchorPoint = Vector2.new(1, 0.5),
         AutoButtonColor = false,
+        Size = UDim2.new(1, 0, 0, Theme.TriggerMinH),
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, 0, 0.5, 0),
         Text = "",
         Parent = slot,
     })
-    corner(trigger, 6)
-    stroke(trigger, {r = 59, g = 59, b = 59}, 1)
-    local shown = text(NewInstance("TextLabel", {
+    corner(trigger, Theme.TriggerRadius)
+    stroke(trigger, Theme.TriggerBorder, 1)
+    pad(trigger, 0, 11, 0, 11)
+    local shown = label(new("TextLabel", {
         Name = "Value",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, -30, 1, 0),
-        Position = UDim2.fromOffset(11, 0),
+        Size = UDim2.new(1, -22, 1, 0),
         TextTruncate = Enum.TextTruncate.AtEnd,
         TextYAlignment = Enum.TextYAlignment.Center,
         Parent = trigger,
-    }), tostring(current or "—"), 11, {r = 197, g = 197, b = 197}, false)
-    text(NewInstance("TextLabel", {
+    }), tostring(current or "Escolher"), Theme.TriggerFont, Theme.TriggerText)
+    label(new("TextLabel", {
         Name = "Caret",
-        BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(18, 0),
-        Position = UDim2.new(1, -22, 0, 0),
+        Size = UDim2.fromOffset(14, 1),
+        Position = UDim2.new(1, -14, 0, 0),
         TextXAlignment = Enum.TextXAlignment.Center,
         TextYAlignment = Enum.TextYAlignment.Center,
         Parent = trigger,
-    }), "⌄", 12, Theme.Muted, false)
+    }), "⌄", 12, Theme.TriggerText).Size = UDim2.new(0, 14, 1, 0)
 
     local control = {Options = options}
-    local function render()
-        shown.Text = tostring(current or "—")
-    end
+    local function render() shown.Text = tostring(current or "Escolher") end
     function control:Get() return current end
     function control:Set(next, silent)
         local found = false
         for _, option in ipairs(options) do
             if option == next then found = true break end
         end
-        if not found then return current end
-        if next == current then return current end
+        if not found or next == current then return current end
         current = next
         render()
         if not silent and callback then pcall(callback, current) end
         return current
     end
     self._connect(trigger.MouseButton1Click, function()
-        self:_openDropdown(trigger, options, current, function(chosen)
-            control:Set(chosen)
-        end)
+        self:_openMenu(trigger, options, current, function(chosen) control:Set(chosen) end)
     end)
     control.Instance = trigger
     control.Row = row
     render()
     self.Components[#self.Components + 1] = control
+    if tab.Search then tab.Search:Register(row, title) end
     return control
 end
 
--- Internal: a floating option list anchored under a trigger. One at a time.
-function Panel:_openDropdown(trigger, options, current, onChoose)
-    if self._menu then
-        self._menu:Destroy()
-        self._menu = nil
+-- Internal: the floating .choice-menu, one at a time.
+function Panel:_openMenu(trigger, options, current, onChoose)
+    if self.Menu then
+        self.Menu:Destroy()
+        self.Menu = nil
     end
-    local menu = NewInstance("Frame", {
-        Name = "DropdownMenu",
-        BackgroundColor3 = Theme.Color({r = 23, g = 23, b = 23}),
+    local menu = new("Frame", {
+        Name = "ChoiceMenu",
+        BackgroundColor3 = Theme.Color(Theme.MenuBg),
         BorderSizePixel = 0,
-        Size = UDim2.fromOffset(math.max(155, trigger.AbsoluteSize.X), 0),
+        Size = UDim2.fromOffset(math.max(Theme.MenuMinW, trigger.AbsoluteSize.X), 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         Position = UDim2.fromOffset(trigger.AbsolutePosition.X, trigger.AbsolutePosition.Y + trigger.AbsoluteSize.Y + 6),
         ZIndex = 150,
         Parent = self.ScreenGui,
     })
-    corner(menu, 8)
-    stroke(menu, {r = 59, g = 59, b = 59}, 1)
-    padding(menu, 5, 5, 5, 5)
-    NewInstance("UIListLayout", {
-        Padding = UDim.new(0, 2),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = menu,
-    })
+    corner(menu, Theme.MenuRadius)
+    stroke(menu, Theme.MenuBorder, 1)
+    pad(menu, Theme.MenuPad, Theme.MenuPad, Theme.MenuPad, Theme.MenuPad)
+    flex(menu, Enum.FillDirection.Vertical, 0)
+
     for index, option in ipairs(options) do
         local selected = option == current
-        local item = NewInstance("TextButton", {
+        local item = new("TextButton", {
             Name = option,
-            BackgroundColor3 = selected and Theme.Color({r = 40, g = 40, b = 40}) or Theme.Color(Theme.Surface),
+            BackgroundColor3 = Theme.Color(selected and Theme.MenuItemSelBg or Theme.MenuBg),
             BackgroundTransparency = selected and 0 or 1,
             BorderSizePixel = 0,
             AutoButtonColor = false,
-            Size = UDim2.new(1, 0, 0, 37),
+            Size = UDim2.new(1, 0, 0, Theme.MenuItemMinH),
             LayoutOrder = index,
-            Text = option,
-            TextSize = 11,
+            Text = selected and (option .. "  ✓") or option,
             Font = Enum.Font.Gotham,
-            TextColor3 = Theme.Color(selected and Theme.Heading or Theme.Muted),
+            TextSize = Theme.MenuFont,
+            TextColor3 = Theme.Color(selected and Theme.MenuItemSelText or Theme.MenuItemColor),
             TextXAlignment = Enum.TextXAlignment.Left,
             Parent = menu,
         })
         corner(item, 5)
-        padding(item, 0, 11, 0, 11)
+        pad(item, 0, Theme.MenuItemPadH, 0, Theme.MenuItemPadH)
         self._connect(item.MouseEnter, function()
             item.BackgroundTransparency = 0
-            item.BackgroundColor3 = Theme.Color({r = 40, g = 40, b = 40})
-            item.TextColor3 = Theme.Color(Theme.Text)
+            item.BackgroundColor3 = Theme.Color(Theme.MenuItemSelBg)
+            item.TextColor3 = Theme.Color(Theme.MenuItemSelText)
         end)
         self._connect(item.MouseLeave, function()
             if not selected then
                 item.BackgroundTransparency = 1
-                item.TextColor3 = Theme.Color(Theme.Muted)
+                item.TextColor3 = Theme.Color(Theme.MenuItemColor)
             end
         end)
         self._connect(item.MouseButton1Click, function()
             menu:Destroy()
-            if self._menu == menu then self._menu = nil end
+            if self.Menu == menu then self.Menu = nil end
             if onChoose then onChoose(option) end
         end)
     end
-    self._menu = menu
+    self.Menu = menu
     return menu
 end
 
--- AddTextField(tab, title, placeholder, value, callback) -> {Set,Get}
-function Panel:AddTextField(tab, title, placeholder, value, callback)
-    local order = self:_next(tab)
-    local page = tab.Page or tab
-    local group = NewInstance("Frame", {
-        Name = title or "TextField",
-        BackgroundColor3 = Theme.Color(Theme.RowBg),
+-- AddTextField(tab, title, placeholder, value, callback, help)
+-- The .input-group block: label above a field with the darker background.
+function Panel:AddTextField(tab, title, placeholder, value, callback, help)
+    local stack = tab.Stack or tab.Page
+    local group = new("Frame", {
+        Name = title or "InputGroup",
+        BackgroundColor3 = Theme.Color(Theme.GroupBg),
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 74),
-        LayoutOrder = order,
-        Parent = page,
+        Size = UDim2.new(1, 0, 0, 76),
+        LayoutOrder = self:_next(),
+        Parent = stack,
     })
-    corner(group, 6)
-    padding(group, 14, 14, 14, 14)
-    text(NewInstance("TextLabel", {
+    corner(group, Theme.GroupRadius)
+    pad(group, Theme.GroupPad, Theme.GroupPad, Theme.GroupPad, Theme.GroupPad)
+    label(new("TextLabel", {
         Name = "Title",
-        BackgroundTransparency = 1,
-        Size = UDim2.new(1, 0, 0, 14),
+        Size = UDim2.new(1, 0, 0, 13),
         Parent = group,
-    }), title or "", 11, {r = 176, g = 176, b = 176}, false)
+    }), title or "", Theme.GroupLabelSize, Theme.GroupLabel)
 
-    local box = NewInstance("TextBox", {
+    local box = new("TextBox", {
         Name = "Input",
-        BackgroundColor3 = Theme.Color(Theme.MainBg),
+        BackgroundColor3 = Theme.Color(Theme.GroupFieldBg),
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 42),
-        Position = UDim2.fromOffset(0, 20),
+        Size = UDim2.new(1, 0, 0, Theme.FieldMinH),
+        Position = UDim2.fromOffset(0, Theme.GroupLabelSize + Theme.GroupLabelMargin),
         Text = tostring(value or ""),
         PlaceholderText = placeholder or "",
-        PlaceholderColor3 = Theme.Color({r = 129, g = 129, b = 129}),
+        PlaceholderColor3 = Theme.Color(Theme.FieldPlaceholder),
         Font = Enum.Font.Gotham,
-        TextSize = 12,
-        TextColor3 = Theme.Color(Theme.Text),
+        TextSize = Theme.FieldFont,
+        TextColor3 = Theme.Color(Theme.FieldText),
         TextXAlignment = Enum.TextXAlignment.Left,
         ClearTextOnFocus = false,
         Parent = group,
     })
-    corner(box, 6)
-    stroke(box, Theme.FieldBorder, 1)
-    padding(box, 0, 12, 0, 12)
+    corner(box, Theme.FieldRadius)
+    local boxStroke = stroke(box, Theme.FieldBorder, 1)
+    pad(box, 0, Theme.FieldPadH, 0, Theme.FieldPadH)
+
+    if help then
+        label(new("TextLabel", {
+            Name = "Help",
+            Size = UDim2.new(1, 0, 0, 12),
+            Position = UDim2.fromOffset(0, Theme.GroupLabelSize + Theme.GroupLabelMargin + Theme.FieldMinH + 4),
+            TextWrapped = true,
+            TextYAlignment = Enum.TextYAlignment.Top,
+            Parent = group,
+        }), help, Theme.HelpFont, Theme.HelpColor)
+        group.Size = UDim2.new(1, 0, 0, 96)
+    end
 
     local control = {}
     function control:Get() return box.Text end
@@ -3547,49 +3776,46 @@ function Panel:AddTextField(tab, title, placeholder, value, callback)
     end
     self._connect(box.Focused, function()
         box.BackgroundColor3 = Theme.Color(Theme.FieldFocusBg)
-        box:FindFirstChildOfClass("UIStroke").Color = Theme.Color(Theme.Quiet)
+        boxStroke.Color = Theme.Color(Theme.FieldFocusBorder)
     end)
     self._connect(box.FocusLost, function(enterPressed)
-        box.BackgroundColor3 = Theme.Color(Theme.MainBg)
-        box:FindFirstChildOfClass("UIStroke").Color = Theme.Color(Theme.FieldBorder)
+        box.BackgroundColor3 = Theme.Color(Theme.GroupFieldBg)
+        boxStroke.Color = Theme.Color(Theme.FieldBorder)
         if enterPressed and callback then pcall(callback, box.Text) end
     end)
     control.Instance = box
     control.Row = group
     self.Components[#self.Components + 1] = control
+    if tab.Search then tab.Search:Register(group, title) end
     return control
 end
 
 -- AddAction(tab, title, help, buttonLabel, callback, primary)
 function Panel:AddAction(tab, title, help, buttonLabel, callback, primary)
-    local order = self:_next(tab)
+    local order = self:_next()
     local _, _, slot = self:_row(tab, title, help, order)
-    local button = NewInstance("TextButton", {
+    local button = new("TextButton", {
         Name = "Action",
         BackgroundColor3 = Theme.Color(primary and Theme.PrimaryBg or Theme.ActionBg),
         BorderSizePixel = 0,
         AutoButtonColor = false,
-        Size = UDim2.new(1, 0, 0, 38),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        Size = UDim2.new(1, 0, 0, Theme.ActionMinH),
         AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, 0, 0.5, 0),
         Text = buttonLabel or "Executar",
         Font = Enum.Font.Gotham,
-        TextSize = 11,
-        TextColor3 = Theme.Color(primary and Theme.PrimaryInk or {r = 204, g = 204, b = 204}),
+        TextSize = Theme.ActionFont,
+        TextColor3 = Theme.Color(primary and Theme.PrimaryText or Theme.ActionText),
         Parent = slot,
     })
-    corner(button, 6)
+    corner(button, Theme.ActionRadius)
     stroke(button, primary and Theme.PrimaryBg or Theme.ActionBorder, 1)
-    local baseBg = button.BackgroundColor3
+    local base = button.BackgroundColor3
     self._connect(button.MouseEnter, function()
-        button.BackgroundColor3 = Theme.Color(primary and {r = 224, g = 224, b = 224} or Theme.ActionHoverBg)
+        button.BackgroundColor3 = Theme.Color(primary and Theme.PrimaryHoverBg or Theme.ActionHoverBg)
     end)
-    self._connect(button.MouseLeave, function()
-        button.BackgroundColor3 = baseBg
-    end)
-    self._connect(button.MouseButton1Click, function()
-        if callback then pcall(callback) end
-    end)
+    self._connect(button.MouseLeave, function() button.BackgroundColor3 = base end)
+    self._connect(button.MouseButton1Click, function() if callback then pcall(callback) end end)
 
     local control = {Instance = button}
     function control:SetLabel(text) button.Text = tostring(text or "") end
@@ -3597,159 +3823,238 @@ function Panel:AddAction(tab, title, help, buttonLabel, callback, primary)
     return control
 end
 
--- AddNotice(tab, message, boldTitle)
-function Panel:AddNotice(tab, message, boldTitle)
-    local order = self:_next(tab)
-    local page = tab.Page or tab
-    local notice = NewInstance("Frame", {
+-- AddKeybind(tab, title, help, keyLabel, callback): the .keybind button.
+function Panel:AddKeybind(tab, title, help, keyLabel, callback)
+    local order = self:_next()
+    local _, _, slot = self:_row(tab, title, help, order)
+    local button = new("TextButton", {
+        Name = "Keybind",
+        BackgroundColor3 = Theme.Color(Theme.ActionBg),
+        BorderSizePixel = 0,
+        AutoButtonColor = false,
+        Size = UDim2.new(1, 0, 0, Theme.ActionMinH),
+        AnchorPoint = Vector2.new(1, 0.5),
+        Position = UDim2.new(1, 0, 0.5, 0),
+        Text = keyLabel or "Insert",
+        Font = Enum.Font.Gotham,
+        TextSize = Theme.ActionFont,
+        TextColor3 = Theme.Color(Theme.ActionText),
+        Parent = slot,
+    })
+    corner(button, Theme.ActionRadius)
+    stroke(button, Theme.ActionBorder, 1)
+    self._connect(button.MouseButton1Click, function()
+        if callback then pcall(callback) end
+    end)
+    local control = {Instance = button}
+    function control:Set(text) button.Text = tostring(text or "") end
+    self.Components[#self.Components + 1] = control
+    return control
+end
+
+-- AddNotice(tab, text, strongTitle): the .notice block.
+function Panel:AddNotice(tab, text, strongTitle)
+    local stack = tab.Stack or tab.Page
+    local notice = new("Frame", {
         Name = "Notice",
         BackgroundColor3 = Theme.Color(Theme.NoticeBg),
         BorderSizePixel = 0,
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        LayoutOrder = order,
-        Parent = page,
+        LayoutOrder = self:_next(),
+        Parent = stack,
     })
-    corner(notice, 6)
-    padding(notice, 14, 14, 14, 14)
-    local body = text(NewInstance("TextLabel", {
+    corner(notice, Theme.NoticeRadius)
+    pad(notice, Theme.NoticePad, Theme.NoticePad, Theme.NoticePad, Theme.NoticePad)
+    local body = label(new("TextLabel", {
         Name = "Body",
-        BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
         TextWrapped = true,
         TextYAlignment = Enum.TextYAlignment.Top,
         RichText = true,
         Parent = notice,
-    }), (boldTitle and ("<b>" .. boldTitle .. "</b><br>") or "") .. (message or ""), 11, Theme.SectionLabel, false)
-    body.TextColor3 = Theme.Color(Theme.SectionLabel)
+    }), (strongTitle and ("<b>" .. strongTitle .. "</b><br>") or "") .. (text or ""), Theme.NoticeSize, Theme.NoticeColor)
+    body.TextYAlignment = Enum.TextYAlignment.Top
     return notice
 end
 
--- AddCollapsible(tab, summary, open) -> {Body, Toggle}
+-- AddCollapsible(tab, summary, open) -> {Body, Toggle}: the details/summary block.
 function Panel:AddCollapsible(tab, summary, open)
-    local order = self:_next(tab)
-    local page = tab.Page or tab
-    local container = NewInstance("Frame", {
-        Name = "Collapsible",
-        BackgroundColor3 = Theme.Color(Theme.RowBg),
+    local stack = tab.Stack or tab.Page
+    local container = new("Frame", {
+        Name = "Details",
+        BackgroundColor3 = Theme.Color(Theme.DetailsBg),
         BorderSizePixel = 0,
-        Size = UDim2.new(1, 0, 0, 44),
+        Size = UDim2.new(1, 0, 0, 46),
         AutomaticSize = Enum.AutomaticSize.Y,
-        LayoutOrder = order,
-        Parent = page,
+        LayoutOrder = self:_next(),
+        Parent = stack,
     })
-    corner(container, 6)
-    local head = NewInstance("TextButton", {
+    corner(container, Theme.DetailsRadius)
+    stroke(container, Theme.DetailsBorder, 1)
+    pad(container, Theme.DetailsPad, Theme.DetailsPad, Theme.DetailsPad, Theme.DetailsPad)
+
+    local head = new("TextButton", {
         Name = "Summary",
         BackgroundTransparency = 1,
         AutoButtonColor = false,
-        Size = UDim2.new(1, 0, 0, 44),
-        Text = summary or "Seção",
-        Font = Enum.Font.Gotham,
-        TextSize = 12,
-        TextColor3 = Theme.Color(Theme.Heading),
-        TextXAlignment = Enum.TextXAlignment.Left,
+        Size = UDim2.new(1, 0, 0, Theme.SummaryMinH),
+        Text = "",
         Parent = container,
     })
-    padding(head, 0, 14, 0, 14)
-    local body = NewInstance("Frame", {
+    local headLabel = label(new("TextLabel", {
+        Name = "SummaryText",
+        Size = UDim2.fromScale(1, 1),
+        TextYAlignment = Enum.TextYAlignment.Center,
+        Parent = head,
+    }), "", 12, Theme.SummaryColor)
+
+    local body = new("Frame", {
         Name = "Body",
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        Position = UDim2.fromOffset(0, 44),
+        Position = UDim2.fromOffset(0, Theme.SummaryMinH),
         Visible = open == true,
         Parent = container,
     })
-    padding(body, 0, 14, 14, 14)
-    NewInstance("UIListLayout", {
-        Padding = UDim.new(0, 4),
-        SortOrder = Enum.SortOrder.LayoutOrder,
-        Parent = body,
-    })
+    flex(body, Enum.FillDirection.Vertical, 4)
+
     local state = open == true
+    local function render()
+        headLabel.Text = (state and "▾  " or "▸  ") .. (summary or "Seção")
+    end
     self._connect(head.MouseButton1Click, function()
         state = not state
         body.Visible = state
-        head.Text = (state and "▾ " or "▸ ") .. (summary or "Seção")
+        render()
     end)
-    head.Text = (state and "▾ " or "▸ ") .. (summary or "Seção")
+    render()
     return {Body = body, Toggle = head}
 end
 
+-- AddButtonGroup(tab, buttons): the .button-group row.
+-- buttons = { {Label=..., Callback=..., Primary=bool}, ... }
+function Panel:AddButtonGroup(tab, buttons)
+    local stack = tab.Stack or tab.Page
+    local group = new("Frame", {
+        Name = "ButtonGroup",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 0, Theme.ActionMinH),
+        LayoutOrder = self:_next(),
+        Parent = stack,
+    })
+    new("UIListLayout", {
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, Theme.ButtonGroupGap),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = group,
+    })
+    local controls = {}
+    local count = #(buttons or {})
+    for index, spec in ipairs(buttons or {}) do
+        -- .button-group .action{flex:1}: share the row equally.
+        local share = (count > 0) and (1 / count) or 1
+        local button = new("TextButton", {
+            Name = spec.Label or "Action",
+            BackgroundColor3 = Theme.Color(spec.Primary and Theme.PrimaryBg or Theme.ActionBg),
+            BorderSizePixel = 0,
+            AutoButtonColor = false,
+            Size = UDim2.new(share, -(Theme.ButtonGroupGap * (count - 1)) / math.max(count, 1), 0, Theme.ActionMinH),
+            LayoutOrder = index,
+            Text = spec.Label or "Ação",
+            Font = Enum.Font.Gotham,
+            TextSize = Theme.ActionFont,
+            TextColor3 = Theme.Color(spec.Primary and Theme.PrimaryText or Theme.ActionText),
+            Parent = group,
+        })
+        corner(button, Theme.ActionRadius)
+        stroke(button, spec.Primary and Theme.PrimaryBg or Theme.ActionBorder, 1)
+        local base = button.BackgroundColor3
+        self._connect(button.MouseEnter, function()
+            button.BackgroundColor3 = Theme.Color(spec.Primary and Theme.PrimaryHoverBg or Theme.ActionHoverBg)
+        end)
+        self._connect(button.MouseLeave, function() button.BackgroundColor3 = base end)
+        self._connect(button.MouseButton1Click, function()
+            if spec.Callback then pcall(spec.Callback) end
+        end)
+        controls[#controls + 1] = button
+    end
+    return {Instance = group, Buttons = controls}
+end
+
 -- ---------------------------------------------------------------------------
--- Feedback: toast + modal
+-- Feedback
 -- ---------------------------------------------------------------------------
 function Panel:Notify(title, message, error)
     if self.Destroyed or not self.Toast then return end
-    local token = self._toastToken + 1
-    self._toastToken = token
+    local token = self.ToastToken + 1
+    self.ToastToken = token
     self.ToastTitle.Text = tostring(title or "")
     self.ToastMessage.Text = tostring(message or "")
     if self.ToastStroke then
-        self.ToastStroke.Color = Theme.Color(error and Theme.ToastError or Theme.ToastBorder)
+        self.ToastStroke.Color = Theme.Color(error and Theme.ToastErrorBorder or Theme.ToastBorder)
     end
     self.Toast.Visible = true
-    self.Toast.Position = UDim2.new(1, -22, 1, -50)
-    local tween = game:GetService("TweenService"):Create(
+    local TweenService = game:GetService("TweenService")
+    local tween = TweenService:Create(
         self.Toast,
-        TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
-        {Position = UDim2.new(1, -22, 1, -22), BackgroundTransparency = 0.06}
+        TweenInfo.new(Theme.Duration.Toast, Enum.EasingStyle.Quint, Enum.EasingDirection.Out),
+        {Position = UDim2.new(1, -Theme.ToastRight, 1, -Theme.ToastBottom), BackgroundTransparency = 0.07}
     )
     tween:Play()
     task.delay(3.5, function()
-        if self.Destroyed or self._toastToken ~= token then return end
-        local out = game:GetService("TweenService"):Create(
+        if self.Destroyed or self.ToastToken ~= token then return end
+        local out = TweenService:Create(
             self.Toast,
             TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            {Position = UDim2.new(1, -22, 1, -50), BackgroundTransparency = 1}
+            {Position = UDim2.new(1, -Theme.ToastRight, 1, -Theme.ToastBottom + 40), BackgroundTransparency = 1}
         )
         out:Play()
         out.Completed:Once(function()
-            if self._toastToken == token then self.Toast.Visible = false end
+            if self.ToastToken == token then self.Toast.Visible = false end
         end)
     end)
 end
 
--- Confirm(title, message, onConfirm) -> shows a modal with Cancel/Confirm.
-function Panel:Confirm(title, message, onConfirm)
-    if self.Destroyed or not self.ModalOverlay then return end
-    self.ModalTitle.Text = tostring(title or "Confirmar ação?")
-    self.ModalMessage.Text = tostring(message or "")
-    self.ModalOverlay.Visible = true
+-- Confirm(title, message, onConfirm, confirmLabel, cancelLabel)
+function Panel:Confirm(title, message, onConfirm, confirmLabel, cancelLabel)
+    if self.Destroyed or not self.DialogOverlay then return end
+    self.DialogTitle.Text = tostring(title or "Confirmar ação?")
+    self.DialogMessage.Text = tostring(message or "")
+    self.DialogOverlay.Visible = true
 
-    local group = self._modalButtons
-    if self._modalClose then
-        pcall(function() self._modalClose:Disconnect() end)
-        self._modalClose = nil
-    end
+    local group = self.DialogButtons
     group:ClearAllChildren()
-    NewInstance("UIListLayout", {
+    new("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
-        Padding = UDim.new(0, 8),
+        Padding = UDim.new(0, Theme.ButtonGroupGap),
         SortOrder = Enum.SortOrder.LayoutOrder,
         Parent = group,
     })
-    local function close()
-        self.ModalOverlay.Visible = false
+    local function close() self.DialogOverlay.Visible = false end
+    local function makeButton(name, text, primary, order, callback)
+        local button = new("TextButton", {
+            Name = name,
+            BackgroundColor3 = Theme.Color(primary and Theme.PrimaryBg or Theme.ActionBg),
+            BorderSizePixel = 0,
+            Size = UDim2.new(0, 110, 1, 0),
+            LayoutOrder = order,
+            Text = text,
+            Font = Enum.Font.Gotham,
+            TextSize = Theme.ActionFont,
+            TextColor3 = Theme.Color(primary and Theme.PrimaryText or Theme.ActionText),
+            AutoButtonColor = false,
+            Parent = group,
+        })
+        corner(button, Theme.ActionRadius)
+        stroke(button, primary and Theme.PrimaryBg or Theme.ActionBorder, 1)
+        self._connect(button.MouseButton1Click, callback)
+        return button
     end
-    local cancel = NewInstance("TextButton", {
-        Name = "Cancel", BackgroundColor3 = Theme.Color(Theme.ActionBg),
-        BorderSizePixel = 0, Size = UDim2.new(0.5, -4, 1, 0), LayoutOrder = 1,
-        Text = "Cancelar", Font = Enum.Font.Gotham, TextSize = 11,
-        TextColor3 = Theme.Color({r = 204, g = 204, b = 204}), AutoButtonColor = false, Parent = group,
-    })
-    corner(cancel, 6)
-    local confirm = NewInstance("TextButton", {
-        Name = "Confirm", BackgroundColor3 = Theme.Color(Theme.PrimaryBg),
-        BorderSizePixel = 0, Size = UDim2.new(0.5, -4, 1, 0), LayoutOrder = 2,
-        Text = "Confirmar", Font = Enum.Font.Gotham, TextSize = 11,
-        TextColor3 = Theme.Color(Theme.PrimaryInk), AutoButtonColor = false, Parent = group,
-    })
-    corner(confirm, 6)
-    self._connect(cancel.MouseButton1Click, close)
-    self._connect(confirm.MouseButton1Click, function()
+    makeButton("Cancel", cancelLabel or "Cancelar", false, 1, close)
+    makeButton("Confirm", confirmLabel or "Confirmar", true, 2, function()
         close()
         if onConfirm then pcall(onConfirm) end
     end)
@@ -3762,16 +4067,347 @@ function Panel:Destroy()
         pcall(function() self.Connections[i]:Disconnect() end)
         self.Connections[i] = nil
     end
-    for _, animation in ipairs(self.Animations) do
-        pcall(function() animation:Cancel() end)
-    end
-    self.Animations = {}
-    if self._menu then pcall(function() self._menu:Destroy() end) self._menu = nil end
+    if self.Menu then pcall(function() self.Menu:Destroy() end) self.Menu = nil end
     if self.ScreenGui then pcall(function() self.ScreenGui:Destroy() end) end
     self.ScreenGui = nil
 end
 
 return Panel
+
+]],
+    ["src/frontend/theme.lua"] = [[
+-- DepHub UI theme.
+--
+-- Exact translation of the design tokens and component metrics from the
+-- authored mockup (dephub.css). Every value here is copied from the stylesheet
+-- so the in-game panel matches the preview pixel for pixel: the same palette,
+-- the same box model, the same radii and the same control dimensions.
+--
+-- Colours use {r,g,b} in 0..255 and are converted with Theme.Color at build
+-- time. Sizes are plain numbers (pixels). Timing values are seconds, matching
+-- the CSS transition durations.
+--
+-- Kept free of engine side effects so tests and the bundler can read it.
+
+local Theme = {}
+
+local function rgb(r, g, b) return {r = r, g = g, b = b} end
+
+-- :root custom properties
+Theme.Accent = rgb(188, 188, 188)          -- --accent: #bcbcbc
+Theme.Bg = rgb(9, 9, 9)                    -- --bg: #090909
+Theme.Surface = rgb(16, 16, 16)            -- --surface: #101010
+Theme.Line = rgb(37, 37, 37)               -- --line: #252525
+Theme.Text = rgb(222, 222, 222)            -- --text: #dedede
+Theme.Muted = rgb(154, 154, 154)           -- --muted: #9a9a9a
+Theme.Quiet = rgb(119, 119, 119)           -- --quiet: #777
+
+Theme.Left = 24                            -- --left: 24px
+Theme.BrandTop = 20                        -- --brand-top: 20px
+Theme.Header = 100                         -- --header: 100px
+Theme.Footer = 40                          -- --footer: 40px
+
+-- Window (--width/--height with the same clamps)
+Theme.MinWidth = 840
+Theme.MinHeight = 560
+Theme.WindowRadius = 12
+Theme.WindowBorder = rgb(44, 44, 44)       -- border: 1px solid #2c2c2c
+Theme.WindowBg = rgb(0, 0, 0)              -- body background #000
+
+-- Page background (#000) and the panel shell (#090909) differ; the shell is the
+-- .rectangle, the page is behind it.
+
+-- Header
+Theme.HeaderBorder = rgb(37, 37, 37)       -- border-bottom: 1px solid var(--line)
+Theme.MarkBg = rgb(209, 209, 209)          -- .header-mark background #d1d1d1
+Theme.MarkInk = rgb(23, 23, 23)            -- .header-mark color #171717
+Theme.MarkSize = 30                        -- .header-mark 30x30
+Theme.MarkRadius = 7                       -- border-radius: 7px
+Theme.MarkGlyphSize = 25                   -- svg 25x25
+Theme.BrandHeight = 30                     -- header strong height:30px
+Theme.BrandText = rgb(222, 222, 222)
+Theme.BrandFont = 15                       -- header strong (font-size inherited 12 -> shown ~15)
+
+-- Current game
+Theme.GameTop = 64                         -- .current-game top: 64px
+Theme.GameGap = 7                          -- gap: 7px
+Theme.GameIndicator = 4                    -- .game-indicator 4x4
+Theme.GameIndicatorColor = rgb(153, 153, 153) -- background #999
+Theme.GameNameColor = rgb(160, 160, 160)   -- #current-game-name color #a0a0a0
+Theme.GameNameFont = 11
+
+-- Window buttons: 30x44 hit area, 13px dot, coloured only while hovered
+Theme.WindowButtonsRight = 16             -- right: 16px
+Theme.WindowButtonsTop = 13               -- top: 13px
+Theme.WindowButtonW = 30
+Theme.WindowButtonH = 44
+Theme.WindowDot = 13                      -- ::before 13x13
+Theme.CloseDot = rgb(255, 96, 88)         -- #ff6058
+Theme.MinDot = rgb(254, 188, 46)          -- #febc2e
+Theme.MaxDot = rgb(40, 200, 64)           -- #28c840
+Theme.WindowGlyphHover = rgb(0, 0, 0, 0.67)
+
+-- Layout: 160px nav + fluid main
+Theme.NavWidth = 160                      -- grid-template-columns: 160px ...
+Theme.NavBorder = rgb(28, 28, 28)         -- border-right: 1px solid #1c1c1c
+Theme.NavPadV = 20                        -- padding: 20px 10px
+Theme.NavPadH = 10
+Theme.NavGap = 7                          -- gap: 7px
+Theme.NavItemMinH = 44                    -- min-height: 44px
+Theme.NavItemPadV = 11                    -- padding: 11px 10px
+Theme.NavItemPadH = 10
+Theme.NavItemRadius = 6                   -- border-radius: 6px
+Theme.NavItemGap = 9                      -- gap: 9px
+Theme.NavIdle = rgb(146, 146, 146)        -- color: #929292
+Theme.NavActiveBg = rgb(26, 26, 26)       -- .active background #1a1a1a
+Theme.NavActiveText = rgb(227, 227, 227)  -- .active color #e3e3e3
+Theme.NavHoverBg = rgb(22, 22, 22)        -- :hover background #161616
+Theme.NavHoverText = rgb(221, 221, 221)   -- :hover color #ddd
+Theme.NavGlyphColor = rgb(138, 138, 138)  -- .nav-glyph color #8a8a8a
+Theme.NavGlyphWidth = 20                  -- .nav-glyph width: 20px
+Theme.NavGlyphFont = 17                   -- font-size: 17px
+Theme.NavFont = 12
+Theme.NavBg = rgb(9, 9, 9)                -- nav background #090909
+
+-- Main content: padding 25px 26px 30px, background #0c0c0c
+Theme.MainBg = rgb(12, 12, 12)            -- #0c0c0c
+Theme.MainPadTop = 25
+Theme.MainPadX = 26
+Theme.MainPadBottom = 30
+Theme.ScrollBar = rgb(58, 58, 58)         -- scrollbar-color #3a3a3a
+
+-- Heading block (h1 + .intro) per page
+Theme.H1Size = 21                         -- h1 font-size: 21px
+Theme.H1Color = rgb(222, 222, 222)        -- inherits --text
+Theme.H1LetterSpacing = -0.5
+Theme.IntroSize = 11                      -- .intro font-size: 11px
+Theme.IntroColor = rgb(150, 150, 150)     -- #969696
+Theme.HeadingGap = 22                     -- .heading margin-bottom: 22px
+
+-- Section label
+Theme.SectionLabel = rgb(153, 153, 153)   -- .section-label color #999
+Theme.SectionLabelSize = 9
+Theme.SectionLabelMarginTop = 25          -- margin: 25px 0 11px
+Theme.SectionLabelMarginBottom = 11
+
+-- Field (input/textarea)
+Theme.FieldBg = rgb(17, 17, 17)           -- #111
+Theme.FieldBorder = rgb(51, 51, 51)       -- #333
+Theme.FieldText = rgb(221, 221, 221)      -- #ddd
+Theme.FieldPlaceholder = rgb(129, 129, 129) -- ::placeholder #818181
+Theme.FieldFocusBg = rgb(22, 22, 22)      -- :focus background #161616
+Theme.FieldFocusBorder = rgb(119, 119, 119) -- :focus border #777
+Theme.FieldRadius = 6                     -- border-radius: 6px
+Theme.FieldPadV = 11                      -- padding: 11px 12px
+Theme.FieldPadH = 12
+Theme.FieldMinH = 42                      -- min-height: 42px
+Theme.FieldFont = 12
+Theme.SearchBg = rgb(15, 15, 15)          -- .search background #0f0f0f
+Theme.SearchBorder = rgb(41, 41, 41)      -- .search border #292929
+
+-- Row (.row): flex space-between, min-height 61, padding 14, radius 6, bg #111
+Theme.RowBg = rgb(17, 17, 17)             -- #111
+Theme.RowHoverBg = rgb(22, 22, 22)        -- :hover #161616
+Theme.RowGap = 14                         -- gap: 14px
+Theme.RowMinH = 61                        -- min-height: 61px
+Theme.RowPad = 14                         -- padding: 14px
+Theme.RowRadius = 6
+Theme.RowMarginBottom = 4                 -- margin: 0 0 4px
+Theme.RowLabel = rgb(206, 206, 206)       -- .row label color #cecece
+Theme.RowLabelFont = 12
+Theme.HelpColor = rgb(146, 146, 146)      -- .help color #929292
+Theme.HelpFont = 10                       -- font-size: 10px
+Theme.HelpMarginTop = 6                   -- margin-top: 6px
+
+-- Toggle: 34x21, radius 20, knob 13 at 3,3, shifts 13px when checked
+Theme.ToggleW = 34
+Theme.ToggleH = 21
+Theme.ToggleRadius = 20
+Theme.ToggleBg = rgb(48, 48, 48)          -- #303030
+Theme.ToggleBorder = rgb(68, 68, 68)      -- #444
+Theme.ToggleKnob = rgb(148, 148, 148)     -- ::after background #949494
+Theme.ToggleKnobSize = 13
+Theme.ToggleKnobInset = 3
+Theme.ToggleKnobOn = rgb(34, 34, 34)      -- :checked::after background #222
+Theme.ToggleOnBg = Theme.Accent           -- :checked background var(--accent)
+Theme.ToggleShift = 13                    -- translateX(13px)
+
+-- Checkbox: 17x17
+Theme.CheckboxSize = 17
+
+-- Range (.range): bg #111, padding 15 14 4, radius 6
+Theme.RangeBg = rgb(17, 17, 17)
+Theme.RangePadTop = 15
+Theme.RangePadX = 14
+Theme.RangePadBottom = 4
+Theme.RangeRadius = 6
+Theme.RangeLabel = rgb(204, 204, 204)     -- .range label color #ccc
+Theme.RangeOutput = rgb(170, 170, 170)    -- .range output color #aaa
+Theme.RangeOutputSize = 11
+Theme.RangeTrackHeight = 5                -- input[type=range] height: 5px
+Theme.RangeTrackMarginTop = 22            -- margin: 22px 0 18px
+Theme.RangeTrackMarginBottom = 18
+
+-- Input group (.input-group): bg #111, padding 14, radius 6
+Theme.GroupBg = rgb(17, 17, 17)
+Theme.GroupPad = 14
+Theme.GroupRadius = 6
+Theme.GroupLabel = rgb(176, 176, 176)     -- .input-group label color #b0b0b0
+Theme.GroupLabelSize = 11
+Theme.GroupLabelMargin = 9                -- margin-bottom: 9px
+Theme.GroupFieldBg = rgb(12, 12, 12)      -- .input-group .field background #0c0c0c
+
+-- Notice (.notice): bg #111, padding 14, radius 6, color #999, margin 21 0
+Theme.NoticeBg = rgb(17, 17, 17)
+Theme.NoticePad = 14
+Theme.NoticeRadius = 6
+Theme.NoticeColor = rgb(153, 153, 153)
+Theme.NoticeSize = 11
+Theme.NoticeLineHeight = 1.8
+Theme.NoticeStrong = rgb(204, 204, 204)   -- .notice strong color #ccc
+Theme.NoticeMarginY = 21
+
+-- Action / keybind buttons
+Theme.ActionBg = rgb(29, 29, 29)          -- #1d1d1d
+Theme.ActionText = rgb(204, 204, 204)     -- #ccc
+Theme.ActionBorder = rgb(58, 58, 58)      -- #3a3a3a
+Theme.ActionHoverBg = rgb(39, 39, 39)     -- :hover #272727
+Theme.ActionHoverBorder = rgb(90, 90, 90) -- :hover border #5a5a5a
+Theme.ActionRadius = 6
+Theme.ActionMinH = 38                     -- min-height: 38px
+Theme.ActionPadV = 9                      -- padding: 9px 12px
+Theme.ActionPadH = 12
+Theme.ActionFont = 11
+Theme.PrimaryBg = rgb(204, 204, 204)      -- .primary background #ccc
+Theme.PrimaryText = rgb(22, 22, 22)       -- .primary color #161616
+Theme.PrimaryHoverBg = rgb(224, 224, 224) -- .primary:hover #e0e0e0
+Theme.ButtonGroupGap = 8                  -- gap: 8px
+Theme.ButtonGroupMarginY = 15             -- margin: 15px 0
+Theme.ButtonGroupMinW = 90                -- .button-group .action min-width: 90px
+
+-- Collapsible (details/summary)
+Theme.DetailsBg = rgb(16, 16, 16)         -- details background #101010
+Theme.DetailsBorder = rgb(44, 44, 44)     -- border: 1px solid #2c2c2c
+Theme.DetailsRadius = 6
+Theme.DetailsPad = 14
+Theme.DetailsMarginTop = 20
+Theme.SummaryColor = rgb(184, 184, 184)   -- summary color #b8b8b8
+Theme.SummaryMinH = 24
+
+-- Custom choice trigger + color trigger
+Theme.TriggerBg = rgb(27, 27, 27)         -- #1b1b1b
+Theme.TriggerBorder = rgb(59, 59, 59)     -- #3b3b3b
+Theme.TriggerText = rgb(197, 197, 197)    -- #c5c5c5
+Theme.TriggerHoverBg = rgb(36, 36, 36)    -- :hover #242424
+Theme.TriggerHoverBorder = rgb(85, 85, 85)
+Theme.TriggerMinH = 38
+Theme.TriggerRadius = 6
+Theme.TriggerFont = 11
+Theme.TriggerMaxWidth = 0.6               -- max-width: 60%
+Theme.SwatchSize = 16                     -- .color-swatch 16x16
+Theme.SwatchRadius = 4
+Theme.ColorCodeFont = 10                  -- #color-code font 10 monospace
+
+-- Choice menu (floating list)
+Theme.MenuBg = rgb(23, 23, 23)            -- #171717
+Theme.MenuBorder = rgb(59, 59, 59)        -- #3b3b3b
+Theme.MenuRadius = 8
+Theme.MenuPad = 5
+Theme.MenuMinW = 155                      -- min-width: 155px
+Theme.MenuMaxH = 220                      -- max-height: 220px
+Theme.MenuItemMinH = 37                   -- min-height: 37px
+Theme.MenuItemPadV = 10                   -- padding: 10px 11px
+Theme.MenuItemPadH = 11
+Theme.MenuItemColor = rgb(170, 170, 170)  -- #aaa
+Theme.MenuItemSelBg = rgb(40, 40, 40)     -- :hover/[selected] background #282828
+Theme.MenuItemSelText = rgb(238, 238, 238) -- color #eee
+Theme.MenuFont = 11
+
+-- Footer
+Theme.FooterBorder = rgb(34, 34, 34)      -- border-top: 1px solid #222
+Theme.FooterBg = rgb(9, 9, 9)             -- #090909
+Theme.FooterText = rgb(139, 139, 139)     -- color #8b8b8b
+Theme.FooterFont = 9                      -- font-size: 9px
+Theme.FooterPadV = 11                     -- padding: 11px 22px
+Theme.FooterPadH = 22
+Theme.FooterBrandColor = rgb(153, 153, 153) -- .footer-brand color #999
+Theme.FooterBrandSize = 8                 -- font-size: 8px
+Theme.FooterBrandSpacing = 0.1            -- letter-spacing .1em
+Theme.FooterKeyColor = rgb(170, 170, 170) -- .footer-key color #aaa
+Theme.FooterKeyBorder = rgb(51, 51, 51)   -- border: 1px solid #333
+Theme.FooterKeyRadius = 3
+Theme.FooterKeyPadV = 3
+Theme.FooterKeyPadH = 5
+
+-- Toast (.toast)
+Theme.ToastBg = rgb(21, 21, 21)           -- #151515 (with ee alpha -> 0.93)
+Theme.ToastBgAlpha = 0.93
+Theme.ToastBorder = rgb(58, 58, 58)       -- #3a3a3a
+Theme.ToastErrorBorder = rgb(121, 80, 80) -- .toast.error border #795050
+Theme.ToastRadius = 9
+Theme.ToastPad = 16
+Theme.ToastWidth = 310
+Theme.ToastBottom = 22
+Theme.ToastRight = 22
+Theme.ToastTitleSize = 12
+Theme.ToastBodySize = 11
+Theme.ToastBodyColor = rgb(170, 170, 170) -- .toast p color #aaa
+
+-- Dialog (modal)
+Theme.DialogBg = rgb(18, 18, 18)          -- #121212
+Theme.DialogBorder = rgb(66, 66, 66)      -- #424242
+Theme.DialogRadius = 12
+Theme.DialogPad = 25
+Theme.DialogWidth = 390
+Theme.DialogBackdrop = 0.69               -- backdrop #000b
+Theme.DialogH2Size = 18                   -- h2 font-size: 18px
+Theme.DialogBodyColor = rgb(170, 170, 170) -- p color #aaa
+Theme.DialogBodySize = 12
+
+-- Hub toggle pill (#hub-toggle)
+Theme.HubBg = rgb(17, 17, 17)
+Theme.HubBorder = rgb(51, 51, 51)         -- border: 1px solid #333
+Theme.HubRadius = 10
+Theme.HubPad = 8
+Theme.HubLeft = 20
+Theme.HubTop = 18
+Theme.HubMarkSize = 29
+Theme.HubMarkRadius = 7
+Theme.HubNameSize = 12
+Theme.HubNameColor = rgb(221, 221, 221)
+
+-- Motion (seconds), mirroring the CSS transitions.
+Theme.Duration = {
+  Fast = 0.18,
+  Background = 0.20,
+  Transform = 0.20,
+  NavBg = 0.18,
+  Knob = 0.25,
+  Toast = 0.30,
+  ToastOpacity = 0.22,
+  Modal = 0.25,
+  Menu = 0.18,
+  Morph = 1.05,
+}
+
+-- Convert a {r,g,b(,a)} token to Color3. A 4th value is alpha in 0..1 and is
+-- returned separately through Theme.Alpha for callers that need transparency.
+function Theme.Color(token)
+  if token == nil then return Color3.fromRGB(255, 255, 255) end
+  return Color3.fromRGB(token.r, token.g, token.b)
+end
+
+function Theme.Alpha(token)
+  if type(token) ~= "table" or token[4] == nil then return 1 end
+  return token[4]
+end
+
+-- UDim2 helpers used repeatedly by the layout.
+function Theme.px(n) return UDim2.fromOffset(n, n) end
+function Theme.off(x, y) return UDim2.fromOffset(x, y) end
+function Theme.scale(x, y) return UDim2.fromScale(x, y) end
+
+return Theme
 
 ]],
     ["src/games/aotr.lua"] = [[
