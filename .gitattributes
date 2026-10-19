@@ -1,0 +1,12 @@
+# Keep line endings consistent between this Windows machine and the Linux CI.
+# Luau/JS are saved as LF in the repo; the working copy may use CRLF locally.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.lua text eol=lf
+*.luau text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.txt text eol=lf
