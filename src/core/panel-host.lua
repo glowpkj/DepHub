@@ -275,6 +275,15 @@ function PanelHost.Mount(env, PanelFactory)
                         panel:Notify(tostring(control.Title), "Executado.")
                     end
                 end, control.Primary)
+            elseif kind == "inline" then
+                local value = control.Min or 0
+                local okGet, current = call(control.Get)
+                if okGet and type(current) == "number" then value = current end
+                panel:AddInlineSlider(tab, control.Title, control.Min, control.Max, control.Step, value,
+                    function(next) call(control.Set, next) end,
+                    control.Format)
+            elseif kind == "disabled" then
+                panel:AddDisabledToggle(tab, control.Title, control.Help, control.Value == true)
             elseif kind == "notice" then
                 panel:AddNotice(tab, control.Text, control.Title)
             elseif kind == "section" then

@@ -437,19 +437,30 @@ function Panel:_buildHeader(config)
         Parent = header,
     })
 
-    -- Brand: mark + morph-name, at left:24 top:20 height:30
+    -- Brand: header strong is a flex row holding the mark and the morph-name.
+    -- In the ready state .morph-name is width:0/max-width:0/opacity:0, so only
+    -- the 30x30 mark shows; the name is materialised by the intro.
     local brand = new("Frame", {
         Name = "Brand",
         BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(220, Theme.BrandHeight),
+        Size = UDim2.new(0, 300, 0, Theme.BrandHeight),
         Position = UDim2.fromOffset(Theme.Left, Theme.BrandTop),
         Parent = header,
+    })
+    new("UIListLayout", {
+        Name = "Flow",
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, 0),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = brand,
     })
     local mark = new("Frame", {
         Name = "Mark",
         BackgroundColor3 = Theme.Color(Theme.MarkBg),
         BorderSizePixel = 0,
         Size = Theme.px(Theme.MarkSize),
+        LayoutOrder = 1,
         Parent = brand,
     })
     corner(mark, Theme.MarkRadius)
@@ -463,40 +474,72 @@ function Panel:_buildHeader(config)
         Parent = mark,
     }), "D", 18, Theme.MarkInk, Enum.Font.GothamBold)
 
-    label(new("TextLabel", {
-        Name = "Name",
-        Size = UDim2.new(1, -38, 1, 0),
-        Position = UDim2.fromOffset(38, 0),
-        TextYAlignment = Enum.TextYAlignment.Center,
+    -- morph-name: collapsed to zero width in the ready state, exactly like the
+    -- stylesheet. Kept as an instance so the intro can grow it.
+    self.BrandName = label(new("TextLabel", {
+        Name = "MorphName",
+        Size = UDim2.fromOffset(0, Theme.BrandHeight),
+        LayoutOrder = 2,
         TextTruncate = Enum.TextTruncate.AtEnd,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        TextTransparency = 1,
         Parent = brand,
     }), config.Title or "DepHub", 15, Theme.Text, Enum.Font.GothamBold)
+    local morphConstraint = new("UISizeConstraint", {
+        Name = "MorphWidth",
+        MinSize = Vector2.new(0, 0),
+        MaxSize = Vector2.new(0, math.huge),
+        Parent = self.BrandName,
+    })
 
-    -- Current game: left:24 top:64, gap:7, 4x4 dot + name
+    -- Current game: left:24 top:64, flex row gap:7 with a 4x4 dot and a div
+    -- holding the (hidden) caption plus the name.
     local gameRow = new("Frame", {
         Name = "CurrentGame",
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, -48, 0, 16),
+        Size = UDim2.new(0, 260, 0, 16),
         Position = UDim2.fromOffset(Theme.Left, Theme.GameTop),
         Parent = header,
+    })
+    new("UIListLayout", {
+        Name = "Flow",
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, Theme.GameGap),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = gameRow,
     })
     local indicator = new("Frame", {
         Name = "Indicator",
         BackgroundColor3 = Theme.Color(Theme.GameIndicatorColor),
         BorderSizePixel = 0,
         Size = Theme.px(Theme.GameIndicator),
-        Position = UDim2.fromOffset(0, 6),
+        LayoutOrder = 1,
         Parent = gameRow,
     })
     corner(indicator, 2)
+    local gameText = new("Frame", {
+        Name = "TextBlock",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, -(Theme.GameIndicator + Theme.GameGap), 0, 16),
+        LayoutOrder = 2,
+        Parent = gameRow,
+    })
+    -- .game-caption is display:none in the ready state; present for fidelity.
+    local caption = label(new("TextLabel", {
+        Name = "Caption",
+        Size = UDim2.new(1, 0, 0, 10),
+        Visible = false,
+        Parent = gameText,
+    }), "JOGO ATUAL", 9, Theme.GameIndicatorColor)
     self.GameLabel = label(new("TextLabel", {
         Name = "GameName",
-        Size = UDim2.new(1, -11, 1, 0),
-        Position = UDim2.fromOffset(11, 0),
+        Size = UDim2.fromScale(1, 1),
         TextTruncate = Enum.TextTruncate.AtEnd,
         TextYAlignment = Enum.TextYAlignment.Center,
-        Parent = gameRow,
+        Parent = gameText,
     }), config.GameName or "Jogo atual", Theme.GameNameFont, Theme.GameNameColor)
+    self.GameCaption = caption
 
     -- Window buttons: right:16 top:13, each 30x44 with a 13px dot that only
     -- reveals its colour on hover (matching .window-buttons button::before).
@@ -513,6 +556,16 @@ function Panel:_buildHeader(config)
         {Name = "Expand", Colour = Theme.MaxDot, Glyph = "⤢", Action = function() self:ToggleExpand() end},
     }
     self.WindowButtons = {}
+    local glyphs = {}
+    -- .window-buttons:hover button{color:#000a}: the glyphs appear when the
+    -- whole cluster is hovered, not on a single button.
+    self._connect(buttons.MouseEnter, function()
+        for _, glyph in ipairs(glyphs) do glyph.TextTransparency = 0.33 end
+    end)
+    self._connect(buttons.MouseLeave, function()
+        for _, glyph in ipairs(glyphs) do glyph.TextTransparency = 1 end
+    end)
+
     for index, spec in ipairs(specs) do
         local button = new("TextButton", {
             Name = spec.Name,
@@ -521,8 +574,11 @@ function Panel:_buildHeader(config)
             Size = UDim2.fromOffset(Theme.WindowButtonW, Theme.WindowButtonH),
             Position = UDim2.fromOffset((index - 1) * Theme.WindowButtonW, 0),
             AutoButtonColor = false,
+            ClipsDescendants = false,
             Parent = buttons,
         })
+        -- The dot is the ::before, drawn behind the glyph (z-index -1). ZIndex
+        -- ordering with Sibling behaviour puts the later Glyph on top.
         local dot = new("Frame", {
             Name = "Dot",
             BackgroundColor3 = Theme.Color(spec.Colour),
@@ -530,6 +586,7 @@ function Panel:_buildHeader(config)
             Size = Theme.px(Theme.WindowDot),
             AnchorPoint = Vector2.new(0.5, 0.5),
             Position = UDim2.fromScale(0.5, 0.5),
+            ZIndex = 1,
             Parent = button,
         })
         corner(dot, Theme.WindowDot / 2)
@@ -539,15 +596,23 @@ function Panel:_buildHeader(config)
             TextXAlignment = Enum.TextXAlignment.Center,
             TextYAlignment = Enum.TextYAlignment.Center,
             TextTransparency = 1,
+            ZIndex = 2,
             Parent = button,
         }), spec.Glyph, 14, {r = 0, g = 0, b = 0}, Enum.Font.GothamBold)
+        glyphs[#glyphs + 1] = glyph
 
+        -- dot:hover::before{transform:scale(1.17);filter:brightness(1.12)}
         self._connect(button.MouseEnter, function()
-            glyph.TextTransparency = 0.33
-            dot.Size = Theme.px(Theme.WindowDot + 2)
+            dot.Size = Theme.px(math.floor(Theme.WindowDot * 1.17 + 0.5))
         end)
         self._connect(button.MouseLeave, function()
-            glyph.TextTransparency = 1
+            dot.Size = Theme.px(Theme.WindowDot)
+        end)
+        -- button:active::before{transform:scale(.82)}
+        self._connect(button.MouseButton1Down, function()
+            dot.Size = Theme.px(math.floor(Theme.WindowDot * 0.82 + 0.5))
+        end)
+        self._connect(button.MouseButton1Up, function()
             dot.Size = Theme.px(Theme.WindowDot)
         end)
         self._connect(button.MouseButton1Click, spec.Action)
@@ -748,39 +813,49 @@ function Panel:_buildDialog()
     corner(dialog, Theme.DialogRadius)
     stroke(dialog, Theme.DialogBorder, 1)
     pad(dialog, Theme.DialogPad, Theme.DialogPad, Theme.DialogPad, Theme.DialogPad)
+    -- Block flow, exactly like the dialog's h2/p/div stack: a vertical list with
+    -- the h2 margin (14) and the p margin (23) expressed as padding.
+    new("UIListLayout", {
+        Name = "Stack",
+        FillDirection = Enum.FillDirection.Vertical,
+        Padding = UDim.new(0, 0),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = dialog,
+    })
 
     self.DialogTitle = label(new("TextLabel", {
         Name = "Title",
-        Size = UDim2.new(1, 0, 0, 24),
+        Size = UDim2.new(1, 0, 0, Theme.DialogH2Size + 6),
+        LayoutOrder = 1,
         TextYAlignment = Enum.TextYAlignment.Top,
         Parent = dialog,
     }), "Confirmar ação?", Theme.DialogH2Size, Theme.Text, Enum.Font.GothamMedium)
-    self.DialogTitle.Position = UDim2.fromOffset(0, 0)
 
     self.DialogMessage = label(new("TextLabel", {
         Name = "Message",
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
+        LayoutOrder = 2,
         TextWrapped = true,
         TextYAlignment = Enum.TextYAlignment.Top,
         Parent = dialog,
     }), "", Theme.DialogBodySize, Theme.DialogBodyColor)
-    self.DialogMessage.Position = UDim2.fromOffset(0, 38)
+    -- h2 margin-bottom 14, p margin-bottom 23.
+    pad(self.DialogMessage, 14, 0, 23, 0)
 
     local group = new("Frame", {
         Name = "Buttons",
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, Theme.ActionMinH),
+        LayoutOrder = 3,
         Parent = dialog,
     })
-    -- Position by an absolute layout so AutomaticSize on the dialog still fits.
     new("UIListLayout", {
         FillDirection = Enum.FillDirection.Horizontal,
         Padding = UDim.new(0, Theme.ButtonGroupGap),
         SortOrder = Enum.SortOrder.LayoutOrder,
         Parent = group,
     })
-    group.Position = UDim2.fromOffset(0, 0)
     self.Dialog = dialog
     self.DialogOverlay = overlay
     self.DialogButtons = group
@@ -867,7 +942,7 @@ function Panel:CreateTab(spec)
     local index = #self.TabOrder + 1
     local first = index == 1
 
-    -- nav button: min-height 44, padding 11 10, gap 9, radius 6
+    -- nav button: flex row, gap 9, min-height 44, padding 11 10, radius 6
     local button = new("TextButton", {
         Name = spec.Name,
         BackgroundColor3 = Theme.Color(first and Theme.NavActiveBg or Theme.NavBg),
@@ -880,25 +955,42 @@ function Panel:CreateTab(spec)
         Parent = self.NavList,
     })
     corner(button, Theme.NavItemRadius)
+    pad(button, Theme.NavItemPadV, Theme.NavItemPadH, Theme.NavItemPadV, Theme.NavItemPadH)
+    new("UIListLayout", {
+        Name = "Flow",
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, Theme.NavItemGap),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = button,
+    })
 
     local glyph = label(new("TextLabel", {
         Name = "Glyph",
-        Size = UDim2.fromOffset(Theme.NavGlyphWidth, 1),
-        Position = UDim2.fromOffset(Theme.NavItemPadH, 0),
+        Size = UDim2.new(0, Theme.NavGlyphWidth, 1, 0),
+        LayoutOrder = 1,
         TextXAlignment = Enum.TextXAlignment.Center,
         TextYAlignment = Enum.TextYAlignment.Center,
         Parent = button,
     }), spec.Glyph or "•", Theme.NavGlyphFont, first and Theme.NavActiveText or Theme.NavGlyphColor)
-    glyph.Size = UDim2.new(0, Theme.NavGlyphWidth, 1, 0)
 
     local text = label(new("TextLabel", {
         Name = "Text",
-        Size = UDim2.new(1, -(Theme.NavItemPadH * 2 + Theme.NavGlyphWidth + Theme.NavItemGap), 1, 0),
-        Position = UDim2.fromOffset(Theme.NavItemPadH + Theme.NavGlyphWidth + Theme.NavItemGap, 0),
+        Size = UDim2.new(1, -(Theme.NavGlyphWidth + Theme.NavItemGap), 1, 0),
+        LayoutOrder = 2,
         TextYAlignment = Enum.TextYAlignment.Center,
         TextTruncate = Enum.TextTruncate.AtEnd,
         Parent = button,
     }), spec.Name, Theme.NavFont, first and Theme.NavActiveText or Theme.NavIdle)
+
+    -- .nav-index{display:none} on desktop; present for structural fidelity.
+    local navIndex = label(new("TextLabel", {
+        Name = "Index",
+        Size = UDim2.new(0, 0, 1, 0),
+        LayoutOrder = 3,
+        Visible = false,
+        Parent = button,
+    }), string.format("%02d", index), Theme.NavFont, Theme.NavIdle)
 
     -- page: a heading (h1 + intro), optional search, then the stack
     local page = new("Frame", {
@@ -944,7 +1036,7 @@ function Panel:CreateTab(spec)
     })
     flex(stack, Enum.FillDirection.Vertical, 0)
 
-    local tab = {Name = spec.Name, Page = page, Button = button, Stack = stack, Label = text, Glyph = glyph, Active = first}
+    local tab = {Name = spec.Name, Page = page, Button = button, Stack = stack, Label = text, Glyph = glyph, Index = navIndex, Active = first}
 
     if spec.Search then
         tab.Search = self:AddSearch(tab, spec.Search)
@@ -1040,6 +1132,9 @@ function Panel:AddSection(tab, text)
 end
 
 -- Internal: a .row with a left label block and a right control slot.
+-- Mirrors .row{display:flex;justify-content:space-between;align-items:center;
+-- gap:14px;min-height:61px;padding:14px}: a horizontal list layout holds the
+-- flexible label block and the fixed control column.
 function Panel:_row(tab, title, help, order, opts)
     opts = opts or {}
     local stack = tab.Stack or tab.Page
@@ -1060,13 +1155,22 @@ function Panel:_row(tab, title, help, order, opts)
         MaxSize = Vector2.new(math.huge, math.huge),
         Parent = row,
     })
+    new("UIListLayout", {
+        Name = "Row",
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, Theme.RowGap),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = row,
+    })
 
-    -- left block: label + optional help
+    -- left block: label + optional help, takes the remaining width
     local block = new("Frame", {
         Name = "Labels",
         BackgroundTransparency = 1,
-        Size = UDim2.new(1, opts.Full and 0 or -150, 0, 0),
+        Size = UDim2.new(1, -(opts.ControlWidth or 150) - Theme.RowGap, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
+        LayoutOrder = 1,
         Parent = row,
     })
     flex(block, Enum.FillDirection.Vertical, Theme.HelpMarginTop)
@@ -1091,14 +1195,22 @@ function Panel:_row(tab, title, help, order, opts)
         }), help, Theme.HelpFont, Theme.HelpColor)
     end
 
+    -- right column: a fixed-width slot whose single control is centred, exactly
+    -- like the flex row's align-items:center putting the control on the right.
     local slot = new("Frame", {
         Name = "Control",
         BackgroundTransparency = 1,
-        Size = UDim2.fromOffset(150, 0),
-        AutomaticSize = Enum.AutomaticSize.Y,
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        Size = UDim2.new(0, opts.ControlWidth or 150, 1, 0),
+        LayoutOrder = 2,
         Parent = row,
+    })
+    new("UIListLayout", {
+        Name = "Column",
+        FillDirection = Enum.FillDirection.Horizontal,
+        HorizontalAlignment = Enum.HorizontalAlignment.Right,
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = slot,
     })
     return row, block, slot
 end
@@ -1119,8 +1231,7 @@ function Panel:AddToggle(tab, title, help, value, callback)
         BackgroundColor3 = Theme.Color(on and Theme.Accent or Theme.ToggleBg),
         BorderSizePixel = 0,
         Size = Theme.px(Theme.ToggleW, Theme.ToggleH),
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        LayoutOrder = 1,
         AutoButtonColor = false,
         Text = "",
         Parent = slot,
@@ -1172,8 +1283,7 @@ function Panel:AddCheckbox(tab, title, help, value, callback)
         BackgroundColor3 = Theme.Color(on and Theme.Accent or Theme.FieldBg),
         BorderSizePixel = 0,
         Size = Theme.px(Theme.CheckboxSize),
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        LayoutOrder = 1,
         AutoButtonColor = false,
         Text = "",
         Parent = slot,
@@ -1346,6 +1456,168 @@ function Panel:AddSlider(tab, title, min, max, step, value, callback, format)
     return control
 end
 
+-- AddInlineSlider(tab, title, min, max, step, value, callback, format)
+-- The .inline control: a range and its output side by side inside a .row,
+-- used by the mockup's "Opacidade" row. Shares the slider semantics.
+function Panel:AddInlineSlider(tab, title, min, max, step, value, callback, format)
+    local order = self:_next()
+    local row, _, slot = self:_row(tab, title, nil, order)
+    local minV = tonumber(min) or 0
+    local maxV = tonumber(max) or 100
+    local stepV = tonumber(step) or 1
+    local current = math.clamp(tonumber(value) or minV, minV, maxV)
+    format = format or function(v) return tostring(v) end
+
+    -- .inline{width:46%;display:flex;align-items:center;gap:10px}; inside the
+    -- right-aligned control column it fills the slot rather than the row.
+    local inline = new("Frame", {
+        Name = "Inline",
+        BackgroundTransparency = 1,
+        Size = UDim2.new(1, 0, 1, 0),
+        LayoutOrder = 1,
+        Parent = slot,
+    })
+    new("UIListLayout", {
+        Name = "Flow",
+        FillDirection = Enum.FillDirection.Horizontal,
+        Padding = UDim.new(0, 10),
+        VerticalAlignment = Enum.VerticalAlignment.Center,
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = inline,
+    })
+
+    local track = new("Frame", {
+        Name = "Track",
+        BackgroundColor3 = Theme.Color(Theme.ToggleBg),
+        BorderSizePixel = 0,
+        Size = UDim2.new(1, -46, 0, Theme.RangeTrackHeight),
+        LayoutOrder = 1,
+        Parent = inline,
+    })
+    corner(track, Theme.RangeTrackHeight / 2)
+    local fill = new("Frame", {
+        Name = "Fill",
+        BackgroundColor3 = Theme.Color(Theme.Accent),
+        BorderSizePixel = 0,
+        Size = UDim2.fromScale((current - minV) / math.max(maxV - minV, 1e-6), 1),
+        Parent = track,
+    })
+    corner(fill, Theme.RangeTrackHeight / 2)
+    local knob = new("Frame", {
+        Name = "Knob",
+        BackgroundColor3 = Theme.Color(Theme.Accent),
+        BorderSizePixel = 0,
+        Size = Theme.px(14),
+        AnchorPoint = Vector2.new(0.5, 0.5),
+        Position = UDim2.new((current - minV) / math.max(maxV - minV, 1e-6), 0, 0.5, 0),
+        Parent = track,
+    })
+    corner(knob, 7)
+    local hitbox = new("TextButton", {
+        Name = "Hitbox",
+        BackgroundTransparency = 1,
+        Text = "",
+        Size = UDim2.new(1, 0, 1, 20),
+        Position = UDim2.new(0, 0, 0.5, 0),
+        AnchorPoint = Vector2.new(0, 0.5),
+        AutoButtonColor = false,
+        Parent = track,
+    })
+    local readout = label(new("TextLabel", {
+        Name = "Output",
+        Size = UDim2.new(0, 40, 1, 0),
+        LayoutOrder = 2,
+        TextXAlignment = Enum.TextXAlignment.Right,
+        TextYAlignment = Enum.TextYAlignment.Center,
+        Parent = inline,
+    }), format(current), 10, {r = 170, g = 170, b = 170})
+
+    local control = {}
+    local function quantize(v)
+        local steps = math.floor((v - minV) / stepV + 0.5)
+        return math.clamp(minV + steps * stepV, minV, maxV)
+    end
+    local function render(v)
+        local alpha = (v - minV) / math.max(maxV - minV, 1e-6)
+        fill.Size = UDim2.fromScale(alpha, 1)
+        knob.Position = UDim2.new(alpha, 0, 0.5, 0)
+        readout.Text = format(v)
+    end
+    function control:Get() return current end
+    function control:Set(v, silent)
+        local next = quantize(tonumber(v) or current)
+        if next == current then return current end
+        current = next
+        render(current)
+        if not silent and callback then pcall(callback, current) end
+        return current
+    end
+    local dragging = false
+    local function fromX(px)
+        local absX = track.AbsolutePosition.X
+        local width = math.max(track.AbsoluteSize.X, 1)
+        local alpha = math.clamp((px - absX) / width, 0, 1)
+        control:Set(minV + alpha * (maxV - minV))
+    end
+    self._connect(hitbox.InputBegan, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true
+            fromX(input.Position.X)
+        end
+    end)
+    self._connect(hitbox.InputEnded, function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end)
+    self._connect(game:GetService("UserInputService").InputChanged, function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            fromX(input.Position.X)
+        end
+    end)
+    control.Instance = track
+    control.Block = inline
+    control.Row = row
+    self.Components[#self.Components + 1] = control
+    if tab.Search then tab.Search:Register(row, title) end
+    return control
+end
+
+-- AddDisabledToggle(tab, title, help, value): the .row.disabled state (opacity
+-- .55, control not interactive). Used for the mockup's "indisponível" row.
+function Panel:AddDisabledToggle(tab, title, help, value)
+    local order = self:_next()
+    local row = self:_row(tab, title, help, order)
+    row.BackgroundTransparency = 0.45
+
+    local toggle = new("Frame", {
+        Name = "Toggle",
+        BackgroundColor3 = Theme.Color(value and Theme.Accent or Theme.ToggleBg),
+        BorderSizePixel = 0,
+        Size = Theme.px(Theme.ToggleW, Theme.ToggleH),
+        LayoutOrder = 1,
+        Parent = row:FindFirstChild("Control"),
+    })
+    corner(toggle, Theme.ToggleRadius)
+    toggle.BackgroundTransparency = 0.45
+    stroke(toggle, value and Theme.Accent or Theme.ToggleBorder, 1)
+    local knob = new("Frame", {
+        Name = "Knob",
+        BackgroundColor3 = Theme.Color(value and Theme.ToggleKnobOn or Theme.ToggleKnob),
+        BackgroundTransparency = 0.45,
+        BorderSizePixel = 0,
+        Size = Theme.px(Theme.ToggleKnobSize),
+        Position = UDim2.fromOffset(value and (Theme.ToggleKnobInset + Theme.ToggleShift) or Theme.ToggleKnobInset, Theme.ToggleKnobInset),
+        Parent = toggle,
+    })
+    corner(knob, Theme.ToggleKnobSize / 2)
+    local control = {Instance = toggle, Row = row, Disabled = true}
+    function control:Get() return value == true end
+    self.Components[#self.Components + 1] = control
+    if tab.Search then tab.Search:Register(row, title) end
+    return control
+end
+
 -- AddDropdown(tab, title, help, options, value, callback)
 -- Uses the .choice-trigger button + floating .choice-menu from the mockup.
 function Panel:AddDropdown(tab, title, help, options, value, callback)
@@ -1361,8 +1633,7 @@ function Panel:AddDropdown(tab, title, help, options, value, callback)
         BorderSizePixel = 0,
         AutoButtonColor = false,
         Size = UDim2.new(1, 0, 0, Theme.TriggerMinH),
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        LayoutOrder = 1,
         Text = "",
         Parent = slot,
     })
@@ -1556,8 +1827,7 @@ function Panel:AddAction(tab, title, help, buttonLabel, callback, primary)
         BorderSizePixel = 0,
         AutoButtonColor = false,
         Size = UDim2.new(1, 0, 0, Theme.ActionMinH),
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        LayoutOrder = 1,
         Text = buttonLabel or "Executar",
         Font = Enum.Font.Gotham,
         TextSize = Theme.ActionFont,
@@ -1589,8 +1859,7 @@ function Panel:AddKeybind(tab, title, help, keyLabel, callback)
         BorderSizePixel = 0,
         AutoButtonColor = false,
         Size = UDim2.new(1, 0, 0, Theme.ActionMinH),
-        AnchorPoint = Vector2.new(1, 0.5),
-        Position = UDim2.new(1, 0, 0.5, 0),
+        LayoutOrder = 1,
         Text = keyLabel or "Insert",
         Font = Enum.Font.Gotham,
         TextSize = Theme.ActionFont,
@@ -1650,12 +1919,22 @@ function Panel:AddCollapsible(tab, summary, open)
     corner(container, Theme.DetailsRadius)
     stroke(container, Theme.DetailsBorder, 1)
     pad(container, Theme.DetailsPad, Theme.DetailsPad, Theme.DetailsPad, Theme.DetailsPad)
+    -- details is block flow: summary, then the body. A vertical list mirrors it
+    -- without depending on absolute offsets inside an AutomaticSize parent.
+    new("UIListLayout", {
+        Name = "Stack",
+        FillDirection = Enum.FillDirection.Vertical,
+        Padding = UDim.new(0, 0),
+        SortOrder = Enum.SortOrder.LayoutOrder,
+        Parent = container,
+    })
 
     local head = new("TextButton", {
         Name = "Summary",
         BackgroundTransparency = 1,
         AutoButtonColor = false,
         Size = UDim2.new(1, 0, 0, Theme.SummaryMinH),
+        LayoutOrder = 1,
         Text = "",
         Parent = container,
     })
@@ -1671,7 +1950,7 @@ function Panel:AddCollapsible(tab, summary, open)
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 0),
         AutomaticSize = Enum.AutomaticSize.Y,
-        Position = UDim2.fromOffset(0, Theme.SummaryMinH),
+        LayoutOrder = 2,
         Visible = open == true,
         Parent = container,
     })
@@ -1679,7 +1958,9 @@ function Panel:AddCollapsible(tab, summary, open)
 
     local state = open == true
     local function render()
+        -- summary is a <summary> marker; the mockup shows the disclosure arrow.
         headLabel.Text = (state and "▾  " or "▸  ") .. (summary or "Seção")
+        container.AutomaticSize = Enum.AutomaticSize.Y
     end
     self._connect(head.MouseButton1Click, function()
         state = not state
@@ -1687,7 +1968,7 @@ function Panel:AddCollapsible(tab, summary, open)
         render()
     end)
     render()
-    return {Body = body, Toggle = head}
+    return {Body = body, Toggle = head, Container = container}
 end
 
 -- AddButtonGroup(tab, buttons): the .button-group row.
@@ -1791,11 +2072,12 @@ function Panel:Confirm(title, message, onConfirm, confirmLabel, cancelLabel)
     })
     local function close() self.DialogOverlay.Visible = false end
     local function makeButton(name, text, primary, order, callback)
+        -- .button-group .action{flex:1;min-width:90px}: share the row equally.
         local button = new("TextButton", {
             Name = name,
             BackgroundColor3 = Theme.Color(primary and Theme.PrimaryBg or Theme.ActionBg),
             BorderSizePixel = 0,
-            Size = UDim2.new(0, 110, 1, 0),
+            Size = UDim2.new(0.5, -(Theme.ButtonGroupGap / 2), 1, 0),
             LayoutOrder = order,
             Text = text,
             Font = Enum.Font.Gotham,
@@ -1806,6 +2088,11 @@ function Panel:Confirm(title, message, onConfirm, confirmLabel, cancelLabel)
         })
         corner(button, Theme.ActionRadius)
         stroke(button, primary and Theme.PrimaryBg or Theme.ActionBorder, 1)
+        local base = button.BackgroundColor3
+        self._connect(button.MouseEnter, function()
+            button.BackgroundColor3 = Theme.Color(primary and Theme.PrimaryHoverBg or Theme.ActionHoverBg)
+        end)
+        self._connect(button.MouseLeave, function() button.BackgroundColor3 = base end)
         self._connect(button.MouseButton1Click, callback)
         return button
     end

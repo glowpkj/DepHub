@@ -229,14 +229,35 @@ local function run()
     check(header:FindFirstChild("Brand") ~= nil, "brand block exists")
     check(header:FindFirstChild("CurrentGame") ~= nil, "current-game block exists")
     check(header:FindFirstChild("WindowButtons") ~= nil, "window buttons exist")
+    -- Brand is a flex row of mark + morph-name; the name is collapsed in the
+    -- ready state (width 0 / transparent), exactly like the stylesheet.
+    local brand = header:FindFirstChild("Brand")
+    check(brand:FindFirstChild("Mark") ~= nil, "brand mark exists")
+    check(brand:FindFirstChild("MorphName") ~= nil, "brand morph-name exists")
+    check(brand:FindFirstChildOfClass("UIListLayout") ~= nil, "brand uses a flex row")
+    local morph = brand:FindFirstChild("MorphName")
+    check(morph.Size.X.Offset == 0, "morph-name collapsed to zero width when ready")
+    check(morph.TextTransparency == 1, "morph-name hidden when ready")
+    -- Current game carries a hidden caption plus the name, inside a wrapper div.
+    local gameRow = header:FindFirstChild("CurrentGame")
+    check(gameRow:FindFirstChild("Indicator") ~= nil, "game indicator dot exists")
+    local gameText = gameRow:FindFirstChild("TextBlock")
+    check(gameText ~= nil, "game text block exists")
+    check(gameText:FindFirstChild("Caption") ~= nil, "game caption exists")
+    check(gameText:FindFirstChild("Caption").Visible == false, "game caption hidden when ready")
+    check(gameText:FindFirstChild("GameName") ~= nil, "game name exists")
+
     local buttons = header:FindFirstChild("WindowButtons")
     check(buttons:FindFirstChild("Close") ~= nil, "close button")
     check(buttons:FindFirstChild("Minimize") ~= nil, "minimize button")
     check(buttons:FindFirstChild("Expand") ~= nil, "expand button")
-    -- each button has a coloured Dot and a hidden Glyph
+    -- each button has a coloured Dot behind a glyph that stays transparent until
+    -- the whole cluster is hovered.
     local close = buttons:FindFirstChild("Close")
     check(close:FindFirstChild("Dot") ~= nil, "close dot exists")
     check(close:FindFirstChild("Glyph") ~= nil, "close glyph exists")
+    check(close:FindFirstChild("Glyph").TextTransparency == 1, "glyph hidden until cluster hover")
+    check(close:FindFirstChild("Glyph").ZIndex > close:FindFirstChild("Dot").ZIndex, "glyph draws over the dot")
 
     -- Nav + main
     local layout = body:FindFirstChild("Layout")
@@ -252,8 +273,15 @@ local function run()
     check(tabB.Page.Visible == false, "second tab hidden")
     check(tabA.Page:FindFirstChild("Heading") ~= nil, "page has heading")
     check(tabA.Search ~= nil, "search field created")
+    -- nav button mirrors the HTML: glyph + text + (hidden) index in a flex row.
+    check(tabA.Button:FindFirstChild("Glyph") ~= nil, "nav glyph exists")
+    check(tabA.Button:FindFirstChild("Text") ~= nil, "nav text exists")
+    check(tabA.Button:FindFirstChild("Index") ~= nil, "nav-index exists")
+    check(tabA.Button:FindFirstChild("Index").Visible == false, "nav-index hidden on desktop")
+    check(tabA.Button:FindFirstChildOfClass("UIListLayout") ~= nil, "nav button uses a flex row")
     panel:SelectTab("Visual")
     check(tabB.Page.Visible == true and tabA.Page.Visible == false, "SelectTab switches")
+    panel:SelectTab("Jogador")
 
     -- Section label
     local section = panel:AddSection(tabA, "Preferencias do jogador")
@@ -311,6 +339,18 @@ local function run()
     keybind.Instance.MouseButton1Click:Fire()
     check(bound == true, "keybind fires")
 
+    -- Inline slider (the mockup's Opacidade control): range + output side by side
+    local inline = panel:AddInlineSlider(tabA, "Opacidade", 60, 100, 1, 100, nil, function(v) return tostring(v) .. "%" end)
+    check(inline:Get() == 100, "inline slider value")
+    inline:Set(84)
+    check(inline:Get() == 84, "inline slider set")
+    check(inline.Instance.Parent.Name == "Inline", "inline slider lives in an .inline row")
+
+    -- Disabled toggle: the .row.disabled state is present but non-interactive
+    local disabled = panel:AddDisabledToggle(tabA, "Opção indisponível", "Placeholder futuro.", true)
+    check(disabled.Disabled == true, "disabled toggle flagged")
+    check(disabled:Get() == true, "disabled toggle reads its value")
+
     -- Notice
     local notice = panel:AddNotice(tabA, "Mensagem de aviso.", "DepHub")
     check(notice:FindFirstChild("Body") ~= nil, "notice body")
@@ -344,8 +384,12 @@ local function run()
     local confirmed = false
     panel:Confirm("Confirmar?", "Deseja?", function() confirmed = true end)
     check(panel.DialogOverlay.Visible == true, "dialog shows")
+    -- Block flow: the dialog stacks h2, p and the button group vertically.
+    check(panel.Dialog:FindFirstChildOfClass("UIListLayout") ~= nil, "dialog uses a vertical stack")
+    check(panel.DialogMessage:FindFirstChildOfClass("UIPadding") ~= nil, "dialog message carries its h2/p margins")
     local confirmBtn = panel.DialogButtons:FindFirstChild("Confirm")
     check(confirmBtn ~= nil, "dialog has confirm")
+    check(panel.DialogButtons:FindFirstChild("Cancel") ~= nil, "dialog has cancel")
     confirmBtn.MouseButton1Click:Fire()
     check(confirmed == true, "dialog confirm fires")
     check(panel.DialogOverlay.Visible == false, "dialog closes")
