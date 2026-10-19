@@ -4,8 +4,12 @@
 tools/mingit/
 *.log
 
-# Release artifacts are built locally and hosted separately, never committed.
-dist/
+# Release artifacts are built locally. Only the published bundle is committed
+# (the loader fetches it from the raw URL); the rest of dist/ stays ignored.
+# Note: the directory itself is not ignored, only its contents, so the negation
+# below can re-include the bundle.
+dist/*
+!dist/DepHub.lua
 
 # Editor / OS noise
 .DS_Store
