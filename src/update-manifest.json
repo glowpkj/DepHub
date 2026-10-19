@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-19T02:06:25.350629+00:00",
-  "commit": "87438545a335b8990093f4d721868b9604dd9d40",
+  "generatedAt": "2026-10-19T02:13:22.456052+00:00",
+  "commit": "3d9b7ef24582d63b62329d3a9b75704a826a2ac4",
   "version": "0.0.37",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "2b7ea8f57b6f98a2dab6b693c66bd301744f13b702e8ccdf7c0234745afc4bbf",
-      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
+      "commit": "3d9b7ef24582d63b62329d3a9b75704a826a2ac4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,7 +26,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "18b467ea87e816e5ffa510709fb883434c762e099bde03af9f63d8462f9dbeca",
-      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
+      "commit": "3d9b7ef24582d63b62329d3a9b75704a826a2ac4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -53,7 +53,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "11c1a050afb9903988cf3f9fe3da7508f12e52f5bae194d95d82b67f50de1926",
-      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
+      "commit": "3d9b7ef24582d63b62329d3a9b75704a826a2ac4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -70,7 +70,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "8af80e20cb0f4b226043b7b803f58f064e943a7b2c9a9d34b6c5cb76c2494646",
-      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
+      "commit": "3d9b7ef24582d63b62329d3a9b75704a826a2ac4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -92,7 +92,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "a8e0c0972e934772c9ae08a818c40a726f5946057775b4122962a0660b6dda19",
-      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
+      "commit": "3d9b7ef24582d63b62329d3a9b75704a826a2ac4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -119,7 +119,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "07365134c0a272bcaf8e68f069e01991797887f5163634b1d32e763cd5986186",
-      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
+      "commit": "3d9b7ef24582d63b62329d3a9b75704a826a2ac4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -144,7 +144,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "9c62dd2fa5920da5d0d36e0b66b1ff1257adee84e26767f43dfe55676d04b5e3",
-      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
+      "commit": "3d9b7ef24582d63b62329d3a9b75704a826a2ac4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
