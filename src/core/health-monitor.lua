@@ -33,6 +33,7 @@ function HealthMonitor:Register(name, callback)
     self.Checks[name] = {
         Callback = callback,
         Errors = 0,
+        Failures = 0,
         LastRun = 0,
         LastSuccess = 0,
         LastError = nil,
@@ -42,14 +43,17 @@ function HealthMonitor:Register(name, callback)
     return true
 end
 
+-- A check that returns false is a normal negative report; only a raised error is a
+-- fault. Conflating the two made a legitimately-false check look permanently
+-- Unhealthy once it crossed MaxErrors.
 function HealthMonitor:RunCheck(name, check)
-    local ok, result = pcall(check.Callback)
+    local ok, result = pcall(check.Callback, check)
     check.LastRun = os_clock()
 
     if not ok then
         check.Errors = check.Errors + 1
         check.LastError = tostring(result)
-        check.Healthy = check.Errors < self.MaxErrors
+        check.Healthy = false
         self.ErrorCount = self.ErrorCount + 1
         self.LastError = check.LastError
         self.Results[name] = false
@@ -58,8 +62,14 @@ function HealthMonitor:RunCheck(name, check)
 
     check.Errors = 0
     check.LastError = nil
-    check.LastSuccess = os_clock()
-    check.Healthy = result ~= false
+    if result == false then
+        check.Failures = check.Failures + 1
+        check.Healthy = false
+    else
+        check.Failures = 0
+        check.Healthy = true
+        check.LastSuccess = os_clock()
+    end
     self.Results[name] = check.Healthy
     return check.Healthy
 end
@@ -111,7 +121,8 @@ function HealthMonitor:Start()
     task.spawn(function()
         while not self.Destroyed do
             self:Evaluate()
-            task.wait(self.Interval)
+            -- Jitter the evaluation cadence so the health loop is not perfectly periodic.
+            task.wait(self.Interval * (1 + (math.random() * 2 - 1) * 0.15))
         end
     end)
 
@@ -125,6 +136,7 @@ function HealthMonitor:GetSnapshot()
         checks[name] = {
             Healthy = check.Healthy,
             Errors = check.Errors,
+            Failures = check.Failures,
             LastError = check.LastError,
             LastRun = check.LastRun,
             LastSuccess = check.LastSuccess

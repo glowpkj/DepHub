@@ -1,6 +1,12 @@
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 
+-- Humanised timing: vary periodic waits so the automation loop is not perfectly periodic.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 local AutoFarmFriendsModule = {}
 AutoFarmFriendsModule.Enabled = false
 
@@ -113,7 +119,7 @@ function AutoFarmFriendsModule.Start()
                 end)
             end
 
-            task.wait(0.1)
+            jitter(0.1)
         end
     end)
     print("[Auto Farm Friends] Ativado com Sucesso!")
@@ -124,15 +130,16 @@ function AutoFarmFriendsModule.Stop()
     AutoFarmFriendsModule.Enabled = false
     table.clear(activeInteractions)
 
-    if farmThread then
+    local thread = farmThread
+    farmThread = nil
+    if thread then
         pcall(function()
-            if task and task.cancel then
-                task.cancel(farmThread)
-            else
-                coroutine.close(farmThread)
+            if type(task) == "table" and type(task.cancel) == "function" then
+                task.cancel(thread)
+            elseif type(coroutine.close) == "function" then
+                coroutine.close(thread)
             end
         end)
-        farmThread = nil
     end
 
     print("[Auto Farm Friends] Desativado!")

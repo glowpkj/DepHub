@@ -1,0 +1,11 @@
+# Local publish credentials and machine-specific tooling must never be pushed.
+.publish-token
+.publish-remote
+tools/mingit/
+*.log
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

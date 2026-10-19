@@ -1,6 +1,12 @@
 local Players=game:GetService("Players")
 local Workspace=game:GetService("Workspace")
 
+-- Humanised timing: vary each periodic wait to avoid a perfectly periodic loop.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 local AutoChest={}
 AutoChest.__index=AutoChest
 
@@ -97,7 +103,7 @@ function AutoChest:_run(token)
         local _,root=self:_character()
 
         if not root then
-            task.wait(0.4)
+            jitter(0.4)
             continue
         end
 
@@ -105,7 +111,7 @@ function AutoChest:_run(token)
 
         if not model or not part then
             self.LastTarget=nil
-            task.wait(0.25)
+            jitter(0.25)
             continue
         end
 
@@ -127,10 +133,10 @@ function AutoChest:_run(token)
         local started=os.clock()
 
         while self.Enabled and token==self.Token and model.Parent and self:_spawned(model) and os.clock()-started<1.25 do
-            task.wait(0.08)
+            jitter(0.08)
         end
 
-        task.wait(self.Delay)
+        jitter(self.Delay)
     end
 end
 

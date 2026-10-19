@@ -1,19 +1,18 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-16T01:33:44.176703+00:00",
-  "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
-  "version": "0.0.32",
+  "generatedAt": "2026-10-19T00:46:50.301Z",
+  "commit": "local",
+  "version": "0.0.37",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "598ec06e4de86b1a12052a57cdab42c82ae0d5d18a031347ac84f74b160ff659",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+      "version": "3556817d9514ac1b76c9b7df8b24413ed13535f5e16bcc1aefaad9b3a730f88f",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/ui-guard.lua",
         "src/core/updater.lua",
-        "library/compact.lua",
         "src/games/mm2.lua",
         "src/games/features/mm2/roletracker.lua",
         "src/games/features/mm2/roundtracker.lua",
@@ -21,14 +20,13 @@
         "src/games/features/mm2/coinfarm.lua",
         "src/games/features/mm2/playerteleport.lua",
         "src/games/features/mm2/gundrop.lua",
-        "src/games/features/mm2/frontend.lua",
         "src/games/updates/66654135.txt"
       ]
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "934908f2e1fd2356c330b915f2a104e32da23b5d4ed850a3f81a2a7e7ac10088",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+      "version": "95794850cc4ae5295f0005ce93b4acbd5bf2a3069cf56a4cf6ad0411cf22e496",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -42,43 +40,37 @@
         "src/games/features/bloxfruits/dash.lua",
         "src/games/features/bloxfruits/flashstep.lua",
         "src/games/features/bloxfruits/waterwalking.lua",
+        "src/games/features/bloxfruits/bladhits.lua",
+        "src/games/features/bloxfruits/autofarm.lua",
+        "src/games/features/bloxfruits/quests.lua",
         "src/games/features/bloxfruits/config.lua",
         "src/games/features/bloxfruits/team.lua",
-        "src/games/updates/994732206.txt",
-        "library/init.lua",
-        "library/theme.lua",
-        "library/utils.lua",
-        "library/components.lua",
-        "library/window.lua",
-        "library/content/common.lua",
-        "library/content/bloxfruits.lua",
         "src/games/features/bloxfruits/fruitvfx.lua",
+        "src/games/updates/994732206.txt",
         "src/core/updater.lua"
       ]
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "538a3248c86caef74fb02dee6b27392733849615910e8f150505160a9a26959a",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+      "version": "6c2b582fabb6002d1349487b34bcabf733af613610c9ca3772bfa439d29f5adf",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/ui-guard.lua",
         "src/core/updater.lua",
-        "library/compact.lua",
         "src/games/tsb.lua",
         "src/games/features/tsb/animations.lua",
         "src/games/features/tsb/autoblock.lua",
         "src/games/features/tsb/autoblock-v2.lua",
-        "src/games/features/tsb/frontend.lua",
-        "src/games/updates/3808081382.txt",
-        "src/games/features/tsb/autoblock-v3.lua"
+        "src/games/features/tsb/autoblock-v3.lua",
+        "src/games/updates/3808081382.txt"
       ]
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "63f10aaa7515c5ac426dd137eb1e0901738caacafc7b8196b71063f78c28452b",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+      "version": "5106189ea99ca8eebef9baa88b56d2e9cd40b6797b73c4b7c6099dace3a2e6e6",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -94,20 +86,13 @@
         "src/games/features/restauranttycoon3/instant-cook.lua",
         "src/games/features/restauranttycoon3/drops.lua",
         "src/games/features/restauranttycoon3/autofarm-friends.lua",
-        "src/games/updates/119048529960596.txt",
-        "library/init.lua",
-        "library/theme.lua",
-        "library/utils.lua",
-        "library/components.lua",
-        "library/window.lua",
-        "library/content/common.lua",
-        "library/content/rt3.lua"
+        "src/games/updates/119048529960596.txt"
       ]
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "36a6cb25a8c8b180c8d97173ceea4e586b67a1f2b90fb9f46a818cb5d36bba1b",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+      "version": "522ba53ccb0daf250e5660df6d3c8eca26acfd15b972d763b0381f7b684d9982",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -121,40 +106,20 @@
         "src/games/features/bloxfruits/dash.lua",
         "src/games/features/bloxfruits/flashstep.lua",
         "src/games/features/bloxfruits/waterwalking.lua",
+        "src/games/features/bloxfruits/bladhits.lua",
+        "src/games/features/bloxfruits/autofarm.lua",
+        "src/games/features/bloxfruits/quests.lua",
         "src/games/features/bloxfruits/config.lua",
         "src/games/features/bloxfruits/team.lua",
-        "src/games/updates/85211729168715.txt",
-        "library/init.lua",
-        "library/theme.lua",
-        "library/utils.lua",
-        "library/components.lua",
-        "library/window.lua",
-        "library/content/common.lua",
-        "library/content/bloxfruits.lua",
         "src/games/features/bloxfruits/fruitvfx.lua",
+        "src/games/updates/85211729168715.txt",
         "src/core/updater.lua"
-      ]
-    },
-    "6739698191": {
-      "name": "Violence District",
-      "version": "54d188048d58db599131fa46e3321510ef574dd01afa2913772aab727538455f",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
-      "files": [
-        "DepHub.lua",
-        "src/version.txt",
-        "src/core/ui-guard.lua",
-        "src/core/updater.lua",
-        "src/games/violencedistrict.lua",
-        "src/games/features/violencedistrict/esp.lua",
-        "src/games/features/violencedistrict/generator.lua",
-        "src/games/features/violencedistrict/frontend.lua",
-        "src/games/updates/6739698191.txt"
       ]
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "fe046dd3af5eb6d73b907caf222e091273819494d9b2dada6aee87d603181fac",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+      "version": "83423df345128430842b5652134680286a6e35a94dd43ca2ab3f9c9102d9bd20",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -173,86 +138,23 @@
         "src/games/features/noobpiece/autoquest.lua",
         "src/games/features/noobpiece/islanddata.lua",
         "src/games/features/noobpiece/islandtracker.lua",
-        "src/games/updates/84822469255086.txt",
-        "library/init.lua",
-        "library/theme.lua",
-        "library/utils.lua",
-        "library/components.lua",
-        "library/window.lua",
-        "library/content/common.lua",
-        "library/content/noobpiece.lua"
-      ]
-    },
-    "6931042565": {
-      "name": "Volleyball Legends",
-      "version": "d797594fd7273fe025ae4aa53aaac2419a3c269092581dc1106b7cf8d48471fa",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
-      "files": [
-        "DepHub.lua",
-        "src/version.txt",
-        "src/core/ui-guard.lua",
-        "src/core/updater.lua",
-        "library/compact.lua",
-        "src/games/volleyballlegends.lua",
-        "src/games/features/volleyballlegends/ball-detector.lua",
-        "src/games/features/volleyballlegends/ball-esp.lua",
-        "src/games/features/volleyballlegends/trajectory.lua",
-        "src/games/features/volleyballlegends/frontend.lua",
-        "src/games/updates/6931042565.txt"
+        "src/games/updates/84822469255086.txt"
       ]
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "7fc5f13a1f55490e72fe3b80ba97d80d1375853fa15d641a1c695a57e8437bb6",
-      "commit": "e1e917cdf3163da5f670fbee109ab377911c117e",
+      "version": "edbaaf18cedb1419d91ae4a61fc9364c75fc430ffcc04f713b76614e21c22d61",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/ui-guard.lua",
         "src/core/updater.lua",
-        "library/compact.lua",
         "src/games/aotr.lua",
         "src/games/features/aotr/assistance.lua",
-        "src/games/features/aotr/frontend.lua",
         "src/games/updates/4658598196.txt"
       ]
     }
   },
-  "recentUpdates": [
-    {
-      "Version": "696f106",
-      "Date": "2026-10-15T22:29:58-03:00",
-      "Changes": [
-        "Integrate initial AOTR assistance, ID routing and lifecycle cleanup"
-      ]
-    },
-    {
-      "Version": "b2bb58a",
-      "Date": "2026-10-15T22:13:22-03:00",
-      "Changes": [
-        "feat(aotr): register module and compact frontend in DepHub loader"
-      ]
-    },
-    {
-      "Version": "0b61c61",
-      "Date": "2026-10-15T22:13:12-03:00",
-      "Changes": [
-        "feat(aotr): add compact DepHub frontend"
-      ]
-    },
-    {
-      "Version": "ad0e9f9",
-      "Date": "2026-10-15T22:13:09-03:00",
-      "Changes": [
-        "feat(aotr): add defensive titan features and diagnostics"
-      ]
-    },
-    {
-      "Version": "e640a3a",
-      "Date": "2026-10-06T22:03:21-03:00",
-      "Changes": [
-        "feat(volleyball): dynamic Ball ESP and reusable trajectory and landing visuals"
-      ]
-    }
-  ]
+  "recentUpdates": []
 }

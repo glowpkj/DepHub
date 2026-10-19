@@ -5,6 +5,12 @@ local localPlayer = Players.LocalPlayer
 local AutoDropModule = {}
 AutoDropModule.Enabled = false
 
+-- Humanised timing: vary the poll interval so the scan loop is not perfectly periodic.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 local dropThread = nil
 local dropConnection = nil
 local boundFolder = nil
@@ -73,7 +79,7 @@ function AutoDropModule.Start()
                 end)
             end
 
-            task.wait(0.15)
+            jitter(0.15)
         end
     end)
 end

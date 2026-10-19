@@ -1,6 +1,13 @@
 local Players=game:GetService("Players")
 local Workspace=game:GetService("Workspace")
 
+-- Humanised timing: a perfectly periodic loop is a bot fingerprint. jitter keeps
+-- the same average cadence while varying each wait by +/-15%.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 local AutoFarm={}
 AutoFarm.__index=AutoFarm
 
@@ -494,7 +501,7 @@ function AutoFarm:_run(token)
         if self.Paused then
             self.Target=nil
             self.AutoAttack:SetFarmReady(false)
-            task.wait(0.1)
+            jitter(0.1)
             continue
         end
 
@@ -503,7 +510,7 @@ function AutoFarm:_run(token)
         if not root then
             self.Target=nil
             self.AutoAttack:SetFarmReady(false)
-            task.wait(0.25)
+            jitter(0.25)
             continue
         end
 
@@ -520,7 +527,7 @@ function AutoFarm:_run(token)
                 continue
             end
 
-            task.wait(0.4)
+            jitter(0.4)
             continue
         end
 
@@ -529,7 +536,7 @@ function AutoFarm:_run(token)
         if not enemyRoot then
             self.Target=nil
             self.AutoAttack:SetFarmReady(false)
-            task.wait(0.1)
+            jitter(0.1)
             continue
         end
 
@@ -547,7 +554,7 @@ function AutoFarm:_run(token)
                 targetDistance<=range
                 and targetDistance>=math.max(0.5,desired-1.5)
             )
-            task.wait(0.05)
+            jitter(0.05)
         end
     end
 

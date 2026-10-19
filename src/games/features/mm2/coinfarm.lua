@@ -6,6 +6,12 @@ local os_clock=os.clock
 
 local Factory={}
 
+-- Humanised timing: vary each periodic wait to avoid a perfectly periodic loop.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 local function disconnectAll(list)
     for i=#list,1,-1 do
         local c=list[i]
@@ -134,25 +140,25 @@ function Factory.new(context)
         while self.Enabled and not self.Destroyed and token==self.Token do
             if RoundTracker and not RoundTracker:IsRoundActive() then
                 self.DebugInfo.Paused="lobby"
-                task.wait(0.08)
+                jitter(0.08)
             else
                 local root=self:_root()
                 if not root then
                     self.DebugInfo.Paused="dead"
-                    task.wait(0.08)
+                    jitter(0.08)
                 elseif self:_murderTooClose(root) then
                     self.DebugInfo.Paused="murder nearby"
-                    task.wait(0.06)
+                    jitter(0.06)
                 else
                     self:_refreshCounts()
                     local coin,distance=self:_nearest(root)
                     if not coin then
                         self.DebugInfo.Paused="no coins"
-                        task.wait(0.06)
+                        jitter(0.06)
                     else
                         self.DebugInfo.Paused="none"
                         self:_teleportCoin(root,coin,distance)
-                        task.wait(self.Delay)
+                        jitter(self.Delay)
                     end
                 end
             end

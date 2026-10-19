@@ -2,6 +2,7 @@ local type = type
 local tostring = tostring
 local pcall = pcall
 local tonumber = tonumber
+local pairs = pairs
 local os_clock = os.clock
 
 local Runtime = {}
@@ -22,7 +23,19 @@ function Runtime.new(options)
     self.LastError = nil
     self.Health = "Healthy"
     self.Events = {}
-    self.Scheduler = type(Scheduler) == "table" and Scheduler.new(options.SchedulerOptions or {}) or nil
+    local schedulerOptions = {}
+    local providedSchedulerOptions = options.SchedulerOptions
+    if type(providedSchedulerOptions) == "table" then
+        for key, value in pairs(providedSchedulerOptions) do schedulerOptions[key] = value end
+    end
+    local previousOnError = schedulerOptions.OnError
+    schedulerOptions.OnError = function(state, message)
+        self.ErrorCount = self.ErrorCount + 1
+        self.LastError = message
+        self:Emit("TaskError", state, message)
+        if type(previousOnError) == "function" then pcall(previousOnError, state, message) end
+    end
+    self.Scheduler = type(Scheduler) == "table" and Scheduler.new(schedulerOptions) or nil
     self.HealthMonitor = type(HealthMonitor) == "table" and HealthMonitor.new(options.HealthOptions or {}) or nil
     self.Dashboard = type(Dashboard) == "table" and Dashboard.new(options.DashboardOptions or {}) or nil
     return self

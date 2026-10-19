@@ -2,15 +2,14 @@
 do
     for _,ids in ipairs({{13379208636,2},{999,4658598196}}) do
         local ctx=sandbox(ids[1],ids[2])
-        ctx.Responses["src/version.txt"]="0.0.32"
+        ctx.Responses["src/version.txt"]="0.0.37"
         ctx:Provide("src/games/aotr.lua",{Destroyed=false})
-        ctx:Provide("src/games/features/aotr/frontend.lua",{Destroyed=false})
         check(ctx:Run("DepHub.lua")==true,"AOTR routes without game.Name")
         check(ctx.State.__DEPHUB.AOTR~=nil and ctx.State.__DEPHUB.BloxFruits==nil,"AOTR route preserves backend identity")
+        check(ctx.State.__DEPHUB.Mode=="AOTR" and ctx.State.__DEPHUB.Backend==ctx.State.__DEPHUB.AOTR,"AOTR route exposes mode and backend")
     end
     local ctx=sandbox()
     ctx.Services.TweenService={}
-    ctx.Env.Vector3=vectors
     ctx.Player.Name="Tester"
     ctx.Player.Idled=signal()
     ctx.Responses["src/games/features/aotr/assistance.lua"]=sources["src/games/features/aotr/assistance.lua"]
@@ -21,7 +20,7 @@ do
     local model=object("Model","Titan",folder)
     local hit=object("Folder","Hit",object("Folder","Hitboxes",model))
     local nape=object("Part","Nape",hit)
-    nape.Size=vectors.new(15,9,11);nape.Transparency=1
+    nape.Size=Vector3.new(15,9,11);nape.Transparency=1
     object("Highlight","Unrelated",folder)
     local backend=ctx:Run("src/games/aotr.lua")
     check(backend:SetToggle("NapeVisible",true) and nape.Transparency==0.65,"AOTR ignores Highlight siblings")
@@ -38,7 +37,7 @@ do
     check(folder:FindFirstChild("Unrelated")~=nil,"AOTR preserves unrelated highlights")
     local boss=object("Model","Attack_Titan",folder)
     local bossHit=object("Folder","Hit",object("Folder","Hitboxes",boss))
-    local weakpoint=object("Part","LeftLeg",bossHit);weakpoint.Size=vectors.new(10,20,10);weakpoint.Transparency=1
+    local weakpoint=object("Part","LeftLeg",bossHit);weakpoint.Size=Vector3.new(10,20,10);weakpoint.Transparency=1
     local marker=object("BillboardGui","Marker",boss);marker.Adornee=weakpoint
     backend:SetToggle("ErenExtend",true)
     check(weakpoint.Size.X==95,"AOTR extends validated marker target")

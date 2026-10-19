@@ -2,6 +2,12 @@ local Players=game:GetService("Players")
 local ReplicatedStorage=game:GetService("ReplicatedStorage")
 local Workspace=game:GetService("Workspace")
 
+-- Humanised timing: vary each periodic wait so loops are not perfectly periodic.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 local AutoQuest={}
 AutoQuest.__index=AutoQuest
 
@@ -361,7 +367,7 @@ function AutoQuest:_requestQuest(island,enemy,token)
 
     if not giver then
         self:_approachIsland(root,island)
-        task.wait(0.35)
+        jitter(0.35)
         return false
     end
 
@@ -369,7 +375,7 @@ function AutoQuest:_requestQuest(island,enemy,token)
 
     if not npcRoot then
         self:_approachIsland(root,island)
-        task.wait(0.2)
+        jitter(0.2)
         return false
     end
 
@@ -426,7 +432,7 @@ function AutoQuest:_run(token)
         local deadline=os.clock()+4
 
         while self.Enabled and token==self.Token and not self.ActiveQuest and os.clock()<deadline do
-            task.wait(0.1)
+            jitter(0.1)
         end
 
         if self.ActiveQuest then
@@ -438,7 +444,7 @@ function AutoQuest:_run(token)
 
         self.WaitingDialog=false
         self.Stage=nil
-        task.wait(0.35)
+        jitter(0.35)
     end
 end
 

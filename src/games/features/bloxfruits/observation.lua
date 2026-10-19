@@ -1,6 +1,12 @@
 local Feature = {}
 Feature.__index = Feature
 
+-- Humanised timing: vary each periodic wait to avoid a perfectly periodic loop.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 function Feature.new(context)
     return setmetatable({Context = context, State = context.State, Enabled = false, Thread = nil}, Feature)
 end
@@ -25,7 +31,7 @@ function Feature:Enable()
             pcall(function()
                 if self.Context.LocalPlayer.VisionRadius ~= 5000 then self:_setVisionRadius(5000) end
             end)
-            task.wait(0.5)
+            jitter(0.5)
         end
     end)
     return true

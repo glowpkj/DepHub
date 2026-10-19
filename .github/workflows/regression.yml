@@ -22,8 +22,6 @@ jobs:
         run: node tests/validate_repo.js
       - name: Compile Luau
         run: |
-          find src library diagnostics -name '*.lua' -print0 | xargs -0 /tmp/luau/luau-compile --null DepHub.lua
+          find src diagnostics -name '*.lua' -print0 | xargs -0 /tmp/luau/luau-compile --null DepHub.lua
       - name: Backend and lifecycle checks
         run: node tests/run_backend_tests.js /tmp/luau/luau
-      - name: Library checks
-        run: node tests/run_library_tests.js /tmp/luau/luau

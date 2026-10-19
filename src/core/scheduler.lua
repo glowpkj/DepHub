@@ -18,9 +18,13 @@ function Scheduler.new(options)
     self.NextId = 0
     self.DefaultInterval = tonumber(options.DefaultInterval) or 0.1
     self.MaxErrors = tonumber(options.MaxErrors) or 5
+    self.OnError = type(options.OnError) == "function" and options.OnError or nil
     return self
 end
 
+-- Re-registering an existing name must not silently keep the stale callback:
+-- backends re-register tasks after respawns with fresh upvalues. Swap the body in
+-- place, bump the version (which retires the current thread) and restart if live.
 function Scheduler:Register(name, callback, options)
     if self.Destroyed or type(name) ~= "string" or type(callback) ~= "function" then
         return nil
@@ -28,6 +32,17 @@ function Scheduler:Register(name, callback, options)
 
     local existing = self.Tasks[name]
     if existing then
+        existing.Callback = callback
+        existing.Version = existing.Version + 1
+        existing.Started = false
+        if options then
+            if options.Interval ~= nil then existing.Interval = math.max(tonumber(options.Interval) or existing.Interval, 0.01) end
+            if options.Priority ~= nil then existing.Priority = tonumber(options.Priority) or existing.Priority end
+            if options.Enabled ~= nil then existing.Enabled = options.Enabled ~= false end
+        end
+        if self.Started and existing.Enabled then
+            self:StartTask(existing)
+        end
         return existing
     end
 
@@ -47,6 +62,7 @@ function Scheduler:Register(name, callback, options)
         LastRun = 0,
         LastSuccess = 0,
         Started = false,
+        RunningVersion = nil,
         Version = 0,
         Destroyed = false
     }
@@ -69,6 +85,7 @@ function Scheduler:SetEnabled(name, enabled)
 
     state.Enabled = enabled == true
     state.Version = state.Version + 1
+    state.RunningVersion = nil
 
     if state.Enabled and self.Started then
         self:StartTask(state)
@@ -102,16 +119,28 @@ function Scheduler:Run(state)
         state.Enabled = false
     end
 
+    if self.OnError then
+        pcall(self.OnError, state, state.LastError)
+    end
+
     return false
 end
 
+-- A task can have at most one live thread per Version. The old guard
+-- (`state.Started and state.Enabled`) skipped restarting when the previous thread
+-- was still parked in task.wait, leaving an enabled task with no runner.
 function Scheduler:StartTask(state)
-    if state.Started and state.Enabled then
+    if self.Destroyed or state.Destroyed then
+        return
+    end
+
+    if state.RunningVersion == state.Version and state.Started then
         return
     end
 
     state.Started = true
     local version = state.Version
+    state.RunningVersion = version
 
     task.spawn(function()
         while not self.Destroyed and not state.Destroyed and state.Version == version do
@@ -120,7 +149,10 @@ function Scheduler:StartTask(state)
             end
             task.wait(state.Interval)
         end
-        state.Started = false
+        if state.RunningVersion == version then
+            state.Started = false
+            state.RunningVersion = nil
+        end
     end)
 end
 
@@ -156,6 +188,7 @@ function Scheduler:Stop(name)
 
     state.Enabled = false
     state.Version = state.Version + 1
+    state.RunningVersion = nil
     return true
 end
 
@@ -194,6 +227,7 @@ function Scheduler:Destroy()
         state.Destroyed = true
         state.Enabled = false
         state.Version = state.Version + 1
+        state.RunningVersion = nil
     end
 
     self.Tasks = {}

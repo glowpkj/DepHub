@@ -43,6 +43,8 @@ for (const [gameId, game] of Object.entries(manifestConfig)) {
     if (seen.has(file)) fail(`Duplicate tracked path in ${gameId}: ${file}`);
     seen.add(file);
     if (!exists(file)) fail(`Missing tracked file for ${gameId}: ${file}`);
+    if (file.startsWith('library/')) fail(`Retired library path is still tracked in ${gameId}: ${file}`);
+    if (file.endsWith('/frontend.lua')) fail(`Removed frontend is still tracked in ${gameId}: ${file}`);
   }
 
   for (const required of requiredCommon) {
@@ -53,14 +55,13 @@ for (const [gameId, game] of Object.entries(manifestConfig)) {
   if (!seen.has(updateFile) || !exists(updateFile)) fail(`Game ${gameId} is missing its update marker: ${updateFile}`);
 }
 
-function validateFeatureDirectory(gameId, directory, requiredFiles) {
+// Every backend feature module must be tracked so the updater can hash it.
+function validateFeatureDirectory(gameId, directory) {
   const game = manifestConfig[gameId];
   if (!game) fail(`Manifest entry is missing: ${gameId}`);
   const files = new Set(game.files);
-  for (const required of requiredFiles) {
-    if (!files.has(required)) fail(`${game.name} manifest is missing: ${required}`);
-  }
   const absolute = path.join(root, directory);
+  if (!fs.existsSync(absolute)) return;
   for (const entry of fs.readdirSync(absolute, {withFileTypes: true})) {
     if (!entry.isFile() || !entry.name.endsWith('.lua')) continue;
     const relative = `${directory}/${entry.name}`;
@@ -68,39 +69,51 @@ function validateFeatureDirectory(gameId, directory, requiredFiles) {
   }
 }
 
-validateFeatureDirectory('6931042565', 'src/games/features/volleyballlegends', [
-  'src/core/updater.lua', 'library/compact.lua', 'src/games/volleyballlegends.lua'
-]);
-validateFeatureDirectory('3808081382', 'src/games/features/tsb', [
-  'src/core/updater.lua',
-  'library/compact.lua',
-  'src/games/tsb.lua'
-]);
-validateFeatureDirectory('66654135', 'src/games/features/mm2', [
-  'src/core/updater.lua',
-  'library/compact.lua',
-  'src/games/mm2.lua',
-  'src/games/features/mm2/playerteleport.lua'
-]);
-validateFeatureDirectory('4658598196', 'src/games/features/aotr', [
-  'src/core/updater.lua', 'library/compact.lua', 'src/games/aotr.lua'
-]);
+validateFeatureDirectory('994732206', 'src/games/features/bloxfruits');
+validateFeatureDirectory('85211729168715', 'src/games/features/bloxfruits');
+validateFeatureDirectory('119048529960596', 'src/games/features/restauranttycoon3');
+validateFeatureDirectory('84822469255086', 'src/games/features/noobpiece');
+validateFeatureDirectory('3808081382', 'src/games/features/tsb');
+validateFeatureDirectory('66654135', 'src/games/features/mm2');
+validateFeatureDirectory('4658598196', 'src/games/features/aotr');
 
 if (!loader.includes('["142823291"]') || !loader.includes('["66654135"]') || !loader.includes('src/games/mm2.lua')) {
   fail('MM2 loader routing is incomplete');
 }
-
-if (exists('src/games/features/mm2/evade.lua')) {
-  fail('Retired MM2 evade module still exists');
+if (loader.includes('volleyball') || loader.includes('Volleyball') || loader.includes('6931042565')) {
+  fail('Removed Volleyball Legends routing remains in the loader');
+}
+if (loader.includes('violencedistrict') || loader.includes('ViolenceDistrict') || loader.includes('6739698191')) {
+  fail('Removed Violence District routing remains in the loader');
+}
+if (/library\/|frontend\.lua|Library\.new|CreateTab|CreateSection/.test(loader)) {
+  fail('Loader still references a retired frontend/library');
 }
 
-const compact = read('library/compact.lua');
-for (const api of ['AddSection', 'AddToggle', 'AddFeature', 'AddSlider', 'AddButton', 'AddStatus']) {
-  if (!compact.includes(api)) fail(`Shared compact library missing API: ${api}`);
+for (const retired of ['src/games/volleyballlegends.lua', 'src/games/violencedistrict.lua']) {
+  if (exists(retired)) fail('Retired backend still exists: ' + retired);
+}
+for (const retired of ['src/games/features/volleyballlegends', 'src/games/features/violencedistrict', 'library']) {
+  if (exists(retired)) fail('Retired directory still exists: ' + retired);
 }
 
-const legacyUi = path.join(root, 'src/ui');
-if (fs.existsSync(legacyUi) && fs.readdirSync(legacyUi).length > 0) {
+// No backend may create UI instances now that the library is gone.
+const xmlUi = /CreateTab|CreateSection|CreateToggle\b|Library\.new|dephubCompact|dephubViolenceDistrict|library\//;
+function walk(dir) {
+  for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
+    const file = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(file);
+    else if (entry.name.endsWith('.lua')) {
+      const source = fs.readFileSync(file, 'utf8');
+      if (xmlUi.test(source)) {
+        fail('Backend still depends on a retired frontend/library: ' + path.relative(root, file));
+      }
+    }
+  }
+}
+walk(path.join(root, 'src'));
+
+if (exists('src/ui') && fs.readdirSync(path.join(root, 'src/ui')).length > 0) {
   fail('Legacy src/ui directory must stay empty');
 }
 

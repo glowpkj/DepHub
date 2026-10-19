@@ -7,12 +7,11 @@ const root = path.resolve(__dirname, '..');
 const luau = process.argv[2];
 if (!luau) throw new Error('Usage: node tests/run_backend_tests.js /path/to/luau');
 const files = ['src/games/aotr.lua', 'src/games/features/aotr/assistance.lua', 'DepHub.lua', 'src/games/bloxfruits.lua', 'src/games/universal.lua',
-  'src/games/rt3.lua', 'src/core/runtime.lua', 'src/core/updater.lua',
+  'src/games/rt3.lua', 'src/core/runtime.lua', 'src/core/updater.lua', 'src/core/scheduler.lua', 'src/core/health-monitor.lua',
   'src/games/features/bloxfruits/fruitvfx.lua', 'src/games/noobpiece.lua',
+  'src/games/features/bloxfruits/bladhits.lua', 'src/games/features/bloxfruits/autofarm.lua', 'src/games/features/bloxfruits/quests.lua',
   'src/games/features/mm2/roletracker.lua', 'src/games/features/tsb/autoblock-v3.lua',
-  'src/games/tsb.lua', 'src/games/features/tsb/frontend.lua', 'src/games/volleyballlegends.lua',
-  'src/games/features/volleyballlegends/frontend.lua', 'src/games/features/volleyballlegends/ball-detector.lua',
-  'src/games/features/volleyballlegends/ball-esp.lua', 'src/games/features/volleyballlegends/trajectory.lua'];
+  'src/games/tsb.lua'];
 const manifestConfig = JSON.parse(fs.readFileSync(path.join(root, '.github/dephub-games.json'), 'utf8'));
 for (const game of Object.values(manifestConfig)) {
   for (const file of game.files) {
@@ -32,14 +31,17 @@ function luaFiles(dir) {
     return entry.isDirectory() ? luaFiles(file) : file.endsWith('.lua') ? [file] : [];
   });
 }
-// Fail on dangling dependencies on the retired frontend directory.
+// Fail on dangling dependencies on retired frontend/library code.
+if (fs.existsSync(path.join(root, 'library'))) {
+  throw new Error('Retired library directory still exists');
+}
 if (fs.existsSync(path.join(root, 'src/ui')) && fs.readdirSync(path.join(root, 'src/ui')).length) {
   throw new Error('Legacy UI directory still contains files');
 }
 for (const file of [path.join(root, 'DepHub.lua'), ...luaFiles(path.join(root, 'src'))]) {
   const source = fs.readFileSync(file, 'utf8');
-  if (/src\/ui\/|CreateUI|MountUI|CreatePrompt/.test(source)) {
-    throw new Error('Retired frontend dependency remains in ' + file);
+  if (/src\/ui\/|CreateUI|MountUI|CreatePrompt|library\/|frontend\.lua|CreateTab|CreateSection|Library\.new/.test(source)) {
+    throw new Error('Retired frontend/library dependency remains in ' + file);
   }
 }
 const sources = 'local sources = {\n' + files.map(file =>
@@ -47,7 +49,7 @@ const sources = 'local sources = {\n' + files.map(file =>
 const harness = fs.readFileSync(path.join(__dirname, 'backend_harness.luau'), 'utf8')
   .replace('-- INSERT_SOURCES', () => sources)
   .replace('-- INSERT_FRUIT_VFX_TESTS', () => fs.readFileSync(path.join(__dirname, 'fruit_vfx_tests.luau'), 'utf8'))
-  .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'volleyball_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_tests.luau'), 'utf8'))
+  .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'core_tests.luau'), 'utf8'))
   .replace('-- INSERT_HEADLESS_TESTS', () => fs.readFileSync(path.join(__dirname, 'headless_tests.luau'), 'utf8'));
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'dephub-backend-test-'));
 const file = path.join(temp, 'test.luau');

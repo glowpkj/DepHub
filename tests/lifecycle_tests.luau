@@ -1,19 +1,28 @@
 do
     local ctx=sandbox()
-    ctx.Responses["src/version.txt"]="0.0.29"
+    ctx.Responses["src/version.txt"]="0.0.37"
     local backend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
-    local frontend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
     ctx:Provide("src/games/universal.lua",backend)
-    ctx:Provide("library/init.lua",{new=function() frontend.Destroyed=false; backend.Destroyed=false; return frontend end})
     local updaterCreations=0
     ctx:Provide("src/core/updater.lua",{new=function() updaterCreations+=1; return {Start=function() end} end})
     check(ctx:Run("DepHub.lua")==true,"initial loader session starts")
     local requests=#ctx.Requests
     check(ctx:Run("DepHub.lua")==true and #ctx.Requests==requests,"healthy session is reused")
-    frontend.Destroyed=true
-    check(ctx:Run("DepHub.lua")==true and #ctx.Requests>requests,"destroyed frontend forces rebuild")
+    backend.Destroyed=true
+    check(ctx:Run("DepHub.lua")==true and #ctx.Requests>requests,"destroyed backend forces rebuild")
     ctx:FlushDeferred()
     check(updaterCreations==1,"superseded session cannot create a stale updater")
+end
+
+do
+    local ctx=sandbox()
+    ctx.Responses["src/version.txt"]="0.0.37"
+    local backend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
+    ctx:Provide("src/games/universal.lua",backend)
+    ctx:Provide("src/core/updater.lua",{new=function() return {Start=function() end} end})
+    check(ctx:Run("DepHub.lua")==true,"loader succeeds without any frontend module")
+    check(ctx.State.__DEPHUB.Frontend==nil and ctx.State.__DEPHUB.Window==nil,"loader no longer publishes a frontend handle")
+    check(ctx.State.__DEPHUB.Mode=="Universal" and ctx.State.__DEPHUB.Backend==backend,"loader exposes mode and backend for the new library")
 end
 
 do

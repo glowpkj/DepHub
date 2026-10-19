@@ -6,7 +6,6 @@
       "src/version.txt",
       "src/core/ui-guard.lua",
       "src/core/updater.lua",
-      "library/compact.lua",
       "src/games/mm2.lua",
       "src/games/features/mm2/roletracker.lua",
       "src/games/features/mm2/roundtracker.lua",
@@ -14,7 +13,6 @@
       "src/games/features/mm2/coinfarm.lua",
       "src/games/features/mm2/playerteleport.lua",
       "src/games/features/mm2/gundrop.lua",
-      "src/games/features/mm2/frontend.lua",
       "src/games/updates/66654135.txt"
     ]
   },
@@ -33,17 +31,13 @@
       "src/games/features/bloxfruits/dash.lua",
       "src/games/features/bloxfruits/flashstep.lua",
       "src/games/features/bloxfruits/waterwalking.lua",
+      "src/games/features/bloxfruits/bladhits.lua",
+      "src/games/features/bloxfruits/autofarm.lua",
+      "src/games/features/bloxfruits/quests.lua",
       "src/games/features/bloxfruits/config.lua",
       "src/games/features/bloxfruits/team.lua",
-      "src/games/updates/994732206.txt",
-      "library/init.lua",
-      "library/theme.lua",
-      "library/utils.lua",
-      "library/components.lua",
-      "library/window.lua",
-      "library/content/common.lua",
-      "library/content/bloxfruits.lua",
       "src/games/features/bloxfruits/fruitvfx.lua",
+      "src/games/updates/994732206.txt",
       "src/core/updater.lua"
     ]
   },
@@ -54,14 +48,12 @@
       "src/version.txt",
       "src/core/ui-guard.lua",
       "src/core/updater.lua",
-      "library/compact.lua",
       "src/games/tsb.lua",
       "src/games/features/tsb/animations.lua",
       "src/games/features/tsb/autoblock.lua",
       "src/games/features/tsb/autoblock-v2.lua",
-      "src/games/features/tsb/frontend.lua",
-      "src/games/updates/3808081382.txt",
-      "src/games/features/tsb/autoblock-v3.lua"
+      "src/games/features/tsb/autoblock-v3.lua",
+      "src/games/updates/3808081382.txt"
     ]
   },
   "119048529960596": {
@@ -81,14 +73,7 @@
       "src/games/features/restauranttycoon3/instant-cook.lua",
       "src/games/features/restauranttycoon3/drops.lua",
       "src/games/features/restauranttycoon3/autofarm-friends.lua",
-      "src/games/updates/119048529960596.txt",
-      "library/init.lua",
-      "library/theme.lua",
-      "library/utils.lua",
-      "library/components.lua",
-      "library/window.lua",
-      "library/content/common.lua",
-      "library/content/rt3.lua"
+      "src/games/updates/119048529960596.txt"
     ]
   },
   "85211729168715": {
@@ -106,32 +91,14 @@
       "src/games/features/bloxfruits/dash.lua",
       "src/games/features/bloxfruits/flashstep.lua",
       "src/games/features/bloxfruits/waterwalking.lua",
+      "src/games/features/bloxfruits/bladhits.lua",
+      "src/games/features/bloxfruits/autofarm.lua",
+      "src/games/features/bloxfruits/quests.lua",
       "src/games/features/bloxfruits/config.lua",
       "src/games/features/bloxfruits/team.lua",
-      "src/games/updates/85211729168715.txt",
-      "library/init.lua",
-      "library/theme.lua",
-      "library/utils.lua",
-      "library/components.lua",
-      "library/window.lua",
-      "library/content/common.lua",
-      "library/content/bloxfruits.lua",
       "src/games/features/bloxfruits/fruitvfx.lua",
+      "src/games/updates/85211729168715.txt",
       "src/core/updater.lua"
-    ]
-  },
-  "6739698191": {
-    "name": "Violence District",
-    "files": [
-      "DepHub.lua",
-      "src/version.txt",
-      "src/core/ui-guard.lua",
-      "src/core/updater.lua",
-      "src/games/violencedistrict.lua",
-      "src/games/features/violencedistrict/esp.lua",
-      "src/games/features/violencedistrict/generator.lua",
-      "src/games/features/violencedistrict/frontend.lua",
-      "src/games/updates/6739698191.txt"
     ]
   },
   "84822469255086": {
@@ -154,30 +121,7 @@
       "src/games/features/noobpiece/autoquest.lua",
       "src/games/features/noobpiece/islanddata.lua",
       "src/games/features/noobpiece/islandtracker.lua",
-      "src/games/updates/84822469255086.txt",
-      "library/init.lua",
-      "library/theme.lua",
-      "library/utils.lua",
-      "library/components.lua",
-      "library/window.lua",
-      "library/content/common.lua",
-      "library/content/noobpiece.lua"
-    ]
-  },
-  "6931042565": {
-    "name": "Volleyball Legends",
-    "files": [
-      "DepHub.lua",
-      "src/version.txt",
-      "src/core/ui-guard.lua",
-      "src/core/updater.lua",
-      "library/compact.lua",
-      "src/games/volleyballlegends.lua",
-      "src/games/features/volleyballlegends/ball-detector.lua",
-      "src/games/features/volleyballlegends/ball-esp.lua",
-      "src/games/features/volleyballlegends/trajectory.lua",
-      "src/games/features/volleyballlegends/frontend.lua",
-      "src/games/updates/6931042565.txt"
+      "src/games/updates/84822469255086.txt"
     ]
   },
   "4658598196": {
@@ -187,10 +131,8 @@
       "src/version.txt",
       "src/core/ui-guard.lua",
       "src/core/updater.lua",
-      "library/compact.lua",
       "src/games/aotr.lua",
       "src/games/features/aotr/assistance.lua",
-      "src/games/features/aotr/frontend.lua",
       "src/games/updates/4658598196.txt"
     ]
   }

@@ -29,6 +29,24 @@ local function disconnectAll(list)
     end
 end
 
+-- Humanised timing: a fixed cadence (chat loop, rejoin polls) is a bot fingerprint.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
+-- Frame-rate independent aim smoothing. A camera that snaps onto a target in a
+-- single frame is both robotic and easy for behavioural anti-cheat to flag.
+-- strength is the fraction of the remaining angle covered per second.
+local AIM_SMOOTHING = 8
+local function smoothLook(camera, targetPosition, dt)
+    local current = camera.CFrame
+    local goal = CFrame.lookAt(current.Position, targetPosition)
+    local factor = 1 - math.exp(-AIM_SMOOTHING * (tonumber(dt) or 0))
+    if factor < 0 then factor = 0 elseif factor > 1 then factor = 1 end
+    camera.CFrame = current:Lerp(goal, factor)
+end
+
 local function compile(source)
     if type(loadstring) ~= "function" then return false, "loadstring indisponivel" end
     local ok, chunk, compileError = pcall(loadstring, source)
@@ -42,10 +60,11 @@ local function characterParts()
 end
 
 local State = {
-    Destroyed = false, Connections = {}, FeatureConnections = {}, PlayerConnections = {}, ESPObjects = {}, Keys = {}, ChatToken = 0,
-    Values = {WalkSpeed = 16, JumpPower = 50, FlySpeed = 70, ESPRange = 2000, ESPTextSize = 14, ESPColor = Color3.fromRGB(90, 170, 255), AimbotFOV = 180, AimPart = "Head", ChatMessage = "DepHub Universal", ChatInterval = 5},
-    Toggles = {WalkSpeed = false, Jump = false, Fly = false, Noclip = false, ESP = false, ESPNames = true, ESPDistance = true, ESPHealth = true, TeamCheck = false, TeamColors = true, Chams = true, Fullbright = false, InfiniteZoom = false, Aimbot = false, ChatLoop = false},
-    TeleportTool = nil, FlyVelocity = nil, FlyGyro = nil, OriginalCollisions = {}, OriginalLighting = nil, OriginalMovement = setmetatable({}, {__mode="k"}), OriginalZoom = LocalPlayer.CameraMaxZoomDistance
+    Destroyed = false, Connections = {}, FeatureConnections = {}, PlayerConnections = {}, ESPObjects = {}, Keys = {}, ChatToken = 0, LocalCharacterConnections = {},
+    Values = {WalkSpeed = 16, JumpPower = 50, FlySpeed = 70, ESPRange = 2000, ESPTextSize = 14, ESPColor = Color3.fromRGB(90, 170, 255), AimbotFOV = 180, AimPart = "Head", ChatMessage = "DepHub Universal", ChatInterval = 5, TracerColor = Color3.fromRGB(255, 80, 80), VoidHeight = -50, AntiFlingStrength = 100000, SilentAimRange = 500, BhopDelay = 0.05},
+    Toggles = {WalkSpeed = false, Jump = false, Fly = false, Noclip = false, ESP = false, ESPNames = true, ESPDistance = true, ESPHealth = true, TeamCheck = false, TeamColors = true, Chams = true, Fullbright = false, InfiniteZoom = false, Aimbot = false, ChatLoop = false, SilentAim = false, Tracers = false, AntiFling = false, AntiVoid = false, BunnyHop = false, InfiniteJump = false},
+    TeleportTool = nil, FlyVelocity = nil, FlyGyro = nil, OriginalCollisions = {}, OriginalLighting = nil, OriginalMovement = setmetatable({}, {__mode="k"}), OriginalZoom = LocalPlayer.CameraMaxZoomDistance,
+    TracerObjects = {}, LastSafePosition = nil, JumpConnection = nil
 }
 env[STATE_KEY] = State
 env.__DEPHUB = env.__DEPHUB or {}
@@ -266,10 +285,168 @@ function State:SetChatLoop(enabled)
         task.spawn(function()
             while not self.Destroyed and self.Toggles.ChatLoop and token == self.ChatToken do
                 self:SendChat()
-                task.wait(math.max(3, tonumber(self.Values.ChatInterval) or 5))
+                jitter(math.max(3, tonumber(self.Values.ChatInterval) or 5))
             end
         end)
     end
+end
+
+-- ===== Tracers =====
+-- Draws a line from the local player toward each visible enemy. Cheaper and more
+-- situational than ESP: complements the existing billboard/chams.
+function State:RemoveTracers()
+    for _, line in pairs(self.TracerObjects) do
+        if line and line.Parent then pcall(line.Destroy, line) end
+    end
+    self.TracerObjects = {}
+end
+
+function State:SetTracers(enabled)
+    self.Toggles.Tracers = enabled == true
+    self:ClearFeature("Tracers")
+    if not enabled then return self:RemoveTracers() end
+    local list = {}; self.FeatureConnections.Tracers = list
+    connect(list, RunService.RenderStepped, function()
+        if self.Destroyed or not self.Toggles.Tracers then return end
+        local _, _, localRoot = characterParts()
+        if not localRoot then return end
+        local camera = Workspace.CurrentCamera
+        for player, record in pairs(self.ESPObjects) do
+            local character = player.Character
+            local targetRoot = character and character:FindFirstChild("HumanoidRootPart")
+            if not record.Billboard or not targetRoot or not record.Billboard.Enabled then
+                local old = self.TracerObjects[player]
+                if old and old.Parent then pcall(old.Destroy, old) end
+                self.TracerObjects[player] = nil
+            else
+                local line = self.TracerObjects[player]
+                if not line or not line.Parent then
+                    line = Instance.new("LineHandleAdornment")
+                    line.Adornee = camera
+                    line.Thickness = 1
+                    line.AlwaysOnTop = true
+                    self.TracerObjects[player] = line
+                end
+                line.Color3 = self.Values.TracerColor
+                line.Length = (targetRoot.Position - localRoot.Position).Magnitude
+            end
+        end
+    end)
+end
+
+-- ===== Anti-Fling =====
+-- Neutralises malicious angular velocity applied to the local root (fling exploits).
+function State:SetAntiFling(enabled)
+    self.Toggles.AntiFling = enabled == true
+    self:ClearFeature("AntiFling")
+    if not enabled then return end
+    local list = {}; self.FeatureConnections.AntiFling = list
+    connect(list, RunService.Heartbeat, function()
+        if self.Destroyed or not self.Toggles.AntiFling then return end
+        local _, humanoid, root = characterParts()
+        if not root or not humanoid then return end
+        local angular = root:FindFirstChildOfClass("BodyAngularVelocity")
+        if angular then pcall(function() angular:Destroy() end) end
+        local assembly = root.AssemblyAngularVelocity
+        if assembly and assembly.Magnitude > self.Values.AntiFlingStrength then
+            pcall(function() root.AssemblyAngularVelocity = Vector3.zero end)
+        end
+    end)
+end
+
+-- ===== Anti-Void =====
+-- Remembers the last safe position and teleports back if the character falls.
+function State:SetAntiVoid(enabled)
+    self.Toggles.AntiVoid = enabled == true
+    self:ClearFeature("AntiVoid")
+    if not enabled then self.LastSafePosition = nil; return end
+    local list = {}; self.FeatureConnections.AntiVoid = list
+    connect(list, RunService.Heartbeat, function()
+        if self.Destroyed or not self.Toggles.AntiVoid then return end
+        local _, humanoid, root = characterParts()
+        if not root or not humanoid or humanoid.Health <= 0 then return end
+        if root.Position.Y > (self.Values.VoidHeight + 20) then
+            self.LastSafePosition = root.Position
+        elseif root.Position.Y < self.Values.VoidHeight and self.LastSafePosition then
+            pcall(function() root.CFrame = CFrame.new(self.LastSafePosition) end)
+        end
+    end)
+end
+
+-- ===== Bunny Hop =====
+-- Re-jumps automatically on landing, jittered so the cadence is not robotic.
+function State:SetBunnyHop(enabled)
+    self.Toggles.BunnyHop = enabled == true
+    self:ClearFeature("BunnyHop")
+    if not enabled then return end
+    local list = {}; self.FeatureConnections.BunnyHop = list
+    connect(list, RunService.Heartbeat, function()
+        if self.Destroyed or not self.Toggles.BunnyHop then return end
+        local _, humanoid = characterParts()
+        if humanoid and humanoid.FloorMaterial ~= Enum.Material.Air then
+            pcall(function() humanoid.Jump = true end)
+        end
+    end)
+end
+
+-- ===== Infinite Jump =====
+-- Allows jumping while airborne by re-triggering Jump on the JumpRequest input.
+function State:SetInfiniteJump(enabled)
+    self.Toggles.InfiniteJump = enabled == true
+    self:ClearFeature("InfiniteJump")
+    if not enabled then return end
+    local list = {}; self.FeatureConnections.InfiniteJump = list
+    connect(list, UIS.JumpRequest, function()
+        if self.Destroyed or not self.Toggles.InfiniteJump then return end
+        local _, humanoid = characterParts()
+        if humanoid then pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.Jumping) end) end
+    end)
+end
+
+-- ===== Silent Aim =====
+-- Redirects the next attack/mouse-press to the nearest target without moving the
+-- camera. More discreet than visual aim; only the outgoing input is rerouted.
+function State:GetSilentAimTarget()
+    local camera = Workspace.CurrentCamera
+    if not camera then return nil end
+    local _, _, localRoot = characterParts()
+    local bestPart, bestDistance = nil, tonumber(self.Values.SilentAimRange) or 500
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and (not self.Toggles.TeamCheck or player.Team ~= LocalPlayer.Team) then
+            local character = player.Character
+            local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+            local part = character and (character:FindFirstChild(self.Values.AimPart) or character:FindFirstChild("HumanoidRootPart"))
+            if humanoid and humanoid.Health > 0 and part then
+                local distance = localRoot and (part.Position - localRoot.Position).Magnitude or 0
+                if distance < bestDistance then bestPart, bestDistance = part, distance end
+            end
+        end
+    end
+    return bestPart
+end
+
+function State:SetSilentAim(enabled)
+    self.Toggles.SilentAim = enabled == true
+    self:ClearFeature("SilentAim")
+    if not enabled then return end
+    local list = {}; self.FeatureConnections.SilentAim = list
+    connect(list, UIS.InputBegan, function(input, processed)
+        if processed or self.Destroyed or not self.Toggles.SilentAim then return end
+        if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+        local target = self:GetSilentAimTarget()
+        if not target then return end
+        local character = LocalPlayer.Character
+        local tool = character and character:FindFirstChildOfClass("Tool")
+        if tool and tool:IsA("Tool") then
+            pcall(function() tool:Activate() end)
+        end
+        -- Route the look direction at the target for the frame the input fires.
+        local camera = Workspace.CurrentCamera
+        if camera then
+            local goal = CFrame.lookAt(camera.CFrame.Position, target.Position)
+            pcall(function() camera.CFrame = goal end)
+        end
+    end)
 end
 
 function State:ServerHop()
@@ -306,8 +483,12 @@ function State:Destroy()
     if self.Destroyed then return end
     self.Destroyed, self.Toggles.ChatLoop = true, false
     self.ChatToken += 1
+    disconnectAll(self.LocalCharacterConnections)
     for player, list in pairs(self.PlayerConnections) do disconnectAll(list.CharacterConnections); disconnectAll(list); self.PlayerConnections[player] = nil end
     self:StopFly(); self:SetNoclip(false); self:SetESP(false); self:SetFullbright(false)
+    self:SetTracers(false); self:SetAntiFling(false); self:SetAntiVoid(false)
+    self:SetBunnyHop(false); self:SetInfiniteJump(false); self:SetSilentAim(false)
+    self:RemoveTracers()
     for humanoid, original in pairs(self.OriginalMovement) do
         if humanoid and humanoid.Parent then humanoid.WalkSpeed, humanoid.JumpPower, humanoid.UseJumpPower = original.WalkSpeed, original.JumpPower, original.UseJumpPower end
     end
@@ -339,7 +520,7 @@ connect(State.Connections, RunService.RenderStepped, function(dt)
     if State.Toggles.Aimbot and UIS:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
         local target = State:GetAimTarget()
         local camera = Workspace.CurrentCamera
-        if target then camera.CFrame = CFrame.lookAt(camera.CFrame.Position, target.Position) end
+        if target and camera then smoothLook(camera, target.Position, dt) end
     end
 end)
 local function watchPlayer(player)
@@ -373,27 +554,21 @@ connect(State.Connections, Players.PlayerRemoving, function(player)
     local list = State.PlayerConnections[player]
     if list then disconnectAll(list.CharacterConnections); disconnectAll(list); State.PlayerConnections[player] = nil end
 end)
-local localCharacterConnections={}
 connect(State.Connections, LocalPlayer.CharacterAdded, function(character)
-    disconnectAll(localCharacterConnections)
+    disconnectAll(State.LocalCharacterConnections)
     local function refresh()
         if State.Destroyed or LocalPlayer.Character ~= character then return end
         State:ApplyMovement()
         if State.Toggles.Fly and not State.FlyVelocity then State:SetFly(true) end
     end
-    if character then connect(localCharacterConnections,character.ChildAdded,refresh) end
+    if character then connect(State.LocalCharacterConnections,character.ChildAdded,refresh) end
     task.defer(refresh)
 end)
 connect(State.Connections, LocalPlayer.CharacterRemoving, function()
-    disconnectAll(localCharacterConnections)
+    disconnectAll(State.LocalCharacterConnections)
     State:StopFly()
     State.Keys = {}
     State.OriginalCollisions = {}
 end)
-local originalDestroy=State.Destroy
-function State:Destroy()
-    disconnectAll(localCharacterConnections)
-    originalDestroy(self)
-end
 
 return State

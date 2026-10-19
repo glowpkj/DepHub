@@ -36,20 +36,19 @@ Esta é uma integração inicial parcial. Ripper, os dois autofarms e a checagem
 
 ## Arquitetura e arquivos
 
-- `DepHub.lua`: versão 0.0.32; rotas AOTR por PlaceId 13379208636 e GameId 4658598196; fallback de nome anterior preservado. As rotas dos outros jogos foram mantidas.
+- `DepHub.lua`: versão 0.0.33; rotas AOTR por PlaceId 13379208636 e GameId 4658598196; fallback de nome anterior preservado. As rotas dos outros jogos foram mantidas.
 - `src/games/aotr.lua`: fachada de estado e recursos visuais; carrega assistência usando SourceBaseURL da mesma revisão; valida números e gerencia tween, tarefa, Highlights e originais.
-- `src/games/features/aotr/assistance.lua`: novo módulo com jobs próprios por recurso, referências renovadas por tick e cancelamento/limpeza ao desligar. Falha de download não impede a UI visual; ativação do auxiliar retorna false e registra erro.
-- `src/games/features/aotr/frontend.lua`: categorias Titans, Assistance, Movement, Pending Validation e Diagnostics, usando exclusivamente library/compact.lua. Defaults de automação desligados, sem carregar preferências antigas. Destruição cancela status e backend; substituição apenas do frontend preserva backend.
+- `src/games/features/aotr/assistance.lua`: novo módulo com jobs próprios por recurso, referências renovadas por tick e cancelamento/limpeza ao desligar. Falha de download não impede as features visuais; ativação do auxiliar retorna false e registra erro.
 - `.github/dephub-games.json`: nova entrada pelo universo, incluindo todos os módulos e marcador de atualização.
 - `src/games/updates/4658598196.txt`: novo marcador.
-- `src/version.txt`: sincronizado em 0.0.32.
+- `src/version.txt`: sincronizado em 0.0.33.
 - `tests/aotr_tests.luau`: novos testes comportamentais de roteamento sem nome, referências ausentes/não Titan, restauração, marcador, idempotência, lesões e cleanup.
 - `tests/run_backend_tests.js`: inclui fontes e testes AOTR.
 - `tests/headless_tests.luau`: expectativa da versão atualizada.
 - `tests/validate_repo.js`: exige rastreamento de todos os módulos AOTR no manifesto.
 - `AOTR_INTEGRATION_REPORT.md`: este relatório.
 
-`library/compact.lua`, os módulos MM2/TSB e `src/core/updater.lua` foram lidos e preservados. O updater já usa GameId como ManifestId e a entrada nova atende esse contrato. `src/update-manifest.json` é gerado pelo workflow ao publicar em main; não foi preenchido manualmente com hashes fictícios.
+O frontend compacto do AOTR e a `library/compact.lua` foram removidos junto com toda a interface antiga; a UI nova consumirá `getgenv().__DEPHUB.Mode` e `getgenv().__DEPHUB.Backend`. Os módulos MM2/TSB e `src/core/updater.lua` foram preservados. O updater já usa GameId como ManifestId e a entrada nova atende esse contrato. `src/update-manifest.json` é gerado pelo workflow ao publicar em main; não foi preenchido manualmente com hashes fictícios.
 
 ## Correções e limitações do anexo
 

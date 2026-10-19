@@ -6,6 +6,11 @@ local player=Players.LocalPlayer
 local env=type(getgenv)=="function" and getgenv() or _G
 local old=env.__DEPHUB_AOTR
 if type(old)=="table" and type(old.Destroy)=="function" then pcall(old.Destroy,old) end
+-- Humanised timing: vary the refresh interval so the loop is not perfectly periodic.
+local function jitter(base, spread)
+ spread = spread or 0.15
+ return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
 local M={Destroyed=false,Toggles={TitanESP=false,NapeVisible=false,NapeExtend=false,ErenExtend=false,AutoBladeRefill=false,AutoGrabEscape=false,AntiInjury=false,AutoRetry=false,AntiAFK=false},Values={NapeMultiplier=1},Connections={},Originals={},Highlights={},LastError="none"}
 local function warnError(message)
  local nextError=tostring(message)
@@ -199,7 +204,7 @@ end
 M.Connections[#M.Connections+1]=player.CharacterRemoving:Connect(function() M:CancelTeleport() end)
 M.RefreshTask=task.spawn(function()
  while not M.Destroyed do
-  task.wait(1)
+  jitter(1)
   if M.Destroyed then return end
   local ok,err=pcall(function() M:Refresh() end)
   if not ok then warnError(err) end

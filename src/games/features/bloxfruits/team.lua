@@ -5,6 +5,12 @@ local Teams = game:GetService("Teams")
 local Feature = {}
 Feature.__index = Feature
 
+-- Humanised timing: vary each periodic wait to avoid a perfectly periodic loop.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 function Feature.new(context)
     local savedTeam = context.State and context.State.Config and context.State.Config:Get("PreferredTeam", "Pirates") or "Pirates"
     return setmetatable({
@@ -53,7 +59,7 @@ function Feature:Enable()
     self.Thread = task.spawn(function()
         while self.Enabled and not self.State.Destroyed do
             self:_ensure()
-            task.wait(0.5)
+            jitter(0.5)
         end
     end)
     self.RespawnConnection = self.Context.Connect(self.State.Connections, self.LocalPlayer.CharacterAdded, function()

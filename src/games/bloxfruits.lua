@@ -30,7 +30,7 @@ local LegendarySwordDealer = NPCs and NPCs:FindFirstChild("Legendary Sword Deale
 local env = type(getgenv) == "function" and getgenv() or _G
 local STATE_KEY = "__DEPHUB_BLOXFRUITS"
 local BASE_URL = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION = "0.0.2"
+local VERSION = "0.0.3"
 local previous = type(env[STATE_KEY]) == "table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
 
@@ -132,7 +132,20 @@ end
 local baseContext = {LocalPlayer = LocalPlayer, Players = Players, Workspace = Workspace, Connect = connect, DisconnectAll = disconnectAll, Destroy = destroy, GetRoot = getRoot, GetPlayer = getPlayer, GetHumanoid = getHumanoid, HealthText = healthText, IsProtectionName = isProtectionName, HasProtection = hasProtection, TeamColor = teamColor, ChangeSetting = ChangeSetting}
 local configOk, config = loadModule("src/games/features/bloxfruits/config.lua", baseContext)
 if not configOk then return false end
-config:Load({PlayerESP = false, FruitESP = false, UnbreakableAll = false, DashCustomizer = false, FlashstepNoCooldown = false, WaterWalking = false, AutoJoinTeam = true, DashLength = 1, PreferredTeam = "Pirates"})
+config:Load({PlayerESP = false, FruitESP = false, UnbreakableAll = false, DashCustomizer = false, FlashstepNoCooldown = false, WaterWalking = false, AutoJoinTeam = true, DashLength = 1, PreferredTeam = "Pirates", BladeHits = false, AutoFarm = false})
+
+-- Pure-data quest/rarity tables. Loaded separately because quests.lua returns a
+-- plain table, not a feature factory (no .new).
+local function loadData(path)
+    local okGet, source = pcall(function() return game:HttpGet(BASE_URL .. path) end)
+    if not okGet or type(source) ~= "string" or #source == 0 then return nil end
+    local okCompile, chunk = compile(source)
+    if not okCompile then return nil end
+    local okRun, data = pcall(chunk)
+    if not okRun or type(data) ~= "table" then return nil end
+    return data
+end
+local questData = loadData("src/games/features/bloxfruits/quests.lua")
 
 local State = {
     Started = false,
@@ -147,7 +160,9 @@ local State = {
         DashCustomizer = config:Get("DashCustomizer", false),
         FlashstepNoCooldown = config:Get("FlashstepNoCooldown", false),
         WaterWalking = config:Get("WaterWalking", false),
-        AutoJoinTeam = config:Get("AutoJoinTeam", true)
+        AutoJoinTeam = config:Get("AutoJoinTeam", true),
+        BladeHits = config:Get("BladeHits", false),
+        AutoFarm = config:Get("AutoFarm", false)
     },
     Values = {DashLength = tonumber(config:Get("DashLength", 1)) or 1},
     Connections = {},
@@ -156,7 +171,9 @@ local State = {
     OriginalUnbreakableAll = nil,
     UnbreakableCaptured = false,
     CameraShakeDisabled = false,
-    Paths = {IceEffect = IceEffect, LegendarySwordDealer = LegendarySwordDealer, IceEffectPath = "game:GetService(\"ReplicatedStorage\").Effect.Container.Ice1.Waterwalk.ice", LegendarySwordDealerPath = "game:GetService(\"ReplicatedStorage\").NPCs[\"Legendary Sword Dealer\"]"}
+    Paths = {IceEffect = IceEffect, LegendarySwordDealer = LegendarySwordDealer, IceEffectPath = "game:GetService(\"ReplicatedStorage\").Effect.Container.Ice1.Waterwalk.ice", LegendarySwordDealerPath = "game:GetService(\"ReplicatedStorage\").NPCs[\"Legendary Sword Dealer\"]"},
+    QuestData = questData,
+    FruitRarityFilter = {Enabled = false, Common = false, Uncommon = false, Rare = false, Legendary = false, Mythical = true}
 }
 
 baseContext.State = State
@@ -165,7 +182,7 @@ env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.BloxFruits = State
 env.__DEPHUB.BloxFruitsPaths = State.Paths
 
-local featurePaths = {PlayerESP = "src/games/features/bloxfruits/playeresp.lua", FruitESP = "src/games/features/bloxfruits/fruit.lua", ObservationHaki = "src/games/features/bloxfruits/observation.lua", UnbreakableAll = "src/games/features/bloxfruits/unbreakable.lua", CameraShake = "src/games/features/bloxfruits/camerashake.lua", DashCustomizer = "src/games/features/bloxfruits/dash.lua", FlashstepNoCooldown = "src/games/features/bloxfruits/flashstep.lua", WaterWalking = "src/games/features/bloxfruits/waterwalking.lua", AutoJoinTeam = "src/games/features/bloxfruits/team.lua"}
+local featurePaths = {PlayerESP = "src/games/features/bloxfruits/playeresp.lua", FruitESP = "src/games/features/bloxfruits/fruit.lua", ObservationHaki = "src/games/features/bloxfruits/observation.lua", UnbreakableAll = "src/games/features/bloxfruits/unbreakable.lua", CameraShake = "src/games/features/bloxfruits/camerashake.lua", DashCustomizer = "src/games/features/bloxfruits/dash.lua", FlashstepNoCooldown = "src/games/features/bloxfruits/flashstep.lua", WaterWalking = "src/games/features/bloxfruits/waterwalking.lua", AutoJoinTeam = "src/games/features/bloxfruits/team.lua", BladeHits = "src/games/features/bloxfruits/bladhits.lua", AutoFarm = "src/games/features/bloxfruits/autofarm.lua"}
 featurePaths.FruitVFX = "src/games/features/bloxfruits/fruitvfx.lua"
 local features = {}
 for name, path in pairs(featurePaths) do
@@ -219,9 +236,32 @@ function State:GetPreferredTeam()
     return self.Features and self.Features.AutoJoinTeam and self.Features.AutoJoinTeam.PreferredTeam or self.Config:Get("PreferredTeam", "Pirates")
 end
 
+function State:SetBladeRange(value)
+    if self.Destroyed or not self.Features or not self.Features.BladeHits then return false end
+    return self.Features.BladeHits:SetRange(value)
+end
+
+function State:SetFruitRarity(rarity, enabled)
+    if self.Destroyed or type(rarity) ~= "string" then return false end
+    if self.FruitRarityFilter[rarity] == nil then return false end
+    self.FruitRarityFilter[rarity] = enabled == true
+    return true
+end
+
+function State:SetFruitRarityFilter(enabled)
+    if self.Destroyed then return false end
+    self.FruitRarityFilter.Enabled = enabled == true
+    return true
+end
+
+function State:GetFarmStatus()
+    local feature = self.Features and self.Features.AutoFarm
+    return feature and feature:GetStatus() or nil
+end
+
 function State:SaveConfig()
     if self.Destroyed then return false end
-    return self.Config:Update({PlayerESP = self.Toggles.PlayerESP, FruitESP = self.Toggles.FruitESP, UnbreakableAll = self.Toggles.UnbreakableAll, DashCustomizer = self.Toggles.DashCustomizer, FlashstepNoCooldown = self.Toggles.FlashstepNoCooldown, WaterWalking = self.Toggles.WaterWalking, AutoJoinTeam = self.Toggles.AutoJoinTeam, DashLength = self.Values.DashLength, PreferredTeam = self:GetPreferredTeam()})
+    return self.Config:Update({PlayerESP = self.Toggles.PlayerESP, FruitESP = self.Toggles.FruitESP, UnbreakableAll = self.Toggles.UnbreakableAll, DashCustomizer = self.Toggles.DashCustomizer, FlashstepNoCooldown = self.Toggles.FlashstepNoCooldown, WaterWalking = self.Toggles.WaterWalking, AutoJoinTeam = self.Toggles.AutoJoinTeam, BladeHits = self.Toggles.BladeHits, AutoFarm = self.Toggles.AutoFarm, DashLength = self.Values.DashLength, PreferredTeam = self:GetPreferredTeam()})
 end
 
 function State:SetToggle(name, enabled)
@@ -281,7 +321,7 @@ function State:Start()
     if self.Destroyed or self.Started then return false end
     self.Started = true
     if self.Toggles.ObservationHaki then self.Features.ObservationHaki:Enable() end
-    for _, name in ipairs({"PlayerESP", "FruitESP", "UnbreakableAll", "DashCustomizer", "FlashstepNoCooldown", "WaterWalking"}) do
+    for _, name in ipairs({"PlayerESP", "FruitESP", "UnbreakableAll", "DashCustomizer", "FlashstepNoCooldown", "WaterWalking", "BladeHits", "AutoFarm"}) do
         if self.Toggles[name] then
             local ok = self.Features[name]:Enable()
             if not ok then self.Toggles[name] = false end

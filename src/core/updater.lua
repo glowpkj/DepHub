@@ -278,7 +278,7 @@ function Updater:Start()
         self:Check()
 
         while not self.Destroyed do
-            task.wait(self.PollInterval)
+            task.wait(self.PollInterval * (1 + (math.random() * 2 - 1) * 0.15))
             if not self.Destroyed then
                 self:Check()
             end

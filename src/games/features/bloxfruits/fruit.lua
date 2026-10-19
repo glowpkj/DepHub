@@ -10,6 +10,12 @@ local math_floor = math.floor
 local GENERIC_NAMES = {Fruit = true, Handle = true, Weld = true, Welded = true, Keep = true, Script = true, LocalScript = true, ToolScript = true, FruitAnimator = true, EatRemote = true}
 local WORLD_NON_ISLANDS = {Camera = true, Characters = true, _WorldOrigin = true, Map = true, Effects = true, Effect = true, Debris = true, Ignore = true, Temp = true, Temporary = true, SpawnLocation = true, Fruit = true}
 
+-- Humanised timing: vary each periodic wait to avoid a perfectly periodic loop.
+local function jitter(base, spread)
+    spread = spread or 0.15
+    return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
+end
+
 local function safeText(value)
     if value == nil then return nil end
     local text = tostring(value)
@@ -277,10 +283,22 @@ function Feature:_remove(instance)
     self.Context.Destroy(record.RootAttachment)
 end
 
+function Feature:_passesRarityFilter(instance, adornee)
+    local filter = self.State and self.State.FruitRarityFilter
+    if type(filter) ~= "table" or filter.Enabled ~= true then return true end
+    local quests = self.State and self.State.QuestData
+    if not quests or type(quests.RarityOf) ~= "function" then return true end
+    local name = self:_fruitName(instance, adornee)
+    local rarity = quests.RarityOf(name)
+    if not rarity then return true end
+    return filter[rarity] == true
+end
+
 function Feature:_create(instance)
     if self.State.Destroyed or not self.Enabled or self.Records[instance] or not self:_isFruit(instance) then return end
     local adornee = self:_adornee(instance)
     if not adornee then return end
+    if not self:_passesRarityFilter(instance, adornee) then return end
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "DepHubFruitESP"
     billboard.Adornee = adornee
@@ -346,7 +364,10 @@ function Feature:Enable()
             for instance, record in pairs(self.Records) do
                 if not self:_isFruit(instance) or not record.Label or not record.Label.Parent then self:_remove(instance) else self:_update(record) end
             end
-            task.wait(0.2)
+            for instance, record in pairs(self.Records) do
+                if not self:_passesRarityFilter(instance, record.Adornee) then self:_remove(instance) end
+            end
+            jitter(0.2)
         end
     end)
     return true
