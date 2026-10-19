@@ -58,10 +58,12 @@ end
 local rs = blankInstance("ReplicatedStorage")
 local workspace = blankInstance("Workspace")
 local networkAttempts = {}
+-- Model an executor that does NOT expose HttpGet as a DataModel member (some
+-- only provide it as a global). The bundle must never depend on the member
+-- existing, and never fetch — the blocker below records any attempt either way.
 local game = {
     PlaceId = ${placeId}, GameId = ${gameId}, JobId = "job", Name = "Test Game",
     IsLoaded = function() return true end, Loaded = signal(),
-    HttpGet = function(self, url) networkAttempts[#networkAttempts+1] = tostring(url); error("NETWORK BLOCKED (bundle should not fetch): " .. tostring(url)) end,
     GetService = function(self, name)
         if name == "Players" then return players end
         if name == "ReplicatedStorage" then return rs end
@@ -98,6 +100,10 @@ local env = {
     print = function(...) local parts={} for _,v in ipairs({...}) do parts[#parts+1]=tostring(v) end; logs[#logs+1]=table.concat(parts," ") end,
     warn = function(...) local parts={} for _,v in ipairs({...}) do parts[#parts+1]=tostring(v) end; logs[#logs+1]=table.concat(parts," ") end,
     getgenv = function() return state end, identifyexecutor = function() return "BundleVerify" end,
+    -- The global HttpGet is the executor's fetch primitive here; the loader must
+    -- reach for this when the DataModel member is absent. Any call is a bundle
+    -- defect, so it records and errors.
+    HttpGet = function(url) networkAttempts[#networkAttempts+1] = tostring(url); error("NETWORK BLOCKED (bundle should not fetch): " .. tostring(url)) end,
     typeof = typeof, tostring=tostring, tonumber=tonumber, type=type, pcall=pcall,
     ipairs=ipairs, pairs=pairs, next=next, select=select, unpack=unpack or table.unpack,
     os=os, math=math, string=string, table=table,

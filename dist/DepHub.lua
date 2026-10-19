@@ -96,7 +96,7 @@ end
 
 local function httpGet(url)
     local ok, result = pcall(function()
-        return game:HttpGet(url)
+        return __dephubHttpGet(url)
     end)
     if ok and type(result) == "string" and #result > 0 then
         return true, result
@@ -1966,7 +1966,7 @@ local updateWarn = silent
 
 local function httpGet(url)
     local ok, result = pcall(function()
-        return game:HttpGet(url)
+        return __dephubHttpGet(url)
     end)
     if ok and type(result) == "string" and #result > 0 then
         return true, result
@@ -3796,7 +3796,7 @@ local function warnError(message)
 end
 local base=(env.__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 local okHelpers,helpers=pcall(function()
- local source=game:HttpGet(base.."src/games/features/aotr/assistance.lua")
+ local source=__dephubHttpGet(base.."src/games/features/aotr/assistance.lua")
  local chunk,err=loadstring(source)
  assert(chunk,err)
  return chunk().new({Player=player,Warn=warnError})
@@ -4114,7 +4114,7 @@ local function compile(source)
 end
 
 local function loadModule(path, context)
-    local okGet, source = pcall(function() return game:HttpGet(BASE_URL .. path) end)
+    local okGet, source = pcall(function() return __dephubHttpGet(BASE_URL .. path) end)
     if not okGet or type(source) ~= "string" or #source == 0 then return false, tostring(source) end
     local okCompile, chunk = compile(source)
     if not okCompile then return false, chunk end
@@ -4133,7 +4133,7 @@ config:Load({PlayerESP = false, FruitESP = false, UnbreakableAll = false, DashCu
 -- Pure-data quest/rarity tables. Loaded separately because quests.lua returns a
 -- plain table, not a feature factory (no .new).
 local function loadData(path)
-    local okGet, source = pcall(function() return game:HttpGet(BASE_URL .. path) end)
+    local okGet, source = pcall(function() return __dephubHttpGet(BASE_URL .. path) end)
     if not okGet or type(source) ~= "string" or #source == 0 then return nil end
     local okCompile, chunk = compile(source)
     if not okCompile then return nil end
@@ -13655,7 +13655,7 @@ local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
 
 local function loadFeature(path,context)
-    local okGet,source=pcall(function() return game:HttpGet(BASE_URL..path) end)
+    local okGet,source=pcall(function() return __dephubHttpGet(BASE_URL..path) end)
     if not okGet or type(source)~="string" or #source==0 then return false,tostring(source) end
     local okCompile,chunk,err=pcall(loadstring,source)
     if not okCompile or type(chunk)~="function" then return false,tostring(err or chunk) end
@@ -13810,7 +13810,7 @@ if type(previous)=="table" and type(previous.Destroy)=="function" then previous:
 local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local function loadFeature(path)
-    local source=game:HttpGet(BASE_URL..path)
+    local source=__dephubHttpGet(BASE_URL..path)
     local chunk=assert(loadstring(source))
     return chunk()
 end
@@ -14220,7 +14220,7 @@ local BASE_URL = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}
 local function fetch(path)
     local url = BASE_URL .. path
     local ok, result = pcall(function()
-        return game:HttpGet(url)
+        return __dephubHttpGet(url)
     end)
 
     if ok and type(result) == "string" and #result > 0 then
@@ -14474,7 +14474,7 @@ local function compile(source)
     return true,chunk
 end
 local function fetch(path)
-    local ok,source=pcall(function() return game:HttpGet(BASE_URL..path) end)
+    local ok,source=pcall(function() return __dephubHttpGet(BASE_URL..path) end)
     if not ok or type(source)~="string" or #source==0 then return false,tostring(source) end
     return true,source
 end
@@ -15066,7 +15066,7 @@ function State:SetSilentAim(enabled)
 end
 
 function State:ServerHop()
-    local ok, body = pcall(function() return game:HttpGet("https://games.roblox.com/v1/games/" .. tostring(game.PlaceId) .. "/servers/Public?sortOrder=Asc&limit=100") end)
+    local ok, body = pcall(function() return __dephubHttpGet("https://games.roblox.com/v1/games/" .. tostring(game.PlaceId) .. "/servers/Public?sortOrder=Asc&limit=100") end)
     if not ok then return self:Notify("Não foi possível consultar os servidores.", "Error") end
     local decoded, data = pcall(HttpService.JSONDecode, HttpService, body)
     if decoded then for _, server in ipairs(data.data or {}) do local playing,maxPlayers=tonumber(server.playing),tonumber(server.maxPlayers); if server.id ~= game.JobId and playing and maxPlayers and playing < maxPlayers then TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer); return end end end
@@ -15074,7 +15074,7 @@ function State:ServerHop()
 end
 
 function State:RunExternal(url, name)
-    local ok, source = pcall(function() return game:HttpGet(url) end)
+    local ok, source = pcall(function() return __dephubHttpGet(url) end)
     if not ok or type(source) ~= "string" then return self:Notify("Falha ao baixar " .. name .. ".", "Error") end
     local compiled, chunk = compile(source)
     local ran = compiled and pcall(chunk)
@@ -15230,6 +15230,25 @@ AOTR: initial assistance integration; runtime testing pending.
 ]],
 }
 
+-- Safe HttpGet resolver. Modules never call game:HttpGet directly: some
+-- executors expose HttpGet only as a global, and writing a DataModel member
+-- that does not exist errors. Resolve bundled paths from the in-memory table
+-- first, then fall back to whatever fetch primitive the executor provides.
+local globalHttpGet = (type(HttpGet) == "function") and HttpGet or nil
+local function __dephubHttpGet(url)
+    if type(url) ~= "string" then return nil end
+    local clean = url:match("^[^?]*") or url
+    local rel = clean:match("DepHub/[^/]+/(.+)$")
+    if rel and type(BUNDLED_SOURCES[rel]) == "string" then return BUNDLED_SOURCES[rel] end
+    if type(globalHttpGet) == "function" then return globalHttpGet(url) end
+    local memberOk, member = pcall(function() return game.HttpGet end)
+    if memberOk and type(member) == "function" then
+        local ok, result = pcall(function() return game:HttpGet(url) end)
+        if ok then return result end
+    end
+    return nil
+end
+
 
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
@@ -15243,18 +15262,49 @@ local STATE_KEY = "__DEPHUB_LOADER_STATE"
 -- Feature/quest files a backend fetches directly (rather than through the
 -- loader httpGet) resolve here, so the bundle never needs the network. Any
 -- cache-busting query string is stripped before the lookup.
+--
+-- Not every executor exposes HttpGet as a DataModel member: some provide it
+-- only as a global, and writing a nonexistent member errors. So probe before
+-- wrapping, and fall back to the global helper when the member is absent.
 do
-    local nativeHttpGet = game.HttpGet
-    game.HttpGet = function(a, b, ...)
-        -- Support both game:HttpGet(url) and game.HttpGet(url) call styles.
-        local url = (b ~= nil) and b or a
-        local self = (b ~= nil) and a or game
-        if type(url) == "string" then
-            local clean = url:match("^[^?]*") or url
-            local rel = clean:match("DepHub/[^/]+/(.+)$")
-            if rel and BUNDLED_SOURCES[rel] then return BUNDLED_SOURCES[rel] end
+    local bundledFor = function(url)
+        if type(url) ~= "string" then return nil end
+        local clean = url:match("^[^?]*") or url
+        local rel = clean:match("DepHub/[^/]+/(.+)$")
+        if rel and BUNDLED_SOURCES[rel] then return BUNDLED_SOURCES[rel] end
+        return nil
+    end
+    local memberOk, nativeHttpGet = pcall(function() return game.HttpGet end)
+    if memberOk and type(nativeHttpGet) == "function" then
+        if pcall(function() game.HttpGet = nativeHttpGet end) then
+            local ok, err = pcall(function()
+                game.HttpGet = function(a, b, ...)
+                    local url = (b ~= nil) and b or a
+                    local self = (b ~= nil) and a or game
+                    local hit = bundledFor(url)
+                    if hit then return hit end
+                    return nativeHttpGet(self, url, ...)
+                end
+            end)
+            if not ok then game.HttpGet = nativeHttpGet end
         end
-        return nativeHttpGet(self, url, ...)
+    elseif type(HttpGet) == "function" then
+        -- No DataModel member: install a global shim for backends that call
+        -- HttpGet(url) directly, and a game:HttpGet method on the metatable of
+        -- a proxy is not possible here, so also expose it as game.HttpGet only
+        -- when the engine accepts the write (checked above).
+        local nativeGlobal = HttpGet
+        local shim = function(a, b, ...)
+            local url = (b ~= nil) and b or a
+            if type(url) ~= "string" then url = a end
+            local hit = bundledFor(url)
+            if hit then return hit end
+            return nativeGlobal(url, ...)
+        end
+        if pcall(function() game.HttpGet = shim end) then
+            game.HttpGet = shim
+        end
+        HttpGet = shim
     end
 end
 
@@ -15422,9 +15472,20 @@ local function performRequest(url)
                 end
             end
         end
-        local ok, result = pcall(function() return game:HttpGet(url) end)
-        if ok and type(result) == "string" and #result > 0 then return true, result end
-        lastError = ok and "Resposta HTTP vazia" or tostring(result)
+        -- Some executors expose HttpGet as a global helper, others only as a
+        -- DataModel member. Try the global first, then the member, and never
+        -- assume the member exists (reading or writing it can error).
+        if type(HttpGet) == "function" then
+            local ok, result = pcall(HttpGet, url)
+            if ok and type(result) == "string" and #result > 0 then return true, result end
+            lastError = ok and "Resposta HTTP vazia" or tostring(result)
+        end
+        local memberOk, memberHttpGet = pcall(function() return game.HttpGet end)
+        if memberOk and type(memberHttpGet) == "function" then
+            local ok, result = pcall(function() return game:HttpGet(url) end)
+            if ok and type(result) == "string" and #result > 0 then return true, result end
+            lastError = ok and "Resposta HTTP vazia" or tostring(result)
+        end
         if attempt < 2 then task.wait(0.1 + math.random() * 0.08) end
     end
     return false, lastError

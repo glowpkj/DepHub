@@ -66,7 +66,15 @@ const sources = {};
 for (const p of [...modulePaths].sort()) {
   const full = path.join(root, p);
   if (!fs.existsSync(full)) throw new Error('Missing module: ' + p);
-  sources[p] = fs.readFileSync(full, 'utf8');
+  let text = fs.readFileSync(full, 'utf8');
+  // Rewrite direct game:HttpGet / game.HttpGet calls to the bundle's safe
+  // resolver. Executors differ: some expose HttpGet only as a global, and
+  // writing a DataModel member may error. Call sites must not depend on the
+  // member existing. moduleName is used only for the error message.
+  text = text
+    .replace(/game:HttpGet\(/g, '__dephubHttpGet(')
+    .replace(/game\.HttpGet\(/g, '__dephubHttpGet(');
+  sources[p] = text;
 }
 
 // Encode each source as a Lua long-bracket string. Lua's [==[ ]==] tolerates
@@ -95,6 +103,25 @@ const bundleHeader = [
   'local BUNDLED_SOURCES = {',
   tableLines.join('\n'),
   '}',
+  '',
+  '-- Safe HttpGet resolver. Modules never call game:HttpGet directly: some',
+  '-- executors expose HttpGet only as a global, and writing a DataModel member',
+  '-- that does not exist errors. Resolve bundled paths from the in-memory table',
+  '-- first, then fall back to whatever fetch primitive the executor provides.',
+  'local globalHttpGet = (type(HttpGet) == "function") and HttpGet or nil',
+  'local function __dephubHttpGet(url)',
+  '    if type(url) ~= "string" then return nil end',
+  '    local clean = url:match("^[^?]*") or url',
+  '    local rel = clean:match("DepHub/[^/]+/(.+)$")',
+  '    if rel and type(BUNDLED_SOURCES[rel]) == "string" then return BUNDLED_SOURCES[rel] end',
+  '    if type(globalHttpGet) == "function" then return globalHttpGet(url) end',
+  '    local memberOk, member = pcall(function() return game.HttpGet end)',
+  '    if memberOk and type(member) == "function" then',
+  '        local ok, result = pcall(function() return game:HttpGet(url) end)',
+  '        if ok then return result end',
+  '    end',
+  '    return nil',
+  'end',
   ''
 ].join('\n');
 
@@ -147,18 +174,49 @@ const httpWrap = [
   '-- Feature/quest files a backend fetches directly (rather than through the',
   '-- loader httpGet) resolve here, so the bundle never needs the network. Any',
   '-- cache-busting query string is stripped before the lookup.',
+  '--',
+  '-- Not every executor exposes HttpGet as a DataModel member: some provide it',
+  '-- only as a global, and writing a nonexistent member errors. So probe before',
+  '-- wrapping, and fall back to the global helper when the member is absent.',
   'do',
-  '    local nativeHttpGet = game.HttpGet',
-  '    game.HttpGet = function(a, b, ...)',
-  '        -- Support both game:HttpGet(url) and game.HttpGet(url) call styles.',
-  '        local url = (b ~= nil) and b or a',
-  '        local self = (b ~= nil) and a or game',
-  '        if type(url) == "string" then',
-  '            local clean = url:match("^[^?]*") or url',
-  '            local rel = clean:match("DepHub/[^/]+/(.+)$")',
-  '            if rel and BUNDLED_SOURCES[rel] then return BUNDLED_SOURCES[rel] end',
+  '    local bundledFor = function(url)',
+  '        if type(url) ~= "string" then return nil end',
+  '        local clean = url:match("^[^?]*") or url',
+  '        local rel = clean:match("DepHub/[^/]+/(.+)$")',
+  '        if rel and BUNDLED_SOURCES[rel] then return BUNDLED_SOURCES[rel] end',
+  '        return nil',
+  '    end',
+  '    local memberOk, nativeHttpGet = pcall(function() return game.HttpGet end)',
+  '    if memberOk and type(nativeHttpGet) == "function" then',
+  '        if pcall(function() game.HttpGet = nativeHttpGet end) then',
+  '            local ok, err = pcall(function()',
+  '                game.HttpGet = function(a, b, ...)',
+  '                    local url = (b ~= nil) and b or a',
+  '                    local self = (b ~= nil) and a or game',
+  '                    local hit = bundledFor(url)',
+  '                    if hit then return hit end',
+  '                    return nativeHttpGet(self, url, ...)',
+  '                end',
+  '            end)',
+  '            if not ok then game.HttpGet = nativeHttpGet end',
   '        end',
-  '        return nativeHttpGet(self, url, ...)',
+  '    elseif type(HttpGet) == "function" then',
+  '        -- No DataModel member: install a global shim for backends that call',
+  '        -- HttpGet(url) directly, and a game:HttpGet method on the metatable of',
+  '        -- a proxy is not possible here, so also expose it as game.HttpGet only',
+  '        -- when the engine accepts the write (checked above).',
+  '        local nativeGlobal = HttpGet',
+  '        local shim = function(a, b, ...)',
+  '            local url = (b ~= nil) and b or a',
+  '            if type(url) ~= "string" then url = a end',
+  '            local hit = bundledFor(url)',
+  '            if hit then return hit end',
+  '            return nativeGlobal(url, ...)',
+  '        end',
+  '        if pcall(function() game.HttpGet = shim end) then',
+  '            game.HttpGet = shim',
+  '        end',
+  '        HttpGet = shim',
   '    end',
   'end',
   ''

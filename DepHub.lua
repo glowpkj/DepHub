@@ -182,9 +182,20 @@ local function performRequest(url)
                 end
             end
         end
-        local ok, result = pcall(function() return game:HttpGet(url) end)
-        if ok and type(result) == "string" and #result > 0 then return true, result end
-        lastError = ok and "Resposta HTTP vazia" or tostring(result)
+        -- Some executors expose HttpGet as a global helper, others only as a
+        -- DataModel member. Try the global first, then the member, and never
+        -- assume the member exists (reading or writing it can error).
+        if type(HttpGet) == "function" then
+            local ok, result = pcall(HttpGet, url)
+            if ok and type(result) == "string" and #result > 0 then return true, result end
+            lastError = ok and "Resposta HTTP vazia" or tostring(result)
+        end
+        local memberOk, memberHttpGet = pcall(function() return game.HttpGet end)
+        if memberOk and type(memberHttpGet) == "function" then
+            local ok, result = pcall(function() return game:HttpGet(url) end)
+            if ok and type(result) == "string" and #result > 0 then return true, result end
+            lastError = ok and "Resposta HTTP vazia" or tostring(result)
+        end
         if attempt < 2 then task.wait(0.1 + math.random() * 0.08) end
     end
     return false, lastError
