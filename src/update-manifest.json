@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-19T02:00:47.743886+00:00",
-  "commit": "41531893cacda971a88c3f986a17bb52de3d7a29",
+  "generatedAt": "2026-10-19T02:06:25.350629+00:00",
+  "commit": "87438545a335b8990093f4d721868b9604dd9d40",
   "version": "0.0.37",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "7bd945a8b7f86fd11ffd14013243388e7350dc27208291eb40fda0b738275b32",
-      "commit": "41531893cacda971a88c3f986a17bb52de3d7a29",
+      "version": "2b7ea8f57b6f98a2dab6b693c66bd301744f13b702e8ccdf7c0234745afc4bbf",
+      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -25,8 +25,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "12554096984ffa94b8fa327e6bb1eb5ec6000abe71f7bac27bb80544409d2556",
-      "commit": "41531893cacda971a88c3f986a17bb52de3d7a29",
+      "version": "18b467ea87e816e5ffa510709fb883434c762e099bde03af9f63d8462f9dbeca",
+      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "824bbc441c0e1900b68a4d94624c7d96a73fc845eda17b8bbcb79a061157fad7",
-      "commit": "41531893cacda971a88c3f986a17bb52de3d7a29",
+      "version": "11c1a050afb9903988cf3f9fe3da7508f12e52f5bae194d95d82b67f50de1926",
+      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -69,8 +69,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "53ab514d9a8e2634e7e0904ab1491de9d40a760395ef587c04de9a04ae109944",
-      "commit": "41531893cacda971a88c3f986a17bb52de3d7a29",
+      "version": "8af80e20cb0f4b226043b7b803f58f064e943a7b2c9a9d34b6c5cb76c2494646",
+      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,8 +91,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "7bd28878fca7354d8bb08833a4173160dd95296e673126016608158ce0285ce8",
-      "commit": "41531893cacda971a88c3f986a17bb52de3d7a29",
+      "version": "a8e0c0972e934772c9ae08a818c40a726f5946057775b4122962a0660b6dda19",
+      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -118,8 +118,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "7c66f47f870e0391869ae240caffcc237a79b71a8e9be4682557f389130473b0",
-      "commit": "41531893cacda971a88c3f986a17bb52de3d7a29",
+      "version": "07365134c0a272bcaf8e68f069e01991797887f5163634b1d32e763cd5986186",
+      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -143,8 +143,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "2c9f17c00362d53bd1f87e3b7fae141fddb71662aba1346568f8660844a3bc38",
-      "commit": "41531893cacda971a88c3f986a17bb52de3d7a29",
+      "version": "9c62dd2fa5920da5d0d36e0b66b1ff1257adee84e26767f43dfe55676d04b5e3",
+      "commit": "87438545a335b8990093f4d721868b9604dd9d40",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -157,6 +157,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "8743854",
+      "Date": "2026-10-18T23:06:07-03:00",
+      "Changes": [
+        "fix: publish bundled HttpGet resolver to the shared environment"
+      ]
+    },
     {
       "Version": "77fc110",
       "Date": "2026-10-18T22:52:37-03:00",
@@ -183,13 +190,6 @@
       "Date": "2026-10-15T22:29:58-03:00",
       "Changes": [
         "Integrate initial AOTR assistance, ID routing and lifecycle cleanup"
-      ]
-    },
-    {
-      "Version": "b2bb58a",
-      "Date": "2026-10-15T22:13:22-03:00",
-      "Changes": [
-        "feat(aotr): register module and compact frontend in DepHub loader"
       ]
     }
   ]
