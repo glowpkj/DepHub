@@ -4,6 +4,9 @@
 tools/mingit/
 *.log
 
+# Release artifacts are built locally and hosted separately, never committed.
+dist/
+
 # Editor / OS noise
 .DS_Store
 Thumbs.db

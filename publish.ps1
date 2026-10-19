@@ -13,16 +13,20 @@
          CI workflow uses, so the two never disagree.
       4. Commits every change and pushes to origin/<branch>.
 
-    Credentials: GitHub rejects password pushes over HTTPS. Provide a Personal
-    Access Token either in the environment variable DEPHUB_GIT_TOKEN or in a
-    file named .publish-token next to this script (both are gitignored). The
-    token is only used for this one push and is never written into the repo.
+    Credentials: authentication uses Git Credential Manager and your GitHub
+    account. The first HTTPS push opens a browser window to sign in; the
+    credential is stored (DPAPI-encrypted) and every later push is automatic.
+    A token in the environment variable DEPHUB_GIT_TOKEN or in a gitignored
+    .publish-token file is still honoured for headless runs. The token is only
+    used for that one push and is never written into the repo.
 
     Usage:
       powershell -ExecutionPolicy Bypass -File publish.ps1
       powershell -ExecutionPolicy Bypass -File publish.ps1 -Message "feat: add blox fruits autofarm"
       powershell -ExecutionPolicy Bypass -File publish.ps1 -NoPush      # build + commit only
       powershell -ExecutionPolicy Bypass -File publish.ps1 -DryRun      # gate only, no commit
+
+    Or just double-click publish.bat.
 #>
 param(
     [string]$Message = "",
@@ -97,6 +101,11 @@ if (-not $SkipTests) {
         & $NodeExe tests/run_backend_tests.js $LuauExe
         if ($LASTEXITCODE -ne 0) { Fail 'backend/headless tests failed.' }
         Write-Ok 'backend tests passed'
+
+        Write-Step 'Running panel tests'
+        & $NodeExe tests/run_panel_tests.js $LuauExe
+        if ($LASTEXITCODE -ne 0) { Fail 'panel tests failed.' }
+        Write-Ok 'panel tests passed'
     } else {
         Write-Warn2 'luau.exe not found - skipping behavioral tests.'
     }

@@ -86,7 +86,9 @@ if (loader.includes('volleyball') || loader.includes('Volleyball') || loader.inc
 if (loader.includes('violencedistrict') || loader.includes('ViolenceDistrict') || loader.includes('6739698191')) {
   fail('Removed Violence District routing remains in the loader');
 }
-if (/library\/|frontend\.lua|Library\.new|CreateTab|CreateSection/.test(loader)) {
+// The loader must not pull in the retired third-party library. Loading its own
+// in-repo frontend module is fine; the retired markers below are not.
+if (/library\/|frontend\.lua|Library\.new|dephubCompact|dephubViolenceDistrict/.test(loader)) {
   fail('Loader still references a retired frontend/library');
 }
 
@@ -97,7 +99,9 @@ for (const retired of ['src/games/features/volleyballlegends', 'src/games/featur
   if (exists(retired)) fail('Retired directory still exists: ' + retired);
 }
 
-// No backend may create UI instances now that the library is gone.
+// Game backends must stay presentation-free: they may not build UI. The UI
+// itself lives in src/frontend (and the host in src/core/panel-host.lua), which
+// are allowed to create instances. Only src/games is checked here.
 const xmlUi = /CreateTab|CreateSection|CreateToggle\b|Library\.new|dephubCompact|dephubViolenceDistrict|library\//;
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
@@ -111,7 +115,7 @@ function walk(dir) {
     }
   }
 }
-walk(path.join(root, 'src'));
+walk(path.join(root, 'src/games'));
 
 if (exists('src/ui') && fs.readdirSync(path.join(root, 'src/ui')).length > 0) {
   fail('Legacy src/ui directory must stay empty');

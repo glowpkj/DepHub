@@ -293,6 +293,24 @@ if okGuard and type(guardFactory) == "table" and type(guardFactory.new) == "func
 end
 
 if env[STATE_KEY] ~= session then return false end
+
+-- Mount the interface now that __DEPHUB is published. The frontend is pure
+-- presentation; panel-host binds its controls to the backend's toggle API.
+-- Absence of either module is not an error (e.g. headless execution), so it
+-- stays silent; only a genuine mount failure is reported.
+local okFrontend, frontendFactory = loadModule("src/frontend/init.lua", false)
+if okFrontend and type(frontendFactory) == "table" and type(frontendFactory.new) == "function" then
+    local okHost, host = loadModule("src/core/panel-host.lua", false)
+    if okHost and type(host) == "table" and type(host.Mount) == "function" then
+        local okMount, panel = pcall(host.Mount, env, frontendFactory)
+        if okMount and panel then
+            env.__DEPHUB.Frontend = panel
+        else
+            pcall(print, "[DepHub] frontend mount failed: " .. tostring(panel))
+        end
+    end
+end
+
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()

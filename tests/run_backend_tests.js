@@ -31,7 +31,10 @@ function luaFiles(dir) {
     return entry.isDirectory() ? luaFiles(file) : file.endsWith('.lua') ? [file] : [];
   });
 }
-// Fail on dangling dependencies on retired frontend/library code.
+// Fail on dangling dependencies on retired frontend/library code. The UI lives
+// in src/frontend and src/core/panel-host.lua by design, so the "no UI here"
+// check is scoped to game backends; the retired markers are still banned
+// everywhere (loader included).
 if (fs.existsSync(path.join(root, 'library'))) {
   throw new Error('Retired library directory still exists');
 }
@@ -40,8 +43,14 @@ if (fs.existsSync(path.join(root, 'src/ui')) && fs.readdirSync(path.join(root, '
 }
 for (const file of [path.join(root, 'DepHub.lua'), ...luaFiles(path.join(root, 'src'))]) {
   const source = fs.readFileSync(file, 'utf8');
-  if (/src\/ui\/|CreateUI|MountUI|CreatePrompt|library\/|frontend\.lua|CreateTab|CreateSection|Library\.new/.test(source)) {
+  if (/src\/ui\/|CreateUI|MountUI|CreatePrompt|library\/|frontend\.lua|Library\.new|dephubCompact|dephubViolenceDistrict/.test(source)) {
     throw new Error('Retired frontend/library dependency remains in ' + file);
+  }
+}
+for (const file of luaFiles(path.join(root, 'src/games'))) {
+  const source = fs.readFileSync(file, 'utf8');
+  if (/CreateTab|CreateSection/.test(source)) {
+    throw new Error('Game backend must not build UI: ' + file);
   }
 }
 const sources = 'local sources = {\n' + files.map(file =>
