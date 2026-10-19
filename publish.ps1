@@ -196,34 +196,27 @@ Write-Step 'Pushing to origin'
 $Remote = (& $GitExe remote get-url origin).Trim()
 if (-not $Remote) { Fail 'No origin remote configured.' }
 
-# Resolve a token: env var first, then the gitignored .publish-token file.
+# Authentication is handled by Git Credential Manager: the first HTTPS push
+# opens a browser window to sign in to GitHub, and the credential is stored
+# (DPAPI-encrypted) for every push after that. A token in DEPHUB_GIT_TOKEN or
+# .publish-token is still honoured if present, for headless use.
 $Token = $env:DEPHUB_GIT_TOKEN
 $tokenFile = Join-Path $RepoRoot '.publish-token'
 if (-not $Token -and (Test-Path $tokenFile)) {
     $Token = (Get-Content $tokenFile -Raw).Trim()
 }
 
-if ($Remote -match '^https://') {
-    if (-not $Token) {
-        Fail @"
-No GitHub token found for an HTTPS remote.
-Create a Personal Access Token with 'repo' scope, then either:
-  setx DEPHUB_GIT_TOKEN ghp_xxxxxxxx
-    - or -
-  save it in $tokenFile
-"@
-    }
-    $hostPart = ($Remote -replace '^https://', '')
-    $hostPart = $hostPart -replace '^[^@]*@', ''
-    $authUrl = "https://x-access-token:$Token@$hostPart"
-    & $GitExe -c credential.helper= push $authUrl "HEAD:$Branch"
+if ($Token -and $Remote -match '^https://') {
+    $hostPart = ($Remote -replace '^https://', '') -replace '^[^@]*@', ''
+    & $GitExe -c credential.helper= push "https://x-access-token:$Token@$hostPart" "HEAD:$Branch"
     $pushExit = $LASTEXITCODE
-    # Never leave the token on the remote config.
     & $GitExe remote set-url origin $Remote | Out-Null
     if ($pushExit -ne 0) { Fail 'git push failed (check the token scope and branch protection).' }
 } else {
+    # Normal authenticated push. GCM will prompt the first time.
+    Write-Host "    (if this is the first push, a browser window will open to sign in to GitHub)" -ForegroundColor DarkGray
     & $GitExe push origin "HEAD:$Branch"
-    if ($LASTEXITCODE -ne 0) { Fail 'git push failed.' }
+    if ($LASTEXITCODE -ne 0) { Fail 'git push failed. If the login window was cancelled, run the script again.' }
 }
 
 Write-Host ""
