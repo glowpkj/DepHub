@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-19T00:49:54.706Z",
-  "commit": "local",
+  "generatedAt": "2026-10-19T00:50:14.127273+00:00",
+  "commit": "a2016d2a6ee02da180d20351d12a11d4e681f3ed",
   "version": "0.0.37",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "3556817d9514ac1b76c9b7df8b24413ed13535f5e16bcc1aefaad9b3a730f88f",
-      "commit": "local",
+      "version": "20a7a6d9dd6561eacd6b4ce7aab34b08605e2170fd8e5729bd3f461474bf3b21",
+      "commit": "a2016d2a6ee02da180d20351d12a11d4e681f3ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -25,8 +25,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "95794850cc4ae5295f0005ce93b4acbd5bf2a3069cf56a4cf6ad0411cf22e496",
-      "commit": "local",
+      "version": "c7fec9f73b3e1e80aa867bc6787a0a938f6c64d876dfd19327f428e5b5eb71b7",
+      "commit": "a2016d2a6ee02da180d20351d12a11d4e681f3ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "6c2b582fabb6002d1349487b34bcabf733af613610c9ca3772bfa439d29f5adf",
-      "commit": "local",
+      "version": "01b4fe2372faa58dc6b4328dbc759d70599cf303d5d86b1355146a166df2571b",
+      "commit": "a2016d2a6ee02da180d20351d12a11d4e681f3ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -69,8 +69,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "5106189ea99ca8eebef9baa88b56d2e9cd40b6797b73c4b7c6099dace3a2e6e6",
-      "commit": "local",
+      "version": "e97b9e114de6a5e1f9067bed9a7384735366500b357498360698c89c9958332d",
+      "commit": "a2016d2a6ee02da180d20351d12a11d4e681f3ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,8 +91,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "522ba53ccb0daf250e5660df6d3c8eca26acfd15b972d763b0381f7b684d9982",
-      "commit": "local",
+      "version": "6cb58bc58a531e9512bcc5747f339f85b41fffc1807846900f05e455217cc839",
+      "commit": "a2016d2a6ee02da180d20351d12a11d4e681f3ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -118,8 +118,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "83423df345128430842b5652134680286a6e35a94dd43ca2ab3f9c9102d9bd20",
-      "commit": "local",
+      "version": "ed0bc408a83c7ed848355ecb5447baae9ccd86f7c8a38fbdec9b665843308f4f",
+      "commit": "a2016d2a6ee02da180d20351d12a11d4e681f3ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -143,8 +143,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "edbaaf18cedb1419d91ae4a61fc9364c75fc430ffcc04f713b76614e21c22d61",
-      "commit": "local",
+      "version": "7c5b4537da0f81dafddc6ff8449af4ee3818ba61a7a05c4930c320ecb9b2b3f8",
+      "commit": "a2016d2a6ee02da180d20351d12a11d4e681f3ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -156,5 +156,41 @@
       ]
     }
   },
-  "recentUpdates": []
+  "recentUpdates": [
+    {
+      "Version": "904975f",
+      "Date": "2026-10-18T21:46:50-03:00",
+      "Changes": [
+        "chore: finalize session build (UI removed, anti-detection, BF autofarm, publish tooling)"
+      ]
+    },
+    {
+      "Version": "696f106",
+      "Date": "2026-10-15T22:29:58-03:00",
+      "Changes": [
+        "Integrate initial AOTR assistance, ID routing and lifecycle cleanup"
+      ]
+    },
+    {
+      "Version": "b2bb58a",
+      "Date": "2026-10-15T22:13:22-03:00",
+      "Changes": [
+        "feat(aotr): register module and compact frontend in DepHub loader"
+      ]
+    },
+    {
+      "Version": "ad0e9f9",
+      "Date": "2026-10-15T22:13:09-03:00",
+      "Changes": [
+        "feat(aotr): add defensive titan features and diagnostics"
+      ]
+    },
+    {
+      "Version": "e640a3a",
+      "Date": "2026-10-06T22:03:21-03:00",
+      "Changes": [
+        "feat(volleyball): dynamic Ball ESP and reusable trajectory and landing visuals"
+      ]
+    }
+  ]
 }
