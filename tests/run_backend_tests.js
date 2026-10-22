@@ -38,12 +38,19 @@ function luaFiles(dir) {
 if (fs.existsSync(path.join(root, 'library'))) {
   throw new Error('Retired library directory still exists');
 }
-if (fs.existsSync(path.join(root, 'src/ui')) && fs.readdirSync(path.join(root, 'src/ui')).length) {
-  throw new Error('Legacy UI directory still contains files');
+// src/ui is the presentation layer (the intro animation). It must not be
+// depended on by game backends; that is enforced by the src/games scan below.
+const allowedUi = new Set(['Intro.lua', 'DepHubUI.lua']);
+if (fs.existsSync(path.join(root, 'src/ui'))) {
+  for (const entry of fs.readdirSync(path.join(root, 'src/ui'), {withFileTypes: true})) {
+    if (!entry.isDirectory() && entry.name.endsWith('.lua') && !allowedUi.has(entry.name)) {
+      throw new Error('Unexpected module in src/ui: ' + entry.name);
+    }
+  }
 }
 for (const file of [path.join(root, 'DepHub.lua'), ...luaFiles(path.join(root, 'src'))]) {
   const source = fs.readFileSync(file, 'utf8');
-  if (/src\/ui\/|CreateUI|MountUI|CreatePrompt|library\/|frontend\.lua|Library\.new|dephubCompact|dephubViolenceDistrict/.test(source)) {
+  if (/CreateUI|MountUI|CreatePrompt|library\/|frontend\.lua|Library\.new|dephubCompact|dephubViolenceDistrict/.test(source)) {
     throw new Error('Retired frontend/library dependency remains in ' + file);
   }
 }

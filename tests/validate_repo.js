@@ -117,8 +117,18 @@ function walk(dir) {
 }
 walk(path.join(root, 'src/games'));
 
-if (exists('src/ui') && fs.readdirSync(path.join(root, 'src/ui')).length > 0) {
-  fail('Legacy src/ui directory must stay empty');
+// src/ui holds presentation-only modules (the intro animation and the
+// standalone UI reference). It must never host engine logic: no game backend
+// API use, no service access beyond the presentation layer.
+const uiAllowed = new Set(['Intro.lua', 'DepHubUI.lua']);
+if (exists('src/ui')) {
+  for (const entry of fs.readdirSync(path.join(root, 'src/ui'), {withFileTypes: true})) {
+    if (entry.isDirectory()) continue;
+    if (!entry.name.endsWith('.lua')) continue;
+    if (!uiAllowed.has(entry.name)) {
+      fail('Unexpected module in src/ui: ' + entry.name + ' (presentation-only)');
+    }
+  }
 }
 
 console.log(`DepHub repository validation passed for v${version}`);

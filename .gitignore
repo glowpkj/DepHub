@@ -16,3 +16,6 @@ dist/*
 Thumbs.db
 .vscode/
 .idea/
+
+# Local safety copies made before risky edits; never published.
+_backup_*/

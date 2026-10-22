@@ -314,6 +314,18 @@ if env[STATE_KEY] ~= session then return false end
 -- presentation; panel-host binds its controls to the backend's toggle API.
 -- Absence of either module is not an error (e.g. headless execution), so it
 -- stays silent; only a genuine mount failure is reported.
+-- Intro animation: plays before the panel mounts so the boot feels authored.
+-- Loaded as a plain chunk; failure is silent (headless or missing module).
+do
+    local okIntro, Intro = loadModule("src/ui/Intro.lua", false)
+    if okIntro and type(Intro) == "table" and type(Intro.Play) == "function" then
+        local okPlay, inst = pcall(function() return Intro:Play({}) end)
+        if okPlay and inst then
+            env.__DEPHUB.Intro = inst
+        end
+    end
+end
+
 local okFrontend, frontendFactory = loadModule("src/frontend/init.lua", false)
 if okFrontend and type(frontendFactory) == "table" and type(frontendFactory.new) == "function" then
     local okHost, host = loadModule("src/core/panel-host.lua", false)
