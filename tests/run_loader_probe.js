@@ -142,12 +142,16 @@ local players = {LocalPlayer = player, PlayerAdded = signal(), PlayerRemoving = 
 function players:GetPlayers() return {player} end
 function players:GetPlayerFromCharacter() return nil end
 
-local tweenService = {
+local tweenService
+local probeTaskRef
+tweenService = {
     Create = function(_, inst, info, props)
         local t = {Completed = signal(), _inst = inst, _props = props or {}}
         function t:Play()
             for k, v in pairs(self._props) do pcall(function() inst[k] = v end) end
-            if self.Completed then task.defer(function() if self.Completed then self.Completed:Fire() end end) end
+            if self.Completed and probeTaskRef then
+                probeTaskRef.defer(function() if self.Completed then self.Completed:Fire() end end)
+            end
         end
         function t:Cancel() end
         function t:Pause() end
@@ -175,8 +179,7 @@ local game = {PlaceId=2753915549, GameId=2753915549, Name="Blox Fruits",
     end}
 
 -- The resolver reads SOURCES by repo-relative path.
-local function resolver(url)
-    local rel = tostring(url):match("^.-main/(.+)$") or tostring(url)
+local function resolver(url)    local rel = tostring(url):match("^.-main/(.+)$") or tostring(url)
     rel = rel:gsub("%?.*$", "")
     local src = SOURCES[rel]
     if type(src) ~= "string" then error("not bundled: " .. rel) end
@@ -243,6 +246,7 @@ local probeTask = (function()
     function t.__now() return clock end
     return t
 end)()
+probeTaskRef = probeTask
 
 local state = {}
 local env
@@ -251,7 +255,8 @@ local env
 local function envLoadstring(source, chunkname)
     local fn, err = loadstring(source, chunkname)
     if not fn then return fn, err end
-    setfenv(fn, env)
+    local okSet = pcall(setfenv, fn, env)
+    if not okSet then print("  [envLoadstring] setfenv FAILED for " .. tostring(chunkname)) end
     return fn
 end
 
@@ -351,16 +356,39 @@ end
 
 local dephubGui = findGui(coreGuiService, "dephub", introGui) or findGui(playerGui, "dephub", introGui)
 ok(dephubGui ~= nil, "panel ScreenGui mounted")
+
+-- Capture the pre-handoff state: the loader mounts the panel hidden and plays
+-- the intro over it, so before any clock advance the panel must be down while
+-- the intro sits at its opening 62x62 monogram. Assert on this snapshot, then
+-- advance the clock so the reveal phase runs and the panel comes up.
+local bootShell = introGui and introGui:FindFirstChild("Stage")
+bootShell = bootShell and bootShell:FindFirstChild("Shell")
+local bootVisible = dephubGui and dephubGui:FindFirstChild("Root") and dephubGui:FindFirstChild("Root").Visible
+
+if bootShell then
+    ok(bootShell.Size.X.Offset == 62 and bootShell.Size.Y.Offset == 62,
+        "intro mounts at its starting 62x62 monogram")
+end
+ok(bootVisible == false, "panel starts hidden for the intro to reveal")
+
 if dephubGui then
     print("  panel gui: " .. dephubGui.Name .. " in " .. tostring(dephubGui.Parent and dephubGui.Parent.ClassName))
     local kids = {}
     for _, c in ipairs(dephubGui:GetChildren()) do kids[#kids+1] = c.ClassName .. ":" .. c.Name end
     print("  panel children: " .. table.concat(kids, ", "))
+end
+
+-- Run the intro's whole timeline; its "revealed" phase calls OnReveal, which
+-- is what unhides the panel.
+if probeTask and probeTask.__advance then probeTask.__advance(4.0) end
+
+if dephubGui then
     local root = dephubGui:FindFirstChild("Root")
     ok(root ~= nil, "panel window frame exists")
     if root then
         print("  panel window visible = " .. tostring(root.Visible)
             .. " size = " .. root.Size.X.Offset .. "x" .. root.Size.Y.Offset)
+        ok(root.Visible == true, "panel is visible after the intro handoff")
     end
 end
 
@@ -372,25 +400,9 @@ if DEP then
 end
 
 -- The intro's phase timeline is asserted by tests/intro_probe.js, which drives
--- a virtual clock through every phase. Here we only confirm the loader wired
--- the intro to the panel: the panel mounts hidden and the intro is playing.
-local shell = introGui and introGui:FindFirstChild("Stage")
-shell = shell and shell:FindFirstChild("Shell")
-if shell then
-    ok(shell.Size.X.Offset == 62 and shell.Size.Y.Offset == 62,
-        "intro mounts at its starting 62x62 monogram")
-end
-if dephubGui then
-    local root = dephubGui:FindFirstChild("Root")
-    ok(root ~= nil, "panel window exists")
-    if root then
-        -- The loader hides the panel so the intro can reveal it; if no intro
-        -- mounted, the panel must be visible instead.
-        local introMounted = introGui ~= nil
-        ok(root.Visible == (not introMounted),
-            "panel visibility is coordinated with the intro handoff")
-    end
-end
+-- a virtual clock through every phase. Above we confirmed the two facts that
+-- belong to the loader: the intro mounts at its opening monogram over a hidden
+-- panel, and once the intro's reveal phase runs the panel is up.
 print(string.format("probe checks: %d run, %d failed", checks, fails))
 `;
 
