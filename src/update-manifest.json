@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-22T23:50:13.569160+00:00",
-  "commit": "2c9e6833fd9d8f39300ddc21807339bd41d62c46",
+  "generatedAt": "2026-10-23T00:11:46.795256+00:00",
+  "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
   "version": "0.0.37",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "11f3c2c5c8f8ca6bf1605ace84e40b88f820a7e8cca00e3af3fe884ce6e3a34c",
-      "commit": "2c9e6833fd9d8f39300ddc21807339bd41d62c46",
+      "version": "e3c96c6d96b38f646f68a3898e1d23de78b5f068a933b740fe07f4ad8d6992f7",
+      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -25,8 +25,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "de594e99627ef69f54fafa8d92e6dbb58eca137408d8eb5e3b455d35481a285e",
-      "commit": "2c9e6833fd9d8f39300ddc21807339bd41d62c46",
+      "version": "571279819504c3228b19b3f10fb2ab3d9f98250d2f3298ea3d59bf8840caf6c1",
+      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "215c8be570954071822c34a807cd3bd38d402f319aba548f0f3239613f48b60c",
-      "commit": "2c9e6833fd9d8f39300ddc21807339bd41d62c46",
+      "version": "ec73bb2833c8ef7beafdb92cdf12ad01baf2b3e43320d13bac0a3980979083dc",
+      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -69,8 +69,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "6d98e51dec4ea4b7529a34e75c0703959ac42d6c67ef5689c541f373276e2b68",
-      "commit": "2c9e6833fd9d8f39300ddc21807339bd41d62c46",
+      "version": "d819a355a40ee76a19f9755d09e6a58f242cc97ba67b7fea19ddd3fd5862d7f4",
+      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -91,8 +91,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "8ffef75fb433c7424311dcac5f4535029b48a5fc390ad4c77d39a01ceaa644fd",
-      "commit": "2c9e6833fd9d8f39300ddc21807339bd41d62c46",
+      "version": "7ab73aaee8405ef0031aedff8e88cbbe6bc9e692f367b4089e4cde2637869f60",
+      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -118,8 +118,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "265c0b124b50b5b6ccfb35782f4a46dc65bf6c61428af22cf0b28baf8b72c607",
-      "commit": "2c9e6833fd9d8f39300ddc21807339bd41d62c46",
+      "version": "42a0ba40c5ed9305a564c3d9e7b1ebb9d73a41b0dce7e6e46fb101096eaa0e1c",
+      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -143,8 +143,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "9d79b4a42affa00f76f3db7ee7b257ee88761e10fa9d763f8808471b168e8f84",
-      "commit": "2c9e6833fd9d8f39300ddc21807339bd41d62c46",
+      "version": "eb8b23f799d6835ecee3584737f7d66a6254c1cb28809573cd5ad3ff80b9bd7f",
+      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -157,6 +157,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "b595136",
+      "Date": "2026-10-22T21:11:31-03:00",
+      "Changes": [
+        "fix(ui): fiel INTRO.html, hotkey Insert, painel visivel e handoff"
+      ]
+    },
     {
       "Version": "2c9e683",
       "Date": "2026-10-22T20:49:57-03:00",
@@ -183,13 +190,6 @@
       "Date": "2026-10-18T22:37:19-03:00",
       "Changes": [
         "feat: new panel frontend and release pipeline"
-      ]
-    },
-    {
-      "Version": "904975f",
-      "Date": "2026-10-18T21:46:50-03:00",
-      "Changes": [
-        "chore: finalize session build (UI removed, anti-detection, BF autofarm, publish tooling)"
       ]
     }
   ]
