@@ -119,6 +119,11 @@ if (-not $SkipTests) {
         & $NodeExe tests/run_panel_tests.js $LuauExe
         if ($LASTEXITCODE -ne 0) { Fail 'panel tests failed.' }
         Write-Ok 'panel tests passed'
+
+        Write-Step 'Running intro timeline probe'
+        & $NodeExe tests/intro_probe.js $LuauExe
+        if ($LASTEXITCODE -ne 0) { Fail 'intro probe failed.' }
+        Write-Ok 'intro timeline matches the mockup at every phase'
     } else {
         Write-Warn2 'luau.exe not found - skipping behavioral tests.'
     }
@@ -159,6 +164,11 @@ if (-not $SkipTests -and $LuauExe) {
         if ($LASTEXITCODE -ne 0) { Fail ("bundle verification failed for " + $route[2]) }
     }
     Write-Ok 'every route resolves offline with zero network fetches'
+
+    Write-Step 'Probing the bundle end-to-end (loader probe)'
+    & $NodeExe tests/run_loader_probe.js $LuauExe $bundlePath
+    if ($LASTEXITCODE -ne 0) { Fail 'loader probe failed.' }
+    Write-Ok 'bundle boots, the intro mounts, and the panel mounts behind it'
 }
 
 # ---------------------------------------------------------------------------

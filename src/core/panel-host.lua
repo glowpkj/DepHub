@@ -212,7 +212,7 @@ function PanelHost.Mount(env, PanelFactory)
     if type(backend) ~= "table" then
         -- No backend (unknown game without fallback). Still show a stub panel so
         -- the user sees the interface exists, with an explanatory notice.
-        local panel = PanelFactory.new({Title = "DepHub", GameName = game.Name, StartOpen = false})
+        local panel = PanelFactory.new({Title = "DepHub", GameName = game.Name, StartOpen = true})
         local tab = panel:CreateTab({Name = "Estado", Glyph = "!"})
         panel:AddNotice(tab, "Nenhum backend ativo para este jogo. Modo: " .. mode)
         env.__DEPHUB.Frontend = panel
@@ -223,7 +223,7 @@ function PanelHost.Mount(env, PanelFactory)
     local panel = PanelFactory.new({
         Title = "DepHub",
         GameName = (GameName ~= "" and GameName) or mode,
-        StartOpen = false,
+        StartOpen = true,
     })
 
     local build = SPECS[mode] or buildGeneric

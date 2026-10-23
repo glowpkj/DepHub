@@ -314,17 +314,11 @@ if env[STATE_KEY] ~= session then return false end
 -- presentation; panel-host binds its controls to the backend's toggle API.
 -- Absence of either module is not an error (e.g. headless execution), so it
 -- stays silent; only a genuine mount failure is reported.
--- Intro animation: plays before the panel mounts so the boot feels authored.
--- Loaded as a plain chunk; failure is silent (headless or missing module).
-do
-    local okIntro, Intro = loadModule("src/ui/Intro.lua", false)
-    if okIntro and type(Intro) == "table" and type(Intro.Play) == "function" then
-        local okPlay, inst = pcall(function() return Intro:Play({}) end)
-        if okPlay and inst then
-            env.__DEPHUB.Intro = inst
-        end
-    end
-end
+--
+-- The intro and the panel share one boot: the panel mounts hidden and the
+-- intro reveals it on its "revealed" phase, so the shell expansion lands on
+-- the panel rather than racing it. Without an intro the panel opens at once.
+local bootPanel
 
 local okFrontend, frontendFactory = loadModule("src/frontend/init.lua", false)
 if okFrontend and type(frontendFactory) == "table" and type(frontendFactory.new) == "function" then
@@ -333,8 +327,34 @@ if okFrontend and type(frontendFactory) == "table" and type(frontendFactory.new)
         local okMount, panel = pcall(host.Mount, env, frontendFactory)
         if okMount and panel then
             env.__DEPHUB.Frontend = panel
+            bootPanel = panel
         else
             pcall(print, "[DepHub] frontend mount failed: " .. tostring(panel))
+        end
+    end
+end
+
+-- Intro animation: plays after the panel exists so it can hand over to it.
+-- Loaded as a plain chunk; failure is silent (headless or missing module).
+do
+    local okIntro, Intro = loadModule("src/ui/Intro.lua", false)
+    if okIntro and type(Intro) == "table" and type(Intro.Play) == "function" then
+        if bootPanel then
+            -- Keep the panel hidden until the shell has expanded into it.
+            if bootPanel.Root then bootPanel.Root.Visible = false end
+            if bootPanel.FloatingButton then bootPanel.FloatingButton.Visible = false end
+        end
+        local okPlay, inst = pcall(function()
+            return Intro:Play({
+                OnReveal = function()
+                    if bootPanel then
+                        if bootPanel.Root then bootPanel.Root.Visible = true end
+                    end
+                end,
+            })
+        end)
+        if okPlay and inst then
+            env.__DEPHUB.Intro = inst
         end
     end
 end

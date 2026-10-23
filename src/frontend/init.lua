@@ -41,6 +41,8 @@ local Theme = {
     TextQuiet     = Color3.fromRGB(110, 110, 110),
     Accent        = Color3.fromRGB(221, 221, 221),
     AccentInk     = Color3.fromRGB(24, 24, 24),
+    Mark          = Color3.fromRGB(221, 221, 221),
+    MarkInk       = Color3.fromRGB(21, 21, 21),
     NavActive     = Color3.fromRGB(30, 30, 30),
     NavHover      = Color3.fromRGB(26, 26, 26),
     Field         = Color3.fromRGB(17, 17, 17),
@@ -66,9 +68,9 @@ local Theme = {
     FontMono      = Enum.Font.Code,
 }
 
-local WIN_W, WIN_H = 620, 460
+local WIN_W, WIN_H = 780, 520
 local SIDEBAR_W    = 160
-local HEADER_H     = 48
+local HEADER_H     = 66
 
 -- ---------------------------------------------------------------------------
 -- Instance helpers
@@ -187,31 +189,31 @@ function Panel.new(spec)
     }, header)
 
     local badge = new("TextLabel", {
-        Size = UDim2.fromOffset(28, 28),
-        Position = UDim2.fromOffset(14, 10),
-        BackgroundColor3 = Theme.Accent,
-        Text = "d",
-        TextColor3 = Theme.AccentInk,
+        Size = UDim2.fromOffset(34, 34),
+        Position = UDim2.fromOffset(24, 16),
+        BackgroundColor3 = Theme.Mark,
+        Text = "D",
+        TextColor3 = Theme.MarkInk,
         Font = Theme.FontHeader,
-        TextSize = 18,
+        TextSize = 27,
         BorderSizePixel = 0,
     }, header)
-    corner(badge, UDim.new(0, 6))
+    corner(badge, UDim.new(0, 8))
 
     local title = new("TextLabel", {
-        Size = UDim2.new(0, 200, 0, 16),
-        Position = UDim2.fromOffset(52, 8),
+        Size = UDim2.new(0, 200, 0, 18),
+        Position = UDim2.fromOffset(69, 17),
         BackgroundTransparency = 1,
         Text = spec.Title or "DepHub",
         TextColor3 = Theme.TextBright,
         Font = Theme.FontHeader,
-        TextSize = 13,
+        TextSize = 18,
         TextXAlignment = Enum.TextXAlignment.Left,
     }, header)
 
     local gameName = new("TextLabel", {
         Size = UDim2.new(0, 300, 0, 14),
-        Position = UDim2.fromOffset(52, 26),
+        Position = UDim2.fromOffset(69, 37),
         BackgroundTransparency = 1,
         Text = spec.GameName or "",
         TextColor3 = Theme.TextDim,
@@ -330,10 +332,10 @@ function Panel.new(spec)
     end)
     self.FloatingButton = floating
 
-    -- RightShift toggle
+    -- Insert toggles the panel; the floating button reopens it when hidden.
     UserInput.InputBegan:Connect(function(input, processed)
         if processed then return end
-        if input.KeyCode == Enum.KeyCode.RightShift then
+        if input.KeyCode == Enum.KeyCode.Insert then
             root.Visible = not root.Visible
             floating.Visible = not root.Visible
         end
