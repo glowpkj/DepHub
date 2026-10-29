@@ -209,7 +209,7 @@ function TempUI.Mount(env)
                     "Version: " .. tostring(status.Version or "?"),
                     "Sea: " .. tostring(status.Sea or "?"),
                     "Controls: " .. tostring(status.Controls or 0),
-                    "Modules: " .. tostring(status.Modules and #status.Modules or 0),
+                    "Modules: " .. tostring((function() local n = 0; for _ in pairs(status.Modules or {}) do n = n + 1 end; return n end)()),
                     "Restored config: " .. tostring(status.RestoredConfig == true),
                     "Errors: " .. tostring(status.Errors and #status.Errors or 0)
                 }
@@ -227,6 +227,9 @@ function TempUI.Mount(env)
             local notifications = backend.Notifications
             if type(notifications) == "table" then
                 if #notifications ~= lastNotificationCount then
+                    if #notifications > lastNotificationCount and #notifications > 0 then
+                        window:Notify("DepHub", tostring(notifications[#notifications]), 3)
+                    end
                     lastNotificationCount = #notifications
                     local first = math.max(1, #notifications - 9)
                     local lines = {}
