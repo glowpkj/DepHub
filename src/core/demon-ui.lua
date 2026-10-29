@@ -41,7 +41,7 @@ function DemonUI.new(options)
     local export = loadLibrary()
     local library = export.new({
         Title = options.Name or "DepHub",
-        Version = options.Version or "0.0.54",
+        Version = options.Version or "0.0.55",
         Author = "DepHub",
         Theme = "Monochrome",
         TabPosition = "Side",
