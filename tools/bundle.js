@@ -56,7 +56,7 @@ function walk(dir) {
   for (const entry of fs.readdirSync(path.join(root, dir), {withFileTypes: true})) {
     const rel = dir + '/' + entry.name;
     if (entry.isDirectory()) walk(rel);
-    else if (entry.name.endsWith('.lua') || entry.name.endsWith('.txt')) modulePaths.add(rel);
+    else if (entry.name.endsWith('.lua') || entry.name.endsWith('.luau') || entry.name.endsWith('.txt')) modulePaths.add(rel);
   }
 }
 walk('src');

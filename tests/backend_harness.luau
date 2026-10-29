@@ -127,17 +127,97 @@ end
 local Instance = {}
 function Instance.new(class)
     assert(class ~= "ScreenGui" and class ~= "TextButton" and class ~= "Frame", "Frontend instance created: " .. class)
-    return setmetatable({_props={ClassName=class, Name=class}, _children={}, _attributes={}}, instanceMeta)
+    local object = setmetatable({_props={ClassName=class, Name=class}, _children={}, _attributes={}}, instanceMeta)
+    -- Instance container signals, available on every double so feature modules
+    -- that watch children/descendants bind exactly like they do in Roblox.
+    object.ChildAdded = signal()
+    object.ChildRemoved = signal()
+    object.DescendantAdded = signal()
+    object.DescendantRemoving = signal()
+    -- Remote event doubles expose the client/server signals features connect to.
+    if class == "RemoteEvent" or class == "RemoteFunction" or class == "BindableEvent" then
+        object.OnClientEvent = signal()
+        object.OnServerEvent = signal()
+        object.OnServerInvoke = signal()
+    end
+    return object
 end
+-- UDim/UDim2 doubles: the Demon UI wrapper builds window sizes with them.
+local UDim = {}
+function UDim.new(scale, offset) return {Scale = scale or 0, Offset = offset or 0} end
+local UDim2 = {}
+function UDim2.new(xs, xo, ys, yo) return {X = UDim.new(xs, xo), Y = UDim.new(ys, yo)} end
+function UDim2.fromOffset(x, y) return UDim2.new(0, x, 0, y) end
+function UDim2.fromScale(x, y) return UDim2.new(x, 0, y, 0) end
+local ColorSequence = {}
+function ColorSequence.new(color) return {__colorSequence = true, Color = color} end
+function ColorSequence.new(colorA, colorB) return {__colorSequence = true, Color = colorA, Color2 = colorB} end
+local NumberSequence = {}
+function NumberSequence.new(value) return {__numberSequence = true, Value = value} end
+-- RaycastParams double: enough for prediction code to construct and mutate it.
+local RaycastParams = {}
+function RaycastParams.new() return {FilterType = nil, FilterDescendantsInstances = {}, IgnoreWater = false} end
 local Enum = setmetatable({}, {__index=function(t, key)
     local values = setmetatable({}, {__index=function(s, name) rawset(s, name, name); return name end})
     rawset(t, key, values); return values
 end})
 -- INSERT_SOURCES
+-- Minimal stand-in for DemonOfDarknessUI. It records every category, tab and
+-- control so tests can assert per-game isolation without a Roblox client.
+local DOD_LIBRARY_STUB = [==[
+local function NewWindow()
+    local state = {ContentPages = {}, CategoryButtons = {}, ActiveCategory = "General", ActiveTab = nil}
+    local library = {_STATE = state, _Categories = {}, _Tabs = {}, _Controls = {}}
+    function library:CreateCategory(name, icon)
+        self._Categories[name] = true
+        state.CategoryButtons[name] = {button = {Visible = true, IsA = function(_, c) return c == "GuiObject" end}}
+        return {Name = name}
+    end
+    function library:CreateTab(category, name)
+        self._Tabs[#self._Tabs + 1] = {Category = category, Name = name}
+        state.ContentPages[name] = {Visible = true}
+        return {Name = name}
+    end
+    function library:CreateSection(tabName, title, _, _, column)
+        if not state.ContentPages[tabName] then return nil end
+        return {TabName = tabName, Title = title, Column = column}
+    end
+    function library:AddToggle(_, label, default, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "toggle", Label = label, Callback = callback}
+        return {Kind = "toggle", Value = default}
+    end
+    function library:AddSlider(_, label, min, max, default, _, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Callback = callback}
+        return {Kind = "slider", Value = default}
+    end
+    function library:AddDropdown(_, label, options, index, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback}
+        return {Kind = "dropdown", Value = options[index]}
+    end
+    function library:AddButton(_, label, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "button", Label = label, Callback = callback}
+        return {Kind = "button"}
+    end
+    function library:AddTextbox(_, label, _, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "textbox", Label = label, Callback = callback}
+        return {Kind = "textbox", Value = ""}
+    end
+    function library:AddParagraph(_, title, body)
+        library._Controls[#library._Controls + 1] = {Kind = "paragraph", Title = title, Body = body}
+        return {Kind = "paragraph"}
+    end
+    function library:Notify(title, message) library.Notifications = library.Notifications or {}; library.Notifications[#library.Notifications + 1] = {title, message} end
+    function library:SetActiveCategory(category, tab) state.ActiveCategory = category; state.ActiveTab = tab end
+    function library:Destroy() library.Destroyed = true end
+    return library
+end
+return {new = function() return NewWindow() end}
+]==]
 local function sandbox(placeId, gameId)
     local player = Instance.new("Player")
     player.CharacterAdded, player.CharacterRemoving, player.CameraMaxZoomDistance = signal(), signal(), 128
     player.Idled = signal()
+    player.ChildAdded, player.ChildRemoved = signal(), signal()
     local players = {LocalPlayer=player, PlayerAdded=signal(), PlayerRemoving=signal()}
     function players:GetPlayers() return {player} end
     function players:GetPlayerFromCharacter(character)
@@ -164,6 +244,16 @@ local function sandbox(placeId, gameId)
         Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting={},
         ReplicatedStorage=Instance.new("ReplicatedStorage"), TextChatService=Instance.new("TextChatService"), HttpService={}}
     services.Workspace.CurrentCamera = {CFrame = CFrame.new(0, 0, 0)}
+    -- Workspace/instance container signals the feature modules connect to.
+    services.Workspace.ChildAdded = signal()
+    services.Workspace.ChildRemoved = signal()
+    services.Workspace.DescendantAdded = signal()
+    services.Workspace.DescendantRemoving = signal()
+    -- ReplicatedStorage.Events holder that several games resolve remotes from.
+    local events = Instance.new("Folder"); events.Name = "Events"; events.Parent = services.ReplicatedStorage
+    -- Workspace physics/query surface used by prediction and movement features.
+    services.Workspace.Gravity = 196.2
+    function services.Workspace:Raycast() return nil end
     local context = {State={}, Logs={}, Requests={}, Responses={}, Deferred={}, Spawned={}, Services=services, Player=player}
     local game = {PlaceId=placeId or 1, GameId=gameId or 2, JobId="job"}
     function game:GetService(name) return assert(services[name], "Unexpected service " .. name) end
@@ -171,10 +261,16 @@ local function sandbox(placeId, gameId)
     function game:HttpGet(url)
         context.Requests[#context.Requests + 1] = url
         assert(not url:find("src/ui/", 1, true), "Frontend download attempted")
+        -- The Demon UI wrapper prefers the vendored library; the test double
+        -- stands in for it so the wrapper can build a window without a client.
+        if url:find("demon-of-darkness-ui", 1, true) or url:find("DemonOfDarknessUI", 1, true) then
+            return DOD_LIBRARY_STUB
+        end
         local path = url:gsub("^https://raw.githubusercontent.com/glowpkj/DepHub/main/", ""):gsub("%?.*$", "")
         return assert(context.Responses[path], "Unexpected HTTP: " .. path)
     end
     local env = setmetatable({game=game, workspace=services.Workspace, Color3=Color3, Vector3=Vector3, CFrame=CFrame, typeof=typeof, Instance=Instance, Enum=Enum,
+        UDim=UDim, UDim2=UDim2, ColorSequence=ColorSequence, NumberSequence=NumberSequence, RaycastParams=RaycastParams,
         getgenv=function() return context.State end, identifyexecutor=function() return "Test" end,
         print=function(message) context.Logs[#context.Logs + 1] = tostring(message) end,
         warn=function(message) context.Logs[#context.Logs + 1] = tostring(message) end,
@@ -196,8 +292,30 @@ local function sandbox(placeId, gameId)
         self.Responses[path] = 'return _provided[' .. string.format('%q', path) .. ']'
         env._provided[path] = value
     end
+    -- Install the Demon UI wrapper as the shared frontend (context.State.UI)
+    -- and hand back the recorded library so tests can inspect which categories,
+    -- tabs and controls a backend registered.
+    function context:MountUI(options)
+        options = options or {}
+        local demon = env.loadstring(sources['src/core/demon-ui.lua'])()
+        local window = demon.new({
+            Name = 'DepHub',
+            Version = 'test',
+            Mode = options.Mode or 'Universal',
+            Categories = options.Categories
+        })
+        self.State.__DEPHUB = self.State.__DEPHUB or {}
+        self.State.__DEPHUB.UI = window
+        return window, window.Library
+    end
     env._provided = {}
     context.Env = env
+    -- Core modules that the loader always fetches are served straight from the
+    -- bundled sources unless a test overrides them, so a loader run only needs
+    -- to provide its game backend.
+    for path, source in pairs(sources) do
+        if context.Responses[path] == nil then context.Responses[path] = source end
+    end
     -- Vendored Blox Fruits modules read their globals from the shared
     -- environment (getgenv), not from chunk-locals, so publish the same runtime
     -- table a real executor's module would see.

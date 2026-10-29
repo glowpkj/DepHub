@@ -1,5 +1,6 @@
 do
     local ctx=sandbox()
+    ctx.State.__DEPHUB_FORCE_UNIVERSAL = true
     ctx.Responses["src/version.txt"]="0.0.37"
     local backend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
     ctx:Provide("src/games/universal.lua",backend)
@@ -16,6 +17,7 @@ end
 
 do
     local ctx=sandbox()
+    ctx.State.__DEPHUB_FORCE_UNIVERSAL = true
     ctx.Responses["src/version.txt"]="0.0.37"
     local backend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
     ctx:Provide("src/games/universal.lua",backend)
@@ -23,6 +25,25 @@ do
     check(ctx:Run("DepHub.lua")==true,"loader succeeds without any frontend module")
     check(ctx.State.__DEPHUB.Frontend==nil and ctx.State.__DEPHUB.Window==nil,"loader no longer publishes a frontend handle")
     check(ctx.State.__DEPHUB.Mode=="Universal" and ctx.State.__DEPHUB.Backend==backend,"loader exposes mode and backend for the new library")
+end
+
+do
+    -- Unknown game: the loader must show a safe, informative state and never
+    -- silently run a backend (in particular not Blox Fruits or Universal).
+    local ctx=sandbox(1234567890, 1234567890)
+    ctx.Responses["src/version.txt"]="0.0.37"
+    check(ctx:Run("DepHub.lua")==true,"unknown game still completes the loader run")
+    check(ctx.State.__DEPHUB_LOADER_STATE.status=="unsupported","unknown game records the unsupported state")
+    check(ctx.State.__DEPHUB.Mode=="Unsupported" and ctx.State.__DEPHUB.Backend==nil,"unknown game loads no backend")
+    check(ctx.State.__DEPHUB.BloxFruits==nil and ctx.State.__DEPHUB.Universal==nil,"unknown game is not handed Blox Fruits or Universal")
+end
+
+do
+    -- Universal is opt-in only: without the flag the same place stays unsupported.
+    local ctx=sandbox(1234567890, 1234567890)
+    ctx.Responses["src/version.txt"]="0.0.37"
+    ctx:Run("DepHub.lua")
+    check(ctx.State.__DEPHUB.Mode=="Unsupported","Universal is not a silent fallback")
 end
 
 do

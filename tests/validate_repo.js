@@ -101,16 +101,17 @@ for (const retired of ['src/games/features/volleyballlegends', 'src/games/featur
   if (exists(retired)) fail('Retired directory still exists: ' + retired);
 }
 
-// Game backends must stay presentation-free: they may not build UI. The
-// frontend has been removed entirely, so only src/games is checked here.
-const xmlUi = /CreateTab|CreateSection|CreateToggle\b|Library\.new|dephubCompact|dephubViolenceDistrict|library\//;
+// Game backends own their presentation through the shared Demon UI wrapper
+// (env.__DEPHUB.UI). What must never come back is the retired third-party
+// library, the removed in-repo frontend, or the old panel/module hosts.
+const retiredUi = /Library\.new|dephubCompact|dephubViolenceDistrict|library\/|frontend\.lua|CreateUI|MountUI|CreatePrompt/;
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
     const file = path.join(dir, entry.name);
     if (entry.isDirectory()) walk(file);
     else if (entry.name.endsWith('.lua')) {
       const source = fs.readFileSync(file, 'utf8');
-      if (xmlUi.test(source)) {
+      if (retiredUi.test(source)) {
         fail('Backend still depends on a retired frontend/library: ' + path.relative(root, file));
       }
     }

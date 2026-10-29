@@ -715,4 +715,35 @@ function State:Destroy()
 end
 
 State:Start()
+
+local UI = (env.__DEPHUB or {}).UI
+if type(UI) == "table" and type(UI.CreateTab) == "function" then
+    local tabs = {}
+    local function section(tabName, sectionName, column)
+        local tab = tabs[tabName]
+        if not tab then
+            tab = UI:CreateTab(tabName, "All")
+            tabs[tabName] = tab
+        end
+        if not tab then return nil end
+        return tab:CreateSection(sectionName, column or "Left")
+    end
+    local function notify(message)
+        if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", message) end
+    end
+
+    local predict = section("Ball Predict", "Previsão da bola", "Left")
+    if predict then
+        predict:CreateToggle("Ball Predict", State.Toggles.BallPredict, function(v) State:SetToggle("BallPredict", v) end)
+        predict:CreateDropdown("Modo", State.Modes, State.Mode, function(v)
+            if State:SetMode(v) then
+                notify("Modo " .. tostring(v) .. " selecionado.")
+            else
+                notify("Modo inválido.")
+            end
+        end)
+        predict:CreateParagraph("Como funciona", "Personal prevê a bola do próprio jogador; Match cobre as equipes; Future ainda não está configurado.")
+    end
+end
+
 return State

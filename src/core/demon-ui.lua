@@ -3,10 +3,54 @@ DemonUI.__index = DemonUI
 
 local LIBRARY_URL = "https://raw.githubusercontent.com/rapzxcwxcorparation/DemonOfDarknessUI/refs/heads/main/DOD.luau"
 
+-- Fallback category profiles, used only when the loader does not pass an
+-- explicit profile. The loader derives the authoritative profile from
+-- src/core/ui-profile.lua and passes it in as options.Categories, so a game can
+-- never register another game's categories. Blox Fruits is the only mode with
+-- sea categories; every other mode falls back to the single "General".
+local DEFAULT_CATEGORIES = {"General"}
+local CATEGORY_PROFILES = {
+    BloxFruits = {"General", "Sea 1", "Sea 2", "Sea 3", "Sea 1/2", "Sea 2/3"}
+}
+
+local function profileFor(mode)
+    return CATEGORY_PROFILES[mode] or DEFAULT_CATEGORIES
+end
+
+-- The library is vendored so a bundled build stays self-contained. Prefer the
+-- vendored copy through the shared resolver; only fall back to the network when
+-- no local copy is reachable (e.g. a raw source checkout that predates it).
+local LIBRARY_PATHS = {
+    "src/core/vendor/demon-of-darkness-ui.luau",
+    "src/core/vendor/demon-of-darkness-ui.lua"
+}
+
+local function fetchVendored()
+    local env = type(getgenv) == "function" and getgenv() or _G
+    local resolver = (type(env.__dephubHttpGet) == "function" and env.__dephubHttpGet)
+        or (type(env.__DEPHUB_HTTP_GET) == "function" and env.__DEPHUB_HTTP_GET)
+        or (type(_G.__dephubHttpGet) == "function" and _G.__dephubHttpGet)
+        or (type(_G.__DEPHUB_HTTP_GET) == "function" and _G.__DEPHUB_HTTP_GET)
+    local base = (env.__DEPHUB and env.__DEPHUB.SourceBaseURL) or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+    for _, path in ipairs(LIBRARY_PATHS) do
+        if resolver then
+            local ok, source = pcall(resolver, base .. path)
+            if ok and type(source) == "string" and #source > 0 then return source end
+        end
+        local ok, source = pcall(function() return game:HttpGet(base .. path) end)
+        if ok and type(source) == "string" and #source > 0 then return source end
+    end
+    return nil
+end
+
 local function loadLibrary()
-    local ok, source = pcall(function() return game:HttpGet(LIBRARY_URL) end)
-    if not ok or type(source) ~= "string" or #source == 0 then
-        error("Falha ao baixar DemonOfDarknessUI: " .. tostring(source))
+    local source = fetchVendored()
+    if not source then
+        local ok, remote = pcall(function() return game:HttpGet(LIBRARY_URL) end)
+        if ok and type(remote) == "string" and #remote > 0 then source = remote end
+    end
+    if type(source) ~= "string" or #source == 0 then
+        error("Falha ao baixar DemonOfDarknessUI: nenhuma copia local ou remota disponivel")
     end
     local chunk, compileError = loadstring(source)
     if not chunk then error("Falha ao compilar DemonOfDarknessUI: " .. tostring(compileError)) end
@@ -40,6 +84,7 @@ end
 function DemonUI.new(options)
     options = options or {}
     local export = loadLibrary()
+    local mode = options.Mode or "Universal"
     local library = export.new({
         Title = options.Name or "DepHub",
         Version = options.Version or "0.0.56",
@@ -60,16 +105,13 @@ function DemonUI.new(options)
         Tabs = {},
         Categories = {},
         CurrentSea = "Sea1",
+        Mode = mode,
         Destroyed = false
     }, DemonUI)
-    local categories = options.Mode == "BloxFruits"
-        and {"General", "Sea 1", "Sea 2", "Sea 3", "Sea 1/2", "Sea 2/3"}
-        or {"General"}
-    for _, category in ipairs(categories) do
+    for _, category in ipairs(options.Categories or profileFor(mode)) do
         library:CreateCategory(category, "layers")
         self.Categories[category] = true
     end
-    self.Mode = options.Mode or "Game"
     return self
 end
 
@@ -78,14 +120,13 @@ function DemonUI:CreateTab(name, sea)
     name = tostring(name)
     local category = categoryFor(sea, self.Mode)
     local ok, result = pcall(function() self.Library:CreateTab(category, name) end)
-    local tabExists = self.Library._STATE
-        and self.Library._STATE.ContentPages
-        and self.Library._STATE.ContentPages[name] ~= nil
+    local state = self.Library._STATE
+    local tabExists = state and state.ContentPages and state.ContentPages[name] ~= nil
     if not ok or not tabExists then
         self.Library:Notify("DepHub", "Falha ao criar aba " .. name .. ": " .. tostring(result), "error")
         return nil
     end
-    local record = {Adapter = self, Name = name, Category = category, Key = category .. "|" .. name, Control = self.Library._STATE.ContentPages[name], Sections = {}, Visible = true}
+    local record = {Adapter = self, Name = name, Category = category, Key = category .. "|" .. name, Control = state.ContentPages[name], Sections = {}, Visible = true}
     function record:CreateSection(title, column)
         title = tostring(title or self.Name)
         if self.Sections[title] then return self.Sections[title] end
@@ -137,8 +178,10 @@ end
 
 function DemonUI:_refreshVisibility()
     if self.Destroyed then return end
+    local state = self.Library._STATE
+    if type(state) ~= "table" then return end
     local sea = normalizeSea(self.CurrentSea)
-    for category, data in pairs(self.Library._STATE.CategoryButtons or {}) do
+    for category, data in pairs(state.CategoryButtons or {}) do
         local visible = category == "General"
         if category == "Sea 1" then visible = sea == "Sea1" end
         if category == "Sea 2" then visible = sea == "Sea2" end
@@ -155,17 +198,17 @@ function DemonUI:_refreshVisibility()
     end
     for _, tab in pairs(self.Tabs) do
         if not tab.Visible then
-            local page = self.Library._STATE.ContentPages and self.Library._STATE.ContentPages[tab.Name]
+            local page = state.ContentPages and state.ContentPages[tab.Name]
             if page then page.Visible = false end
         end
     end
-    local activeCategory = self.Library._STATE.ActiveCategory
-    local activeTab = self.Library._STATE.ActiveTab
+    local activeCategory = state.ActiveCategory
+    local activeTab = state.ActiveTab
     local activeData = activeTab and (self.Tabs[tostring(activeCategory or "General") .. "|" .. activeTab] or self.Tabs[activeTab])
     if activeData and not activeData.Visible then
         pcall(function() self.Library:SetActiveCategory("General", "Home") end)
     elseif activeCategory and activeCategory ~= "General" then
-        local catData = self.Library._STATE.CategoryButtons and self.Library._STATE.CategoryButtons[activeCategory]
+        local catData = state.CategoryButtons and state.CategoryButtons[activeCategory]
         if catData and catData.button and not catData.button.Visible then
             pcall(function() self.Library:SetActiveCategory("General", "Info") end)
         end

@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.56"
+local VERSION = "0.0.57"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -247,16 +247,46 @@ local targets = {
 
 local gameName = tostring(game.Name or ""):lower()
 local isAOTRName = gameName:find("attack on titan") ~= nil and gameName:find("revolution") ~= nil
-local target = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "src/games/aotr.lua", AOTR = true}) or {Core = "src/games/universal.lua", Universal = true}
+-- A known place/game id wins. The AOT:R name check is a documented fallback for
+-- its newer universe. Universal is opt-in only (env.__DEPHUB_FORCE_UNIVERSAL),
+-- so an unknown game is never silently handed a backend it was not built for.
+local knownTarget = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "src/games/aotr.lua", AOTR = true}) or nil
+if not knownTarget and env.__DEPHUB_FORCE_UNIVERSAL == true then
+    knownTarget = {Core = "src/games/universal.lua", Universal = true}
+end
 if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait()
+
+-- Resolve the explicit visual mode from the target so the categories and the
+-- backend are always chosen together. Unknown games resolve to Universal, but
+-- only the safe window below is ever shown for them.
+local okProfile, profile = loadModule("src/core/ui-profile.lua", false)
+local profileModule = (okProfile and type(profile) == "table") and profile or nil
+local function resolveMode(target)
+    if profileModule and type(profileModule.modeForTarget) == "function" then
+        return profileModule.modeForTarget(target)
+    end
+    return target and target.Core == "src/games/bloxfruits.lua" and "BloxFruits" or "Universal"
+end
+local function resolveCategories(mode)
+    if profileModule and type(profileModule.categoriesFor) == "function" then
+        return profileModule.categoriesFor(mode)
+    end
+    return mode == "BloxFruits" and {"General", "Sea 1", "Sea 2", "Sea 3", "Sea 1/2", "Sea 2/3"} or {"General"}
+end
 
 local okDemon, demonModule = loadModule("src/core/demon-ui.lua", false)
 if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "function" then
     return fail("DemonOfDarknessUI nao carregou: " .. tostring(demonModule))
 end
 
-local okWindow, window = pcall(demonModule.new, {Name = "DepHub", Version = VERSION, Mode = target.Core == "src/games/bloxfruits.lua" and "BloxFruits" or "Game"})
+local mode = resolveMode(knownTarget)
+local okWindow, window = pcall(demonModule.new, {
+    Name = "DepHub",
+    Version = VERSION,
+    Mode = mode,
+    Categories = resolveCategories(mode)
+})
 if not okWindow or type(window) ~= "table" then
     return fail("Nao foi possivel iniciar DemonOfDarknessUI: " .. tostring(window))
 end
@@ -264,6 +294,30 @@ end
 env.__DEPHUB.DemonUI = window
 env.__DEPHUB.UI = window
 
+-- Unknown game: keep the window, tell the player the place is unsupported and
+-- stop. No backend is loaded, so no incompatible features can run.
+if not knownTarget then
+    pcall(function()
+        local tab = window:CreateTab("Incompativel")
+        if tab then
+            local section = tab:CreateSection("Estado", "Left")
+            if section then
+                section:CreateParagraph("Jogo nao reconhecido",
+                    "O DepHub nao tem suporte para este lugar.\nPlaceId: " .. placeId ..
+                    "\nGameId: " .. gameId .. "\nNenhum script foi carregado.")
+            end
+        end
+    end)
+    env.__DEPHUB.Mode = "Unsupported"
+    env.__DEPHUB.Backend = nil
+    env[EXECUTED_KEY] = true
+    env[STATE_KEY].status = "unsupported"
+    env[STATE_KEY].finishedAt = os.clock()
+    log("Jogo nao reconhecido - PlaceId " .. placeId .. " / GameId " .. gameId)
+    return true
+end
+
+local target = knownTarget
 local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then
     return fail("Core " .. tostring(target.Core) .. " falhou: " .. tostring(coreResult))
@@ -289,17 +343,18 @@ env.__DEPHUB.AOTR = isAOTR and coreResult or nil
 env.__DEPHUB.NoobPiece = isNoobPiece and coreResult or nil
 env.__DEPHUB.Volleyball42 = isVolleyball42 and coreResult or nil
 
-local mode
 local backend
-if target.Universal then mode = "Universal" backend = coreResult
-elseif isRT3 then mode = "RT3" backend = env.__DEPHUB.Runtime
-elseif isTSB then mode = "TSB" backend = coreResult
-elseif isMM2 then mode = "MM2" backend = coreResult
-elseif isAOTR then mode = "AOTR" backend = coreResult
-elseif isNoobPiece then mode = "NoobPiece" backend = coreResult
-elseif isVolleyball42 then mode = "Volleyball42" backend = coreResult
-else mode = "BloxFruits" backend = coreResult end
+if target.Universal then backend = coreResult
+elseif isRT3 then backend = env.__DEPHUB.Runtime
+elseif isTSB then backend = coreResult
+elseif isMM2 then backend = coreResult
+elseif isAOTR then backend = coreResult
+elseif isNoobPiece then backend = coreResult
+elseif isVolleyball42 then backend = coreResult
+else backend = coreResult end
 
+-- `mode` was already resolved from the target and used to build the window, so
+-- the backend and the visual profile always agree.
 env.__DEPHUB.Mode = mode
 env.__DEPHUB.Backend = backend
 
