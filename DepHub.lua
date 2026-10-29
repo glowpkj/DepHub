@@ -309,9 +309,9 @@ env.__DEPHUB.Backend = backend
 
 if env[STATE_KEY] ~= session then return false end
 
-local okUILibrary, uiLibrary = loadModule("src/core/nebulatech.lua", false)
-if okUILibrary and type(uiLibrary) == "table" and type(uiLibrary.new) == "function" then
-    env.__DEPHUB.UILibrary = uiLibrary
+local okUILibrary, uiModule = loadModule("src/core/nebulatech.lua", false)
+if okUILibrary and type(uiModule) == "table" and type(uiModule.new) == "function" then
+    env.__DEPHUB.UILibrary = uiModule
 end
 
 -- The shared NebulaTech library is loaded once and used by the common frontend
