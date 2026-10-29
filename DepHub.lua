@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.39"
+local VERSION = "0.0.40"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -43,7 +43,7 @@ local BACKEND_KEYS = {
 -- Window/UIGuard are legacy names from the removed frontend: kept so a session
 -- started by an older version is fully cleaned up when the loader runs again.
 local HANDLE_KEYS = {
-    "Updater", "Window", "UIGuard", "TempUI", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
+    "Updater", "Window", "UIGuard", "TempUI", "UI", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
 }
 
 -- Legacy globals that older revisions wrote directly to the shared environment.
@@ -79,6 +79,8 @@ local function cleanupRuntime()
             state[key] = nil
         end
         state.Frontend = nil
+        state.UILibrary = nil
+        state.UI = nil
     end
 
     for _, key in ipairs(LEGACY_GLOBALS) do
@@ -307,9 +309,13 @@ env.__DEPHUB.Backend = backend
 
 if env[STATE_KEY] ~= session then return false end
 
--- Temporary UI: a minimal panel bound to the backend, so features can be
--- toggled while the proper frontend does not exist. Failure/missing module is
--- not an error (headless runs, partial deployments).
+local okUILibrary, uiLibrary = loadModule("src/core/nebulatech.lua", false)
+if okUILibrary and type(uiLibrary) == "table" and type(uiLibrary.new) == "function" then
+    env.__DEPHUB.UILibrary = uiLibrary
+end
+
+-- The shared NebulaTech library is loaded once and used by the common frontend
+-- for every game backend. UI loading remains optional for headless executors.
 local okTempUI, tempUIModule = loadModule("src/core/temp-ui.lua", false)
 if okTempUI and type(tempUIModule) == "table" and type(tempUIModule.Mount) == "function" then
     local okMount, tempUI = pcall(tempUIModule.Mount, env)
