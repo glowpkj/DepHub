@@ -251,24 +251,44 @@ function DepHub.new(config)
         if self.SetVisible then self.SetVisible(false) end
     end)
 
-    local dragging, dragInput, dragStart, startPosition
-    tabbar.InputBegan:Connect(function(input)
+    local dragging = false
+    local dragStart = nil
+    local startPosition = nil
+
+    local function inDragArea(position)
+        local p = tabbar.AbsolutePosition
+        local s = tabbar.AbsoluteSize
+        return position.X >= p.X and position.X <= p.X + s.X - 42
+            and position.Y >= p.Y and position.Y <= p.Y + s.Y
+    end
+
+    self.Connections[#self.Connections + 1] = UserInputService.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true
-            dragStart = input.Position
-            startPosition = main.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
+            if main.Visible and inDragArea(input.Position) then
+                dragging = true
+                dragStart = input.Position
+                startPosition = main.Position
+            end
+        elseif input.KeyCode == Enum.KeyCode.LeftControl then
+            setVisible(not visible)
         end
     end)
-    tabbar.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
-    end)
+
     self.Connections[#self.Connections + 1] = UserInputService.InputChanged:Connect(function(input)
-        if dragging and input == dragInput then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
-            main.Position = UDim2.new(startPosition.X.Scale, startPosition.X.Offset + delta.X, startPosition.Y.Scale, startPosition.Y.Offset + delta.Y)
+            main.Position = UDim2.new(
+                startPosition.X.Scale,
+                startPosition.X.Offset + delta.X,
+                startPosition.Y.Scale,
+                startPosition.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    self.Connections[#self.Connections + 1] = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
         end
     end)
 
@@ -279,9 +299,6 @@ function DepHub.new(config)
         floating.Visible = not visible
     end
     floating.Activated:Connect(function() setVisible(true) end)
-    self.Connections[#self.Connections + 1] = UserInputService.InputBegan:Connect(function(input, processed)
-        if input.KeyCode == Enum.KeyCode.LeftControl then setVisible(not visible) end
-    end)
     self.SetVisible = setVisible
 
     function self:CreateTab(tabName)
