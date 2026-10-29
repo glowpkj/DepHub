@@ -126,19 +126,19 @@ function M.init(Core, UI)
 
     local page = UI.page("Player")
 
-    UI.toggle(page, "Player ESP", "Highlight players and show distance", true, function(s) M.setESP(s) end)
+    UI.toggle(page, "Player ESP", "Highlight players and show distance", false, function(s) M.setESP(s) end)
 
     UI.section(page, "MOBILITY")
     UI.toggle(page, "NoClip", "Walk through walls", false, function(s) M.config.noclip = s end)
-    UI.toggle(page, "Walk on Water", "Invisible platform over water", true, function(s) M.config.walkWater = s end)
+    UI.toggle(page, "Walk on Water", "Invisible platform over water", false, function(s) M.config.walkWater = s end)
     UI.toggle(page, "Speed boost", "Faster walk speed", false, function(s) M.config.speedOn = s end)
     UI.slider(page, "Walk speed", "Speed value", 16, 300, M.config.walkSpeed, function(v) M.config.walkSpeed = v end)
     UI.toggle(page, "Super jump", "Higher jump", false, function(s) M.config.jumpOn = s end)
     UI.slider(page, "Jump power", "Jump value", 50, 500, M.config.jumpPower, function(v) M.config.jumpPower = v end)
 
     UI.section(page, "HAKI")
-    UI.toggle(page, "Auto Ken", "Keep Observation Haki on (must be unlocked)", true, function(s) M.setKen(s) end)
-    UI.toggle(page, "Auto Buso", "Keep Armament Haki on (must be unlocked)", true, function(s) M.setBuso(s) end)
+    UI.toggle(page, "Auto Ken", "Keep Observation Haki on (must be unlocked)", false, function(s) M.setKen(s) end)
+    UI.toggle(page, "Auto Buso", "Keep Armament Haki on (must be unlocked)", false, function(s) M.setBuso(s) end)
 
     UI.section(page, "UTILITY")
     UI.toggle(page, "Anti-AFK", "Prevent the 20-min idle kick (on by default)", true, function(s) M.setAntiAfk(s) end)
