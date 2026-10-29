@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T02:31:01.942Z",
-  "commit": "local",
+  "generatedAt": "2026-10-29T02:46:45.116810+00:00",
+  "commit": "db1753e96943f6e7239c5134470855c421e16be6",
   "version": "0.0.38",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "ae0e3eeb3006264156ed9db2c59be02fb5cce2f8a0ff0509f5adbf850435ae01",
-      "commit": "local",
+      "commit": "db1753e96943f6e7239c5134470855c421e16be6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,7 +26,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "ced03e88c518df481729b0b49b3b1f8b82b8cf459881cefe2b6279b758a053a7",
-      "commit": "local",
+      "commit": "db1753e96943f6e7239c5134470855c421e16be6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -53,7 +53,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "a1c1eb656e4d552360f27e4b91d19cbeaddd8d7a5c4abd5681a716a3148f47bf",
-      "commit": "local",
+      "commit": "db1753e96943f6e7239c5134470855c421e16be6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -70,7 +70,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "8d0ffcb19e145f87eaa88570b516a34a1523200b6983a49ec3f260c98b4519ba",
-      "commit": "local",
+      "commit": "db1753e96943f6e7239c5134470855c421e16be6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -92,7 +92,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "eddde0bf8846c177671bdc485a16f4bdfc5616747a70402bc1e6ec8ab50d1e7d",
-      "commit": "local",
+      "commit": "db1753e96943f6e7239c5134470855c421e16be6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -119,7 +119,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "0a20625d88d56b7f4096fc73dcb59a493d27d994bf47f278389292cf2ab7663a",
-      "commit": "local",
+      "commit": "db1753e96943f6e7239c5134470855c421e16be6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -144,7 +144,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "394d8811790814f47e41961e3920762eaf71a1c3022c837a53bc48afd64d5953",
-      "commit": "local",
+      "commit": "db1753e96943f6e7239c5134470855c421e16be6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -156,5 +156,41 @@
       ]
     }
   },
-  "recentUpdates": []
+  "recentUpdates": [
+    {
+      "Version": "db1753e",
+      "Date": "2026-10-28T23:46:33-03:00",
+      "Changes": [
+        "refactor(ui): consolidate temporary interface"
+      ]
+    },
+    {
+      "Version": "910b3dc",
+      "Date": "2026-10-22T21:11:31-03:00",
+      "Changes": [
+        "fix(ui): fiel INTRO.html, hotkey Insert, painel visivel e handoff"
+      ]
+    },
+    {
+      "Version": "3a3cde0",
+      "Date": "2026-10-22T20:49:57-03:00",
+      "Changes": [
+        "feat(ui): v2 Rayfield-style frontend + intro animation"
+      ]
+    },
+    {
+      "Version": "e899954",
+      "Date": "2026-10-18T23:06:07-03:00",
+      "Changes": [
+        "fix: publish bundled HttpGet resolver to the shared environment"
+      ]
+    },
+    {
+      "Version": "fd45baf",
+      "Date": "2026-10-18T22:52:37-03:00",
+      "Changes": [
+        "fix: support executors without a writable game.HttpGet member"
+      ]
+    }
+  ]
 }
