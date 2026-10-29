@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T17:44:21.644308+00:00",
-  "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
-  "version": "0.0.43",
+  "generatedAt": "2026-10-29T17:44:42.282613+00:00",
+  "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
+  "version": "0.0.44",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "c5e79b8ce40aa2dd2b6fd65939825b73d6f386e584cdc4f2ff44ca30a92d3660",
-      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
+      "version": "73a6756ff4579c0041070a2d4e0b4a52134b8000071d4bb0d06e74bfbe0fb19a",
+      "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,8 +26,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "79c223188a14adf1d892e1307c5644303c9c8518de8c8071438879b4abcbab29",
-      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
+      "version": "ae40df441bce48c5b708e176c1a26434b4eeb4a466e46ebfe33a376bcf4000f2",
+      "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "fce076986969ad43946631c1e4435720bcd721f5281a6e12a1f7dae420a2f448",
-      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
+      "version": "56028b956ab10a62b1306c41eab343502e827fb610e934f029227f2ae6fad096",
+      "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -66,8 +66,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "10f234a3de0ca0aa69a03e8a9d6ef23b5b3d9168aad7ee1721dafe038545a773",
-      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
+      "version": "903bb7521378e2183dbcaa97bea817751e255b85faf55ceb12d4d27a71cc87f0",
+      "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -84,8 +84,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "30c141f502f563840fbcae06f408d66c3bddaeb34b9f1f0301ac5715756e2455",
-      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
+      "version": "6d0954ea9c33e6e207070af2c7f1b2936612c29dcba3413d2b2d66fb86d4db00",
+      "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -107,8 +107,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "e99bf4f6f3bea3c06e9fe05c42c5f3f5e6da24694979b689187df27c4daefd3a",
-      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
+      "version": "87b1f31197fdb57b6c6acfb9d586ee52a0a536e26b8c7171a0836fd9077e8869",
+      "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,8 +133,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "a8126aa62e4a12f17f1b0b00fef9855c1d4f711f1964e739e271714ad6559fd9",
-      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
+      "version": "0fb3f7b14facb68a12eab73aecac8a74f23b0b69167943309d0876bc7c31c303",
+      "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "8935e1a29d64b3caefce57c667e7c710fbc97521b42f73241abf88a1d73c182e",
-      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
+      "version": "cef1d101d2971603f82eeff798a9b23dacae6f20453f300085dafb2ce37f8ecf",
+      "commit": "20e277005d9531d125135d49d5de593a70d88c4d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -174,6 +174,20 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "20e2770",
+      "Date": "2026-10-29T14:44:32-03:00",
+      "Changes": [
+        "chore(release): update remote version to 0.0.44"
+      ]
+    },
+    {
+      "Version": "a984c40",
+      "Date": "2026-10-29T14:44:27-03:00",
+      "Changes": [
+        "chore(release): bump DepHub to 0.0.44"
+      ]
+    },
     {
       "Version": "d682b82",
       "Date": "2026-10-29T14:44:12-03:00",
@@ -193,20 +207,6 @@
       "Date": "2026-10-29T14:43:56-03:00",
       "Changes": [
         "fix(ui): improve control hotkey and window dragging"
-      ]
-    },
-    {
-      "Version": "7b885a7",
-      "Date": "2026-10-29T14:41:27-03:00",
-      "Changes": [
-        "fix(ui): restore LeftControl visibility toggle"
-      ]
-    },
-    {
-      "Version": "67792e9",
-      "Date": "2026-10-29T13:49:53-03:00",
-      "Changes": [
-        "fix(ui): restore controls when backend rejects changes"
       ]
     }
   ]
