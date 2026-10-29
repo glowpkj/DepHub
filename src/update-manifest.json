@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T21:38:01.411Z",
-  "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+  "generatedAt": "2026-10-29T21:38:20.344423+00:00",
+  "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
   "version": "0.0.68",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "e83ac6fa768f309fd6e4d64f55686128e23c161735065c1715dc6bfeec703d3b",
-      "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+      "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "6522a50dc05b7c205fd02d06a66b0cc068560a07cbeba6d8b1f3f82a04a4b580",
-      "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+      "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -55,7 +55,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "78db32bfaa2e430cf6f8bc6fb81de1e306c890e3cf9b71de9e7d32104ba035cd",
-      "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+      "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -70,7 +70,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "6746be62b859ee21c60482101f5b38128e1aa6194f22bc98bac3db20788e7b07",
-      "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+      "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -89,7 +89,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "d21de89aa3fcd81eedd3796ce5bf9c77f736d9b8a0ac66dac03e1a3da134ab53",
-      "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+      "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -113,7 +113,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "ea261ddfe14ef019a0dad4a09ab90c9d71753797cf2bf5cc9b3698c65ce1cd29",
-      "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+      "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -140,7 +140,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "7a359ad651a879f89ffae510e741bac721f7a02bbe342571547fe2185a3d30f7",
-      "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+      "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -167,7 +167,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "80d9fcc63b3815da50ee307be983c36de05a693626fd1a6c152c7d29a2eff6be",
-      "commit": "1ceb2ab719b33edd1a47f0b4e934cea2c7f91573",
+      "commit": "7ac583b793d87ed8c22ceab9fb65edbf72247d4e",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -186,6 +186,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "7ac583b",
+      "Date": "2026-10-29T18:38:08-03:00",
+      "Changes": [
+        "Cache-bust module fetches so a stale executor HttpGet cache cannot serve old source"
+      ]
+    },
     {
       "Version": "9101bc1",
       "Date": "2026-10-29T18:33:58-03:00",
@@ -212,13 +219,6 @@
       "Date": "2026-10-29T18:10:07-03:00",
       "Changes": [
         "Live Debug console: streaming log, live metrics, hooks, remote sniffer and terminal commands"
-      ]
-    },
-    {
-      "Version": "d3872e9",
-      "Date": "2026-10-29T17:55:00-03:00",
-      "Changes": [
-        "Add a shared Debug tab for diagnostics in every game"
       ]
     }
   ]
