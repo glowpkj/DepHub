@@ -255,13 +255,17 @@ function M.init(Core, UI)
     UI.button(page, "Teleport to event", "Go to the active sea event", function() M.teleportEvent() end)
     UI.button(page, "Pull nearby levers / prompts", "Fire ProximityPrompts within 60 studs", function() M.pullLevers() end)
     UI.button(page, "Server hop", "Rejoin the game (find another server)", function() M.serverHop() end)
+    if UI._controls["Raids/Events / Server hop"] then UI._controls["Raids/Events / Server hop"].sea = "All" end
 
     UI.section(page, "ELITE HUNTER")
     UI.button(page, "Claim Elite Hunter", "Trigger the elite hunter reward/quest", function() M.eliteHunter() end)
+    if UI._controls["Raids/Events / Claim Elite Hunter"] then UI._controls["Raids/Events / Claim Elite Hunter"].sea = "Sea3" end
     UI.button(page, "Elite progress", "Show elite hunter progress", function() M.eliteProgress() end)
+    if UI._controls["Raids/Events / Elite progress"] then UI._controls["Raids/Events / Elite progress"].sea = "Sea3" end
 
     UI.section(page, "LEVIATHAN")
     UI.button(page, "Open Leviathan gate", "Open the leviathan gate (if active)", function() M.leviathanGate() end)
+    if UI._controls["Raids/Events / Open Leviathan gate"] then UI._controls["Raids/Events / Open Leviathan gate"].sea = "Sea3" end
 
     Core.register("events", M)
     return M
