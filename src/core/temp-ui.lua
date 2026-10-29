@@ -175,7 +175,7 @@ function TempUI.Mount(env)
         local session = tab:CreateSection("Sessao")
         if type(backend.Rejoin) == "function" then session:CreateButton("Reentrar", function() pcall(backend.Rejoin, backend) end) end
         if type(backend.ServerHop) == "function" then session:CreateButton("Trocar servidor", function() pcall(backend.ServerHop, backend) end) end
-        session:CreateLabel("Insert abre ou minimiza a interface.")
+        session:CreateLabel("Ctrl esquerdo/direito abre ou minimiza a interface.")
     end
 
     infoTab = renderedTabs.Info and renderedTabs.Info.Tab or window:CreateTab("Info")
