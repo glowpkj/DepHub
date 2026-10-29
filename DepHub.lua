@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.70"
+local VERSION = "0.0.71"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -287,6 +287,63 @@ log("GameId: " .. gameId)
 
 local okVersion, remoteVersion = httpGet("src/version.txt", false)
 if okVersion then env.__DEPHUB.RemoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION end
+
+-- Compare two dotted version strings numerically, segment by segment. Returns
+-- true only when "a" is strictly newer than "b", so an older remote (a test
+-- stub, a branch build, a stale mirror) never triggers a reload.
+local function versionIsNewer(a, b)
+    local function segments(v)
+        local out = {}
+        for part in tostring(v):gmatch("%d+") do out[#out + 1] = tonumber(part) or 0 end
+        return out
+    end
+    local sa, sb = segments(a), segments(b)
+    for i = 1, math.max(#sa, #sb) do
+        local x, y = sa[i] or 0, sb[i] or 0
+        if x ~= y then return x > y end
+    end
+    return false
+end
+
+-- Self-heal for the bootstrap cached by the executor. The loader's own module
+-- fetches carry a per-session cache-bust token, but the bootstrap line a user
+-- pastes (game:HttpGet(BASE_URL .. "DepHub.lua")) has a fixed URL, so an
+-- executor can keep serving the old loader body even after main is bumped --
+-- the running build then lags a whole version behind (old branch behaviour in
+-- game). When the remote version is newer than this build, re-fetch the loader
+-- itself with a fresh token and re-execute it. The guard records the version we
+-- are switching to (in env, which survives the re-execution), so the freshly
+-- loaded build sees the flag matching its own VERSION and does not loop.
+local remV = env.__DEPHUB.RemoteVersion
+if okVersion and type(remV) == "string" and versionIsNewer(remV, VERSION) and env.__DEPHUB_SELF_UPDATE_ATTEMPT ~= remV then
+    env.__DEPHUB_SELF_UPDATE_ATTEMPT = remV
+    log("Versao remota " .. remV .. " difere da local " .. VERSION .. "; recarregando loader.")
+    local token = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
+    local fetched, freshSource = performRequest(BASE_URL .. "DepHub.lua?cb=" .. token)
+    if fetched and type(freshSource) == "string" and #freshSource > 0 then
+        local okCompile, freshChunk = compile(freshSource)
+        if okCompile then
+            -- Retire this session before re-executing: the fresh build runs from
+            -- the top and would otherwise see a "running" session and bail with
+            -- "inicializacao em andamento". Clearing it lets the new build take
+            -- over cleanly; this frame returns right after, so it never resumes.
+            env[STATE_KEY] = nil
+            local okRun, runError = pcall(freshChunk, sourceRef)
+            if okRun then return true end
+            log("Recarga do loader falhou ao executar: " .. tostring(runError))
+        else
+            log("Recarga do loader nao compilou: " .. tostring(freshChunk))
+        end
+    else
+        log("Recarga do loader nao baixou: " .. tostring(freshSource))
+    end
+    -- Fall through: if the reload did not take, run the cached build as before
+    -- rather than leaving the player with nothing. Restore the session that was
+    -- cleared for the reload attempt so this frame can still finish cleanly.
+    env[STATE_KEY] = session
+end
+-- This build is the one the guard was waiting for, so the attempt is complete.
+if env.__DEPHUB_SELF_UPDATE_ATTEMPT == VERSION then env.__DEPHUB_SELF_UPDATE_ATTEMPT = nil end
 
 local targets = {
     ["13379208636"] = {Core = "src/games/aotr.lua", AOTR = true},

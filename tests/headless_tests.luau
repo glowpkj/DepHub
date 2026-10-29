@@ -56,6 +56,52 @@ do
 end
 
 do
+    -- The executor can serve a stale loader body for the fixed bootstrap URL.
+    -- When the remote version is newer than this build, the loader re-fetches
+    -- and re-executes itself once, guarded so it cannot loop.
+    local ctx = sandbox()
+    ctx.Responses["src/version.txt"] = "9.9.9"
+    ctx.Responses["DepHub.lua"] = 'local env=getgenv(); env.__DEPHUB_SELF_UPDATE_STUB_RAN=true; ' ..
+        'env.__DEPHUB_STUB_SEEN_ATTEMPT=env.__DEPHUB_SELF_UPDATE_ATTEMPT; return true'
+    check(ctx:Run("DepHub.lua") == true, "loader self-reload completes")
+    check(ctx.State.__DEPHUB_SELF_UPDATE_STUB_RAN == true, "loader re-fetched and executed the remote build when versions differ")
+    check(ctx.State.__DEPHUB_STUB_SEEN_ATTEMPT == "9.9.9", "self-reload guard is set to the target version before re-execution")
+end
+
+do
+    -- No-loop: if the reloaded body is STILL stale (the executor ignored the
+    -- cache-bust token), the same build must not re-reload itself. The guard
+    -- flag, already set to the target version, makes the second execution fall
+    -- through and run normally instead of reloading again.
+    local ctx = sandbox()
+    ctx.Responses["src/version.txt"] = "9.9.9"
+    ctx.Responses["DepHub.lua"] = ctx.Sources["DepHub.lua"]
+    ctx:Provide("src/games/universal.lua", {})
+    check(ctx:Run("DepHub.lua") == true, "stale reloaded build still completes without looping")
+    -- Exactly one self-reload happened: the guard stopped the second attempt.
+    local reloadFetches = 0
+    for _, url in ipairs(ctx.Requests) do
+        if url:find("/DepHub.lua", 1, true) then reloadFetches += 1 end
+    end
+    check(reloadFetches == 1, "a stale build re-fetches itself only once per session")
+end
+
+do
+    -- Version matches: the loader runs normally and never re-fetches itself,
+    -- so a healthy session is not reloaded on every execution. The remote
+    -- version is read from the loader source so the match is exact.
+    local ctx = sandbox()
+    local localVersion = ctx.Sources["DepHub.lua"]:match('local VERSION = "([^"]+)"')
+    check(localVersion ~= nil, "loader declares a version")
+    ctx.Responses["src/version.txt"] = localVersion
+    ctx:Provide("src/games/universal.lua", {})
+    check(ctx:Run("DepHub.lua") == true, "loader runs when versions match")
+    for _, url in ipairs(ctx.Requests) do
+        check(not url:find("/DepHub.lua", 1, true), "loader does not re-fetch itself when the version matches")
+    end
+end
+
+do
     local ctx = sandbox()
     local universal = ctx:Run("src/games/universal.lua")
     check(type(universal) == "table" and universal.UI == nil and #ctx.Requests == 0, "actual Universal starts without UI, PlayerGui, or downloads")

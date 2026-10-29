@@ -323,6 +323,7 @@ local function sandbox(placeId, gameId)
     end
     env._provided = {}
     context.Env = env
+    context.Sources = sources
     -- Core modules that the loader always fetches are served straight from the
     -- bundled sources unless a test overrides them, so a loader run only needs
     -- to provide its game backend.
