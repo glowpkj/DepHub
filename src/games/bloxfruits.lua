@@ -173,11 +173,24 @@ end
 
 local visual = env.__DEPHUB and env.__DEPHUB.UI
 local uiModel = State.UI
-local tabOrder = {
-    "Info", "Farm", "Farm 2", "Farm 3", "PVP", "Teleport", "Sea",
-    "Fruit", "Shop", "Shop 2", "Shop 3", "Raids/Events", "Extras",
-    "Player", "Config"
+local pageAliases = {
+    ["Info"] = "Home",
+    ["Farm"] = "Farm",
+    ["Farm 2"] = "Farm",
+    ["Farm 3"] = "Farm",
+    ["PVP"] = "Combat",
+    ["Teleport"] = "Teleport",
+    ["Sea"] = "Travel",
+    ["Fruit"] = "Fruits",
+    ["Shop"] = "Shop",
+    ["Shop 2"] = "Shop",
+    ["Shop 3"] = "Shop",
+    ["Raids/Events"] = "Events",
+    ["Extras"] = "Extras",
+    ["Player"] = "Player",
+    ["Config"] = "Settings"
 }
+local tabOrder = {"Info", "Farm", "Farm 2", "Farm 3", "PVP", "Teleport", "Sea", "Fruit", "Shop", "Shop 2", "Shop 3", "Raids/Events", "Extras", "Player", "Config"}
 local renderedTabs = {}
 local renderedSections = {}
 local function splitSeas(value)
@@ -187,43 +200,53 @@ local function splitSeas(value)
     end
     return result
 end
-local function tabNameFor(pageName, pageSea, controlSea)
-    if controlSea == "All" then return pageName .. " · General" end
-    if controlSea and pageSea and controlSea ~= pageSea then
-        local seas = splitSeas(controlSea)
-        if seas.Sea2 and seas.Sea3 then return pageName .. " · Sea 2/3" end
-        if seas.Sea1 then return pageName .. " · Sea 1" end
-        if seas.Sea2 then return pageName .. " · Sea 2" end
-        if seas.Sea3 then return pageName .. " · Sea 3" end
-    elseif controlSea and not pageSea then
-        local seas = splitSeas(controlSea)
-        if seas.Sea1 and seas.Sea2 and seas.Sea3 then return pageName end
-        if seas.Sea2 and seas.Sea3 then return pageName .. " · Sea 2/3" end
-        if seas.Sea1 then return pageName .. " · Sea 1" end
-        if seas.Sea2 then return pageName .. " · Sea 2" end
-        if seas.Sea3 then return pageName .. " · Sea 3" end
-    end
-    return pageName
+local function categoryForControl(sea)
+    local value = tostring(sea or "All")
+    if value == "All" or value == "" then return "General" end
+    local seas = splitSeas(value)
+    if seas.Sea1 and seas.Sea2 and seas.Sea3 then return "General" end
+    if seas.Sea1 and seas.Sea2 then return "Sea 1/2" end
+    if seas.Sea2 and seas.Sea3 then return "Sea 2/3" end
+    if seas.Sea1 then return "Sea 1" end
+    if seas.Sea2 then return "Sea 2" end
+    if seas.Sea3 then return "Sea 3" end
+    return "General"
 end
 local function ensureTab(name, sea)
-    if renderedTabs[name] then
-        if sea then renderedTabs[name].Sea = sea end
-        return renderedTabs[name]
-    end
+    local category = categoryForControl(sea)
+    local key = category .. "|" .. name
+    if renderedTabs[key] then return renderedTabs[key] end
     local tab = visual:CreateTab(name, sea)
-    local record = {Tab = tab, Sea = sea, Name = name}
-    renderedTabs[name] = record
+    local record = {Tab = tab, Sea = sea, Name = name, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
+    renderedTabs[key] = record
     return record
 end
-local function sectionFor(tabRecord, pageName)
-    local key = tabRecord.Name .. "|" .. pageName
+local function groupFor(definition)
+    local key = tostring(definition.key or ""):lower()
+    local title = tostring(definition.title or ""):lower()
+    local value = key .. " " .. title
+    if value:find("config") or value:find("save") or value:find("load") then return "Configuration" end
+    if value:find("quest") or value:find("level") or value:find("farm") or value:find("mastery") or value:find("stat") or value:find("bring") or value:find("collect") then return "Farming" end
+    if value:find("fruit") or value:find("dealer") or value:find("spin") or value:find("storage") then return "Fruits" end
+    if value:find("raid") or value:find("event") or value:find("leviathan") or value:find("mirage") or value:find("sea beast") or value:find("bones") then return "Events" end
+    if value:find("island") or value:find("teleport") or value:find("waypoint") or value:find("travel") or value:find("sea travel") or value:find("boss") then return "Travel" end
+    if value:find("player") or value:find("walk") or value:find("speed") or value:find("jump") or value:find("esp") or value:find("afk") or value:find("ken") or value:find("buso") then return "Player" end
+    if value:find("shop") or value:find("buy") or value:find("weapon") or value:find("style") or value:find("accessory") or value:find("race") then return "Shop & Upgrades" end
+    if value:find("aim") or value:find("attack") or value:find("combat") or value:find("aura") or value:find("bounty") or value:find("pvp") or value:find("skill") or value:find("stun") or value:find("target") or value:find("sword") or value:find("gun") then return "Combat" end
+    if value:find("info") or value:find("status") or value:find("version") then return "Overview" end
+    return "Other"
+end
+local function sectionFor(tabRecord, group)
+    local key = tabRecord.Key .. "|" .. group
     if renderedSections[key] then return renderedSections[key] end
-    local section = tabRecord.Tab:CreateSection(pageName == tabRecord.Name and "Controls" or pageName)
+    local column = tabRecord.Columns.Left <= tabRecord.Columns.Right and "Left" or "Right"
+    tabRecord.Columns[column] += 1
+    local section = tabRecord.Tab:CreateSection(group, column)
     renderedSections[key] = section
     return section
 end
 local function renderDefinition(definition, section)
-    local title = tostring(definition.key or ((definition.page or "General") .. " · " .. tostring(definition.title or "Control")))
+    local title = tostring(definition.title or definition.key or "Control")
     local function set(value) State:SetControl(definition.key, value) end
     if definition.kind == "toggle" then
         section:CreateToggle(title, definition.get and definition.get() == true, set)
@@ -241,15 +264,16 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
     for _, pageName in ipairs(tabOrder) do
         local page = uiModel.tabs[pageName]
         if page then
-            local pageSea = page.sea
+            local logicalName = pageAliases[pageName] or pageName
             if #page.controls == 0 then
-                local record = ensureTab(pageName, pageSea)
-                local section = sectionFor(record, pageName)
+                local record = ensureTab(logicalName, page.sea)
                 if pageName == "Info" then
-                    section:CreateParagraph("DepHub Blox Fruits", "Interface dinâmica por Sea. Apenas Anti-AFK fica ligado por padrão.")
+                    local section = sectionFor(record, "Overview")
+                    section:CreateParagraph("DepHub", "Controles organizados por categoria. Apenas Anti-AFK fica ligado por padrão.")
                 elseif pageName == "Config" then
+                    local section = sectionFor(record, "Configuration")
                     local configName = "default"
-                    local nameInput = section:CreateInput("Config name", "Nome da configuração", configName, function(value) configName = tostring(value or "default") end)
+                    section:CreateInput("Config name", "Nome da configuração", configName, function(value) configName = tostring(value or "default") end)
                     section:CreateButton("Save config", function()
                         local name = tostring(configName ~= "" and configName or "default")
                         if State:SaveConfig(name) then visual:Notify("Config", "Configuração salva: " .. name) else visual:Notify("Config", "Não foi possível salvar.") end
@@ -261,26 +285,16 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                 end
             else
                 for _, definition in ipairs(page.controls) do
-                    local effectiveSea = definition.sea or pageSea
-                    local tabName = tabNameFor(pageName, pageSea, definition.sea)
-                    local record = ensureTab(tabName, effectiveSea)
-                    local section = sectionFor(record, pageName)
+                    local sea = definition.sea or page.sea
+                    local record = ensureTab(logicalName, sea)
+                    local section = sectionFor(record, groupFor(definition))
                     renderDefinition(definition, section)
                 end
             end
         end
     end
     local function applySea(sea)
-        local current = tostring(sea or "Sea1")
-        if type(visual.SetCurrentSea) == "function" then visual:SetCurrentSea(current) end
-        for _, record in pairs(renderedTabs) do
-            local visible = true
-            if record.Sea and record.Sea ~= "All" then
-                local allowed = splitSeas(record.Sea)
-                visible = allowed[current] == true
-            end
-            if type(record.Tab.SetVisible) == "function" then record.Tab:SetVisible(visible) end
-        end
+        if type(visual.SetCurrentSea) == "function" then visual:SetCurrentSea(sea or "Sea1") end
     end
     if type(uiModel.onSea) == "function" then uiModel.onSea(applySea) else applySea(State.Sea or "Sea1") end
     State.UIFrontend = visual
