@@ -550,6 +550,120 @@ function NebulaTech.new(config)
                 return item
             end
 
+            function section:CreateColorPicker(name, default, callback)
+                local _, _, controls = addRow(name, 36)
+                local color = default or COLORS.Accent
+                local hue, saturation, brightness = color:ToHSV()
+                local swatch = makeButton(controls, "", UDim2.fromOffset(22, 22))
+                swatch.AnchorPoint = Vector2.new(1, 0.5)
+                swatch.Position = UDim2.new(1, 0, 0.5, 0)
+                swatch.BackgroundColor3 = color
+                stroke(swatch)
+
+                local popup = create("Frame", {
+                    Visible = false,
+                    Position = UDim2.new(1, -184, 1, 4),
+                    Size = UDim2.fromOffset(172, 138),
+                    BackgroundColor3 = COLORS.Background,
+                    BorderSizePixel = 0,
+                    ZIndex = 40
+                }, card)
+                corner(popup, 8)
+                stroke(popup)
+                padding(popup, 8, 8, 8, 8)
+
+                local hueBar = create("TextButton", {
+                    Text = "",
+                    AutoButtonColor = false,
+                    Size = UDim2.new(1, 0, 0, 14),
+                    BackgroundColor3 = Color3.new(1, 1, 1),
+                    BorderSizePixel = 0,
+                    ZIndex = 41
+                }, popup)
+                corner(hueBar, 4)
+                create("UIGradient", {
+                    Color = ColorSequence.new({
+                        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 0, 0)),
+                        ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255, 255, 0)),
+                        ColorSequenceKeypoint.new(0.33, Color3.fromRGB(0, 255, 0)),
+                        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(0, 255, 255)),
+                        ColorSequenceKeypoint.new(0.67, Color3.fromRGB(0, 0, 255)),
+                        ColorSequenceKeypoint.new(0.83, Color3.fromRGB(255, 0, 255)),
+                        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0))
+                    })
+                }, hueBar)
+
+                local sv = create("TextButton", {
+                    Text = "",
+                    AutoButtonColor = false,
+                    Position = UDim2.fromOffset(0, 22),
+                    Size = UDim2.new(1, 0, 1, -22),
+                    BackgroundColor3 = Color3.fromHSV(hue, 1, 1),
+                    BorderSizePixel = 0,
+                    ZIndex = 41
+                }, popup)
+                corner(sv, 5)
+                create("UIGradient", {
+                    Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromHSV(hue, 1, 1))
+                }, sv)
+                create("UIGradient", {
+                    Rotation = 90,
+                    Transparency = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, 1),
+                        NumberSequenceKeypoint.new(1, 0)
+                    })
+                }, sv)
+
+                local function refresh()
+                    color = Color3.fromHSV(hue, saturation, brightness)
+                    swatch.BackgroundColor3 = color
+                    sv.BackgroundColor3 = Color3.fromHSV(hue, 1, 1)
+                    section.ParentWindow.Flags[name] = color
+                    if callback then callback(color) end
+                end
+
+                local function bindDrag(target, update)
+                    local active = false
+                    target.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                            active = true
+                            update(input.Position)
+                        end
+                    end)
+                    target.InputEnded:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then active = false end
+                    end)
+                    section.ParentWindow.Connections[#section.ParentWindow.Connections + 1] = UserInputService.InputChanged:Connect(function(input)
+                        if active and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then update(input.Position) end
+                    end)
+                end
+
+                bindDrag(hueBar, function(position)
+                    hue = math.clamp((position.X - hueBar.AbsolutePosition.X) / math.max(hueBar.AbsoluteSize.X, 1), 0, 1)
+                    refresh()
+                end)
+                bindDrag(sv, function(position)
+                    saturation = math.clamp((position.X - sv.AbsolutePosition.X) / math.max(sv.AbsoluteSize.X, 1), 0, 1)
+                    brightness = 1 - math.clamp((position.Y - sv.AbsolutePosition.Y) / math.max(sv.AbsoluteSize.Y, 1), 0, 1)
+                    refresh()
+                end)
+
+                local item = register(name, function(available)
+                    swatch.Active = available
+                    swatch.BackgroundTransparency = available and 0 or 0.5
+                end)
+                function item:Set(nextColor)
+                    if typeof(nextColor) ~= "Color3" then return end
+                    color = nextColor
+                    hue, saturation, brightness = color:ToHSV()
+                    refresh()
+                end
+                swatch.Activated:Connect(function() if item.Available then popup.Visible = not popup.Visible end end)
+                item:SetAvailableState(section.Enabled)
+                section.ParentWindow.Flags[name] = color
+                return item
+            end
+
             function section:CreateLabel(text)
                 local _, title = addRow(text, 28)
                 title.Size = UDim2.new(1, 0, 1, 0)
