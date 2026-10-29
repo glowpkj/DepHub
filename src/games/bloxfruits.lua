@@ -339,4 +339,39 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
     State.UITabs = renderedTabs
 end
 
+-- Report the Blox Fruits backend into the shared Debug tab. Modules are
+-- reported by load outcome, then the control registry is exposed as live
+-- features so the player can see exactly which toggles are on and why a module
+-- failed to load.
+do
+    local Diag = env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if Diag and type(Diag.RegisterModule) == "function" then
+        Diag:SetEnvironment({["BloxFruits sea"] = tostring(State.Sea or "?")})
+        local modules = State.Modules or {}
+        for _, name in ipairs({"core", "teleport", "combat", "farm", "player", "fruits", "shop", "events", "extras", "info"}) do
+            Diag:RegisterModule("features/bloxfruits/oss/" .. name .. ".lua")
+            local loaded = type(modules[name]) == "table"
+            local detail = loaded and "carregado" or "ausente"
+            if not loaded and type(State.Errors) == "table" and State.Errors[name] ~= nil then detail = tostring(State.Errors[name]) end
+            Diag:Module("features/bloxfruits/oss/" .. name .. ".lua", loaded, detail)
+        end
+        local toggleCount, onCount = 0, 0
+        for key, value in pairs(State.Toggles or {}) do
+            toggleCount = toggleCount + 1
+            if value then onCount = onCount + 1 end
+        end
+        Diag:Note("BloxFruits toggles: " .. tostring(onCount) .. " ligados de " .. tostring(toggleCount))
+        Diag:Feature("BloxFruits.Sea", function() return tostring(State.Sea or "?") end)
+        Diag:Feature("BloxFruits.Toggles ligados", function()
+            local parts = {}
+            for key, value in pairs(State.Toggles or {}) do
+                if value then parts[#parts + 1] = key end
+            end
+            table.sort(parts)
+            return #parts > 0 and table.concat(parts, ", ") or "nenhum"
+        end)
+        Diag:Feature("BloxFruits.LastError", function() return tostring(State.LastError or "none") end)
+    end
+end
+
 return State

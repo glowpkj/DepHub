@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.62"
+local VERSION = "0.0.63"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -21,7 +21,10 @@ local placeId = tostring(game.PlaceId)
 local gameId = tostring(game.GameId)
 
 local function log(message)
-    pcall(print, tostring(message))
+    local text = tostring(message)
+    pcall(print, text)
+    local diag = env and env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if diag and type(diag.Log) == "function" then pcall(diag.Log, diag, "loader", text) end
 end
 
 local function detectExecutor()
@@ -121,6 +124,10 @@ env.__DEPHUB.SourceBaseURL = BASE_URL
 env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 
+-- The diagnostics collector is declared here so early failures can be recorded,
+-- but it is only instantiated after the module loader exists (below).
+local Diag
+
 env.__DEPHUB.Debug = function()
     return {
         Executor = detectExecutor(),
@@ -134,6 +141,7 @@ end
 local function fail(reason)
     local message = tostring(reason or "Falha desconhecida")
     log("Falha: " .. message)
+    if Diag then Diag:Note("FALHA DO LOADER: " .. message) end
     if env[STATE_KEY] ~= session then return false end
     cleanupRuntime()
     if env[STATE_KEY] == session then
@@ -221,6 +229,37 @@ local function loadModule(path, useCache)
     return true, result
 end
 
+-- Instantiate the diagnostics collector now that the loader can fetch modules.
+-- A no-op stand-in keeps every later Diag call valid even if it fails to load.
+do
+    local okDiag, diagModule = loadModule("src/core/diagnostics.lua", false)
+    if okDiag and type(diagModule) == "table" and type(diagModule.new) == "function" then
+        local okNew, instance = pcall(diagModule.new)
+        if okNew and type(instance) == "table" then Diag = instance end
+    end
+    if not Diag then
+        Diag = {SetEnvironment=function() end, RegisterModule=function() end, Module=function() end,
+            Probe=function() end, Feature=function() end, Note=function() end, Log=function() end,
+            Install=function() return false end, Report=function() return "diagnostico indisponivel" end,
+            Copy=function() return false, "diagnostico indisponivel" end}
+        Diag.__stub = true
+    end
+    env.__DEPHUB.Diagnostics = Diag
+end
+Diag:RegisterModule("src/core/diagnostics.lua")
+Diag:Module("src/core/diagnostics.lua", not Diag.__stub, Diag.__stub and "nao carregou" or "carregado")
+Diag:SetEnvironment({
+    Executor = detectExecutor(),
+    Version = VERSION,
+    PlaceId = placeId,
+    GameId = gameId,
+    GameName = tostring(game.Name or "?"),
+    SourceRef = sourceRef,
+    HttpGet = type(game.HttpGet) == "function" and "game:HttpGet" or "ausente",
+    request = type(request) == "function" and "presente" or "ausente",
+    loadstring = type(loadstring) == "function" and "presente" or "ausente"
+})
+
 local executorName = detectExecutor()
 log("Iniciando loader v" .. VERSION)
 log("Executor detectado: " .. tostring(executorName))
@@ -261,24 +300,34 @@ task.wait()
 -- and version. Categories and tabs are the backend's job: each game fills the
 -- shared shell with its own interface.
 local okDemon, demonModule = loadModule("src/core/demon-ui.lua", false)
+Diag:RegisterModule("src/core/demon-ui.lua")
 if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "function" then
+    Diag:Module("src/core/demon-ui.lua", false, tostring(demonModule))
     return fail("DemonOfDarknessUI nao carregou: " .. tostring(demonModule))
 end
+Diag:Module("src/core/demon-ui.lua", true, "carregado")
 
 local okWindow, window = pcall(demonModule.new, {
     Name = "DepHub",
     Version = VERSION
 })
 if not okWindow or type(window) ~= "table" then
+    Diag:Module("demon-ui window", false, tostring(window))
     return fail("Nao foi possivel iniciar DemonOfDarknessUI: " .. tostring(window))
 end
+Diag:Module("demon-ui window", true, "janela criada")
 
 env.__DEPHUB.DemonUI = window
 env.__DEPHUB.UI = window
 
+-- The Debug tab is shared by every game and installed before the backend runs,
+-- so the backend's own environment, probes and feature readers land in it.
+Diag:Install(window)
+
 -- Unknown game: keep the window, tell the player the place is unsupported and
 -- stop. No backend is loaded, so no incompatible features can run.
 if not knownTarget then
+    Diag:Note("Jogo nao reconhecido: nenhum backend carregado.")
     pcall(function()
         local tab = window:CreateTab("Incompativel")
         if tab then
@@ -300,8 +349,10 @@ if not knownTarget then
 end
 
 local target = knownTarget
+Diag:RegisterModule(target.Core)
 local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then
+    Diag:Module(target.Core, false, tostring(coreResult))
     return fail("Core " .. tostring(target.Core) .. " falhou: " .. tostring(coreResult))
 end
 local isRT3 = target.Core == "src/games/rt3.lua"
@@ -312,9 +363,16 @@ local isNoobPiece = target.NoobPiece == true
 local isVolleyball42 = target.Volleyball42 == true
 
 if isRT3 then
-    if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
+    if coreResult ~= true then
+        Diag:Module(target.Core, false, "retornou " .. tostring(coreResult))
+        return fail("Modulo RT3 nao inicializou")
+    end
+    Diag:Module(target.Core, true, "carregado")
 elseif type(coreResult) ~= "table" then
+    Diag:Module(target.Core, false, "retornou " .. typeof(coreResult) .. " (" .. tostring(coreResult) .. ")")
     return fail("Core " .. tostring(target.Core) .. " retornou " .. typeof(coreResult) .. " (" .. tostring(coreResult) .. ")")
+else
+    Diag:Module(target.Core, true, "carregado")
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil

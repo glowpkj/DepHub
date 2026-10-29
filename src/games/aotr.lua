@@ -81,6 +81,63 @@ end
 local function nape(model)
  return child(child(child(model,"Hitboxes"),"Hit"),"Nape")
 end
+-- Report this backend's own structure and live state into the shared Debug tab.
+local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
+if Diag and type(Diag.Probe)=="function" then
+ local assets=child(game:GetService("ReplicatedStorage"),"Assets")
+ local remotes=child(assets,"Remotes")
+ local getRemote=child(remotes,"GET")
+ local postRemote=child(remotes,"POST")
+ Diag:RegisterModule("features/aotr/properties.lua")
+ Diag:RegisterModule("features/aotr/assistance.lua")
+ Diag:RegisterModule("features/aotr/targets.lua")
+ Diag:RegisterModule("features/aotr/movement.lua")
+ Diag:RegisterModule("features/aotr/combat.lua")
+ Diag:Module("features/aotr/properties.lua",properties~=nil,tostring(propertiesError or "ok"))
+ Diag:Module("features/aotr/assistance.lua",helpers~=nil,tostring(helpersError or "ok"))
+ Diag:Module("features/aotr/targets.lua",targets~=nil,tostring(targetsError or "ok"))
+ Diag:Module("features/aotr/movement.lua",movement~=nil,tostring(movementError or "ok"))
+ Diag:Module("features/aotr/combat.lua",combat~=nil,tostring(combatError or "ok"))
+ Diag:Probe("Workspace.Titans",titanFolder()~=nil,titanFolder() and (#titans().." titans") or "ausente")
+ local napeFound=false
+ for _,model in ipairs(titans()) do if nape(model) then napeFound=true break end end
+ Diag:Probe("Hitboxes.Hit.Nape",napeFound,napeFound and "resolvivel em titan vivo" or "nao encontrado")
+ Diag:Probe("Assets.Remotes.GET",getRemote and getRemote:IsA("RemoteFunction") or false,getRemote and getRemote.ClassName or "ausente")
+ Diag:Probe("Assets.Remotes.POST",postRemote and postRemote:IsA("RemoteEvent") or false,postRemote and postRemote.ClassName or "ausente")
+ Diag:Probe("HUD Hotbar",child(child(child(child(player,"PlayerGui"),"Interface"),"HUD"),"Main")~=nil,"HUD/Main")
+ local refillFound=false
+ for _,rootName in ipairs({"Unclimbable","Climbable"}) do
+  local root=child(Workspace,rootName)
+  if root then
+   for _,item in ipairs(root:GetDescendants()) do
+    if item.Name=="Refill" and item:IsA("BasePart") then
+     local ancestor=item.Parent
+     while ancestor and ancestor~=root do
+      if ancestor.Name=="GasTanks" then refillFound=true break end
+      ancestor=ancestor.Parent
+     end
+    end
+    if refillFound then break end
+   end
+  end
+ end
+ Diag:Probe("GasTanks.Refill",refillFound,refillFound and "encontrado" or "ausente")
+ Diag:Feature("AOTR.TitanESP",function() return M.Toggles.TitanESP and "ON" or "off" end)
+ Diag:Feature("AOTR.TitanRipper",function() return M.Combat and tostring(M.Combat.States.Ripper or "Disabled") or "sem modulo" end)
+ Diag:Feature("AOTR.SkillAutofarm",function() return M.Combat and tostring(M.Combat.States.SkillAutofarm or "Disabled") or "sem modulo" end)
+ Diag:Feature("AOTR.ClassicAutofarm",function() return M.Combat and tostring(M.Combat.States.ClassicAutofarm or "Disabled") or "sem modulo" end)
+ Diag:Feature("AOTR.Assistencia",function()
+  if not M.Assistance then return "sem modulo" end
+  local parts={}
+  for _,name in ipairs({"AutoBladeRefill","AutoGrabEscape","AntiInjury","AutoRetry","AntiAFK"}) do
+   if M.Toggles[name] then parts[#parts+1]=name.."="..tostring(M.Assistance.States[name] or "?") end
+  end
+  return #parts>0 and table.concat(parts,"; ") or "todas off"
+ end)
+ Diag:Feature("AOTR.TravelSpeed",function() return tostring(M.Values.TravelSpeed).." studs/s" end)
+ Diag:Feature("AOTR.ShadowBan",function() return M.Combat and M.Combat.CheckResult or "sem modulo" end)
+ Diag:Feature("AOTR.LastError",function() return M.LastError end)
+end
 function M:Refresh()
  if self.Destroyed then return end
  local visual,eren={},{}

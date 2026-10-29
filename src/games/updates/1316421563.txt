@@ -1,1 +1,2 @@
+0.0.63 | Shared Debug tab: module health, game-structure probes, live feature state and a copyable diagnostic report in every game.
 0.1.0 | Add Volleyball 4.2 ball prediction backend and DepHub mode selector

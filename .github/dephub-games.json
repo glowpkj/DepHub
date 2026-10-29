@@ -7,6 +7,7 @@
       "src/core/demon-ui.lua",
       "src/core/ui/demon-theme.luau",
       "src/core/updater.lua",
+      "src/core/diagnostics.lua",
       "src/games/mm2.lua",
       "src/games/features/mm2/roletracker.lua",
       "src/games/features/mm2/roundtracker.lua",
@@ -38,7 +39,8 @@
       "src/games/features/bloxfruits/oss/extras.lua",
       "src/games/features/bloxfruits/oss/info.lua",
       "src/games/updates/994732206.txt",
-      "src/core/updater.lua"
+      "src/core/updater.lua",
+      "src/core/diagnostics.lua"
     ]
   },
   "1316421563": {
@@ -49,6 +51,7 @@
       "src/core/demon-ui.lua",
       "src/core/ui/demon-theme.luau",
       "src/core/updater.lua",
+      "src/core/diagnostics.lua",
       "src/games/volleyball42.lua",
       "src/games/updates/1316421563.txt"
     ]
@@ -61,6 +64,7 @@
       "src/core/demon-ui.lua",
       "src/core/ui/demon-theme.luau",
       "src/core/updater.lua",
+      "src/core/diagnostics.lua",
       "src/games/tsb.lua",
       "src/games/features/tsb/animations.lua",
       "src/games/features/tsb/autoblock.lua",
@@ -82,6 +86,7 @@
       "src/core/runtime.lua",
       "src/core/scheduler.lua",
       "src/core/updater.lua",
+      "src/core/diagnostics.lua",
       "src/games/rt3.lua",
       "src/games/features/restauranttycoon3/autofarm.lua",
       "src/games/features/restauranttycoon3/instant-cook.lua",
@@ -111,7 +116,8 @@
       "src/games/features/bloxfruits/oss/extras.lua",
       "src/games/features/bloxfruits/oss/info.lua",
       "src/games/updates/85211729168715.txt",
-      "src/core/updater.lua"
+      "src/core/updater.lua",
+      "src/core/diagnostics.lua"
     ]
   },
   "84822469255086": {
@@ -122,6 +128,7 @@
       "src/core/demon-ui.lua",
       "src/core/ui/demon-theme.luau",
       "src/core/updater.lua",
+      "src/core/diagnostics.lua",
       "src/core/tween-movement.lua",
       "src/games/features/noobpiece/movementprofile.lua",
       "src/games/noobpiece.lua",
@@ -146,6 +153,7 @@
       "src/core/demon-ui.lua",
       "src/core/ui/demon-theme.luau",
       "src/core/updater.lua",
+      "src/core/diagnostics.lua",
       "src/games/aotr.lua",
       "src/games/features/aotr/assistance.lua",
       "src/games/features/aotr/properties.lua",

@@ -1,19 +1,20 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T20:47:28.519685+00:00",
-  "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
-  "version": "0.0.62",
+  "generatedAt": "2026-10-29T20:54:59.778Z",
+  "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+  "version": "0.0.63",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "66272ef62ada37b020c9e199c3e418ac78c569c6231ea524e66aac146c3d8b79",
-      "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
+      "version": "921e329a42ea5dc5e21d544645a664bbfda0ac53f1b528fc48dd6f747dd3a982",
+      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
+        "src/core/diagnostics.lua",
         "src/games/mm2.lua",
         "src/games/features/mm2/roletracker.lua",
         "src/games/features/mm2/roundtracker.lua",
@@ -26,8 +27,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "be15f2c6bf58016fa89339e132ed8e7adac4f03a448f091d5d5f28e339525ee6",
-      "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
+      "version": "d2f12a72b39138659492ac1f28b1b4d71c55826adc997b058da1a265d3f9a54a",
+      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -47,33 +48,36 @@
         "src/games/features/bloxfruits/oss/extras.lua",
         "src/games/features/bloxfruits/oss/info.lua",
         "src/games/updates/994732206.txt",
-        "src/core/updater.lua"
+        "src/core/updater.lua",
+        "src/core/diagnostics.lua"
       ]
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "72b828b33764b8cb72b9eda6eef4008c826d0a34509f3129f27bc0674a96d7a8",
-      "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
+      "version": "1fafcaa91813a272edadfb0b021178a2686de9df4d1f892ef72572bff5de8bd9",
+      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
+        "src/core/diagnostics.lua",
         "src/games/volleyball42.lua",
         "src/games/updates/1316421563.txt"
       ]
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "d64be8b92a62ebd14d23dfc93be4df6cf11522cfcd0c3996f7ef407b340ac63f",
-      "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
+      "version": "29bc659b4d5a4ae9123fc3c9b544c9e152680ea3e06d96a211d88fdd01bd3f8b",
+      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
+        "src/core/diagnostics.lua",
         "src/games/tsb.lua",
         "src/games/features/tsb/animations.lua",
         "src/games/features/tsb/autoblock.lua",
@@ -84,8 +88,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "e5c2770d80d9664fd59b642684e21928fa6f61e90972e80f436e4af69fd9b2a7",
-      "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
+      "version": "db43d301276fe00895b15caaa064d55405280a5858b41fc4a28adb78c8534dba",
+      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -97,6 +101,7 @@
         "src/core/runtime.lua",
         "src/core/scheduler.lua",
         "src/core/updater.lua",
+        "src/core/diagnostics.lua",
         "src/games/rt3.lua",
         "src/games/features/restauranttycoon3/autofarm.lua",
         "src/games/features/restauranttycoon3/instant-cook.lua",
@@ -107,8 +112,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "fa2ad648df6d0aeb1604e5ed6c6a22b61535b9ece9967beb1906974f900e7d41",
-      "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
+      "version": "b12414be2aa51ca5b32f670f1d20504b09f2dc6151315005c25406c84fd1cf0d",
+      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -128,19 +133,21 @@
         "src/games/features/bloxfruits/oss/extras.lua",
         "src/games/features/bloxfruits/oss/info.lua",
         "src/games/updates/85211729168715.txt",
-        "src/core/updater.lua"
+        "src/core/updater.lua",
+        "src/core/diagnostics.lua"
       ]
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "aba94133b1acaa72e626e28a0bf79940b17a0e8862ecb8c4c19b36486a8135d3",
-      "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
+      "version": "47a9a1f0828d3943fbef38f422ad6cf45c121f1f80c83521a8dfba9e0fc5c5b3",
+      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
+        "src/core/diagnostics.lua",
         "src/core/tween-movement.lua",
         "src/games/features/noobpiece/movementprofile.lua",
         "src/games/noobpiece.lua",
@@ -159,14 +166,15 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "aba211e16e1f3b0309352f09b281676ce8d3e65bc211ddf93854269372524e1c",
-      "commit": "c50118148fd58a464a2abb783e1ce208c8a33a16",
+      "version": "7067ed7754d285f7f70db539ebadc2f4fc7ea2b64d30d558ccef7e2864c9062f",
+      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
+        "src/core/diagnostics.lua",
         "src/games/aotr.lua",
         "src/games/features/aotr/assistance.lua",
         "src/games/features/aotr/properties.lua",
@@ -179,38 +187,38 @@
   },
   "recentUpdates": [
     {
-      "Version": "c501181",
-      "Date": "2026-10-29T17:47:13-03:00",
+      "Version": "7185cd8",
+      "Date": "2026-10-29T14:58:23-03:00",
       "Changes": [
-        "AOTR: restore combat/autofarm behind the shared UI"
+        "Bump version to 0.0.49"
       ]
     },
     {
-      "Version": "e55d732",
-      "Date": "2026-10-29T17:16:01-03:00",
+      "Version": "06a35bb",
+      "Date": "2026-10-29T14:58:20-03:00",
       "Changes": [
-        "feat(bloxfruits): filter tabs by the current sea"
+        "Switch DepHub UI loader to Bracket v0.0.49"
       ]
     },
     {
-      "Version": "990ff00",
-      "Date": "2026-10-29T17:02:49-03:00",
+      "Version": "c100c90",
+      "Date": "2026-10-29T14:49:33-03:00",
       "Changes": [
-        "fix(ui): stop rejecting same-named tabs across categories"
+        "chore(release): sync WindUI test build version"
       ]
     },
     {
-      "Version": "77e6c68",
-      "Date": "2026-10-29T16:59:21-03:00",
+      "Version": "2b5618c",
+      "Date": "2026-10-29T14:49:27-03:00",
       "Changes": [
-        "refactor(ui): ship the theme as an editable repo module, drop the remote blob"
+        "fix(ui): log WindUI loading failures and bump test build"
       ]
     },
     {
-      "Version": "bea2791",
-      "Date": "2026-10-29T16:51:07-03:00",
+      "Version": "d1d4ace",
+      "Date": "2026-10-29T14:49:07-03:00",
       "Changes": [
-        "refactor(ui): one shared shell for every game, backends own their tabs"
+        "chore(release): sync WindUI test version"
       ]
     }
   ]

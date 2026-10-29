@@ -1,1 +1,2 @@
+0.0.63 | Shared Debug tab: module health, game-structure probes, live feature state and a copyable diagnostic report in every game.
 0.0.2 | Universal UI, lifecycle hardening and diagnostics
