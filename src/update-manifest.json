@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T17:44:04.497937+00:00",
-  "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+  "generatedAt": "2026-10-29T17:44:21.644308+00:00",
+  "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
   "version": "0.0.43",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "1851c8f854f755599054234e542d81ce67b11389f20eae7e5f574a6cefb8b27d",
-      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+      "version": "c5e79b8ce40aa2dd2b6fd65939825b73d6f386e584cdc4f2ff44ca30a92d3660",
+      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,8 +26,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "4af9473671a531e14ecea1ea57660dd6952fbb5dd2675bb965c1851b7a0bd7a1",
-      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+      "version": "79c223188a14adf1d892e1307c5644303c9c8518de8c8071438879b4abcbab29",
+      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "c6f8856a0d8e965366c4b319fcc0683e30c265f7f8f54f3fbf27abdb93aa9154",
-      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+      "version": "fce076986969ad43946631c1e4435720bcd721f5281a6e12a1f7dae420a2f448",
+      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -66,8 +66,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "1d969cb483f707c442ae5fe8ef174c437d55618fb8313db11c42062da05f73e4",
-      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+      "version": "10f234a3de0ca0aa69a03e8a9d6ef23b5b3d9168aad7ee1721dafe038545a773",
+      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -84,8 +84,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "b357ae6a5ca3764de596f035c2f792cf9294a7d3cc322d5ea8609b9883d3b2c5",
-      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+      "version": "30c141f502f563840fbcae06f408d66c3bddaeb34b9f1f0301ac5715756e2455",
+      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -107,8 +107,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "6158875046121e1f6b0da3aba995ff56489aa186fca5423012d20de97a9d7c2f",
-      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+      "version": "e99bf4f6f3bea3c06e9fe05c42c5f3f5e6da24694979b689187df27c4daefd3a",
+      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,8 +133,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "087610c866f00f9b2eabc0ab10956fb354e20ffdb3dbd83871dca12bad263d0d",
-      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+      "version": "a8126aa62e4a12f17f1b0b00fef9855c1d4f711f1964e739e271714ad6559fd9",
+      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "1b730731c2dae533f3cff2584e3b1858a001e09690b6737c151f3e75ac6fd10a",
-      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
+      "version": "8935e1a29d64b3caefce57c667e7c710fbc97521b42f73241abf88a1d73c182e",
+      "commit": "d682b8283fd4e0f903cfc9ec73e711ef72d2c93d",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -174,6 +174,20 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "d682b82",
+      "Date": "2026-10-29T14:44:12-03:00",
+      "Changes": [
+        "fix(ui): show the correct visibility hotkey"
+      ]
+    },
+    {
+      "Version": "5eff7e5",
+      "Date": "2026-10-29T14:44:07-03:00",
+      "Changes": [
+        "fix(ui): keep reopen button above popup layer"
+      ]
+    },
     {
       "Version": "4ec567e",
       "Date": "2026-10-29T14:43:56-03:00",
@@ -193,20 +207,6 @@
       "Date": "2026-10-29T13:49:53-03:00",
       "Changes": [
         "fix(ui): restore controls when backend rejects changes"
-      ]
-    },
-    {
-      "Version": "896bb6e",
-      "Date": "2026-10-29T13:49:50-03:00",
-      "Changes": [
-        "fix(ui): align toggle hotkey and support unique control flags"
-      ]
-    },
-    {
-      "Version": "f785af7",
-      "Date": "2026-10-29T13:42:48-03:00",
-      "Changes": [
-        "Update nebulatech.lua"
       ]
     }
   ]
