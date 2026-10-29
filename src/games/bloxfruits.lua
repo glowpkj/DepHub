@@ -170,4 +170,120 @@ function State:Destroy()
     if env.__DEPHUB and env.__DEPHUB.BloxFruitsOSS == self then env.__DEPHUB.BloxFruitsOSS = nil end
 end
 
+
+local visual = env.__DEPHUB and env.__DEPHUB.UI
+local uiModel = State.UI
+local tabOrder = {
+    "Info", "Farm", "Farm 2", "Farm 3", "PVP", "Teleport", "Sea",
+    "Fruit", "Shop", "Shop 2", "Shop 3", "Raids/Events", "Extras",
+    "Player", "Config"
+}
+local renderedTabs = {}
+local renderedSections = {}
+local function splitSeas(value)
+    local result = {}
+    for sea in string.gmatch(tostring(value or ""), "[^,]+") do
+        result[string.gsub(sea, "%s+", "")] = true
+    end
+    return result
+end
+local function tabNameFor(pageName, pageSea, controlSea)
+    if controlSea and not pageSea then
+        local seas = splitSeas(controlSea)
+        if seas.Sea1 and seas.Sea2 and seas.Sea3 then return pageName end
+        if seas.Sea2 and seas.Sea3 then return pageName .. " · Sea 2/3" end
+        if seas.Sea1 then return pageName .. " · Sea 1" end
+        if seas.Sea2 then return pageName .. " · Sea 2" end
+        if seas.Sea3 then return pageName .. " · Sea 3" end
+    end
+    return pageName
+end
+local function ensureTab(name, sea)
+    if renderedTabs[name] then
+        if sea then renderedTabs[name].Sea = sea end
+        return renderedTabs[name]
+    end
+    local tab = visual:CreateTab(name)
+    local record = {Tab = tab, Sea = sea, Name = name}
+    renderedTabs[name] = record
+    return record
+end
+local function sectionFor(tabRecord, pageName)
+    local key = tabRecord.Name .. "|" .. pageName
+    if renderedSections[key] then return renderedSections[key] end
+    local section = tabRecord.Tab:CreateSection(pageName == tabRecord.Name and "Controls" or pageName)
+    renderedSections[key] = section
+    return section
+end
+local function renderDefinition(definition, section)
+    local title = tostring(definition.title or definition.key)
+    local function set(value) State:SetControl(definition.key, value) end
+    if definition.kind == "toggle" then
+        section:CreateToggle(title, definition.get and definition.get() == true, set)
+    elseif definition.kind == "slider" then
+        section:CreateSlider(title, definition.min, definition.max, definition.get and definition.get() or definition.default, set)
+    elseif definition.kind == "dropdown" then
+        section:CreateDropdown(title, definition.options or {}, definition.get and definition.get() or definition.default, set)
+    elseif definition.kind == "button" then
+        section:CreateButton(title, function() set(true) end)
+    elseif definition.kind == "textbox" then
+        section:CreateInput(title, title, definition.get and definition.get() or "", set)
+    end
+end
+if type(visual) == "table" and type(visual.CreateTab) == "function" then
+    for _, pageName in ipairs(tabOrder) do
+        local page = uiModel.tabs[pageName]
+        if page then
+            local pageSea = page.sea
+            if #page.controls == 0 then
+                local record = ensureTab(pageName, pageSea)
+                local section = sectionFor(record, pageName)
+                if pageName == "Info" then
+                    section:CreateParagraph("DepHub Blox Fruits", "Interface dinâmica por Sea. Apenas Anti-AFK fica ligado por padrão.")
+                elseif pageName == "Config" then
+                    local nameInput = section:CreateInput("Config name", "Nome da configuração", "default", function(value) end)
+                    section:CreateButton("Save config", function()
+                        local name = tostring(nameInput.Value or "default")
+                        if State:SaveConfig(name) then visual:Notify("Config", "Configuração salva: " .. name) else visual:Notify("Config", "Não foi possível salvar.") end
+                    end)
+                    section:CreateButton("Load config", function()
+                        local name = tostring(nameInput.Value or "default")
+                        if State:LoadConfig(name) then visual:Notify("Config", "Configuração carregada: " .. name) else visual:Notify("Config", "Não foi possível carregar.") end
+                    end)
+                end
+            else
+                for _, definition in ipairs(page.controls) do
+                    local effectiveSea = definition.sea or pageSea
+                    local tabName = tabNameFor(pageName, pageSea, definition.sea)
+                    local record = ensureTab(tabName, effectiveSea)
+                    local section = sectionFor(record, pageName)
+                    renderDefinition(definition, section)
+                end
+            end
+        end
+    end
+    local function applySea(sea)
+        local current = tostring(sea or "Sea1")
+        for _, record in pairs(renderedTabs) do
+            local visible = true
+            if record.Sea then
+                local allowed = splitSeas(record.Sea)
+                visible = allowed[current] == true
+            end
+            record.Tab.Visible = visible
+            if record.Tab.Control and record.Tab.Control.Asset then record.Tab.Control.Asset.Visible = visible end
+            if record.Tab.Control and record.Tab.Control.ButtonAsset then record.Tab.Control.ButtonAsset.Visible = visible end
+        end
+        for _, record in pairs(renderedTabs) do
+            if record.Tab.Visible and record.Tab.Control and record.Tab.Control.Asset and record.Tab.Control.ButtonAsset then
+                pcall(function() visual.Bracket.Utilities.ChooseTab(record.Tab.Control.ButtonAsset, record.Tab.Control.Asset) end)
+                break
+            end
+        end
+    end
+    if type(uiModel.onSea) == "function" then uiModel.onSea(applySea) else applySea(State.Sea or "Sea1") end
+    State.UIFrontend = visual
+    State.UITabs = renderedTabs
+end
+
 return State
