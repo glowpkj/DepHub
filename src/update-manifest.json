@@ -1,17 +1,18 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-30T01:00:00+00:00",
-  "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+  "generatedAt": "2026-10-29T15:15:29.985816+00:00",
+  "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
   "version": "0.0.40",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "0.0.40",
-      "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+      "version": "8f50e085913dc6661085db68c243a0cdb8e9e2635a3f6abb958d060aec54dbd1",
+      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
+        "src/core/nebulatech.lua",
         "src/core/updater.lua",
         "src/games/mm2.lua",
         "src/games/features/mm2/roletracker.lua",
@@ -20,18 +21,18 @@
         "src/games/features/mm2/coinfarm.lua",
         "src/games/features/mm2/playerteleport.lua",
         "src/games/features/mm2/gundrop.lua",
-        "src/games/updates/66654135.txt",
-        "src/core/nebulatech.lua"
+        "src/games/updates/66654135.txt"
       ]
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "0.0.40",
-      "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+      "version": "47316a1b092e953904bd76657930ecd88abac072333afe4d0d791ac6f31dd497",
+      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
+        "src/core/nebulatech.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/playeresp.lua",
         "src/games/features/bloxfruits/fruit.lua",
@@ -48,50 +49,50 @@
         "src/games/features/bloxfruits/team.lua",
         "src/games/features/bloxfruits/fruitvfx.lua",
         "src/games/updates/994732206.txt",
-        "src/core/updater.lua",
-        "src/core/nebulatech.lua"
+        "src/core/updater.lua"
       ]
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "0.0.40",
-      "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+      "version": "2f5bba4e151408c482afa586343306915a396a941af7825d53cac926f066a6de",
+      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
+        "src/core/nebulatech.lua",
         "src/core/updater.lua",
         "src/games/volleyball42.lua",
-        "src/games/updates/1316421563.txt",
-        "src/core/nebulatech.lua"
+        "src/games/updates/1316421563.txt"
       ]
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "0.0.40",
-      "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+      "version": "c9d91d54e236d52aadf58aeb834e17919ba1caf98bfeaccb0aab9b16b5794316",
+      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
+        "src/core/nebulatech.lua",
         "src/core/updater.lua",
         "src/games/tsb.lua",
         "src/games/features/tsb/animations.lua",
         "src/games/features/tsb/autoblock.lua",
         "src/games/features/tsb/autoblock-v2.lua",
         "src/games/features/tsb/autoblock-v3.lua",
-        "src/games/updates/3808081382.txt",
-        "src/core/nebulatech.lua"
+        "src/games/updates/3808081382.txt"
       ]
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "0.0.40",
-      "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+      "version": "18d3e508e23c07e8c0fcd90ebf414325bb2c034fb2171ce1816ad2938b73f629",
+      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
+        "src/core/nebulatech.lua",
         "src/core/anti-afk.lua",
         "src/core/dashboard.lua",
         "src/core/health-monitor.lua",
@@ -103,18 +104,18 @@
         "src/games/features/restauranttycoon3/instant-cook.lua",
         "src/games/features/restauranttycoon3/drops.lua",
         "src/games/features/restauranttycoon3/autofarm-friends.lua",
-        "src/games/updates/119048529960596.txt",
-        "src/core/nebulatech.lua"
+        "src/games/updates/119048529960596.txt"
       ]
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "0.0.40",
-      "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+      "version": "982d8e9f9cd0739af8fcb213fd70a45abddbbc97b765289f4044ee97518e4c8c",
+      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
+        "src/core/nebulatech.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/playeresp.lua",
         "src/games/features/bloxfruits/fruit.lua",
@@ -131,18 +132,18 @@
         "src/games/features/bloxfruits/team.lua",
         "src/games/features/bloxfruits/fruitvfx.lua",
         "src/games/updates/85211729168715.txt",
-        "src/core/updater.lua",
-        "src/core/nebulatech.lua"
+        "src/core/updater.lua"
       ]
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "0.0.40",
-      "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+      "version": "0b2623d70457defe2dd739570d9a7f58a23266a294fdac4f9e6e918a34340154",
+      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
+        "src/core/nebulatech.lua",
         "src/core/updater.lua",
         "src/core/tween-movement.lua",
         "src/games/features/noobpiece/movementprofile.lua",
@@ -157,68 +158,59 @@
         "src/games/features/noobpiece/autoquest.lua",
         "src/games/features/noobpiece/islanddata.lua",
         "src/games/features/noobpiece/islandtracker.lua",
-        "src/games/updates/84822469255086.txt",
-        "src/core/nebulatech.lua"
+        "src/games/updates/84822469255086.txt"
       ]
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "0.0.40",
-      "commit": "fc8bdb43f0a6821807b91194fda437090c3cfa6d",
+      "version": "406a1e6edcd29fc13b2ce9f38c233aad698d051790ec199c2cf4ed9ef210c0a6",
+      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
+        "src/core/nebulatech.lua",
         "src/core/updater.lua",
         "src/games/aotr.lua",
         "src/games/features/aotr/assistance.lua",
-        "src/games/updates/4658598196.txt",
-        "src/core/nebulatech.lua"
+        "src/games/updates/4658598196.txt"
       ]
     }
   },
   "recentUpdates": [
     {
-      "Version": "0.0.40",
-      "Date": "2026-10-29T22:00:00-03:00",
+      "Version": "fc8bdb4",
+      "Date": "2026-10-29T12:15:08-03:00",
       "Changes": [
-        "feat(ui): add shared NebulaTech library",
-        "refactor(ui): use NebulaTech across game backends"
+        "fix(loader): avoid retired frontend marker in library loader"
       ]
     },
     {
-      "Version": "f5612e0",
-      "Date": "2026-10-29T12:11:06-03:00",
+      "Version": "0d6c581",
+      "Date": "2026-10-29T12:14:12-03:00",
       "Changes": [
-        "refactor(ui): mount DepHub through NebulaTech library"
+        "feat(ui): complete NebulaTech color picker control"
       ]
     },
     {
-      "Version": "addcb84",
-      "Date": "2026-10-29T12:05:32-03:00",
+      "Version": "ac8ee46",
+      "Date": "2026-10-29T12:12:46-03:00",
       "Changes": [
-        "fix: validate full marker block against court bounds"
+        "fix(ui): keep dynamic sections from overlapping"
       ]
     },
     {
-      "Version": "3458c86",
-      "Date": "2026-10-29T12:04:48-03:00",
+      "Version": "57862bd",
+      "Date": "2026-10-29T12:12:10-03:00",
       "Changes": [
-        "feat: integrate Volleyball 4.2 ball predictor"
+        "chore(release): bump version to 0.0.40"
       ]
     },
     {
-      "Version": "db1753e",
-      "Date": "2026-10-28T23:46:33-03:00",
+      "Version": "fb9aecc",
+      "Date": "2026-10-29T12:11:49-03:00",
       "Changes": [
-        "refactor(ui): consolidate temporary interface"
-      ]
-    },
-    {
-      "Version": "910b3dc",
-      "Date": "2026-10-22T21:11:31-03:00",
-      "Changes": [
-        "fix(ui): fiel INTRO.html, hotkey Insert, painel visivel e handoff"
+        "feat(ui): load shared NebulaTech library"
       ]
     }
   ]
