@@ -41,7 +41,7 @@ function DemonUI.new(options)
     local export = loadLibrary()
     local library = export.new({
         Title = options.Name or "DepHub",
-        Version = options.Version or "0.0.53",
+        Version = options.Version or "0.0.54",
         Author = "DepHub",
         Theme = "Monochrome",
         TabPosition = "Side",
@@ -155,7 +155,7 @@ function DemonUI:_refreshVisibility()
     local activeTab = self.Library._STATE.ActiveTab
     local activeData = activeTab and (self.Tabs[tostring(activeCategory or "General") .. "|" .. activeTab] or self.Tabs[activeTab])
     if activeData and not activeData.Visible then
-        pcall(function() self.Library:SetActiveCategory("General", "Info") end)
+        pcall(function() self.Library:SetActiveCategory("General", "Home") end)
     elseif activeCategory and activeCategory ~= "General" then
         local catData = self.Library._STATE.CategoryButtons and self.Library._STATE.CategoryButtons[activeCategory]
         if catData and catData.button and not catData.button.Visible then
