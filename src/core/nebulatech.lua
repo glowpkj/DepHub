@@ -407,6 +407,7 @@ function DepHub.new(config)
         Hover = THEME.Accent,
     })
     floating.Name = "Floating"
+    floating.ZIndex = 70
     floating.AnchorPoint = Vector2.new(1, 1)
     floating.Position = UDim2.new(1, -18, 1, -18)
     floating.Visible = false
