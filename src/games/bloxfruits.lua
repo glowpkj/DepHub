@@ -105,7 +105,7 @@ function State:SetToggle(name, enabled)
     if self.Destroyed or type(name) ~= "string" then return false end
     local control = self:GetControl(name)
     if not control or control.kind ~= "toggle" then return false end
-    self:SetControl(name, enabled == true)
+    if not self:SetControl(name, enabled == true) then return false end
     self.Toggles[name] = control.get() == true
     return true
 end
@@ -124,7 +124,10 @@ function State:GetValue(name, fallback)
 end
 
 function State:SetValue(name, value)
-    return self:SetControl(name, value)
+    local ok = self:SetControl(name, value)
+    local control = self:GetControl(name)
+    if ok and control and control.kind == "toggle" then self.Toggles[name] = control.get() == true end
+    return ok
 end
 
 -- Core.spawn hands every loop back so the frontend's Rejoin can restart the
