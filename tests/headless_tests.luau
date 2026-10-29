@@ -22,7 +22,7 @@ do
         check(ctx.State.__DEPHUB_LOADER_STATE.status == "success", "successful loader records success state")
         check(ctx.State.__DEPHUB.Mode == (case[3] == "rt3" and "RT3" or case[3] == "bloxfruits" and "BloxFruits" or "Universal"), "loader records the correct mode")
         check(#ctx.Logs == 4, "loader emits four startup identity lines")
-        check(ctx.Logs[1] == "Iniciando loader v0.0.38" and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
+        check(ctx.Logs[1] and ctx.Logs[1]:match("^Iniciando loader v%d+%.%d+%.%d+$") ~= nil and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
         check(ctx.Logs[3] == "PlaceId: " .. case[1] and ctx.Logs[4] == "GameId: " .. case[2], "game identity logs preserved")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
