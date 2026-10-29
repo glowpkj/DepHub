@@ -314,20 +314,22 @@ end
 
 local function updateMarkerColor(position)
     local inside = false
-    local radius = MARKER_DIAMETER / 2
+    local halfX = marker.Size.X / 2
+    local halfZ = marker.Size.Z / 2
+    local offsets = {
+        Vector3.new(-halfX, 0, -halfZ),
+        Vector3.new(-halfX, 0, halfZ),
+        Vector3.new(halfX, 0, -halfZ),
+        Vector3.new(halfX, 0, halfZ)
+    }
 
     for _, court in ipairs(State.Courts) do
         if court.Parent then
             local center = Vector3.new(position.X, court.Position.Y, position.Z)
             local courtInside = true
 
-            for i = 0, CIRCLE_SAMPLES - 1 do
-                local angle = (2 * math.pi * i) / CIRCLE_SAMPLES
-                local point = center + Vector3.new(
-                    math.cos(angle) * radius,
-                    0,
-                    math.sin(angle) * radius
-                )
+            for _, offset in ipairs(offsets) do
+                local point = center + offset
                 local localPoint = court.CFrame:PointToObjectSpace(point)
 
                 if math.abs(localPoint.X) + 0.001 > court.Size.X / 2
