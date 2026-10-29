@@ -368,7 +368,9 @@ function M.init(Core, UI)
     local mp = UI.page("Farm")
     UI.section(mp, "CHESTS")
     UI.toggle(mp, "Chest ESP", "Highlight chests on the map", false, function(s) M.setChestESP(s) end)
+    if UI._controls["Farm / Chest ESP"] then UI._controls["Farm / Chest ESP"].sea = "All" end
     UI.toggle(mp, "Auto collect chests", "Teleport chest to chest (nearest first)", false, function(s) M.setChestFarm(s) end)
+    if UI._controls["Farm / Auto collect chests"] then UI._controls["Farm / Auto collect chests"].sea = "All" end
 
     Core.register("fruits", M)
     return M
