@@ -1,20 +1,20 @@
-local NebulaTech = {}
-NebulaTech.__index = NebulaTech
+local DepHub = {}
+DepHub.__index = DepHub
 
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local TweenService = game:GetService("TweenService")
 
 local COLORS = {
-    Background = Color3.fromRGB(13, 15, 20),
-    Panel = Color3.fromRGB(21, 23, 31),
-    Panel2 = Color3.fromRGB(26, 29, 39),
-    Border = Color3.fromRGB(38, 42, 54),
+    Background = Color3.fromRGB(0, 0, 0),
+    Panel = Color3.fromRGB(5, 5, 5),
+    Panel2 = Color3.fromRGB(10, 10, 10),
+    Border = Color3.fromRGB(24, 24, 24),
     Text = Color3.fromRGB(231, 233, 238),
     Muted = Color3.fromRGB(139, 144, 160),
     Accent = Color3.fromRGB(124, 108, 255),
     Accent2 = Color3.fromRGB(88, 101, 242),
-    Track = Color3.fromRGB(42, 46, 59)
+    Track = Color3.fromRGB(30, 30, 30)
 }
 
 local function create(className, properties, parent)
@@ -66,7 +66,7 @@ local function makeButton(parent, text, size)
     return object
 end
 
-function NebulaTech.new(config)
+function DepHub.new(config)
     config = config or {}
     local self = setmetatable({}, NebulaTech)
     self.Name = config.Name or "DepHub"
@@ -85,11 +85,11 @@ function NebulaTech.new(config)
         end
     end
 
-    local old = parent:FindFirstChild(config.GuiName or "NebulaTech")
+    local old = parent:FindFirstChild(config.GuiName or "DepHub")
     if old then old:Destroy() end
 
     local gui = create("ScreenGui", {
-        Name = config.GuiName or "NebulaTech",
+        Name = config.GuiName or "DepHub",
         ResetOnSpawn = false,
         IgnoreGuiInset = true,
         DisplayOrder = 1000,
@@ -122,7 +122,7 @@ function NebulaTech.new(config)
     create("TextLabel", {
         BackgroundTransparency = 1,
         Size = UDim2.new(1, 0, 0, 34),
-        Text = "<u>nebula</u><font color=\"#7C6CFF\">tech</font>",
+        Text = "<font color=\"#FFFFFF\">Dep</font><font color=\"#8B5CF6\">Hub</font>",
         RichText = true,
         Font = Enum.Font.GothamBold,
         TextSize = 15,
@@ -310,7 +310,7 @@ function NebulaTech.new(config)
             end
             page.Visible = true
             tabButton.TextColor3 = COLORS.Text
-            navButton.BackgroundColor3 = Color3.fromRGB(44, 40, 70)
+            navButton.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
             local indicator = create("Frame", {
                 AnchorPoint = Vector2.new(0.5, 1),
                 Position = UDim2.new(0.5, 0, 1, 0),
@@ -543,7 +543,7 @@ function NebulaTech.new(config)
                 local action = makeButton(controls, name, UDim2.fromOffset(104, 26))
                 action.AnchorPoint = Vector2.new(1, 0.5)
                 action.Position = UDim2.new(1, 0, 0.5, 0)
-                action.BackgroundColor3 = Color3.fromRGB(44, 40, 70)
+                action.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
                 local item = register(name, function(available) action.Active = available; action.BackgroundTransparency = available and 0 or 0.5 end)
                 action.Activated:Connect(function() if item.Available and callback then callback() end end)
                 item:SetAvailableState(section.Enabled)
@@ -664,6 +664,94 @@ function NebulaTech.new(config)
                 return item
             end
 
+            function section:CreateSlider(name, minimum, maximum, default, callback)
+                local minValue = tonumber(minimum) or 0
+                local maxValue = tonumber(maximum) or 100
+                if maxValue < minValue then minValue, maxValue = maxValue, minValue end
+                local value = math.clamp(tonumber(default) or minValue, minValue, maxValue)
+                local row = create("Frame", {Name = tostring(name), BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 48)}, inner)
+                create("TextLabel", {BackgroundTransparency = 1, Size = UDim2.new(1, -54, 0, 20), Text = tostring(name), Font = Enum.Font.Gotham, TextSize = 12, TextColor3 = COLORS.Text, TextXAlignment = Enum.TextXAlignment.Left, TextTruncate = Enum.TextTruncate.AtEnd}, row)
+                local valueLabel = create("TextLabel", {BackgroundTransparency = 1, AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, 0, 0, 0), Size = UDim2.fromOffset(48, 20), Text = tostring(value), Font = Enum.Font.GothamSemibold, TextSize = 11, TextColor3 = COLORS.Accent, TextXAlignment = Enum.TextXAlignment.Right}, row)
+                local bar = create("TextButton", {Text = "", AutoButtonColor = false, Position = UDim2.fromOffset(0, 29), Size = UDim2.new(1, 0, 0, 6), BackgroundColor3 = COLORS.Track, BorderSizePixel = 0}, row)
+                corner(bar, 4)
+                local fill = create("Frame", {Size = UDim2.new(maxValue == minValue and 0 or (value - minValue) / (maxValue - minValue), 0, 1, 0), BackgroundColor3 = COLORS.Accent, BorderSizePixel = 0}, bar)
+                corner(fill, 4)
+                local item = register(name, function(available) bar.Active = available; bar.BackgroundTransparency = available and 0 or 0.5 end)
+                local function render(runCallback)
+                    value = math.clamp(value, minValue, maxValue)
+                    valueLabel.Text = tostring(value)
+                    fill.Size = UDim2.new(maxValue == minValue and 0 or (value - minValue) / (maxValue - minValue), 0, 1, 0)
+                    section.ParentWindow.Flags[name] = value
+                    if runCallback and callback then callback(value) end
+                end
+                function item:Set(nextValue)
+                    local n = tonumber(nextValue)
+                    if not n then return end
+                    value = math.clamp(math.floor(n + 0.5), minValue, maxValue)
+                    render(true)
+                end
+                local draggingSlider = false
+                local function setFromX(x)
+                    local alpha = math.clamp((x - bar.AbsolutePosition.X) / math.max(bar.AbsoluteSize.X, 1), 0, 1)
+                    item:Set(minValue + (maxValue - minValue) * alpha)
+                end
+                bar.Activated:Connect(function() if item.Available then setFromX(UserInputService:GetMouseLocation().X) end end)
+                bar.InputBegan:Connect(function(input)
+                    if item.Available and (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+                        draggingSlider = true
+                        setFromX(input.Position.X)
+                    end
+                end)
+                bar.InputEnded:Connect(function(input)
+                    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then draggingSlider = false end
+                end)
+                section.ParentWindow.Connections[#section.ParentWindow.Connections + 1] = UserInputService.InputChanged:Connect(function(input)
+                    if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then setFromX(input.Position.X) end
+                end)
+                item:SetAvailableState(section.Enabled)
+                render(false)
+                return item
+            end
+
+            function section:CreateInput(name, placeholder, default, callback)
+                local _, _, controls = addRow(name, 36)
+                local box = create("TextBox", {AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, 0, 0.5, 0), Size = UDim2.fromOffset(112, 28), BackgroundColor3 = COLORS.Background, BorderSizePixel = 0, Text = tostring(default or ""), PlaceholderText = tostring(placeholder or ""), ClearTextOnFocus = false, Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = COLORS.Text, PlaceholderColor3 = COLORS.Muted}, controls)
+                corner(box, 6)
+                stroke(box)
+                local value = tostring(default or "")
+                local item = register(name, function(available) box.Active = available; box.TextEditable = available; box.BackgroundTransparency = available and 0 or 0.5 end)
+                function item:Set(nextValue)
+                    value = tostring(nextValue or "")
+                    box.Text = value
+                    section.ParentWindow.Flags[name] = value
+                    if callback then callback(value) end
+                end
+                box.FocusLost:Connect(function()
+                    if item.Available then
+                        value = box.Text
+                        section.ParentWindow.Flags[name] = value
+                        if callback then callback(value) end
+                    end
+                end)
+                item:SetAvailableState(section.Enabled)
+                section.ParentWindow.Flags[name] = value
+                return item
+            end
+
+            function section:CreateParagraph(text)
+                local row = create("Frame", {Name = "Paragraph", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44)}, inner)
+                local label = create("TextLabel", {BackgroundColor3 = COLORS.Background, BorderSizePixel = 0, Size = UDim2.new(1, 0, 1, 0), Text = tostring(text or ""), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = COLORS.Muted, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center}, row)
+                corner(label, 6)
+                padding(label, 8, 8, 4, 4)
+                local item = {Name = tostring(text or ""), Label = label}
+                function item:SetText(nextText)
+                    label.Text = tostring(nextText or "")
+                    local bounds = label.TextBounds
+                    row.Size = UDim2.new(1, 0, 0, math.max(32, bounds.Y + 12))
+                end
+                return item
+            end
+
             function section:CreateLabel(text)
                 local _, title = addRow(text, 28)
                 title.Size = UDim2.new(1, 0, 1, 0)
@@ -724,11 +812,11 @@ function NebulaTech.new(config)
     return self
 end
 
-function NebulaTech:Destroy()
+function DepHub:Destroy()
     if self.Destroyed then return end
     self.Destroyed = true
     for _, connection in ipairs(self.Connections) do pcall(function() connection:Disconnect() end) end
     if self.Gui then self.Gui:Destroy() end
 end
 
-return NebulaTech
+return DepHub
