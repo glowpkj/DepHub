@@ -756,15 +756,14 @@ function DepHub.new(config)
             end
 
             function section:CreateParagraph(text)
-                local row = create("Frame", {Name = "Paragraph", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 44)}, inner)
-                local label = create("TextLabel", {BackgroundColor3 = COLORS.Background, BorderSizePixel = 0, Size = UDim2.new(1, 0, 1, 0), Text = tostring(text or ""), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = COLORS.Muted, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center}, row)
+                local row = create("Frame", {Name = "Paragraph", BackgroundTransparency = 1, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y}, inner)
+                local label = create("TextLabel", {BackgroundColor3 = COLORS.Background, BorderSizePixel = 0, Size = UDim2.new(1, 0, 0, 0), AutomaticSize = Enum.AutomaticSize.Y, Text = tostring(text or ""), Font = Enum.Font.Gotham, TextSize = 11, TextColor3 = COLORS.Muted, TextWrapped = true, TextXAlignment = Enum.TextXAlignment.Left, TextYAlignment = Enum.TextYAlignment.Center}, row)
                 corner(label, 6)
                 padding(label, 8, 8, 4, 4)
                 local item = {Name = tostring(text or ""), Label = label}
                 function item:SetText(nextText)
                     label.Text = tostring(nextText or "")
-                    local bounds = label.TextBounds
-                    row.Size = UDim2.new(1, 0, 0, math.max(32, bounds.Y + 12))
+                    row.Size = UDim2.new(1, 0, 0, 0)
                 end
                 return item
             end
