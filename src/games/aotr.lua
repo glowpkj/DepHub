@@ -213,4 +213,48 @@ end)
 env.__DEPHUB_AOTR=M
 env.__DEPHUB=env.__DEPHUB or {}
 env.__DEPHUB.AOTR=M
+
+local UI=(env.__DEPHUB or {}).UI
+if type(UI)=="table" and type(UI.CreateTab)=="function" then
+    local tabs={}
+    local function dephubSection(ui, tabs, tabName, sectionName, column)
+    local tab=tabs[tabName]
+    if not tab then
+        tab=ui:CreateTab(tabName,"All")
+        tabs[tabName]=tab
+    end
+    if not tab then return nil end
+    return tab:CreateSection(sectionName,column or "Left")
+end
+local function dephubNotify(ui,title,message)
+    if ui and type(ui.Notify)=="function" then ui:Notify(title,message) end
+end
+
+    local esp=dephubSection(UI,tabs,"Titan ESP","Visuals","Left")
+    if esp then
+        esp:CreateToggle("Titan ESP",M.Toggles.TitanESP,function(v) M:SetToggle("TitanESP",v) end)
+        esp:CreateToggle("Mostrar nuca",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
+        esp:CreateToggle("Expandir nuca",M.Toggles.NapeExtend,function(v) M:SetToggle("NapeExtend",v) end)
+        esp:CreateSlider("Multiplicador da nuca",0,2,M.Values.NapeMultiplier,function(v) M:SetNapeMultiplier(v) end)
+        esp:CreateToggle("Expandir alvo do Attack Titan",M.Toggles.ErenExtend,function(v) M:SetToggle("ErenExtend",v) end)
+    end
+    local assist=dephubSection(UI,tabs,"Assistência","Automação","Left")
+    if assist then
+        assist:CreateToggle("Repor lâminas",M.Toggles.AutoBladeRefill,function(v) M:SetToggle("AutoBladeRefill",v) end)
+        assist:CreateToggle("Pegar escape automaticamente",M.Toggles.AutoGrabEscape,function(v) M:SetToggle("AutoGrabEscape",v) end)
+        assist:CreateToggle("Anti-injury",M.Toggles.AntiInjury,function(v) M:SetToggle("AntiInjury",v) end)
+        assist:CreateToggle("Tentar novamente",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
+        assist:CreateToggle("Anti-AFK",M.Toggles.AntiAFK,function(v) M:SetToggle("AntiAFK",v) end)
+    end
+    local movement=dephubSection(UI,tabs,"Movement","Movimento","Left")
+    if movement then
+        movement:CreateButton("Ir até o refill",function()
+            local ok=M:TeleportToRefill()
+            dephubNotify(UI,"AOT:R",ok and "Indo até o refill." or "Refill não encontrado.")
+        end)
+        movement:CreateButton("Cancelar movimento",function() M:CancelTeleport() end)
+    end
+    local status=dephubSection(UI,tabs,"Status","Diagnóstico","Left")
+    if status then status:CreateParagraph("Estado atual",M:GetStatus()) end
+end
 return M
