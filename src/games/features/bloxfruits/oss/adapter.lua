@@ -134,6 +134,7 @@ function Factory.new(context)
     local sea = context.Sea or "Sea1"
     pcall(function() UI.setSea(sea) end)
     State.Sea = sea
+    if type(UI.onSea) == "function" then pcall(UI.onSea, function(nextSea) State.Sea = nextSea end) end
 
     function State:SetSea(nextSea)
         if self.Destroyed or type(nextSea) ~= "string" then return false end
