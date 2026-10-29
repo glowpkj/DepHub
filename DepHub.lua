@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.57"
+local VERSION = "0.0.58"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -257,35 +257,17 @@ end
 if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait()
 
--- Resolve the explicit visual mode from the target so the categories and the
--- backend are always chosen together. Unknown games resolve to Universal, but
--- only the safe window below is ever shown for them.
-local okProfile, profile = loadModule("src/core/ui-profile.lua", false)
-local profileModule = (okProfile and type(profile) == "table") and profile or nil
-local function resolveMode(target)
-    if profileModule and type(profileModule.modeForTarget) == "function" then
-        return profileModule.modeForTarget(target)
-    end
-    return target and target.Core == "src/games/bloxfruits.lua" and "BloxFruits" or "Universal"
-end
-local function resolveCategories(mode)
-    if profileModule and type(profileModule.categoriesFor) == "function" then
-        return profileModule.categoriesFor(mode)
-    end
-    return mode == "BloxFruits" and {"General", "Sea 1", "Sea 2", "Sea 3", "Sea 1/2", "Sea 2/3"} or {"General"}
-end
-
+-- The shell is identical for every game, so the loader only hands it the name
+-- and version. Categories and tabs are the backend's job: each game fills the
+-- shared shell with its own interface.
 local okDemon, demonModule = loadModule("src/core/demon-ui.lua", false)
 if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "function" then
     return fail("DemonOfDarknessUI nao carregou: " .. tostring(demonModule))
 end
 
-local mode = resolveMode(knownTarget)
 local okWindow, window = pcall(demonModule.new, {
     Name = "DepHub",
-    Version = VERSION,
-    Mode = mode,
-    Categories = resolveCategories(mode)
+    Version = VERSION
 })
 if not okWindow or type(window) ~= "table" then
     return fail("Nao foi possivel iniciar DemonOfDarknessUI: " .. tostring(window))
@@ -353,9 +335,9 @@ elseif isNoobPiece then backend = coreResult
 elseif isVolleyball42 then backend = coreResult
 else backend = coreResult end
 
--- `mode` was already resolved from the target and used to build the window, so
--- the backend and the visual profile always agree.
-env.__DEPHUB.Mode = mode
+-- Informational only: the shell no longer changes per game, so this label
+-- simply names which backend was loaded.
+env.__DEPHUB.Mode = tostring(knownTarget.Core or "Game"):match("([^/]+)%.lua$") or "Game"
 env.__DEPHUB.Backend = backend
 
 if env[STATE_KEY] ~= session then return false end

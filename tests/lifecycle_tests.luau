@@ -24,7 +24,7 @@ do
     ctx:Provide("src/core/updater.lua",{new=function() return {Start=function() end} end})
     check(ctx:Run("DepHub.lua")==true,"loader succeeds without any frontend module")
     check(ctx.State.__DEPHUB.Frontend==nil and ctx.State.__DEPHUB.Window==nil,"loader no longer publishes a frontend handle")
-    check(ctx.State.__DEPHUB.Mode=="Universal" and ctx.State.__DEPHUB.Backend==backend,"loader exposes mode and backend for the new library")
+    check(ctx.State.__DEPHUB.Mode=="universal" and ctx.State.__DEPHUB.Backend==backend,"loader exposes the loaded backend and its label")
 end
 
 do

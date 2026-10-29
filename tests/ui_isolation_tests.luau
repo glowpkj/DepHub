@@ -29,7 +29,7 @@ do
     -- MM2
     do
         local ctx = sandbox(66654135, 66654135)
-        ctx:MountUI({Mode = "MM2"})
+        ctx:MountUI()
         for _, name in ipairs({"roletracker", "roundtracker", "esp", "coinfarm", "playerteleport", "gundrop"}) do
             ctx.Responses["src/games/features/mm2/" .. name .. ".lua"] = sources["src/games/features/mm2/" .. name .. ".lua"]
         end
@@ -49,7 +49,7 @@ do
     -- AOT:R
     do
         local ctx = sandbox(4658598196, 4658598196)
-        ctx:MountUI({Mode = "AOTR"})
+        ctx:MountUI()
         ctx.Responses["src/games/features/aotr/assistance.lua"] = sources["src/games/features/aotr/assistance.lua"]
         local ui = ctx.State.__DEPHUB.UI
         ctx:Run("src/games/aotr.lua")
@@ -66,7 +66,7 @@ do
     -- Noob Piece
     do
         local ctx = sandbox(84822469255086, 84822469255086)
-        ctx:MountUI({Mode = "NoobPiece"})
+        ctx:MountUI()
         -- Build the remotes the backend resolves from ReplicatedStorage.Events.
         local events = ctx.Services.ReplicatedStorage:FindFirstChild("Events")
         for _, name in ipairs({"PlayerAttack", "SelectTeam", "NpcInteract", "OpenDialog", "DialogChoice", "QuestUpdate"}) do
@@ -90,7 +90,7 @@ do
     -- TSB (newly gained a UI)
     do
         local ctx = sandbox(3808081382, 3808081382)
-        ctx:MountUI({Mode = "TSB"})
+        ctx:MountUI()
         ctx.Responses["src/games/features/tsb/animations.lua"] = sources["src/games/features/tsb/animations.lua"]
         ctx.Responses["src/games/features/tsb/autoblock-v3.lua"] = sources["src/games/features/tsb/autoblock-v3.lua"]
         local ui = ctx.State.__DEPHUB.UI
@@ -109,7 +109,7 @@ do
     -- Volleyball 4.2 (newly gained a UI)
     do
         local ctx = sandbox(1316421563, 1316421563)
-        ctx:MountUI({Mode = "Volleyball42"})
+        ctx:MountUI()
         local ui = ctx.State.__DEPHUB.UI
         ctx:Run("src/games/volleyball42.lua")
         assertNoSeaCategories(ui.Library, "Volleyball42")
@@ -124,10 +124,46 @@ do
     -- Universal
     do
         local ctx = sandbox()
-        ctx:MountUI({Mode = "Universal"})
+        ctx:MountUI()
         local ui = ctx.State.__DEPHUB.UI
         ctx:Run("src/games/universal.lua")
         assertNoSeaCategories(ui.Library, "Universal")
         assertNoBloxTabs(ui.Library, "Universal")
+    end
+
+    -- Every game gets the same shared shell: the wrapper always registers the
+    -- single default category, and only a backend that explicitly asks for more
+    -- (Blox Fruits with its seas) ever gets extra categories.
+    do
+        for _, route in ipairs({
+            {66654135, 66654135},
+            {4658598196, 4658598196},
+            {3808081382, 3808081382},
+            {1316421563, 1316421563},
+            {84822469255086, 84822469255086}
+        }) do
+            local ctx = sandbox(route[1], route[2])
+            ctx:MountUI()
+            local ui = ctx.State.__DEPHUB.UI
+            check(ui.Library._Categories["General"], "shared shell registers the default category")
+        end
+    end
+
+    -- The Demon UI wrapper is the single shared shell: two windows built the
+    -- same way must produce the same category and layout defaults.
+    do
+        local ctxA = sandbox()
+        local uiA = ctxA:MountUI()
+        local ctxB = sandbox()
+        local uiB = ctxB:MountUI()
+        local categoriesA, categoriesB = {}, {}
+        for name in pairs(uiA.Library._Categories) do categoriesA[#categoriesA + 1] = name end
+        for name in pairs(uiB.Library._Categories) do categoriesB[#categoriesB + 1] = name end
+        table.sort(categoriesA)
+        table.sort(categoriesB)
+        check(#categoriesA == #categoriesB, "shared shell builds the same categories for every window")
+        for i = 1, #categoriesA do
+            check(categoriesA[i] == categoriesB[i], "shared shell category set is identical across windows")
+        end
     end
 end

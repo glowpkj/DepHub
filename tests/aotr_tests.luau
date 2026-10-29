@@ -6,7 +6,7 @@ do
         ctx:Provide("src/games/aotr.lua",{Destroyed=false})
         check(ctx:Run("DepHub.lua")==true,"AOTR routes without game.Name")
         check(ctx.State.__DEPHUB.AOTR~=nil and ctx.State.__DEPHUB.BloxFruits==nil,"AOTR route preserves backend identity")
-        check(ctx.State.__DEPHUB.Mode=="AOTR" and ctx.State.__DEPHUB.Backend==ctx.State.__DEPHUB.AOTR,"AOTR route exposes mode and backend")
+        check(ctx.State.__DEPHUB.Mode=="aotr" and ctx.State.__DEPHUB.Backend==ctx.State.__DEPHUB.AOTR,"AOTR route exposes its backend and label")
     end
     local ctx=sandbox()
     ctx.Services.TweenService={}

@@ -216,13 +216,15 @@ local function ensureTab(name, sea)
     local category = categoryForControl(sea)
     local key = category .. "|" .. name
     if renderedTabs[key] then return renderedTabs[key] end
-    local displayName = category == "General" and name or (name .. " · " .. category)
-    local tab = visual:CreateTab(displayName, sea)
+    -- The Blox Fruits backend owns its sea categories: the shared shell only
+    -- creates "General", so this backend registers the seas it uses.
+    if type(visual.CreateCategory) == "function" then visual:CreateCategory(category) end
+    local tab = visual:CreateTab(name, category)
     if not tab then
-        report("BloxFruits: não foi possível criar a aba " .. displayName)
+        report("BloxFruits: não foi possível criar a aba " .. name)
         return nil
     end
-    local record = {Tab = tab, Sea = sea, Name = displayName, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
+    local record = {Tab = tab, Sea = sea, Name = name, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
     renderedTabs[key] = record
     return record
 end

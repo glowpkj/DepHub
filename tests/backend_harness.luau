@@ -294,15 +294,14 @@ local function sandbox(placeId, gameId)
     end
     -- Install the Demon UI wrapper as the shared frontend (context.State.UI)
     -- and hand back the recorded library so tests can inspect which categories,
-    -- tabs and controls a backend registered.
+    -- tabs and controls a backend registered. The shell is identical for every
+    -- game, so no mode/profile is passed here.
     function context:MountUI(options)
         options = options or {}
         local demon = env.loadstring(sources['src/core/demon-ui.lua'])()
         local window = demon.new({
             Name = 'DepHub',
-            Version = 'test',
-            Mode = options.Mode or 'Universal',
-            Categories = options.Categories
+            Version = options.Version or 'test'
         })
         self.State.__DEPHUB = self.State.__DEPHUB or {}
         self.State.__DEPHUB.UI = window

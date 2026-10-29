@@ -1,25 +1,48 @@
+-- Shared DepHub shell.
+--
+-- Every game gets the exact same interface: the same library, the same theme,
+-- the same size, the same tab/section/control API. The backend of each game is
+-- what fills that shell with its own tabs and controls — the shell itself never
+-- knows which game it is running and never adds anything game-specific.
+--
+-- Stable API handed to every backend through env.__DEPHUB.UI:
+--   UI:CreateCategory(name, icon)          -- only when a backend wants categories
+--   UI:CreateTab(name, category)           -- returns a tab wrapper or nil
+--   tab:CreateSection(title, column)       -- "Left" (default) or "Right"
+--   section:CreateToggle/Slider/Dropdown/Button/Input/Paragraph(...)
+--   UI:Notify(title, message, kind)
+--   UI:SetCurrentSea(sea)                  -- category switching, opt-in per backend
+--   UI:Destroy()
+
 local DemonUI = {}
 DemonUI.__index = DemonUI
 
 local LIBRARY_URL = "https://raw.githubusercontent.com/rapzxcwxcorparation/DemonOfDarknessUI/refs/heads/main/DOD.luau"
 
--- Fallback category profiles, used only when the loader does not pass an
--- explicit profile. The loader derives the authoritative profile from
--- src/core/ui-profile.lua and passes it in as options.Categories, so a game can
--- never register another game's categories. Blox Fruits is the only mode with
--- sea categories; every other mode falls back to the single "General".
-local DEFAULT_CATEGORIES = {"General"}
-local CATEGORY_PROFILES = {
-    BloxFruits = {"General", "Sea 1", "Sea 2", "Sea 3", "Sea 1/2", "Sea 2/3"}
+-- Window options are shared by every game so the interface is identical
+-- everywhere. Changing anything here changes it for all games at once.
+local WINDOW_OPTIONS = {
+    Title = "DepHub",
+    Author = "DepHub",
+    Theme = "Monochrome",
+    TabPosition = "Side",
+    CategoryAlign = "Center",
+    ToggleKey = Enum.KeyCode.RightControl,
+    Acrylic = true,
+    AcrylicBlur = 18,
+    Size = UDim2.fromOffset(900, 580),
+    ThemeAutoLoad = false,
+    SoundsEnabled = true,
+    Tooltip = true
 }
 
-local function profileFor(mode)
-    return CATEGORY_PROFILES[mode] or DEFAULT_CATEGORIES
-end
+-- The one category every game has. Backends that want more (for example the
+-- Blox Fruits sea categories) create them explicitly through CreateCategory.
+local DEFAULT_CATEGORY = "General"
 
 -- The library is vendored so a bundled build stays self-contained. Prefer the
 -- vendored copy through the shared resolver; only fall back to the network when
--- no local copy is reachable (e.g. a raw source checkout that predates it).
+-- no local copy is reachable.
 local LIBRARY_PATHS = {
     "src/core/vendor/demon-of-darkness-ui.luau",
     "src/core/vendor/demon-of-darkness-ui.lua"
@@ -70,60 +93,69 @@ local function normalizeSea(sea)
     return value
 end
 
-local function categoryFor(sea, mode)
-    if mode ~= "BloxFruits" then return "General" end
-    if not sea or sea == "" or sea == "All" then return "General" end
-    if sea == "Sea1" then return "Sea 1" end
-    if sea == "Sea2" then return "Sea 2" end
-    if sea == "Sea3" then return "Sea 3" end
-    if sea == "Sea1,Sea2" or sea == "Sea2,Sea1" then return "Sea 1/2" end
-    if sea == "Sea2,Sea3" or sea == "Sea3,Sea2" then return "Sea 2/3" end
-    return "General"
+-- Resolve the category a backend asked for. Backends that pass "All" (or
+-- nothing) want the shared default; backends that pass a real category name
+-- (a Blox Fruits sea, for example) get exactly that.
+local function resolveCategory(category)
+    local value = tostring(category or "")
+    if value == "" or value == "All" then return DEFAULT_CATEGORY end
+    if value == "Sea1" then return "Sea 1" end
+    if value == "Sea2" then return "Sea 2" end
+    if value == "Sea3" then return "Sea 3" end
+    if value == "Sea1,Sea2" or value == "Sea2,Sea1" then return "Sea 1/2" end
+    if value == "Sea2,Sea3" or value == "Sea3,Sea2" then return "Sea 2/3" end
+    return value
 end
 
 function DemonUI.new(options)
     options = options or {}
     local export = loadLibrary()
-    local mode = options.Mode or "Universal"
     local library = export.new({
-        Title = options.Name or "DepHub",
-        Version = options.Version or "0.0.56",
-        Author = "DepHub",
-        Theme = "Monochrome",
-        TabPosition = "Side",
-        CategoryAlign = "Center",
-        ToggleKey = Enum.KeyCode.RightControl,
-        Acrylic = true,
-        AcrylicBlur = 18,
-        Size = UDim2.fromOffset(900, 580),
-        ThemeAutoLoad = false,
-        SoundsEnabled = true,
-        Tooltip = true
+        Title = options.Name or WINDOW_OPTIONS.Title,
+        Version = options.Version or "0.0.0",
+        Author = WINDOW_OPTIONS.Author,
+        Theme = WINDOW_OPTIONS.Theme,
+        TabPosition = WINDOW_OPTIONS.TabPosition,
+        CategoryAlign = WINDOW_OPTIONS.CategoryAlign,
+        ToggleKey = WINDOW_OPTIONS.ToggleKey,
+        Acrylic = WINDOW_OPTIONS.Acrylic,
+        AcrylicBlur = WINDOW_OPTIONS.AcrylicBlur,
+        Size = WINDOW_OPTIONS.Size,
+        ThemeAutoLoad = WINDOW_OPTIONS.ThemeAutoLoad,
+        SoundsEnabled = WINDOW_OPTIONS.SoundsEnabled,
+        Tooltip = WINDOW_OPTIONS.Tooltip
     })
     local self = setmetatable({
         Library = library,
         Tabs = {},
         Categories = {},
         CurrentSea = "Sea1",
-        Mode = mode,
         Destroyed = false
     }, DemonUI)
-    for _, category in ipairs(options.Categories or profileFor(mode)) do
-        library:CreateCategory(category, "layers")
-        self.Categories[category] = true
-    end
+    self:CreateCategory(DEFAULT_CATEGORY, "layers")
     return self
 end
 
-function DemonUI:CreateTab(name, sea)
+-- Backends call this to add a category of their own. The shell does not
+-- pre-create game categories, so a game can never show another game's tabs.
+function DemonUI:CreateCategory(name, icon)
+    name = tostring(name or DEFAULT_CATEGORY)
+    if self.Categories[name] then return true end
+    local ok = pcall(function() self.Library:CreateCategory(name, icon or "layers") end)
+    if ok then self.Categories[name] = true end
+    return ok
+end
+
+function DemonUI:CreateTab(name, category)
     if self.Destroyed then return nil end
     name = tostring(name)
-    local category = categoryFor(sea, self.Mode)
+    category = resolveCategory(category)
+    if not self.Categories[category] then self:CreateCategory(category) end
     local ok, result = pcall(function() self.Library:CreateTab(category, name) end)
     local state = self.Library._STATE
     local tabExists = state and state.ContentPages and state.ContentPages[name] ~= nil
     if not ok or not tabExists then
-        self.Library:Notify("DepHub", "Falha ao criar aba " .. name .. ": " .. tostring(result), "error")
+        pcall(function() self.Library:Notify("DepHub", "Falha ao criar aba " .. name .. ": " .. tostring(result), "error") end)
         return nil
     end
     local record = {Adapter = self, Name = name, Category = category, Key = category .. "|" .. name, Control = state.ContentPages[name], Sections = {}, Visible = true}
@@ -176,13 +208,15 @@ function DemonUI:CreateTab(name, sea)
     return record
 end
 
+-- Category switch used by backends that group tabs by a value (Blox Fruits
+-- seas). Categories not managed by the backend are left untouched.
 function DemonUI:_refreshVisibility()
     if self.Destroyed then return end
     local state = self.Library._STATE
     if type(state) ~= "table" then return end
     local sea = normalizeSea(self.CurrentSea)
     for category, data in pairs(state.CategoryButtons or {}) do
-        local visible = category == "General"
+        local visible = category == DEFAULT_CATEGORY
         if category == "Sea 1" then visible = sea == "Sea1" end
         if category == "Sea 2" then visible = sea == "Sea2" end
         if category == "Sea 3" then visible = sea == "Sea3" end
@@ -204,13 +238,13 @@ function DemonUI:_refreshVisibility()
     end
     local activeCategory = state.ActiveCategory
     local activeTab = state.ActiveTab
-    local activeData = activeTab and (self.Tabs[tostring(activeCategory or "General") .. "|" .. activeTab] or self.Tabs[activeTab])
+    local activeData = activeTab and (self.Tabs[tostring(activeCategory or DEFAULT_CATEGORY) .. "|" .. activeTab] or self.Tabs[activeTab])
     if activeData and not activeData.Visible then
-        pcall(function() self.Library:SetActiveCategory("General", "Home") end)
-    elseif activeCategory and activeCategory ~= "General" then
+        pcall(function() self.Library:SetActiveCategory(DEFAULT_CATEGORY, "Home") end)
+    elseif activeCategory and activeCategory ~= DEFAULT_CATEGORY then
         local catData = state.CategoryButtons and state.CategoryButtons[activeCategory]
         if catData and catData.button and not catData.button.Visible then
-            pcall(function() self.Library:SetActiveCategory("General", "Info") end)
+            pcall(function() self.Library:SetActiveCategory(DEFAULT_CATEGORY, "Info") end)
         end
     end
 end
