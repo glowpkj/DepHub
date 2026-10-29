@@ -20,10 +20,10 @@ M.config = {
     range = 120, delay = 0.15,
     targetPlayers = false, playerRange = 60,
     fast = false,
-    auraRange = 60, losCheck = true,
+    auraRange = 60, losCheck = false,
     aimSmooth = 0.15,
     clickInterval = 0.25,
-    keys = { Z = true, X = true, C = false, V = false, F = false },
+    keys = { Z = false, X = false, C = false, V = false, F = false },
     followDist = 6, attack1v1 = false,
     spectate = false, aim = false,
 }
