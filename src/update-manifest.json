@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T16:03:33.840727+00:00",
-  "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+  "generatedAt": "2026-10-29T16:04:40.009507+00:00",
+  "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
   "version": "0.0.41",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "07d456359cbfa8eb5b3d3b3bd023f7407432d38ce0bf0344af492efbfff9578d",
-      "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+      "version": "1f5821346aa5c0ef8cecd02bd7982aebe5f860f75b933e105937c1060d18ce62",
+      "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,8 +26,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "53d1eb13fc3c8df6a89eec15f1092fb74b004fb959edf837e2b34bea6f03b0fe",
-      "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+      "version": "bce249d1657fb15747c271c223d39441a84467d6d30752af0f83952c854d5d68",
+      "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "be100f30dcc7dafd6cf7306cef3b18c6362fe8bf3e7a4ecdde5674c533a8679d",
-      "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+      "version": "9286ac00e1978112df043c3f22fa142f53650b1fa4ec3f46e58350aa2790821f",
+      "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -66,8 +66,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "a3d8ad693b6a8d18481e6c7c15663cadbfe90d49e7b190832e29313abc026b0b",
-      "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+      "version": "386b37855931a400d3abb0a3e7a4b0c55f93607e525ed149ecd5b61c552bc8c0",
+      "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -84,8 +84,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "8bd389c474596a8d5b9975bdb9e23cba971843a042c20565d879cccbb9d3ba5c",
-      "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+      "version": "64c3e19bc6b90df77aeab1053c8ac7720940f23fa6efaa8bbb0095de11f06084",
+      "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -107,8 +107,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "e9159f34419f24f26a20532858078290c804a0cc1bfb22931fc7dcf1b79759fe",
-      "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+      "version": "589260d0a4b480d1b8419aeab6348b2c19881ae243b917e4b6bb2723eb134d93",
+      "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,8 +133,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "2fd63054940b6a779ce36d57973ce5af0c1bc6f8025ecc50b262eb50bdfd35ad",
-      "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+      "version": "42437dce5814d4253a8ea7ce64010c66053873e64d95435c12e9fafb7bcf0c9b",
+      "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "d273bbbf05ac6821525dce22cf36e630ab2ae0e833eb5d85529b33e51e402543",
-      "commit": "df775630736ba8812917f12a37949cb8a238cddc",
+      "version": "e889d75cf00166c68649ada94af818b0de3e57a2eea0afe3b4584b360eb3f533",
+      "commit": "240adcac3705d8ffbe7014c6111399aab2248d1f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -174,6 +174,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "240adca",
+      "Date": "2026-10-29T13:04:30-03:00",
+      "Changes": [
+        "feat(ui): render backend controls by page and support sea gates"
+      ]
+    },
     {
       "Version": "df77563",
       "Date": "2026-10-29T13:03:23-03:00",
@@ -200,13 +207,6 @@
       "Date": "2026-10-29T12:45:51-03:00",
       "Changes": [
         "feat(bloxfruits): vendor open-source script behind a headless DepHub backend"
-      ]
-    },
-    {
-      "Version": "fc8bdb4",
-      "Date": "2026-10-29T12:15:08-03:00",
-      "Changes": [
-        "fix(loader): avoid retired frontend marker in library loader"
       ]
     }
   ]
