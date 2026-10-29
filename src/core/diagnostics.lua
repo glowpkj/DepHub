@@ -263,9 +263,13 @@ function Diagnostics:SniffRemote(remote, label)
     local record = {Restores = {}, Fields = {}}
     self.Hooks[key] = record
 
+    -- Reading a method that does not exist on the Instance's type raises
+    -- ("FireServer is not a valid member of RemoteFunction"), so every method
+    -- read goes through pcall. A RemoteFunction exposes InvokeServer and a
+    -- RemoteEvent exposes FireServer; whichever is absent simply yields nil.
     for _, name in ipairs({"InvokeServer", "FireServer"}) do
-        local method = remote[name]
-        if type(method) == "function" then
+        local okRead, method = pcall(function() return remote[name] end)
+        if okRead and type(method) == "function" then
             local verb = name == "InvokeServer" and "GET " or "POST "
             local wrapped = function(instance, ...)
                 self:_addLog("remote", verb .. label .. "(" .. self:_fmtArgs(...) .. ")")

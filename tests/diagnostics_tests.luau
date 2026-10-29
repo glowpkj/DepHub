@@ -144,6 +144,40 @@ do
     check(diag:LogText():find("GET Test.GET(S_Skills, Usage, 108)", 1, true) ~= nil, "sniffed remote call is logged with arguments")
     ctx.State.hookfunction = nil
 
+    -- In game, reading a method the type does not have raises rather than
+    -- returning nil ("FireServer is not a valid member of RemoteFunction").
+    -- The sniffer must survive that: a RemoteFunction only exposes InvokeServer,
+    -- a RemoteEvent only FireServer. This double raises on the absent method.
+    local remoteFunction = setmetatable({
+        _props = {ClassName = "RemoteFunction", Name = "GET"},
+        _children = {},
+        __strict = {InvokeServer = true},
+        InvokeServer = function() return "ok" end
+    }, {
+        __index = function(self, key)
+            if self.__strict[key] then return rawget(self, key) end
+            error(key .. " is not a valid member of RemoteFunction \"" .. self._props.Name .. "\"")
+        end
+    })
+    -- Sniffing must not raise on the missing FireServer read.
+    local okSniff = pcall(function() diag:SniffRemote(remoteFunction, "Strict.GET") end)
+    check(okSniff, "sniffing a RemoteFunction does not raise on the absent FireServer method")
+
+    -- And the same for a RemoteEvent, which lacks InvokeServer.
+    local remoteEvent = setmetatable({
+        _props = {ClassName = "RemoteEvent", Name = "POST"},
+        _children = {},
+        __strict = {FireServer = true},
+        FireServer = function() return "fired" end
+    }, {
+        __index = function(self, key)
+            if self.__strict[key] then return rawget(self, key) end
+            error(key .. " is not a valid member of RemoteEvent \"" .. self._props.Name .. "\"")
+        end
+    })
+    local okSniffEvent = pcall(function() diag:SniffRemote(remoteEvent, "Strict.POST") end)
+    check(okSniffEvent, "sniffing a RemoteEvent does not raise on the absent InvokeServer method")
+
     diag:_removeLogHooks()
     check(diag.Hooks.warn == nil, "diagnostics removes its log hooks on teardown")
     diag:Destroy()

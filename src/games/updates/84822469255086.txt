@@ -1,3 +1,4 @@
+0.0.67 | Remote sniffer no longer reads absent methods as raw indexes: a RemoteFunction has no FireServer and a RemoteEvent has no InvokeServer, so each method read is pcall-guarded and the absent one is skipped instead of raising and failing the whole backend load.
 0.0.66 | Debug console metrics no longer crash when the executor does not expose Stats.FrameStats/Network: every optional Stats and Workspace read now resolves through FindFirstChild, so FPS/ping/titans degrade to no-data instead of raising.
 0.0.65 | Every game backend now reports its own structure into the Debug tab: named instances, live feature state, watches and console commands, so a game update that breaks a dependency shows up as [FALHA] at the point of failure.
 0.0.64 | Live Debug console: streaming log, live FPS/ping/memory/uptime metrics, feature state auto-refresh, warn/print/error hooks, remote sniffer and terminal commands in every game.
