@@ -150,14 +150,26 @@ function DemonUI:CreateTab(name, category)
     name = tostring(name)
     category = resolveCategory(category)
     if not self.Categories[category] then self:CreateCategory(category) end
-    local ok, result = pcall(function() self.Library:CreateTab(category, name) end)
+
     local state = self.Library._STATE
-    local tabExists = state and state.ContentPages and state.ContentPages[name] ~= nil
-    if not ok or not tabExists then
-        pcall(function() self.Library:Notify("DepHub", "Falha ao criar aba " .. name .. ": " .. tostring(result), "error") end)
-        return nil
+    -- The library indexes pages by tab name alone, so a name is global even
+    -- when two categories both want a tab called "Farm". Reuse the tab when the
+    -- same name was already created for this same category; otherwise make the
+    -- name unique so the library accepts it.
+    local existing = self.Tabs[category .. "|" .. name]
+    if existing then return existing end
+    local uniqueName = name
+    if state and state.ContentPages and state.ContentPages[uniqueName] ~= nil then
+        uniqueName = name .. " · " .. category
     end
-    local record = {Adapter = self, Name = name, Category = category, Key = category .. "|" .. name, Control = state.ContentPages[name], Sections = {}, Visible = true}
+
+    local ok, result = pcall(function() self.Library:CreateTab(category, uniqueName) end)
+    state = self.Library._STATE
+    local tabExists = state and state.ContentPages and state.ContentPages[uniqueName] ~= nil
+    if not ok or not tabExists then
+        return nil, tostring(result or ("ContentPages[" .. uniqueName .. "] ausente"))
+    end
+    local record = {Adapter = self, Name = uniqueName, DisplayName = name, Category = category, Key = category .. "|" .. name, Control = state.ContentPages[uniqueName], Sections = {}, Visible = true}
     function record:CreateSection(title, column)
         title = tostring(title or self.Name)
         if self.Sections[title] then return self.Sections[title] end

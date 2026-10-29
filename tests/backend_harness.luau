@@ -174,6 +174,14 @@ local function NewWindow()
         return {Name = name}
     end
     function library:CreateTab(category, name)
+        -- Mirror the real library: a tab name is global, so a duplicate name is
+        -- an error, and the category must exist first.
+        if not self._Categories[category] then
+            error("[DoD UI] Category '" .. tostring(category) .. "' belum dibuat. Panggil :CreateCategory dulu.")
+        end
+        if state.ContentPages[name] then
+            error("[DoD UI] Tab '" .. tostring(name) .. "' already exists.")
+        end
         self._Tabs[#self._Tabs + 1] = {Category = category, Name = name}
         state.ContentPages[name] = {Visible = true}
         return {Name = name}

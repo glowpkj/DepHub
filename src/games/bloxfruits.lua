@@ -215,13 +215,16 @@ end
 local function ensureTab(name, sea)
     local category = categoryForControl(sea)
     local key = category .. "|" .. name
-    if renderedTabs[key] then return renderedTabs[key] end
+    if renderedTabs[key] ~= nil then return renderedTabs[key] or nil end
     -- The Blox Fruits backend owns its sea categories: the shared shell only
     -- creates "General", so this backend registers the seas it uses.
     if type(visual.CreateCategory) == "function" then visual:CreateCategory(category) end
     local tab = visual:CreateTab(name, category)
     if not tab then
-        report("BloxFruits: não foi possível criar a aba " .. name)
+        -- Remember the failure so the next control in this group does not try
+        -- again: without this the same tab is retried for every control.
+        renderedTabs[key] = false
+        report("BloxFruits: não foi possível criar a aba " .. name .. " (" .. category .. ")")
         return nil
     end
     local record = {Tab = tab, Sea = sea, Name = name, Category = category, Key = key, Columns = {Left = 0, Right = 0}}

@@ -82,3 +82,34 @@ do
     check(ctx.State.__DEPHUB.BloxFruits == state, "loader contract points at the OSS backend")
     check(state.UI and state.UI._defs and #state.UI._defs > 0, "control registry survives route selection")
 end
+
+-- With a window mounted, the backend renders every page. The library indexes
+-- tabs by name alone, so two categories that both want a "Farm" tab must not
+-- collide: the shell makes the name unique and the backend never retries a tab
+-- that could not be created.
+do
+    local ctx = ossContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table", "Blox Fruits builds against a mounted window")
+
+    local tabNames = {}
+    for _, tab in ipairs(ui.Library._Tabs) do tabNames[tab.Name] = true end
+    local count = 0
+    for _ in pairs(tabNames) do count += 1 end
+    check(count > 0, "Blox Fruits creates tabs when a window is mounted (" .. count .. ")")
+
+    -- Every created tab name must be unique, exactly like the real library
+    -- requires; a duplicate would have errored inside CreateTab.
+    check(count == #ui.Library._Tabs, "no duplicate tab name reached the library")
+
+    -- A "Farm" page exists, and sea-gated duplicates were renamed instead of
+    -- being rejected.
+    local sawFarm, sawSeaSuffixed = false, false
+    for name in pairs(tabNames) do
+        if name == "Farm" then sawFarm = true end
+        if name:find("Farm ·", 1, true) then sawSeaSuffixed = true end
+    end
+    check(sawFarm, "the shared Farm tab is created")
+    check(sawSeaSuffixed, "a same-named tab in another sea category is made unique, not rejected")
+end
