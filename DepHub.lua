@@ -12,10 +12,17 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.67"
+local VERSION = "0.0.68"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
+
+-- Executors cache game:HttpGet by exact URL, so a fixed source URL can keep
+-- serving an older revision of a module even after main is updated. A token
+-- that changes per session makes the module URLs unique, forcing a real fetch
+-- of current source; GitHub's raw host ignores the query, so the file is the
+-- same. The loader's own in-memory cache still keeps it to one fetch per module.
+local CACHE_BUST = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
 
 local placeId = tostring(game.PlaceId)
 local gameId = tostring(game.GameId)
@@ -127,6 +134,9 @@ env[STATE_KEY] = {
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
 env.__DEPHUB.SourceBaseURL = BASE_URL
+-- Published so each backend can make its own module URLs unique per session and
+-- avoid an executor serving a cached older revision (see CACHE_BUST above).
+env.__DEPHUB.SourceCacheBust = CACHE_BUST
 env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 
@@ -210,7 +220,8 @@ end
 local function httpGet(path, useCache)
     local cache = getCache()
     if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
-    local ok, result = performRequest(BASE_URL .. path)
+    local separator = path:find("?", 1, true) and "&" or "?"
+    local ok, result = performRequest(BASE_URL .. path .. separator .. "cb=" .. CACHE_BUST)
     if not ok then return false, result end
     if useCache ~= false then cache[path] = result end
     return true, result

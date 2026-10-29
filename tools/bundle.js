@@ -155,7 +155,8 @@ const bundleHeader = [
 const originalHttpGet = `local function httpGet(path, useCache)
     local cache = getCache()
     if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
-    local ok, result = performRequest(BASE_URL .. path)
+    local separator = path:find("?", 1, true) and "&" or "?"
+    local ok, result = performRequest(BASE_URL .. path .. separator .. "cb=" .. CACHE_BUST)
     if not ok then return false, result end
     if useCache ~= false then cache[path] = result end
     return true, result
@@ -166,7 +167,8 @@ const bundledHttpGet = `local function httpGet(path, useCache)
     if type(bundled) == "string" and #bundled > 0 then return true, bundled end
     local cache = getCache()
     if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
-    local ok, result = performRequest(BASE_URL .. path)
+    local separator = path:find("?", 1, true) and "&" or "?"
+    local ok, result = performRequest(BASE_URL .. path .. separator .. "cb=" .. CACHE_BUST)
     if not ok then return false, result end
     if useCache ~= false then cache[path] = result end
     return true, result

@@ -26,7 +26,8 @@ local function compile(source)
     return true,chunk
 end
 local function fetch(path)
-    local ok,source=pcall(function() return game:HttpGet(BASE_URL..path) end)
+    local cb=tostring((env.__DEPHUB or {}).SourceCacheBust or "")
+    local ok,source=pcall(function() return game:HttpGet(BASE_URL..path..(cb~="" and ("?cb="..cb) or "")) end)
     if not ok or type(source)~="string" or #source==0 then return false,tostring(source) end
     return true,source
 end

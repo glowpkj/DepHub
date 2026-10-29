@@ -23,7 +23,8 @@ local base=(env.__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.
 -- own HttpGet, so fall back to that. Either way the module is plain repo source,
 -- not a remote blob fetched from a third party.
 local function fetch(path)
- local url=base..path
+ local cb=tostring((env.__DEPHUB or {}).SourceCacheBust or "")
+ local url=base..path..(cb~="" and ("?cb="..cb) or "")
  local resolver=(type(env.__dephubHttpGet)=="function" and env.__dephubHttpGet)
   or (type(env.__DEPHUB_HTTP_GET)=="function" and env.__DEPHUB_HTTP_GET)
   or (type(_G.__dephubHttpGet)=="function" and _G.__dephubHttpGet)

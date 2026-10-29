@@ -17,7 +17,8 @@ local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
 
 local function loadFeature(path,context)
-    local okGet,source=pcall(function() return game:HttpGet(BASE_URL..path) end)
+    local cb=tostring((env.__DEPHUB or {}).SourceCacheBust or "")
+    local okGet,source=pcall(function() return game:HttpGet(BASE_URL..path..(cb~="" and ("?cb="..cb) or "")) end)
     if not okGet or type(source)~="string" or #source==0 then return false,tostring(source) end
     local okCompile,chunk,err=pcall(loadstring,source)
     if not okCompile or type(chunk)~="function" then return false,tostring(err or chunk) end

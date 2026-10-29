@@ -23,7 +23,8 @@ end
 local BASE_URL = ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local function fetch(path)
-    local url = BASE_URL .. path
+    local cb = tostring((type(getgenv)=="function" and getgenv() or _G).__DEPHUB and ((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceCacheBust or "")
+    local url = BASE_URL .. path .. (cb ~= "" and ("?cb=" .. cb) or "")
     local ok, result = pcall(function()
         return game:HttpGet(url)
     end)

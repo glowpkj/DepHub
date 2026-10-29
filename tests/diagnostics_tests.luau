@@ -204,4 +204,15 @@ do
     check(report:find("Ambiente", 1, true) ~= nil, "Debug report has an environment section")
     check(report:find("AOTR.TitanRipper", 1, true) ~= nil, "AOT:R backend reports its combat features into Debug")
     check(report:find("Workspace.Titans", 1, true) ~= nil, "AOT:R backend reports its structure probes into Debug")
+
+    -- Every module URL the loader issues carries a per-session cache-bust token,
+    -- so an executor's HttpGet cache cannot serve a stale older revision.
+    check(type(ctx.State.__DEPHUB.SourceCacheBust) == "string" and #ctx.State.__DEPHUB.SourceCacheBust > 0,
+        "loader publishes a cache-bust token for module fetches")
+    local token = ctx.State.__DEPHUB.SourceCacheBust
+    local bustedCalls = 0
+    for _, url in ipairs(ctx.Requests) do
+        if url:find("cb=" .. token, 1, true) then bustedCalls = bustedCalls + 1 end
+    end
+    check(bustedCalls > 0, "loader module fetches carry the cache-bust token")
 end

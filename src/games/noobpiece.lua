@@ -5,7 +5,9 @@ if type(previous)=="table" and type(previous.Destroy)=="function" then previous:
 local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
 
 local function loadFeature(path)
-    local source=game:HttpGet(BASE_URL..path)
+    local env=type(getgenv)=="function" and getgenv() or _G
+    local cb=tostring((env.__DEPHUB or {}).SourceCacheBust or "")
+    local source=game:HttpGet(BASE_URL..path..(cb~="" and ("?cb="..cb) or ""))
     local chunk=assert(loadstring(source))
     return chunk()
 end
