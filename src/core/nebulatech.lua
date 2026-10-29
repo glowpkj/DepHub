@@ -254,6 +254,13 @@ function DepHub.new(config)
     local dragging = false
     local dragStart = nil
     local startPosition = nil
+    local visible = true
+
+    local function setVisible(value)
+        visible = value == true
+        main.Visible = visible
+        floating.Visible = not visible
+    end
 
     local function inDragArea(position)
         local p = tabbar.AbsolutePosition
@@ -292,12 +299,6 @@ function DepHub.new(config)
         end
     end)
 
-    local visible = true
-    local function setVisible(value)
-        visible = value == true
-        main.Visible = visible
-        floating.Visible = not visible
-    end
     floating.Activated:Connect(function() setVisible(true) end)
     self.SetVisible = setVisible
 
