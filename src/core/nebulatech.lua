@@ -215,6 +215,7 @@ function DepHub.new(config)
     config = config or {}
     local self = setmetatable({}, DepHub)
     self.Name = config.Name or "DepHub"
+    self.ToggleKeyCode = config.ToggleKeyCode or Enum.KeyCode.Insert
     self.Tabs = {}
     self.Flags = {}
     self.Connections = {}
@@ -546,7 +547,7 @@ function DepHub.new(config)
                 end
             end
         elseif input.UserInputType == Enum.UserInputType.Keyboard and not gameProcessed then
-            if input.KeyCode == Enum.KeyCode.LeftControl then
+            if input.KeyCode == self.ToggleKeyCode then
                 self.SetVisible(not self.IsVisible())
             end
         end
@@ -931,7 +932,7 @@ function DepHub.new(config)
                         thumb.Position = goalPos
                         track.BackgroundColor3 = goalColor
                     end
-                    window.Flags[name] = value
+                    window.Flags[item.FlagName or name] = value
                 end
 
                 item = registerItem(name, function(enabled)
@@ -989,7 +990,7 @@ function DepHub.new(config)
                     else
                         box.BackgroundColor3 = goalColor
                     end
-                    window.Flags[name] = value
+                    window.Flags[item.FlagName or name] = value
                 end
 
                 item = registerItem(name, function(enabled)
@@ -1078,7 +1079,7 @@ function DepHub.new(config)
 
                 local function render()
                     dd.Text = "  " .. tostring(selected)
-                    window.Flags[name] = selected
+                    window.Flags[item.FlagName or name] = selected
                 end
 
                 item = registerItem(name, function(enabled)
@@ -1252,7 +1253,7 @@ function DepHub.new(config)
                     color = Color3.fromHSV(hue, saturation, brightness)
                     swatch.BackgroundColor3 = color
                     refreshCursors()
-                    window.Flags[name] = color
+                    window.Flags[item.FlagName or name] = color
                     if fire and callback then
                         task.spawn(callback, color)
                     end
@@ -1408,7 +1409,7 @@ function DepHub.new(config)
                         fill.Size = goalFill
                         knob.Position = goalKnob
                     end
-                    window.Flags[name] = value
+                    window.Flags[item.FlagName or name] = value
                     if runCallback and callback then
                         task.spawn(callback, value)
                     end
@@ -1506,7 +1507,7 @@ function DepHub.new(config)
                     tween(boxStroke, TWEEN_FAST, {Color = THEME.Border, Transparency = 0.3})
                     if item:IsEnabled() and box.Text ~= value then
                         value = box.Text
-                        window.Flags[name] = value
+                        window.Flags[item.FlagName or name] = value
                         if callback then
                             task.spawn(callback, value)
                         end
@@ -1518,14 +1519,14 @@ function DepHub.new(config)
                 function item:Set(nextValue)
                     value = tostring(nextValue or "")
                     box.Text = value
-                    window.Flags[name] = value
+                    window.Flags[item.FlagName or name] = value
                     if callback then
                         task.spawn(callback, value)
                     end
                 end
 
                 item.Refresh()
-                window.Flags[name] = value
+                window.Flags[item.FlagName or name] = value
                 return item
             end
 
