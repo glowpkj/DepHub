@@ -72,12 +72,15 @@ function DemonUI:CreateTab(name, sea)
     if self.Destroyed then return nil end
     name = tostring(name)
     local category = categoryFor(sea)
-    local ok, tab = pcall(function() return self.Library:CreateTab(category, name) end)
-    if not ok or not tab then
-        self.Library:Notify("DepHub", "Falha ao criar aba " .. name .. ": " .. tostring(tab), "error")
+    local ok, result = pcall(function() self.Library:CreateTab(category, name) end)
+    local tabExists = self.Library._STATE
+        and self.Library._STATE.ContentPages
+        and self.Library._STATE.ContentPages[name] ~= nil
+    if not ok or not tabExists then
+        self.Library:Notify("DepHub", "Falha ao criar aba " .. name .. ": " .. tostring(result), "error")
         return nil
     end
-    local record = {Adapter = self, Name = name, Category = category, Key = category .. "|" .. name, Control = tab, Sections = {}, Visible = true}
+    local record = {Adapter = self, Name = name, Category = category, Key = category .. "|" .. name, Control = self.Library._STATE.ContentPages[name], Sections = {}, Visible = true}
     function record:CreateSection(title, column)
         title = tostring(title or self.Name)
         if self.Sections[title] then return self.Sections[title] end
