@@ -226,7 +226,7 @@ function TempUI.Mount(env)
             Size = UDim2.new(1, -70, 1, 0),
             Position = UDim2.new(0, 12, 0, 0),
             BackgroundTransparency = 1,
-            Text = title,
+            Text = (type(backend.ToggleLabels) == "table" and backend.ToggleLabels[name]) or title,
             TextColor3 = Color3.fromRGB(214, 214, 214),
             TextSize = 13,
             Font = Enum.Font.Gotham,
@@ -340,6 +340,61 @@ function TempUI.Mount(env)
             TextWrapped = true,
             TextXAlignment = Enum.TextXAlignment.Left,
         }, body).LayoutOrder = nextOrder()
+    end
+
+    if type(backend.Modes) == "table" and type(backend.SetMode) == "function" then
+        addSection("Modo")
+        local modeRow = newInstance("Frame", {
+            Name = "ModeSelector",
+            Size = UDim2.new(1, 0, 0, 34),
+            BackgroundTransparency = 1,
+        }, body)
+        modeRow.LayoutOrder = nextOrder()
+
+        newInstance("UIListLayout", {
+            FillDirection = Enum.FillDirection.Horizontal,
+            HorizontalAlignment = Enum.HorizontalAlignment.Left,
+            VerticalAlignment = Enum.VerticalAlignment.Center,
+            Padding = UDim.new(0, 5),
+            SortOrder = Enum.SortOrder.LayoutOrder,
+        }, modeRow)
+
+        local modeButtons = {}
+        local function renderModes()
+            for name, button in pairs(modeButtons) do
+                local selected = tostring(backend.Mode or "Personal") == name
+                button.BackgroundColor3 = selected and Color3.fromRGB(55, 105, 170) or Color3.fromRGB(34, 34, 34)
+                button.TextColor3 = selected and Color3.fromRGB(245, 245, 245) or Color3.fromRGB(165, 165, 165)
+            end
+        end
+
+        for _, modeName in ipairs(backend.Modes) do
+            local button = newInstance("TextButton", {
+                Name = "Mode_" .. tostring(modeName),
+                Size = UDim2.new(1 / #backend.Modes, -4, 1, 0),
+                BackgroundColor3 = Color3.fromRGB(34, 34, 34),
+                BorderSizePixel = 0,
+                Text = tostring(modeName),
+                TextColor3 = Color3.fromRGB(165, 165, 165),
+                TextSize = 11,
+                Font = Enum.Font.GothamBold,
+                AutoButtonColor = false,
+            }, modeRow)
+            corner(button, 5)
+            modeButtons[modeName] = button
+            button.Activated:Connect(function()
+                local ok, result = pcall(backend.SetMode, backend, modeName)
+                if not ok or result == false then
+                    status.Text = "Falha ao selecionar modo"
+                    status.TextColor3 = Color3.fromRGB(220, 130, 130)
+                    return
+                end
+                renderModes()
+                status.Text = "Modo " .. tostring(modeName) .. " selecionado"
+                status.TextColor3 = Color3.fromRGB(128, 128, 128)
+            end)
+        end
+        renderModes()
     end
 
     if #actions > 0 then
