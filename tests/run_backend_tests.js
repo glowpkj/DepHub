@@ -71,7 +71,7 @@ const sources = 'local sources = {\n' + files.map(file =>
 const harness = fs.readFileSync(path.join(__dirname, 'backend_harness.luau'), 'utf8')
   .replace('-- INSERT_SOURCES', () => sources)
   .replace('-- INSERT_BLOXF_OSS_TESTS', () => fs.readFileSync(path.join(__dirname, 'bloxfruits_oss_tests.luau'), 'utf8'))
-  .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'diagnostics_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'core_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'ui_isolation_tests.luau'), 'utf8'))
+  .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'diagnostics_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'debug_backend_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'core_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'ui_isolation_tests.luau'), 'utf8'))
   .replace('-- INSERT_HEADLESS_TESTS', () => fs.readFileSync(path.join(__dirname, 'headless_tests.luau'), 'utf8'));
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'dephub-backend-test-'));
 const file = path.join(temp, 'test.luau');

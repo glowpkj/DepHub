@@ -218,5 +218,95 @@ if type(UI)=="table" and type(UI.CreateTab)=="function" then
     end
 end
 
+-- Report this backend's own structure and live state into the shared Debug tab.
+-- Every probe names the exact instance a feature reads, so a game update that
+-- renames or removes one shows up as [FALHA] at the point of failure.
+do
+    local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if Diag and type(Diag.Probe)=="function" then
+        Diag:SetEnvironment({["MM2 versao"]=VERSION})
+        for _,name in ipairs({"roletracker","roundtracker","esp","coinfarm","playerteleport","gundrop"}) do
+            Diag:RegisterModule("features/mm2/"..name..".lua")
+        end
+        Diag:Module("features/mm2/roletracker.lua",RoleTracker~=nil,"carregado")
+        Diag:Module("features/mm2/roundtracker.lua",RoundTracker~=nil,"carregado")
+        Diag:Module("features/mm2/esp.lua",ESP~=nil,"carregado")
+        Diag:Module("features/mm2/coinfarm.lua",CoinFarm~=nil,"carregado")
+        Diag:Module("features/mm2/playerteleport.lua",PlayerTeleport~=nil,"carregado")
+        Diag:Module("features/mm2/gundrop.lua",GunDrop~=nil,"carregado")
+        -- Structure probes: the named objects the trackers resolve. A rename of
+        -- any of these is exactly what silently kills a feature after an update.
+        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "ausente")
+        Diag:Probe("Workspace.RegularLobby",Workspace:FindFirstChild("RegularLobby")~=nil,
+            Workspace:FindFirstChild("RegularLobby") and Workspace.RegularLobby.ClassName or "ausente")
+        local hasKnife,hasGun,hasDrop,hasCoins=false,false,false,false
+        for _,object in ipairs(Workspace:GetDescendants()) do
+            if object.Name=="GunDrop" then hasDrop=true end
+            if object.Name=="CoinContainer" then hasCoins=true end
+        end
+        for _,player in ipairs(Players:GetPlayers()) do
+            local character=player.Character
+            local backpack=player:FindFirstChildOfClass("Backpack")
+            if character and character:FindFirstChild("Knife",true) then hasKnife=true end
+            if character and character:FindFirstChild("Gun",true) then hasGun=true end
+            if backpack and backpack:FindFirstChild("Gun") then hasGun=true end
+        end
+        Diag:Probe("Tool.Knife",hasKnife,hasKnife and "visto em algum jogador" or "nao visto (sem murder na rodada?)")
+        Diag:Probe("Tool.Gun",hasGun,hasGun and "visto em algum jogador" or "nao visto (sem sheriff na rodada?)")
+        Diag:Probe("Workspace.GunDrop",hasDrop,hasDrop and "encontrado" or "nenhum drop ativo")
+        Diag:Probe("Workspace.CoinContainer",hasCoins,hasCoins and "encontrado" or "nenhum container")
+        -- Live feature state, read from the tracker debug tables the backend keeps.
+        Diag:Feature("MM2.RoleESP",function() return State.Toggles.RoleESP and "ON" or "off" end)
+        Diag:Feature("MM2.AutoCoins",function() return State.Toggles.AutoCoins and "ON" or "off" end)
+        Diag:Feature("MM2.GunDropESP",function() return State.Toggles.GunDropESP and "ON" or "off" end)
+        Diag:Feature("MM2.AutoGetGun",function() return State.Toggles.AutoGetGun and "ON" or "off" end)
+        Diag:Feature("MM2.Papeis",function()
+            local info=RoleTracker:GetDebugInfo()
+            return "murder="..tostring(info.Murder).." sheriff="..tostring(info.Sheriff).." scans="..tostring(info.Scans)
+        end)
+        Diag:Feature("MM2.Rodada",function()
+            local info=RoundTracker:GetDebugInfo()
+            return "ativa="..tostring(info.RoundActive).." vivos="..tostring(info.AliveRoundPlayers).." lobby="..tostring(info.PlayersInLobby)
+        end)
+        Diag:Feature("MM2.CoinFarm",function()
+            local info=CoinFarm:GetDebugInfo()
+            return "moedas="..tostring(info.Coins).." teleportes="..tostring(info.Teleports).." pausa="..tostring(info.Paused)
+        end)
+        Diag:Feature("MM2.GunDrop",function()
+            local info=GunDrop:GetDebugInfo()
+            return "drop="..tostring(info.GunDrop).." dist="..tostring(info.MurderDistance).." seguro="..tostring(info.Safe)
+        end)
+        Diag:Feature("MM2.LastError",function()
+            local parts={}
+            for _,info in ipairs({RoleTracker:GetDebugInfo(),RoundTracker:GetDebugInfo(),CoinFarm:GetDebugInfo(),PlayerTeleport:GetDebugInfo(),GunDrop:GetDebugInfo()}) do
+                if info.LastError and info.LastError~="none" then parts[#parts+1]=tostring(info.LastError) end
+            end
+            return #parts>0 and table.concat(parts," | ") or "none"
+        end)
+        if type(Diag.Watch)=="function" then
+            Diag:Watch("MM2 murder",function() local info=RoleTracker:GetDebugInfo() return tostring(info.Murder) end)
+            Diag:Watch("MM2 rodada ativa",function() return tostring(RoundTracker:GetDebugInfo().RoundActive) end)
+            Diag:Watch("MM2 moedas",function() return tostring(CoinFarm:GetDebugInfo().Coins) end)
+            Diag:Watch("MM2 gun drop",function() return tostring(GunDrop:GetDebugInfo().GunDrop) end)
+        end
+        if type(Diag.Command)=="function" then
+            Diag:Command("mm2",function()
+                local role=RoleTracker:GetDebugInfo()
+                local round=RoundTracker:GetDebugInfo()
+                local coin=CoinFarm:GetDebugInfo()
+                local gun=GunDrop:GetDebugInfo()
+                return "murder="..tostring(role.Murder).." sheriff="..tostring(role.Sheriff)
+                    .." rodadaAtiva="..tostring(round.RoundActive).." vivos="..tostring(round.AliveRoundPlayers)
+                    .." moedas="..tostring(coin.Coins).." drop="..tostring(gun.GunDrop)
+            end)
+            Diag:Command("mm2-roleesp",function(argument)
+                local on=argument~="off"
+                State:SetRoleESP(on)
+                return "RoleESP="..tostring(on)
+            end)
+        end
+    end
+end
+
 return State
 

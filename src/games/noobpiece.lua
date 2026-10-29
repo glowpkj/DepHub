@@ -444,5 +444,70 @@ end
         team:CreateToggle("Auto team",backend.Toggles.AutoTeam,function(v) backend:SetAutoTeam(v) end)
     end
 end
+
+-- Report this backend's own structure and live state into the shared Debug tab.
+-- The island systems key off a single Workspace folder, "MysteriousIsland"; a
+-- rename there disables its ESP/teleport, so it is probed explicitly.
+do
+    local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if Diag and type(Diag.Probe)=="function" then
+        Diag:SetEnvironment({["NoobPiece versao"]=backend.Version})
+        for _,name in ipairs({"movementprofile","islanddata","chestesp","islandtracker","autochest","autoattack","autofarm","autoteam","wanderinggacha","npcesp","autoquest"}) do
+            Diag:RegisterModule("features/noobpiece/"..name..".lua")
+        end
+        Diag:Module("features/noobpiece/islanddata.lua",backend.IslandTracker~=nil,"carregado")
+        Diag:Module("features/noobpiece/chestesp.lua",backend.ChestESP~=nil,"carregado")
+        Diag:Module("features/noobpiece/islandtracker.lua",backend.IslandTracker~=nil,"carregado")
+        Diag:Module("features/noobpiece/autochest.lua",backend.AutoChest~=nil,"carregado")
+        Diag:Module("features/noobpiece/autoattack.lua",backend.AutoAttack~=nil,"carregado")
+        Diag:Module("features/noobpiece/autofarm.lua",backend.AutoFarm~=nil,"carregado")
+        Diag:Module("features/noobpiece/autoteam.lua",backend.AutoTeam~=nil,"carregado")
+        Diag:Module("features/noobpiece/wanderinggacha.lua",backend.WanderingGacha~=nil,"carregado")
+        Diag:Module("features/noobpiece/npcesp.lua",backend.NpcESP~=nil,"carregado")
+        Diag:Module("features/noobpiece/autoquest.lua",backend.AutoQuest~=nil,"carregado")
+        Diag:Probe("Workspace.MysteriousIsland",Workspace:FindFirstChild("MysteriousIsland")~=nil,
+            Workspace:FindFirstChild("MysteriousIsland") and Workspace.MysteriousIsland.ClassName or "ausente (ESP/teleporte da ilha desligam)")
+        Diag:Probe("Workspace.ChildAdded",backend.IslandWorkspaceConnection~=nil,backend.IslandWorkspaceConnection and "ligado" or "desligado")
+        Diag:Probe("Workspace.ChildRemoved",backend.IslandWorkspaceRemovingConnection~=nil,backend.IslandWorkspaceRemovingConnection and "ligado" or "desligado")
+        Diag:Probe("IslandAvailability",backend.IslandAvailability~=nil,backend.IslandAvailability and "BindableEvent" or "ausente")
+        Diag:Feature("NoobPiece.ChestESP",function() return backend.Toggles.ChestESP and "ON" or "off" end)
+        Diag:Feature("NoobPiece.IslandESP",function() return backend.Toggles.IslandESP and "ON" or "off" end)
+        Diag:Feature("NoobPiece.IslandTeleport",function() return backend.Toggles.IslandTeleport and "ON" or "off" end)
+        Diag:Feature("NoobPiece.GachaESP",function() return backend.Toggles.GachaESP and "ON" or "off" end)
+        Diag:Feature("NoobPiece.AutoQuest",function() return backend.Toggles.AutoQuest and "ON" or "off" end)
+        Diag:Feature("NoobPiece.AutoChest",function() return backend.Toggles.AutoChest and "ON" or "off" end)
+        Diag:Feature("NoobPiece.AutoAttack",function() return backend.Toggles.AutoAttack and "ON" or "off" end)
+        Diag:Feature("NoobPiece.AutoFarm",function() return backend.Toggles.AutoFarm and "ON" or "off" end)
+        Diag:Feature("NoobPiece.AutoTeam",function() return backend.Toggles.AutoTeam and "ON" or "off" end)
+        Diag:Feature("NoobPiece.Ilha selecionada",function() return tostring(backend.Values.SelectedIsland) end)
+        if type(Diag.Watch)=="function" then
+            Diag:Watch("NoobPiece MysteriousIsland",function() return tostring(Workspace:FindFirstChild("MysteriousIsland")~=nil) end)
+            Diag:Watch("NoobPiece ilha selecionada",function() return tostring(backend.Values.SelectedIsland) end)
+            Diag:Watch("NoobPiece toggles",function()
+                local on={}
+                for _,name in ipairs({"ChestESP","IslandESP","IslandTeleport","GachaESP","AutoQuest","AutoChest","AutoAttack","AutoFarm","AutoTeam"}) do
+                    if backend.Toggles[name] then on[#on+1]=name end
+                end
+                return #on>0 and table.concat(on,",") or "nenhum"
+            end)
+        end
+        if type(Diag.Command)=="function" then
+            Diag:Command("np",function()
+                local on={}
+                for _,name in ipairs({"ChestESP","IslandESP","IslandTeleport","GachaESP","AutoQuest","AutoChest","AutoAttack","AutoFarm","AutoTeam"}) do
+                    if backend.Toggles[name] then on[#on+1]=name end
+                end
+                return "ilha="..tostring(backend.Values.SelectedIsland)
+                    .." mystic="..tostring(Workspace:FindFirstChild("MysteriousIsland")~=nil)
+                    .." ligados="..(#on>0 and table.concat(on,",") or "nenhum")
+            end)
+            Diag:Command("np-autofarm",function(argument)
+                local on=argument~="off"
+                backend:SetAutoFarm(on)
+                return "AutoFarm="..tostring(on)
+            end)
+        end
+    end
+end
 env.__DEPHUB_NOOBPIECE=backend
 return backend

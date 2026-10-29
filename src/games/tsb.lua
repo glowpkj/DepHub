@@ -228,5 +228,79 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
     end
 end
 
+-- Report this backend's own structure and live state into the shared Debug tab.
+-- The block key is the "Communicate" RemoteEvent under the character and the
+-- "Live" folder under Workspace -- both are what a TSB update would rename.
+do
+    local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if Diag and type(Diag.Probe)=="function" then
+        Diag:SetEnvironment({["TSB versao"]=VERSION})
+        Diag:RegisterModule("features/tsb/animations.lua")
+        Diag:RegisterModule("features/tsb/autoblock-v3.lua")
+        Diag:Module("features/tsb/animations.lua",type(AnimationData)=="table",type(AnimationData)=="table" and "carregado" or "ausente")
+        Diag:Module("features/tsb/autoblock-v3.lua",State.Features.AutoBlock~=nil,State.Features.AutoBlock and "carregado" or "ausente")
+        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "ausente")
+        local character=LocalPlayer and LocalPlayer.Character
+        local communicate=character and character:FindFirstChild("Communicate")
+        local root=character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid=character and character:FindFirstChildWhichIsA("Humanoid")
+        Diag:Probe("Character.Communicate",communicate and communicate:IsA("RemoteEvent") or false,
+            communicate and communicate.ClassName or "ausente (bloqueio/counters falham)")
+        Diag:Probe("Character.HumanoidRootPart",root~=nil,root and root.ClassName or "ausente")
+        Diag:Probe("Character.Humanoid",humanoid~=nil,humanoid and humanoid.ClassName or "ausente")
+        Diag:Probe("Workspace.Live",Workspace:FindFirstChild("Live")~=nil,
+            Workspace:FindFirstChild("Live") and Workspace.Live.ClassName or "ausente (sem pasta Live, nenhum alvo fica pronto)")
+        Diag:Probe("AnimationData.Groups",type(AnimationData.Groups)=="table","grupos de animacao")
+        Diag:Probe("AnimationData.SkillIds",type(AnimationData.SkillIds)=="table","ids de skill")
+        Diag:Feature("TSB.AutoBlock",function() return State.Toggles.AutoBlock and "ON" or "off" end)
+        Diag:Feature("TSB.M1AfterBlock",function() return State.Toggles.M1AfterBlock and "ON" or "off" end)
+        Diag:Feature("TSB.DashBlock",function() return State.Toggles.DashBlock and "ON" or "off" end)
+        Diag:Feature("TSB.SkillBlock",function() return State.Toggles.SkillBlock and "ON" or "off" end)
+        Diag:Feature("TSB.Estado",function()
+            local info=State:GetDebugInfo()
+            if type(info)~="table" then return "sem dados" end
+            return "bloqueio="..tostring(info.BlockActive).." fonte="..tostring(info.BlockSource)
+                .." alvos="..tostring(info.TrackedPlayers).." blocos="..tostring(info.Blocks)
+        end)
+        Diag:Feature("TSB.Remote",function()
+            local info=State:GetDebugInfo()
+            return type(info)=="table" and tostring(info.Remote) or "sem dados"
+        end)
+        Diag:Feature("TSB.Desconhecidos",function()
+            local info=State:GetDebugInfo()
+            if type(info)~="table" then return "0" end
+            return tostring(info.UnknownAnimations).." animacoes nao mapeadas"
+        end)
+        Diag:Feature("TSB.LastError",function()
+            local info=State:GetDebugInfo()
+            return type(info)=="table" and tostring(info.LastError or "none") or "sem dados"
+        end)
+        if type(Diag.Watch)=="function" then
+            Diag:Watch("TSB bloqueio ativo",function() local info=State:GetDebugInfo() return type(info)=="table" and tostring(info.BlockActive) or "?" end)
+            Diag:Watch("TSB alvos",function() local info=State:GetDebugInfo() return type(info)=="table" and tostring(info.TrackedPlayers) or "?" end)
+            Diag:Watch("TSB remote",function() local info=State:GetDebugInfo() return type(info)=="table" and tostring(info.Remote) or "?" end)
+        end
+        if type(Diag.Command)=="function" then
+            Diag:Command("tsb",function()
+                local info=State:GetDebugInfo()
+                if type(info)~="table" then return "sem dados de debug" end
+                return "bloqueio="..tostring(info.BlockActive).." fonte="..tostring(info.BlockSource)
+                    .." alvos="..tostring(info.TrackedPlayers).." blocos="..tostring(info.Blocks)
+                    .." releases="..tostring(info.Releases).." remote="..tostring(info.Remote)
+                    .." desconhecidos="..tostring(info.UnknownAnimations)
+            end)
+            Diag:Command("tsb-autoblock",function(argument)
+                local on=argument~="off"
+                State:SetAutoBlock(on)
+                return "AutoBlock="..tostring(on)
+            end)
+        end
+        -- Sniff the character remote the block/counters fire through.
+        if type(Diag.SniffRemote)=="function" and communicate then
+            Diag:SniffRemote(communicate,"TSB.Communicate")
+        end
+    end
+end
+
 return State
 

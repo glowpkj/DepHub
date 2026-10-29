@@ -284,5 +284,58 @@ log("Dashboard: " .. tostring(dashboardData.GameName or "Unknown") .. " | Ping: 
 log("Runtime health: " .. tostring(snapshot.Health))
 log("Restaurant Tycoon 3 inicializado com sucesso")
 
+-- Report the RT3 runtime into the shared Debug tab. This backend has no direct
+-- game-structure dependency (every module is fetched over HTTP), so its real
+-- failure surface is the loader and runtime: a module that failed to fetch, a
+-- feature missing its Toggle/Set contract, or a health check that went stale.
+do
+    local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if Diag and type(Diag.Probe)=="function" then
+        Diag:SetEnvironment({["RT3 features"]=tostring(RegisteredFeatures)})
+        for _,path in ipairs(featurePaths) do
+            Diag:RegisterModule(path)
+            local loaded=modules[path]
+            local hasHandler=type(loaded)=="table" and type(loaded.Toggle or loaded.Set)=="function"
+            Diag:Module(path,loaded~=nil,loaded and (hasHandler and "carregado" or "sem Toggle/Set") or "ausente")
+        end
+        Diag:Probe("runtime.Start",runtime~=nil,runtime and "ok" or "ausente")
+        Diag:Probe("Runtime.Dashboard",runtime.Dashboard~=nil,runtime.Dashboard and "ligado" or "ausente")
+        Diag:Probe("Runtime.HealthMonitor",runtime.HealthMonitor~=nil,runtime.HealthMonitor and "ligado" or "ausente")
+        Diag:Probe("Runtime.Scheduler",runtime.Scheduler~=nil,runtime.Scheduler and "ligado" or "ausente")
+        Diag:Probe("AntiAFK",env.__DEPHUB and env.__DEPHUB.AntiAFK~=nil,env.__DEPHUB and env.__DEPHUB.AntiAFK and "ligado" or "ausente")
+        Diag:Probe("Features registradas",RegisteredFeatures>0,RegisteredFeatures.." de "..#featurePaths)
+        Diag:Feature("RT3.AutoFarm",function() return runtime.Features.AutoFarm and tostring(runtime.Features.AutoFarm.Enabled) or "ausente" end)
+        Diag:Feature("RT3.AutoFarmFriends",function() return runtime.Features.AutoFarmFriends and tostring(runtime.Features.AutoFarmFriends.Enabled) or "ausente" end)
+        Diag:Feature("RT3.InstantCook",function() return runtime.Features.InstantCook and tostring(runtime.Features.InstantCook.Enabled) or "ausente" end)
+        Diag:Feature("RT3.AutoDrop",function() return runtime.Features.AutoDrop and tostring(runtime.Features.AutoDrop.Enabled) or "ausente" end)
+        Diag:Feature("RT3.Health",function()
+            local snap=runtime:GetSnapshot()
+            return snap and tostring(snap.Health) or "sem snapshot"
+        end)
+        if type(Diag.Watch)=="function" then
+            Diag:Watch("RT3 health",function() local snap=runtime:GetSnapshot() return snap and tostring(snap.Health) or "?" end)
+            Diag:Watch("RT3 features",function()
+                local n=0
+                for _ in pairs(runtime.Features) do n=n+1 end
+                return n
+            end)
+            Diag:Watch("RT3 destruido",function() return tostring(runtime.Destroyed) end)
+        end
+        if type(Diag.Command)=="function" then
+            Diag:Command("rt3",function()
+                local snap=runtime:GetSnapshot() or {}
+                local data=snap.Dashboard or {}
+                local names={}
+                for name in pairs(runtime.Features) do names[#names+1]=name end
+                table.sort(names)
+                return "features="..table.concat(names,",")
+                    .." health="..tostring(snap.Health)
+                    .." executor="..tostring(data.Executor)
+                    .." destruido="..tostring(runtime.Destroyed)
+            end)
+        end
+    end
+end
+
 return true
 

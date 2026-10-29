@@ -746,4 +746,63 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
     end
 end
 
+-- Report this backend's own structure and live state into the shared Debug tab.
+-- The prediction loop depends on the ball object marked "Ball", the court and
+-- ceiling parts, and each court's Blue/Red teams; a rename of any is what would
+-- break it, so each is probed and its count watched live.
+do
+    local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if Diag and type(Diag.Probe)=="function" then
+        Diag:SetEnvironment({["Volleyball modo"]=tostring(State.Mode),["Volleyball versao"]=State.Version})
+        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "ausente")
+        Diag:Probe("Workspace.Gravity",Workspace.Gravity~=nil,tostring(Workspace.Gravity))
+        local ball=nil
+        for _,object in ipairs(Workspace:GetDescendants()) do
+            if object.Name=="Ball" and (object:IsA("Model") or object:IsA("BasePart")) then ball=object break end
+        end
+        Diag:Probe("Workspace.Ball",ball~=nil,ball and ball.ClassName or "ausente (predicao nao adquire a bola)")
+        Diag:Probe("Workspace.LockCourt",#State.Courts>0,#State.Courts.." quadras cacheadas")
+        Diag:Probe("Workspace.Ceiling",#State.Ceilings>0,#State.Ceilings.." tetos cacheados")
+        local blue,red=false,false
+        local okTeams,teams=pcall(function() return game:GetService("Teams") end)
+        if okTeams and teams then
+            pcall(function()
+                for _,team in ipairs(teams:GetTeams()) do
+                    if team.Name=="Blue" then blue=true end
+                    if team.Name=="Red" then red=true end
+                end
+            end)
+        end
+        Diag:Probe("Teams.Blue",blue,blue and "ok" or "ausente (modo Match sem equipe)")
+        Diag:Probe("Teams.Red",red,red and "ok" or "ausente (modo Match sem equipe)")
+        Diag:Feature("Volleyball.BallPredict",function() return State.Toggles.BallPredict and "ON" or "off" end)
+        Diag:Feature("Volleyball.Modo",function() return tostring(State.Mode) end)
+        Diag:Feature("Volleyball.Bola atual",function() return State.CurrentBall and State.CurrentBall.Name or "nenhuma" end)
+        Diag:Feature("Volleyball.Velocidade",function()
+            local v=State.CurrentVelocity
+            return v and string.format("(%.1f,%.1f,%.1f)",v.X,v.Y,v.Z) or "sem dado"
+        end)
+        Diag:Feature("Volleyball.Historico",function() return #State.History.." amostras" end)
+        if type(Diag.Watch)=="function" then
+            Diag:Watch("Volleyball bola",function() return State.CurrentBall and State.CurrentBall.Name or "nenhuma" end)
+            Diag:Watch("Volleyball quadras",function() return #State.Courts end)
+            Diag:Watch("Volleyball tetos",function() return #State.Ceilings end)
+            Diag:Watch("Volleyball modo",function() return tostring(State.Mode) end)
+        end
+        if type(Diag.Command)=="function" then
+            Diag:Command("vb",function()
+                return "modo="..tostring(State.Mode)
+                    .." bola="..tostring(State.CurrentBall and State.CurrentBall.Name or "nenhuma")
+                    .." quadras="..#State.Courts.." tetos="..#State.Ceilings
+                    .." amostras="..#State.History
+            end)
+            Diag:Command("vb-predict",function(argument)
+                local on=argument~="off"
+                State:SetToggle("BallPredict",on)
+                return "BallPredict="..tostring(on)
+            end)
+        end
+    end
+end
+
 return State
