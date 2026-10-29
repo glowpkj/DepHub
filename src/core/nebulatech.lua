@@ -68,7 +68,7 @@ end
 
 function DepHub.new(config)
     config = config or {}
-    local self = setmetatable({}, NebulaTech)
+    local self = setmetatable({}, DepHub)
     self.Name = config.Name or "DepHub"
     self.Tabs = {}
     self.Flags = {}
@@ -162,7 +162,7 @@ function DepHub.new(config)
         Size = UDim2.new(1, 0, 0, 48),
         BackgroundTransparency = 1
     }, body)
-    padding(tabbar, 16, 12, 5, 0)
+    padding(tabbar, 16, 44, 5, 0)
     local tabLayout = listLayout(tabbar, 6, Enum.FillDirection.Horizontal)
     tabLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
 
@@ -230,7 +230,7 @@ function DepHub.new(config)
         TextXAlignment = Enum.TextXAlignment.Right
     }, footer)
 
-    local floating = makeButton(gui, "N", UDim2.fromOffset(44, 44))
+    local floating = makeButton(gui, "D", UDim2.fromOffset(44, 44))
     floating.Name = "Floating"
     floating.AnchorPoint = Vector2.new(1, 1)
     floating.Position = UDim2.new(1, -18, 1, -18)
@@ -238,6 +238,18 @@ function DepHub.new(config)
     floating.TextSize = 18
     floating.Font = Enum.Font.GothamBold
     corner(floating, 22)
+
+    local closeButton = makeButton(body, "×", UDim2.fromOffset(28, 28))
+    closeButton.Name = "CloseButton"
+    closeButton.AnchorPoint = Vector2.new(1, 0)
+    closeButton.Position = UDim2.new(1, -10, 0, 10)
+    closeButton.TextSize = 20
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.BackgroundColor3 = COLORS.Panel2
+    closeButton.ZIndex = 10
+    closeButton.Activated:Connect(function()
+        if self.SetVisible then self.SetVisible(false) end
+    end)
 
     local dragging, dragInput, dragStart, startPosition
     tabbar.InputBegan:Connect(function(input)
@@ -268,7 +280,7 @@ function DepHub.new(config)
     end
     floating.Activated:Connect(function() setVisible(true) end)
     self.Connections[#self.Connections + 1] = UserInputService.InputBegan:Connect(function(input, processed)
-        if not processed and input.KeyCode == Enum.KeyCode.Insert then setVisible(not visible) end
+        if input.KeyCode == Enum.KeyCode.LeftControl then setVisible(not visible) end
     end)
     self.SetVisible = setVisible
 
