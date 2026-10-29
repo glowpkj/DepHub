@@ -338,7 +338,9 @@ local function sandbox(placeId, gameId)
 end
 local ossContext = sandbox()
 local player = ossContext.Player
+-- INSERT_THEME_SOURCE
 -- INSERT_BLOXF_OSS_TESTS
 -- INSERT_LIFECYCLE_TESTS
 -- INSERT_HEADLESS_TESTS
+-- INSERT_THEME_TESTS
 print(string.format("PASS %d backend/headless checks", passed))
