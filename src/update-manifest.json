@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T22:18:46.907Z",
-  "commit": "809885e9958070f29893147e1297cef99301b11b",
+  "generatedAt": "2026-10-29T22:19:48.210243+00:00",
+  "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
   "version": "0.0.74",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "d864fa983f90fbad91e2c829943d8c544bf8e07a9bfcba75eae1f707dda41ffa",
-      "commit": "809885e9958070f29893147e1297cef99301b11b",
+      "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "76df8964265a03409db2e8d2b9bad2e407ae87edfadd324b13358493da2e9358",
-      "commit": "809885e9958070f29893147e1297cef99301b11b",
+      "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -55,7 +55,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "1bb797f5d1a137bfe3f8bf66693be0ce64be76c3d1727668859cee32ac7ca16d",
-      "commit": "809885e9958070f29893147e1297cef99301b11b",
+      "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -70,7 +70,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "5447f1634a2bcd5be5736dddeb9ec13afaaf258432e17de00df36839ad3c7235",
-      "commit": "809885e9958070f29893147e1297cef99301b11b",
+      "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -89,7 +89,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "61487e630704aa4e1f8c8c80b0708174cf842c62ec5c7386f128a4d6e0b2f1e9",
-      "commit": "809885e9958070f29893147e1297cef99301b11b",
+      "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -113,7 +113,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "4a108cf791771ca23a393c236db3721fb7655e9c9e3f04ab139029b22069de2d",
-      "commit": "809885e9958070f29893147e1297cef99301b11b",
+      "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -140,7 +140,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "0b113521885541d16594a8fd73e0fa590d16c62852b508005f367588dcc59a72",
-      "commit": "809885e9958070f29893147e1297cef99301b11b",
+      "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -167,7 +167,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "fce9204b233a82e82986b9fa54e03d2cce247158cde0c5ee0c6e682f16ea15ec",
-      "commit": "809885e9958070f29893147e1297cef99301b11b",
+      "commit": "ab810d2dd48f796487b5802895f4b8200d336fb6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -186,6 +186,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "ab810d2",
+      "Date": "2026-10-29T19:18:54-03:00",
+      "Changes": [
+        "Add real-theme render test ahead of the UI split (v0.0.74)"
+      ]
+    },
     {
       "Version": "2ca44f6",
       "Date": "2026-10-29T19:03:24-03:00",
@@ -212,13 +219,6 @@
       "Date": "2026-10-29T18:48:13-03:00",
       "Changes": [
         "Load the universal backend automatically for unrecognised games"
-      ]
-    },
-    {
-      "Version": "25b80e7",
-      "Date": "2026-10-29T18:45:33-03:00",
-      "Changes": [
-        "Resolve FPS through GetValue/Value/physics fallback so it is never stuck at 0"
       ]
     }
   ]
