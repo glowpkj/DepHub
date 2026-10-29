@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.37"
+local VERSION = "0.0.38"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -40,8 +40,10 @@ local BACKEND_KEYS = {
 }
 
 -- Extra session handles the loader creates and must tear down on re-execution.
+-- Window/UIGuard are legacy names from the removed frontend: kept so a session
+-- started by an older version is fully cleaned up when the loader runs again.
 local HANDLE_KEYS = {
-    "Updater", "Window", "UIGuard", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
+    "Updater", "Window", "UIGuard", "TempUI", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
 }
 
 -- Legacy globals that older revisions wrote directly to the shared environment.
@@ -117,9 +119,9 @@ env[STATE_KEY] = {
 }
 
 -- Public contract kept small on purpose: anti-cheats that enumerate getgenv()
--- should see only what the UI library needs (Mode/Backend/Version) plus the
--- source base the backends and updater fetch from. Diagnostics live behind
--- __DEPHUB.Debug(), which is only materialised on demand.
+-- should see only Mode/Backend/Version plus the source base the backends and
+-- updater fetch from. Diagnostics live behind __DEPHUB.Debug(), which is only
+-- materialised on demand.
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
 env.__DEPHUB.SourceBaseURL = BASE_URL
@@ -298,64 +300,16 @@ else mode = "BloxFruits" backend = coreResult end
 env.__DEPHUB.Mode = mode
 env.__DEPHUB.Backend = backend
 
-local okGuard, guardFactory = loadModule("src/core/ui-guard.lua", false)
-if okGuard and type(guardFactory) == "table" and type(guardFactory.new) == "function" then
-    local okNew, guard = pcall(guardFactory.new)
-    if okNew and type(guard) == "table" then
-        env.__DEPHUB.UIGuard = guard
-        env.__DEPHUB_UI_GUARD = guard
-        pcall(guard.Start, guard)
-    end
-end
-
 if env[STATE_KEY] ~= session then return false end
 
--- Mount the interface now that __DEPHUB is published. The frontend is pure
--- presentation; panel-host binds its controls to the backend's toggle API.
--- Absence of either module is not an error (e.g. headless execution), so it
--- stays silent; only a genuine mount failure is reported.
---
--- The intro and the panel share one boot: the panel mounts hidden and the
--- intro reveals it on its "revealed" phase, so the shell expansion lands on
--- the panel rather than racing it. Without an intro the panel opens at once.
-local bootPanel
-
-local okFrontend, frontendFactory = loadModule("src/frontend/init.lua", false)
-if okFrontend and type(frontendFactory) == "table" and type(frontendFactory.new) == "function" then
-    local okHost, host = loadModule("src/core/panel-host.lua", false)
-    if okHost and type(host) == "table" and type(host.Mount) == "function" then
-        local okMount, panel = pcall(host.Mount, env, frontendFactory)
-        if okMount and panel then
-            env.__DEPHUB.Frontend = panel
-            bootPanel = panel
-        else
-            pcall(print, "[DepHub] frontend mount failed: " .. tostring(panel))
-        end
-    end
-end
-
--- Intro animation: plays after the panel exists so it can hand over to it.
--- Loaded as a plain chunk; failure is silent (headless or missing module).
-do
-    local okIntro, Intro = loadModule("src/ui/Intro.lua", false)
-    if okIntro and type(Intro) == "table" and type(Intro.Play) == "function" then
-        if bootPanel then
-            -- Keep the panel hidden until the shell has expanded into it.
-            if bootPanel.Root then bootPanel.Root.Visible = false end
-            if bootPanel.FloatingButton then bootPanel.FloatingButton.Visible = false end
-        end
-        local okPlay, inst = pcall(function()
-            return Intro:Play({
-                OnReveal = function()
-                    if bootPanel then
-                        if bootPanel.Root then bootPanel.Root.Visible = true end
-                    end
-                end,
-            })
-        end)
-        if okPlay and inst then
-            env.__DEPHUB.Intro = inst
-        end
+-- Temporary UI: a minimal panel bound to the backend, so features can be
+-- toggled while the proper frontend does not exist. Failure/missing module is
+-- not an error (headless runs, partial deployments).
+local okTempUI, tempUIModule = loadModule("src/core/temp-ui.lua", false)
+if okTempUI and type(tempUIModule) == "table" and type(tempUIModule.Mount) == "function" then
+    local okMount, tempUI = pcall(tempUIModule.Mount, env)
+    if okMount and type(tempUI) == "table" then
+        env.__DEPHUB.TempUI = tempUI
     end
 end
 

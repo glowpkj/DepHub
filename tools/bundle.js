@@ -40,11 +40,11 @@ for (const game of Object.values(config)) {
 }
 
 // The manifest only lists per-game feature files, but the loader also routes to
-// files that appear in no game entry (the universal fallback, the frontend, the
-// panel host, core support, and each target's Core path which a per-game list
-// may not mention). Bundle everything the loader can reach, otherwise those
-// routes bypass BUNDLED_SOURCES and hit the network — which a private
-// repository cannot serve.
+// files that appear in no game entry (the universal fallback, core support, and
+// each target's Core path which a per-game list may not mention). Bundle
+// everything the loader can reach, otherwise those routes bypass
+// BUNDLED_SOURCES and hit the network — which a private repository cannot
+// serve.
 const routedCores = new Set();
 for (const match of loader.matchAll(/Core\s*=\s*"([^"]+)"/g)) routedCores.add(match[1]);
 for (const core of routedCores) modulePaths.add(core);

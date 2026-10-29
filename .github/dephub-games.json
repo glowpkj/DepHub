@@ -4,7 +4,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
-      "src/core/ui-guard.lua",
+      "src/core/temp-ui.lua",
       "src/core/updater.lua",
       "src/games/mm2.lua",
       "src/games/features/mm2/roletracker.lua",
@@ -21,7 +21,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
-      "src/core/ui-guard.lua",
+      "src/core/temp-ui.lua",
       "src/games/bloxfruits.lua",
       "src/games/features/bloxfruits/playeresp.lua",
       "src/games/features/bloxfruits/fruit.lua",
@@ -46,7 +46,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
-      "src/core/ui-guard.lua",
+      "src/core/temp-ui.lua",
       "src/core/updater.lua",
       "src/games/tsb.lua",
       "src/games/features/tsb/animations.lua",
@@ -61,7 +61,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
-      "src/core/ui-guard.lua",
+      "src/core/temp-ui.lua",
       "src/core/anti-afk.lua",
       "src/core/dashboard.lua",
       "src/core/health-monitor.lua",
@@ -81,7 +81,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
-      "src/core/ui-guard.lua",
+      "src/core/temp-ui.lua",
       "src/games/bloxfruits.lua",
       "src/games/features/bloxfruits/playeresp.lua",
       "src/games/features/bloxfruits/fruit.lua",
@@ -106,7 +106,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
-      "src/core/ui-guard.lua",
+      "src/core/temp-ui.lua",
       "src/core/updater.lua",
       "src/core/tween-movement.lua",
       "src/games/features/noobpiece/movementprofile.lua",
@@ -129,7 +129,7 @@
     "files": [
       "DepHub.lua",
       "src/version.txt",
-      "src/core/ui-guard.lua",
+      "src/core/temp-ui.lua",
       "src/core/updater.lua",
       "src/games/aotr.lua",
       "src/games/features/aotr/assistance.lua",

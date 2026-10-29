@@ -1,17 +1,17 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-23T00:11:46.795256+00:00",
-  "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
-  "version": "0.0.37",
+  "generatedAt": "2026-10-29T02:31:01.942Z",
+  "commit": "local",
+  "version": "0.0.38",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "e3c96c6d96b38f646f68a3898e1d23de78b5f068a933b740fe07f4ad8d6992f7",
-      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
+      "version": "ae0e3eeb3006264156ed9db2c59be02fb5cce2f8a0ff0509f5adbf850435ae01",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
-        "src/core/ui-guard.lua",
+        "src/core/temp-ui.lua",
         "src/core/updater.lua",
         "src/games/mm2.lua",
         "src/games/features/mm2/roletracker.lua",
@@ -25,12 +25,12 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "571279819504c3228b19b3f10fb2ab3d9f98250d2f3298ea3d59bf8840caf6c1",
-      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
+      "version": "ced03e88c518df481729b0b49b3b1f8b82b8cf459881cefe2b6279b758a053a7",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
-        "src/core/ui-guard.lua",
+        "src/core/temp-ui.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/playeresp.lua",
         "src/games/features/bloxfruits/fruit.lua",
@@ -52,12 +52,12 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "ec73bb2833c8ef7beafdb92cdf12ad01baf2b3e43320d13bac0a3980979083dc",
-      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
+      "version": "a1c1eb656e4d552360f27e4b91d19cbeaddd8d7a5c4abd5681a716a3148f47bf",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
-        "src/core/ui-guard.lua",
+        "src/core/temp-ui.lua",
         "src/core/updater.lua",
         "src/games/tsb.lua",
         "src/games/features/tsb/animations.lua",
@@ -69,12 +69,12 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "d819a355a40ee76a19f9755d09e6a58f242cc97ba67b7fea19ddd3fd5862d7f4",
-      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
+      "version": "8d0ffcb19e145f87eaa88570b516a34a1523200b6983a49ec3f260c98b4519ba",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
-        "src/core/ui-guard.lua",
+        "src/core/temp-ui.lua",
         "src/core/anti-afk.lua",
         "src/core/dashboard.lua",
         "src/core/health-monitor.lua",
@@ -91,12 +91,12 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "7ab73aaee8405ef0031aedff8e88cbbe6bc9e692f367b4089e4cde2637869f60",
-      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
+      "version": "eddde0bf8846c177671bdc485a16f4bdfc5616747a70402bc1e6ec8ab50d1e7d",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
-        "src/core/ui-guard.lua",
+        "src/core/temp-ui.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/playeresp.lua",
         "src/games/features/bloxfruits/fruit.lua",
@@ -118,12 +118,12 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "42a0ba40c5ed9305a564c3d9e7b1ebb9d73a41b0dce7e6e46fb101096eaa0e1c",
-      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
+      "version": "0a20625d88d56b7f4096fc73dcb59a493d27d994bf47f278389292cf2ab7663a",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
-        "src/core/ui-guard.lua",
+        "src/core/temp-ui.lua",
         "src/core/updater.lua",
         "src/core/tween-movement.lua",
         "src/games/features/noobpiece/movementprofile.lua",
@@ -143,12 +143,12 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "eb8b23f799d6835ecee3584737f7d66a6254c1cb28809573cd5ad3ff80b9bd7f",
-      "commit": "b595136c8c1a7f6f27a3a0e906f7eacf452393cc",
+      "version": "394d8811790814f47e41961e3920762eaf71a1c3022c837a53bc48afd64d5953",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
-        "src/core/ui-guard.lua",
+        "src/core/temp-ui.lua",
         "src/core/updater.lua",
         "src/games/aotr.lua",
         "src/games/features/aotr/assistance.lua",
@@ -156,41 +156,5 @@
       ]
     }
   },
-  "recentUpdates": [
-    {
-      "Version": "b595136",
-      "Date": "2026-10-22T21:11:31-03:00",
-      "Changes": [
-        "fix(ui): fiel INTRO.html, hotkey Insert, painel visivel e handoff"
-      ]
-    },
-    {
-      "Version": "2c9e683",
-      "Date": "2026-10-22T20:49:57-03:00",
-      "Changes": [
-        "feat(ui): v2 Rayfield-style frontend + intro animation"
-      ]
-    },
-    {
-      "Version": "8743854",
-      "Date": "2026-10-18T23:06:07-03:00",
-      "Changes": [
-        "fix: publish bundled HttpGet resolver to the shared environment"
-      ]
-    },
-    {
-      "Version": "77fc110",
-      "Date": "2026-10-18T22:52:37-03:00",
-      "Changes": [
-        "fix: support executors without a writable game.HttpGet member"
-      ]
-    },
-    {
-      "Version": "d431457",
-      "Date": "2026-10-18T22:37:19-03:00",
-      "Changes": [
-        "feat: new panel frontend and release pipeline"
-      ]
-    }
-  ]
+  "recentUpdates": []
 }

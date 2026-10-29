@@ -30,7 +30,7 @@ if (loaderVersion[1] !== version) {
 }
 
 const manifestConfig = JSON.parse(read('.github/dephub-games.json'));
-const requiredCommon = ['DepHub.lua', 'src/version.txt', 'src/core/ui-guard.lua'];
+const requiredCommon = ['DepHub.lua', 'src/version.txt'];
 
 for (const [gameId, game] of Object.entries(manifestConfig)) {
   if (!game || typeof game.name !== 'string' || !Array.isArray(game.files)) {
@@ -44,7 +44,9 @@ for (const [gameId, game] of Object.entries(manifestConfig)) {
     seen.add(file);
     if (!exists(file)) fail(`Missing tracked file for ${gameId}: ${file}`);
     if (file.startsWith('library/')) fail(`Retired library path is still tracked in ${gameId}: ${file}`);
-    if (file.endsWith('/frontend.lua')) fail(`Removed frontend is still tracked in ${gameId}: ${file}`);
+    if (file.endsWith('/frontend.lua') || file.startsWith('src/ui/') || file.startsWith('src/frontend/')) {
+      fail(`Removed frontend is still tracked in ${gameId}: ${file}`);
+    }
   }
 
   for (const required of requiredCommon) {
@@ -86,8 +88,8 @@ if (loader.includes('volleyball') || loader.includes('Volleyball') || loader.inc
 if (loader.includes('violencedistrict') || loader.includes('ViolenceDistrict') || loader.includes('6739698191')) {
   fail('Removed Violence District routing remains in the loader');
 }
-// The loader must not pull in the retired third-party library. Loading its own
-// in-repo frontend module is fine; the retired markers below are not.
+// The loader must not pull in the retired third-party library or the removed
+// in-repo frontend. The retired markers below are banned outright.
 if (/library\/|frontend\.lua|Library\.new|dephubCompact|dephubViolenceDistrict/.test(loader)) {
   fail('Loader still references a retired frontend/library');
 }
@@ -99,9 +101,8 @@ for (const retired of ['src/games/features/volleyballlegends', 'src/games/featur
   if (exists(retired)) fail('Retired directory still exists: ' + retired);
 }
 
-// Game backends must stay presentation-free: they may not build UI. The UI
-// itself lives in src/frontend (and the host in src/core/panel-host.lua), which
-// are allowed to create instances. Only src/games is checked here.
+// Game backends must stay presentation-free: they may not build UI. The
+// frontend has been removed entirely, so only src/games is checked here.
 const xmlUi = /CreateTab|CreateSection|CreateToggle\b|Library\.new|dephubCompact|dephubViolenceDistrict|library\//;
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, {withFileTypes: true})) {
@@ -117,18 +118,8 @@ function walk(dir) {
 }
 walk(path.join(root, 'src/games'));
 
-// src/ui holds presentation-only modules (the intro animation and the
-// standalone UI reference). It must never host engine logic: no game backend
-// API use, no service access beyond the presentation layer.
-const uiAllowed = new Set(['Intro.lua', 'DepHubUI.lua']);
-if (exists('src/ui')) {
-  for (const entry of fs.readdirSync(path.join(root, 'src/ui'), {withFileTypes: true})) {
-    if (entry.isDirectory()) continue;
-    if (!entry.name.endsWith('.lua')) continue;
-    if (!uiAllowed.has(entry.name)) {
-      fail('Unexpected module in src/ui: ' + entry.name + ' (presentation-only)');
-    }
-  }
+for (const removed of ['src/ui', 'src/frontend', 'src/core/panel-host.lua', 'src/core/theme.lua', 'src/core/ui-guard.lua']) {
+  if (exists(removed)) fail('Removed frontend code still exists: ' + removed);
 }
 
 console.log(`DepHub repository validation passed for v${version}`);

@@ -15,7 +15,10 @@ const files = ['src/games/aotr.lua', 'src/games/features/aotr/assistance.lua', '
 const manifestConfig = JSON.parse(fs.readFileSync(path.join(root, '.github/dephub-games.json'), 'utf8'));
 for (const game of Object.values(manifestConfig)) {
   for (const file of game.files) {
-    if (file.startsWith('src/ui/') || !fs.existsSync(path.join(root, file))) {
+    if (file.startsWith('src/ui/') || file.startsWith('src/frontend/') || file.endsWith('/frontend.lua')) {
+      throw new Error('Removed frontend file tracked in manifest: ' + file);
+    }
+    if (!fs.existsSync(path.join(root, file))) {
       throw new Error('Invalid tracked manifest file: ' + file);
     }
   }
@@ -31,21 +34,14 @@ function luaFiles(dir) {
     return entry.isDirectory() ? luaFiles(file) : file.endsWith('.lua') ? [file] : [];
   });
 }
-// Fail on dangling dependencies on retired frontend/library code. The UI lives
-// in src/frontend and src/core/panel-host.lua by design, so the "no UI here"
-// check is scoped to game backends; the retired markers are still banned
-// everywhere (loader included).
+// Fail on dangling dependencies on retired frontend/library code. The frontend
+// has been removed entirely, so no presentation module may come back.
 if (fs.existsSync(path.join(root, 'library'))) {
   throw new Error('Retired library directory still exists');
 }
-// src/ui is the presentation layer (the intro animation). It must not be
-// depended on by game backends; that is enforced by the src/games scan below.
-const allowedUi = new Set(['Intro.lua', 'DepHubUI.lua']);
-if (fs.existsSync(path.join(root, 'src/ui'))) {
-  for (const entry of fs.readdirSync(path.join(root, 'src/ui'), {withFileTypes: true})) {
-    if (!entry.isDirectory() && entry.name.endsWith('.lua') && !allowedUi.has(entry.name)) {
-      throw new Error('Unexpected module in src/ui: ' + entry.name);
-    }
+for (const removed of ['src/ui', 'src/frontend', 'src/core/panel-host.lua', 'src/core/theme.lua', 'src/core/ui-guard.lua']) {
+  if (fs.existsSync(path.join(root, removed))) {
+    throw new Error('Removed frontend code still exists: ' + removed);
   }
 }
 for (const file of [path.join(root, 'DepHub.lua'), ...luaFiles(path.join(root, 'src'))]) {

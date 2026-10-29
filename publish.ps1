@@ -101,11 +101,6 @@ if (-not $SkipTests) {
         & $NodeExe tests/run_backend_tests.js $LuauExe
         if ($LASTEXITCODE -ne 0) { Fail 'backend/headless tests failed.' }
         Write-Ok 'backend tests passed'
-
-        Write-Step 'Running panel tests'
-        & $NodeExe tests/run_panel_tests.js $LuauExe
-        if ($LASTEXITCODE -ne 0) { Fail 'panel tests failed.' }
-        Write-Ok 'panel tests passed'
     } else {
         Write-Warn2 'luau.exe not found - skipping behavioral tests.'
     }
