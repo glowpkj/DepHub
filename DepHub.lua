@@ -38,7 +38,7 @@ local BACKEND_KEYS = {
 }
 
 local HANDLE_KEYS = {
-    "Updater", "Window", "UIGuard", "TempUI", "UI", "Bracket", "DemonUI", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
+    "Updater", "Window", "UIGuard", "TempUI", "UI", "DemonUI", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
 }
 
 local LEGACY_GLOBALS = {
@@ -74,7 +74,6 @@ local function cleanupRuntime()
         end
         state.Frontend = nil
         state.UILibrary = nil
-        state.Bracket = nil
         state.DemonUI = nil
         state.UI = nil
     end
