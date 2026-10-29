@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.47"
+local VERSION = "0.0.48"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -312,16 +312,21 @@ if env[STATE_KEY] ~= session then return false end
 local okUILibrary, uiModule = loadModule("src/core/windui.lua", false)
 if okUILibrary and type(uiModule) == "table" and type(uiModule.new) == "function" then
     env.__DEPHUB.UILibrary = uiModule
+else
+    log("WindUI nao carregou: " .. tostring(uiModule))
 end
 
--- The shared NebulaTech library is loaded once and used by the common frontend
--- for every game backend. UI loading remains optional for headless executors.
+-- WindUI replaces the previous custom library for this test build. UI loading remains optional for headless executors.
 local okTempUI, tempUIModule = loadModule("src/core/temp-ui.lua", false)
 if okTempUI and type(tempUIModule) == "table" and type(tempUIModule.Mount) == "function" then
     local okMount, tempUI = pcall(tempUIModule.Mount, env)
     if okMount and type(tempUI) == "table" then
         env.__DEPHUB.TempUI = tempUI
+    else
+        log("Interface WindUI falhou ao montar: " .. tostring(tempUI))
     end
+elseif not okTempUI then
+    log("Frontend DepHub falhou: " .. tostring(tempUIModule))
 end
 
 env[EXECUTED_KEY] = true
