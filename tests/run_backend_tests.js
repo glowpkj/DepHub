@@ -8,11 +8,16 @@ const luau = process.argv[2];
 if (!luau) throw new Error('Usage: node tests/run_backend_tests.js /path/to/luau');
 const files = ['src/games/aotr.lua', 'src/games/features/aotr/assistance.lua', 'DepHub.lua', 'src/games/bloxfruits.lua', 'src/games/universal.lua',
   'src/games/rt3.lua', 'src/core/runtime.lua', 'src/core/updater.lua', 'src/core/scheduler.lua', 'src/core/health-monitor.lua',
-  'src/games/features/bloxfruits/fruitvfx.lua', 'src/games/noobpiece.lua',
-  'src/games/features/bloxfruits/bladhits.lua', 'src/games/features/bloxfruits/autofarm.lua', 'src/games/features/bloxfruits/quests.lua',
+  'src/games/noobpiece.lua',
   'src/games/features/mm2/roletracker.lua', 'src/games/features/tsb/autoblock-v3.lua',
   'src/games/tsb.lua'];
 const manifestConfig = JSON.parse(fs.readFileSync(path.join(root, '.github/dephub-games.json'), 'utf8'));
+// The Blox Fruits backend loads its modules through game:HttpGet, so every
+// vendored file has to be in `sources`. Pull them straight from the manifest so
+// the test list can never drift from what the game entry actually ships.
+for (const file of manifestConfig['994732206'].files) {
+  if (file.includes('/bloxfruits/oss/') && !files.includes(file)) files.push(file);
+}
 for (const game of Object.values(manifestConfig)) {
   for (const file of game.files) {
     if (file.startsWith('src/ui/') || file.startsWith('src/frontend/') || file.endsWith('/frontend.lua')) {
@@ -60,7 +65,7 @@ const sources = 'local sources = {\n' + files.map(file =>
   `[ ${quote(file)} ] = ${quote(fs.readFileSync(path.join(root, file), 'utf8'))},`).join('\n') + '\n}';
 const harness = fs.readFileSync(path.join(__dirname, 'backend_harness.luau'), 'utf8')
   .replace('-- INSERT_SOURCES', () => sources)
-  .replace('-- INSERT_FRUIT_VFX_TESTS', () => fs.readFileSync(path.join(__dirname, 'fruit_vfx_tests.luau'), 'utf8'))
+  .replace('-- INSERT_BLOXF_OSS_TESTS', () => fs.readFileSync(path.join(__dirname, 'bloxfruits_oss_tests.luau'), 'utf8'))
   .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'core_tests.luau'), 'utf8'))
   .replace('-- INSERT_HEADLESS_TESTS', () => fs.readFileSync(path.join(__dirname, 'headless_tests.luau'), 'utf8'));
 const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'dephub-backend-test-'));

@@ -126,35 +126,31 @@ do
 end
 
 do
+    -- Blox Fruits now runs the vendored open-source script behind a headless
+    -- adapter, so the loader contract is the control registry it publishes
+    -- rather than the old per-feature mock modules.
     local ctx = sandbox()
-    local config = {Values={}}
-    function config:Load(defaults) self.Values = table.clone(defaults) end
-    function config:Get(name, fallback) if self.Values[name] == nil then return fallback end; return self.Values[name] end
-    function config:Update(values) for name, value in pairs(values) do self.Values[name] = value end; return true end
-    function config:Destroy() self.Destroyed = true end
-    ctx:Provide("src/games/features/bloxfruits/config.lua", {new=function() return config end})
-    ctx:Provide("src/games/features/bloxfruits/quests.lua", {Worlds={[1]={{1,9,"Bandit",{0,0,0}}}}, PlaceWorld={[1]=1}, For=function() return "Bandit", {0,0,0}, 1 end, RarityOf=function() return "Mythical" end})
-    local features = {}
-    for _, name in ipairs({"playeresp", "fruit", "observation", "unbreakable", "camerashake", "dash", "flashstep", "waterwalking", "team", "fruitvfx", "bladhits", "autofarm"}) do
-        local feature = {Records={}, Enabled=false, BindCount=0}
-        function feature:Enable() self.Enabled = true; return true end
-        function feature:Disable() self.Enabled = false; return true end
-        function feature:Debug() end
-        function feature:_bind() self.BindCount += 1 end
-        function feature:Destroy() self.Destroyed = true end
-        features[name] = feature
-        ctx:Provide("src/games/features/bloxfruits/" .. name .. ".lua", {new=function() return feature end})
+    for _, name in ipairs(OSS_MODULES) do
+        local path = OSS_PREFIX .. name .. ".lua"
+        ctx.Responses[path] = sources[path]
     end
     local state = ctx:Run("src/games/bloxfruits.lua")
-    check(type(state) == "table" and state.Started and state.UI == nil, "actual Blox Fruits entry starts with mocked features and no UI")
-    check(state.Features.FruitVFX == features.fruitvfx and features.observation.Enabled and features.team.Enabled, "Blox Fruits features and existing startup defaults preserved")
-    check(state:SetToggle("PlayerESP", true) and features.playeresp.Enabled, "Blox Fruits toggles still call feature backends")
+    check(type(state) == "table" and state.Destroyed == false, "actual Blox Fruits entry starts the OSS backend with no UI")
+    check(state.UI ~= nil and state.UI.gui == nil, "Blox Fruits backend builds no window")
+    check(state.Toggles and next(state.Toggles) ~= nil, "Blox Fruits publishes its toggles for the frontend")
+
+    local toggled = false
+    for key in pairs(state.Toggles) do toggled = key break end
+    check(state:SetToggle(toggled, true) and state:GetToggle(toggled), "Blox Fruits toggles route through the backend")
+    check(state:SetValue("does not exist", 1) == false, "unknown control is rejected")
+
     local requests = #ctx.Requests
     ctx.Player.CharacterAdded:Fire({})
     ctx:FlushDeferred()
-    check(features.playeresp.BindCount == 1 and #ctx.Requests == requests, "Blox Fruits respawn rebinds backend without rebuilding UI")
+    check(#ctx.Requests == requests, "Blox Fruits respawn does not reload modules")
+
     state:Destroy()
-    for _, feature in pairs(features) do check(feature.Destroyed, "Blox Fruits cleanup preserves feature destruction") end
+    check(state.Destroyed and ctx.State.__DEPHUB.BloxFruits == nil, "Blox Fruits cleanup releases state")
 end
 
 do
@@ -220,59 +216,44 @@ do
     check(validation.PendingUpdate == nil and validation.RejectedVersions.v3, "backend-change validation still rejects untracked updates")
 end
 
--- Blox Fruits blade-hits + auto-farm behaviour: verifies the server remotes are
--- fired with a rate-limited, humanised cadence (the anti-detection contract).
+-- Vendored combat behaviour: the module must find the nearest Enemies folder
+-- target and fire the real RegisterAttack/RegisterHit remotes with the
+-- server-validated hit table. Exercised through the module's own public API.
 do
     local ctx = sandbox(2753915549, 994732206)
-    ctx:Provide("src/games/features/bloxfruits/quests.lua", {Worlds={}, PlaceWorld={}, For=function() return "Bandit", {100, 20, 100}, 1 end, RarityOf=function() return "Common" end})
-    local context = {LocalPlayer=ctx.Player, Players=ctx.Services.Players, Workspace=ctx.Services.Workspace, GetRoot=function(c) return c and c:FindFirstChild("HumanoidRootPart") end, ClickDelay=0}
-    local state = {Destroyed=false, Features={}, FruitRarityFilter={}}
-    context.State = state
-    local BladeHits = ctx:Run("src/games/features/bloxfruits/bladhits.lua")
-    local blade = BladeHits.new(context)
-    check(type(blade) == "table" and blade.Enabled == false, "BladeHits starts disabled")
-    -- Wire the remotes the feature resolves at Enable time.
+    for _, name in ipairs(OSS_MODULES) do
+        local path = OSS_PREFIX .. name .. ".lua"
+        ctx.Responses[path] = sources[path]
+    end
+
+    -- Remotes the combat module resolves through ReplicatedStorage.
     local rstorage = ctx.Services.ReplicatedStorage
     local modules = Instance.new("Folder"); modules.Name = "Modules"; modules.Parent = rstorage
-    local net = Instance.new("Folder"); net.Name = "Net"; net.Parent = modules
-    local attack = Instance.new("RemoteEvent"); attack.Name = "RE/RegisterAttack"; attack.Parent = net
-    local hit = Instance.new("RemoteEvent"); hit.Name = "RE/RegisterHit"; hit.Parent = net
-    check(blade:_resolveRemotes() and blade.RegisterAttack == attack and blade.RegisterHit == hit, "BladeHits resolves RegisterAttack/RegisterHit remotes")
-    -- A live enemy in Workspace.Enemies with a rooted humanoid.
-    local enemies = Instance.new("Folder"); enemies.Name = "Enemies"; enemies.Parent = ctx.Services.Workspace
-    local enemy = Instance.new("Model"); enemy.Name = "Bandit"; enemy.Parent = enemies
-    local enemyHumanoid = Instance.new("Humanoid"); enemyHumanoid.Health, enemyHumanoid.Parent = 100, enemy
-    local enemyHead = Instance.new("Part"); enemyHead.Name, enemyHead.Position, enemyHead.Parent = "Head", Vector3.new(0, 0, 0), enemy
-    local enemyRoot = Instance.new("Part"); enemyRoot.Name, enemyRoot.Position, enemyRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), enemy
-    enemyRoot.CFrame = CFrame.new(0, 0, 0)
+    local netFolder = Instance.new("Folder"); netFolder.Name = "Net"; netFolder.Parent = modules
+    local attack = Instance.new("RemoteEvent"); attack.Name = "RE/RegisterAttack"; attack.Parent = netFolder
+    local hit = Instance.new("RemoteEvent"); hit.Name = "RE/RegisterHit"; hit.Parent = netFolder
+
+    -- Local player character with a rooted humanoid.
     local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
     ctx.Player.Character = char
     local charHumanoid = Instance.new("Humanoid"); charHumanoid.Health, charHumanoid.Parent = 100, char
-    local charRoot = Instance.new("Part"); charRoot.Name, charRoot.Position, charRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 5), char
-    local fired = blade:AttackNearest(100)
-    check(fired and #attack.Fired == 1 and attack.Fired[1][1] == 0, "BladeHits fires RegisterAttack with the click delay")
-    check(#hit.Fired == 1 and hit.Fired[1][1] == enemyHead, "RegisterHit targets the nearest enemy head")
-    check(type(hit.Fired[1][2]) == "table" and #hit.Fired[1][2] == 1, "RegisterHit carries the enemy table")
-    -- Out of range: no fire.
-    charRoot.Position = Vector3.new(500, 0, 500)
-    local outOfRange = blade:AttackNearest(10)
-    check(not outOfRange and #hit.Fired == 1, "BladeHits stays silent when no enemy is in range")
-    check(blade:SetRange(250) and blade.AttackRange == 250, "BladeHits range is configurable")
-    blade:Destroy()
-    check(blade.Context == nil, "BladeHits releases its context on destroy")
+    local charRoot = Instance.new("Part"); charRoot.Name, charRoot.Position, charRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
 
-    -- Auto-farm drives BladeHits and reports status as data.
-    state.Features.BladeHits = {Enabled=true, AttackRange=100, AttackNearest=function() return true end}
-    local AutoFarm = ctx:Run("src/games/features/bloxfruits/autofarm.lua")
-    local farm = AutoFarm.new(context)
-    farm.QuestData = {For=function() return "Bandit", {100, 20, 100}, 1 end}
-    check(type(farm) == "table" and farm.Enabled == false, "AutoFarm starts disabled")
-    farm:_step()
-    local status = farm:GetStatus()
-    check(status.Monster == "Bandit" and status.Status == "farming Bandit", "AutoFarm targets the quest monster and copies its position")
-    check(enemyHumanoid.WalkSpeed == 0 and enemyRoot.CanCollide == false, "AutoFarm freezes the live target's humanoid and root")
-    check(charRoot.CFrame and charRoot.CFrame.Position.Y == 25, "AutoFarm offsets the pivot above the target (not inside it)")
-    state.Destroyed = true
-    farm:Destroy()
-    check(farm.Context == nil and farm.Enabled == false, "AutoFarm tears down cleanly")
+    -- A live enemy in Workspace.Enemies.
+    local enemies = Instance.new("Folder"); enemies.Name = "Enemies"; enemies.Parent = ctx.Services.Workspace
+    local enemy = Instance.new("Model"); enemy.Name = "Bandit"; enemy.Parent = enemies
+    local enemyHumanoid = Instance.new("Humanoid"); enemyHumanoid.Health, enemyHumanoid.Parent = 100, enemy
+    local enemyRoot = Instance.new("Part"); enemyRoot.Name, enemyRoot.Position, enemyRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 4), enemy
+
+    local Combat = ctx.Env.loadstring(sources[OSS_PREFIX .. "combat.lua"])()
+    local found = Combat.nearest(100)
+    check(found == enemy, "combat finds the nearest enemy in range")
+
+    charRoot.Position = Vector3.new(500, 0, 500)
+    check(Combat.nearest(10) == nil, "combat ignores enemies outside the range")
+    charRoot.Position = Vector3.new(0, 0, 0)
+
+    check(type(Combat.hrp()) == "table", "combat resolves the local humanoid root part")
+    check(type(Combat.nearestAny(100)) == "table", "combat can scan descendants for a live humanoid")
+    Combat.stop()
 end

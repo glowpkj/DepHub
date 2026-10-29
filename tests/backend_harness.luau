@@ -137,14 +137,30 @@ end})
 local function sandbox(placeId, gameId)
     local player = Instance.new("Player")
     player.CharacterAdded, player.CharacterRemoving, player.CameraMaxZoomDistance = signal(), signal(), 128
+    player.Idled = signal()
     local players = {LocalPlayer=player, PlayerAdded=signal(), PlayerRemoving=signal()}
     function players:GetPlayers() return {player} end
+    function players:GetPlayerFromCharacter(character)
+        for _, candidate in ipairs(players:GetPlayers()) do if candidate.Character == character then return candidate end end
+    end
     local run = {RenderStepped=signal(), Stepped=signal(), Heartbeat=signal()}
     local input = {InputBegan=signal(), InputEnded=signal(), JumpRequest=signal()}
     local teleport = {Calls=0}
     function teleport:Teleport() self.Calls += 1 end
     function teleport:TeleportToPlaceInstance() self.Calls += 1 end
+    local tween = {Create=function(_, object, info, goal)
+        return {Play=function() end, Cancel=function() end, Completed={Connect=function() end}}
+    end}
+    local vim = {}
+    for _, name in ipairs({"SendKeyEvent", "SendMouseButtonEvent", "SendMouseMoveEvent", "SendKeyDownEvent", "SendKeyUpEvent", "SendMouseWheelEvent"}) do
+        vim[name] = function() end
+    end
+    local vuser = {}
+    for _, name in ipairs({"Button1Down", "Button1Up", "MouseMove", "KeyPress", "CaptureController", "ClickButton1", "MoveMouseRel"}) do
+        vuser[name] = function() end
+    end
     local services = {Players=players, RunService=run, UserInputService=input, TeleportService=teleport,
+        TweenService=tween, VirtualInputManager=vim, VirtualUser=vuser,
         Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting={},
         ReplicatedStorage=Instance.new("ReplicatedStorage"), TextChatService=Instance.new("TextChatService"), HttpService={}}
     services.Workspace.CurrentCamera = {CFrame = CFrame.new(0, 0, 0)}
@@ -182,12 +198,15 @@ local function sandbox(placeId, gameId)
     end
     env._provided = {}
     context.Env = env
+    -- Vendored Blox Fruits modules read their globals from the shared
+    -- environment (getgenv), not from chunk-locals, so publish the same runtime
+    -- table a real executor's module would see.
+    context.State.__DEPHUB_OSS_RUNTIME = {game = game, task = env.task}
     return context
 end
-local vfxContext = sandbox()
-local player = vfxContext.Player
-local modules = {fruitvfx=vfxContext:Run("src/games/features/bloxfruits/fruitvfx.lua")}
--- INSERT_FRUIT_VFX_TESTS
+local ossContext = sandbox()
+local player = ossContext.Player
+-- INSERT_BLOXF_OSS_TESTS
 -- INSERT_LIFECYCLE_TESTS
 -- INSERT_HEADLESS_TESTS
 print(string.format("PASS %d backend/headless checks", passed))

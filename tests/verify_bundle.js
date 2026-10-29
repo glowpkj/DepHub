@@ -127,6 +127,10 @@ env.loadstring = function(src)
     return fn, err
 end
 env._G = env
+-- The vendored Blox Fruits modules read their globals from the shared
+-- environment rather than from the loader's chunk-locals, so the fake world has
+-- to publish the same runtime table a real executor would.
+state.__DEPHUB_OSS_RUNTIME = {game = game, task = env.task}
 local B = ${quote(bundle)}
 local chunk, err = loadstring(B)
 assert(chunk, "bundle failed to compile: " .. tostring(err))
