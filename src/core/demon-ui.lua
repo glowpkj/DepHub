@@ -31,6 +31,7 @@ local function categoryFor(sea)
     if sea == "Sea1" then return "Sea 1" end
     if sea == "Sea2" then return "Sea 2" end
     if sea == "Sea3" then return "Sea 3" end
+    if sea == "Sea1,Sea2" or sea == "Sea2,Sea1" then return "Sea 1/2" end
     if sea == "Sea2,Sea3" or sea == "Sea3,Sea2" then return "Sea 2/3" end
     return "General"
 end
@@ -60,7 +61,7 @@ function DemonUI.new(options)
         CurrentSea = "Sea1",
         Destroyed = false
     }, DemonUI)
-    for _, category in ipairs({"General", "Sea 1", "Sea 2", "Sea 3", "Sea 2/3"}) do
+    for _, category in ipairs({"General", "Sea 1", "Sea 2", "Sea 3", "Sea 1/2", "Sea 2/3"}) do
         library:CreateCategory(category, "layers")
         self.Categories[category] = true
     end
@@ -104,9 +105,12 @@ function DemonUI:CreateTab(name, sea)
             return self.Adapter.Library:AddButton(self.Control, label, callback)
         end
         function wrapper:CreateInput(label, placeholder, initial, callback)
-            return self.Adapter.Library:AddTextbox(self.Control, label, tostring(initial or placeholder or ""), function(value)
+            local item = {Value = tostring(initial or "")}
+            item.Control = self.Adapter.Library:AddTextbox(self.Control, label, tostring(placeholder or initial or ""), function(value)
+                item.Value = tostring(value or "")
                 if callback then callback(value) end
             end)
+            return item
         end
         function wrapper:CreateParagraph(titleText, bodyText)
             return self.Adapter.Library:AddParagraph(self.Control, tostring(titleText or ""), tostring(bodyText or ""))
@@ -130,9 +134,11 @@ function DemonUI:_refreshVisibility()
         if category == "Sea 1" then visible = sea == "Sea1" end
         if category == "Sea 2" then visible = sea == "Sea2" end
         if category == "Sea 3" then visible = sea == "Sea3" end
+        if category == "Sea 1/2" then visible = sea == "Sea1" or sea == "Sea2" end
         if category == "Sea 2/3" then visible = sea == "Sea2" or sea == "Sea3" end
         local button = data.button or data
         if button and button:IsA("GuiObject") then button.Visible = visible end
+        if data.group and data.group:IsA("GuiObject") then data.group.Visible = visible end
         if data.tabList and data.tabList:IsA("GuiObject") then data.tabList.Visible = visible end
         if data.button and data.button.Parent and data.button.Parent:IsA("GuiObject") then
             data.button.Parent.Visible = visible
