@@ -57,6 +57,8 @@ function Factory.new(context)
     local okRunUI, UI = pcall(uiChunk)
     if not okRunUI or type(UI) ~= "table" then return false, "ui-headless: " .. tostring(UI) end
     State.UI = UI
+    State.Stats = UI.stats
+    State.Notifications = UI.notifications
 
     for _, name in ipairs(ORDER) do
         local path = prefix .. name .. ".lua"
@@ -155,16 +157,17 @@ function Factory.new(context)
 
     function State:SetControl(key, value)
         local control = self:GetControl(key)
-        if not control then return false end
-        local ok = pcall(control.set, value)
-        return ok
+        if not control or type(control.set) ~= "function" then return false end
+        local ok, result = pcall(control.set, value)
+        return ok and result ~= false
     end
 
     function State:GetControlValue(key)
         local control = self:GetControl(key)
-        if not control then return nil end
+        if not control or type(control.get) ~= "function" then return nil end
         local ok, value = pcall(control.get)
-        return ok and value or nil
+        if ok then return value end
+        return nil
     end
 
     function State:GetStatus()
@@ -176,6 +179,15 @@ function Factory.new(context)
             Modules = self.Modules,
             Errors = self.Errors
         }
+    end
+
+    State.Core = Core
+
+    function State:Notify(title, message, duration)
+        local text = message
+        if text == nil then text = title else text = tostring(title or "DepHub") .. ": " .. tostring(message) end
+        pcall(UI.notify, tostring(text), duration)
+        return true
     end
 
     function State:SaveConfig(name)
@@ -193,6 +205,12 @@ function Factory.new(context)
         if ok and type(result) == "table" then return result end
         return {}
     end
+
+    State.Config = {
+        Save = function(name) return State:SaveConfig(name) end,
+        Load = function(name) return State:LoadConfig(name) end,
+        List = function() return State:ListConfigs() end
+    }
 
     function State:Unload()
         if self.Destroyed then return end
