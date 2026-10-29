@@ -314,18 +314,30 @@ end
 -- Metrics
 -- ---------------------------------------------------------------------------
 
+-- Resolve a child by name without raising when the member is absent. A raw
+-- index like stats.FrameStats throws on executors where the member is not
+-- exposed, so every optional read goes through FindFirstChild.
+local function child(object, name)
+    if not object then return nil end
+    local ok, found = pcall(function() return object:FindFirstChild(name) end)
+    return ok and found or nil
+end
+
 function Diagnostics:_collectMetrics()
     local metrics = self.Metrics
     local okStats, stats = pcall(function() return game:GetService("Stats") end)
     if okStats and stats then
-        local frame = stats.FrameStats
+        local frame = child(stats, "FrameStats")
         if frame then
-            local fps = safe(function() return frame.FrameRate.Value end)
+            local rate = child(frame, "FrameRate")
+            local fps = rate and safe(function() return rate.Value end)
             if type(fps) == "number" then metrics.FPS = fps end
         end
-        local net = stats.Network and stats.Network.ServerStatsItem
-        if net then
-            local ping = safe(function() return net["Data Ping"]:GetValue() end)
+        local network = child(stats, "Network")
+        local serverStats = network and child(network, "ServerStatsItem")
+        local pingItem = serverStats and child(serverStats, "Data Ping")
+        if pingItem then
+            local ping = safe(function() return pingItem:GetValue() end)
             if type(ping) == "number" then metrics.Ping = ping end
         end
         local memory = safe(function() return stats:GetTotalMemoryUsageMb() end)
@@ -335,10 +347,11 @@ function Diagnostics:_collectMetrics()
 
     -- Entity counts come from whatever the active backend opted to watch; a
     -- generic fallback keeps the console useful before a backend reports.
-    local okWorkspace = pcall(function() return workspace end)
-    if okWorkspace and workspace then
-        local titans = safe(function() return #workspace.Titans:GetChildren() end)
-        if type(titans) == "number" then metrics.Titans = titans end
+    local okWorkspace, ws = pcall(function() return game:GetService("Workspace") end)
+    if okWorkspace and ws then
+        local titans = child(ws, "Titans")
+        local count = titans and safe(function() return #titans:GetChildren() end)
+        if type(count) == "number" then metrics.Titans = count end
     end
     return metrics
 end

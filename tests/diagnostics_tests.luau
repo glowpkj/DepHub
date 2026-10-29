@@ -60,8 +60,47 @@ do
     diag:Destroy()
 end
 
--- The console listens to the game's own logging and to the remotes the hub
--- drives, and removes its hooks on destroy so nothing is left wrapped.
+-- A Stats service that exists but does not expose FrameStats/Network is exactly
+-- the shape that made _collectMetrics raise in game (raw member indexes throw
+-- when the member is absent). Metrics must degrade to "no data", never error.
+do
+    local ctx = sandbox()
+    local stats = Instance.new("Stats")  -- present, but no FrameStats child
+    ctx.Services.Stats = stats
+    local Diag = ctx:Run("src/core/diagnostics.lua")
+    local diag = Diag.new()
+    local ok, metrics = pcall(function() return diag:_collectMetrics() end)
+    check(ok, "metrics collection survives a Stats service without FrameStats")
+    check(type(metrics) == "table" and type(metrics.Uptime) == "number", "metrics still reports uptime without Stats members")
+    check(metrics.FPS == 0 or type(metrics.FPS) == "number", "missing FPS degrades to a number, not an error")
+    check(diag:RunCommand("metrics"):find("fps=", 1, true) ~= nil, "the metrics console command works without Stats members")
+    diag:Destroy()
+end
+
+-- And when Stats genuinely exposes the members the collector reads, the values
+-- flow through: this guards the FindFirstChild path against silently resolving
+-- nothing once the member does exist.
+do
+    local ctx = sandbox()
+    local stats = Instance.new("Stats")
+    local frameStats = Instance.new("Folder"); frameStats.Name = "FrameStats"; frameStats.Parent = stats
+    local frameRate = Instance.new("NumberValue"); frameRate.Name = "FrameRate"; frameRate.Value = 144; frameRate.Parent = frameStats
+    local network = Instance.new("Folder"); network.Name = "Network"; network.Parent = stats
+    local serverStats = Instance.new("Folder"); serverStats.Name = "ServerStatsItem"; serverStats.Parent = network
+    local dataPing = Instance.new("NumberValue"); dataPing.Name = "Data Ping"
+    function dataPing:GetValue() return 42 end
+    dataPing.Parent = serverStats
+    function stats:GetTotalMemoryUsageMb() return 512 end
+    ctx.Services.Stats = stats
+    local Diag = ctx:Run("src/core/diagnostics.lua")
+    local diag = Diag.new()
+    local metrics = diag:_collectMetrics()
+    check(metrics.FPS == 144, "metrics reads the frame rate when FrameStats exists")
+    check(metrics.Ping == 42, "metrics reads the ping when Network exists")
+    check(metrics.Memory == 512, "metrics reads memory when the method exists")
+    diag:Destroy()
+end
+
 do
     local ctx = sandbox()
     local Diag = ctx:Run("src/core/diagnostics.lua")
