@@ -382,11 +382,14 @@ do
     function themeGame:IsLoaded() return true end
     function themeGame:GetFullName() return "Game" end
     function themeGame:HttpGet(url)
-        -- The theme pulls the optional Icons library from GitHub. Serve a stub so
-        -- the smoke test stays offline; every other fetch fails loudly.
+        -- The theme pulls the optional Icons library from GitHub, then fetches each
+        -- split part through the same resolver path. Both are served locally so the
+        -- smoke test stays offline; any other fetch fails loudly.
         if tostring(url):find("Icons", 1, true) then
             return "return {SetIconsType=function() end, GetIcon=function() return nil end}"
         end
+        local rel = tostring(url):gsub("^https://raw.githubusercontent.com/glowpkj/DepHub/main/", ""):gsub("%?.*$", "")
+        if _THEME_PARTS and _THEME_PARTS[rel] then return _THEME_PARTS[rel] end
         error("Unexpected HTTP in theme smoke test: " .. tostring(url))
     end
     function themeGame:HttpGetAsync(url) return self:HttpGet(url) end

@@ -20,6 +20,18 @@ for (const game of Object.values(manifestConfig)) {
     if ((file.endsWith('.lua') || file.endsWith('.luau')) && !file.includes('demon-theme') && !files.includes(file)) files.push(file);
   }
 }
+// The theme is split into ordered parts under src/core/ui/theme/. The orchestrator
+// (demon-theme.luau) fetches each part through the same resolver the rest of the
+// repo uses, so every part has to be available to the harness the same way.
+const themeDir = path.join(root, 'src/core/ui/theme');
+if (fs.existsSync(themeDir)) {
+  for (const name of fs.readdirSync(themeDir).sort()) {
+    if (name.endsWith('.luau') || name.endsWith('.lua')) {
+      const rel = 'src/core/ui/theme/' + name;
+      if (!files.includes(rel)) files.push(rel);
+    }
+  }
+}
 for (const game of Object.values(manifestConfig)) {
   for (const file of game.files) {
     if (file.startsWith('src/ui/') || file.startsWith('src/frontend/') || file.endsWith('/frontend.lua')) {
@@ -73,7 +85,15 @@ const harness = fs.readFileSync(path.join(__dirname, 'backend_harness.luau'), 'u
   .replace('-- INSERT_BLOXF_OSS_TESTS', () => fs.readFileSync(path.join(__dirname, 'bloxfruits_oss_tests.luau'), 'utf8'))
   .replace('-- INSERT_THEME_SOURCE', () => {
     const theme = fs.readFileSync(path.join(root, 'src/core/ui/demon-theme.luau'), 'utf8');
-    return 'local _THEME_SOURCE = ' + quote(theme);
+    const partsDir = path.join(root, 'src/core/ui/theme');
+    const entries = fs.existsSync(partsDir)
+      ? fs.readdirSync(partsDir).sort().filter((n) => n.endsWith('.luau') || n.endsWith('.lua'))
+      : [];
+    const partsLua = entries
+      .map((n) => `[ ${quote('src/core/ui/theme/' + n)} ] = ${quote(fs.readFileSync(path.join(partsDir, n), 'utf8'))},`)
+      .join('\n');
+    return 'local _THEME_SOURCE = ' + quote(theme) + '\n'
+      + 'local _THEME_PARTS = {\n' + partsLua + '\n}';
   })
   .replace('-- INSERT_THEME_TESTS', () => fs.readFileSync(path.join(__dirname, 'theme_render_tests.luau'), 'utf8'))
   .replace('-- INSERT_LIFECYCLE_TESTS', () => fs.readFileSync(path.join(__dirname, 'lifecycle_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'tsb_combat_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'aotr_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'diagnostics_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'debug_backend_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'core_tests.luau'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, 'ui_isolation_tests.luau'), 'utf8'))
