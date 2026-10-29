@@ -281,7 +281,7 @@ function DepHub.new(config)
         Active = true,
     }, sidebar)
 
-    label(sidebar, {
+    local brand = label(sidebar, {
         Name = "Brand",
         Position = UDim2.fromOffset(16, 14),
         Size = UDim2.new(1, -32, 0, 30),
@@ -537,6 +537,11 @@ function DepHub.new(config)
             beginWindowDrag(input)
         end
     end)
+    brand.InputBegan:Connect(function(input)
+        if isPress(input) then
+            beginWindowDrag(input)
+        end
+    end)
 
     table.insert(self.Connections, UserInputService.InputBegan:Connect(function(input, gameProcessed)
         if isPress(input) then
@@ -546,8 +551,10 @@ function DepHub.new(config)
                     entry.close()
                 end
             end
-        elseif input.UserInputType == Enum.UserInputType.Keyboard and not gameProcessed then
-            if input.KeyCode == self.ToggleKeyCode then
+        elseif input.UserInputType == Enum.UserInputType.Keyboard then
+            local keyMatches = input.KeyCode == self.ToggleKeyCode
+                or (self.ToggleKeyCode == Enum.KeyCode.LeftControl and input.KeyCode == Enum.KeyCode.RightControl)
+            if keyMatches and not UserInputService:GetFocusedTextBox() then
                 self.SetVisible(not self.IsVisible())
             end
         end
