@@ -571,4 +571,169 @@ connect(State.Connections, LocalPlayer.CharacterRemoving, function()
     State.OriginalCollisions = {}
 end)
 
+-- One-line live summary of every toggle, for the Status section and the Debug
+-- feature probe. Built from actual state, never a canned string.
+function State:GetStatus()
+    local names = {
+        "WalkSpeed","Jump","Fly","Noclip","ESP","Fullbright","InfiniteZoom",
+        "Aimbot","SilentAim","Tracers","AntiFling","AntiVoid","BunnyHop",
+        "InfiniteJump","ChatLoop"
+    }
+    local on = {}
+    for _, name in ipairs(names) do
+        if self.Toggles[name] then on[#on + 1] = name end
+    end
+    return #on > 0 and ("ON: " .. table.concat(on, ", ")) or "tudo desligado"
+end
+
+-- The shared shell is identical for every game; this backend fills it with its
+-- own controls. Every control calls a real State setter, so the UI drives the
+-- same code the console commands and the Debug probes read.
+do
+    local UI = (env.__DEPHUB or {}).UI
+    if type(UI) == "table" and type(UI.CreateTab) == "function" then
+        local tabs = {}
+        local function section(tabName, sectionName, column)
+            local tab = tabs[tabName]
+            if not tab then tab = UI:CreateTab(tabName, "Universal"); tabs[tabName] = tab end
+            if not tab then return nil end
+            return tab:CreateSection(sectionName, column or "Left")
+        end
+        local function notify(title, message)
+            if type(UI.Notify) == "function" then UI:Notify(title, message) end
+        end
+
+        local movement = section("Movement", "Movimento")
+        if movement then
+            movement:CreateToggle("WalkSpeed", State.Toggles.WalkSpeed, function(v)
+                State:SetWalkSpeedEnabled(v)
+            end)
+            movement:CreateSlider("WalkSpeed (valor)", 16, 500, State.Values.WalkSpeed, function(v)
+                State.Values.WalkSpeed = tonumber(v) or State.Values.WalkSpeed
+                State:ApplyMovement()
+            end)
+            movement:CreateToggle("JumpPower", State.Toggles.Jump, function(v) State:SetJumpEnabled(v) end)
+            movement:CreateSlider("JumpPower (valor)", 50, 500, State.Values.JumpPower, function(v)
+                State.Values.JumpPower = tonumber(v) or State.Values.JumpPower
+                State:ApplyMovement()
+            end)
+            movement:CreateToggle("Fly", State.Toggles.Fly, function(v) State:SetFly(v) end)
+            movement:CreateSlider("Fly speed", 20, 500, State.Values.FlySpeed, function(v)
+                State.Values.FlySpeed = tonumber(v) or State.Values.FlySpeed
+            end)
+            movement:CreateToggle("Noclip", State.Toggles.Noclip, function(v) State:SetNoclip(v) end)
+            movement:CreateToggle("BunnyHop", State.Toggles.BunnyHop, function(v) State:SetBunnyHop(v) end)
+            movement:CreateToggle("Infinite jump", State.Toggles.InfiniteJump, function(v) State:SetInfiniteJump(v) end)
+            movement:CreateSlider("Bhop delay", 0.01, 1, State.Values.BhopDelay, function(v)
+                State.Values.BhopDelay = tonumber(v) or State.Values.BhopDelay
+            end)
+        end
+
+        local visuals = section("Visuals", "Visual")
+        if visuals then
+            visuals:CreateToggle("ESP", State.Toggles.ESP, function(v) State:SetESP(v) end)
+            visuals:CreateToggle("Nomes", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
+            visuals:CreateToggle("Distância", State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
+            visuals:CreateToggle("Vida", State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
+            visuals:CreateToggle("Team check", State.Toggles.TeamCheck, function(v) State.Toggles.TeamCheck = v == true end)
+            visuals:CreateToggle("Cores de time", State.Toggles.TeamColors, function(v) State.Toggles.TeamColors = v == true end)
+            visuals:CreateToggle("Chams", State.Toggles.Chams, function(v) State.Toggles.Chams = v == true end)
+            visuals:CreateSlider("Alcance do ESP", 100, 10000, State.Values.ESPRange, function(v)
+                State.Values.ESPRange = tonumber(v) or State.Values.ESPRange
+            end)
+            visuals:CreateToggle("Tracers", State.Toggles.Tracers, function(v) State:SetTracers(v) end)
+            visuals:CreateToggle("Fullbright", State.Toggles.Fullbright, function(v) State:SetFullbright(v) end)
+            visuals:CreateToggle("Zoom infinito", State.Toggles.InfiniteZoom, function(v) State:SetInfiniteZoom(v) end)
+        end
+
+        local combat = section("Combate", "Combate")
+        if combat then
+            combat:CreateToggle("Aimbot (botão direito)", State.Toggles.Aimbot, function(v) State.Toggles.Aimbot = v == true end)
+            combat:CreateSlider("FOV do aimbot", 10, 360, State.Values.AimbotFOV, function(v)
+                State.Values.AimbotFOV = tonumber(v) or State.Values.AimbotFOV
+            end)
+            combat:CreateDropdown("Parte mirada", {"Head", "HumanoidRootPart", "UpperTorso", "Torso"}, State.Values.AimPart, function(v)
+                State.Values.AimPart = tostring(v)
+            end)
+            combat:CreateToggle("Silent aim", State.Toggles.SilentAim, function(v) State:SetSilentAim(v) end)
+            combat:CreateSlider("Alcance do silent aim", 50, 2000, State.Values.SilentAimRange, function(v)
+                State.Values.SilentAimRange = tonumber(v) or State.Values.SilentAimRange
+            end)
+            combat:CreateToggle("Anti-fling", State.Toggles.AntiFling, function(v) State:SetAntiFling(v) end)
+            combat:CreateToggle("Anti-void", State.Toggles.AntiVoid, function(v) State:SetAntiVoid(v) end)
+            combat:CreateSlider("Altura do void", -500, 0, State.Values.VoidHeight, function(v)
+                State.Values.VoidHeight = tonumber(v) or State.Values.VoidHeight
+            end)
+        end
+
+        local social = section("Social", "Social")
+        if social then
+            social:CreateToggle("Chat loop", State.Toggles.ChatLoop, function(v) State:SetChatLoop(v) end)
+            social:CreateInput("Mensagem do chat", State.Values.ChatMessage, State.Values.ChatMessage, function(v)
+                State.Values.ChatMessage = tostring(v)
+            end)
+            social:CreateSlider("Intervalo do chat", 1, 60, State.Values.ChatInterval, function(v)
+                State.Values.ChatInterval = tonumber(v) or State.Values.ChatInterval
+            end)
+            social:CreateButton("Enviar mensagem uma vez", function() State:SendChat() end)
+        end
+
+        local server = section("Servidor", "Servidor")
+        if server then
+            server:CreateButton("Server hop", function()
+                State:ServerHop()
+                notify("Universal", "Procurando servidor.")
+            end)
+            server:CreateButton("Rejoin", function() State:Rejoin() end)
+            server:CreateButton("Teleport tool", function() State:CreateTeleportTool(); notify("Universal", "Tool de teleporte criada.") end)
+            server:CreateButton("Dex Explorer", function()
+                State:RunDex()
+                notify("Universal", "Dex solicitado.")
+            end)
+        end
+
+        local status = section("Status", "Diagnóstico")
+        if status then
+            status:CreateParagraph("Estado atual", State:GetStatus())
+            status:CreateButton("Atualizar status", function()
+                notify("Universal", State:GetStatus())
+            end)
+        end
+    end
+end
+
+-- Report this backend's own structure and live state into the shared Debug tab.
+do
+    local Diag = env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if Diag and type(Diag.Probe) == "function" then
+        local character = LocalPlayer.Character
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        local root = character and character:FindFirstChild("HumanoidRootPart")
+        Diag:Probe("Workspace.Character", character ~= nil, character and character.Name or "sem personagem")
+        Diag:Probe("Humanoid", humanoid ~= nil, humanoid and (math.floor(humanoid.Health) .. " HP") or "ausente")
+        Diag:Probe("HumanoidRootPart", root ~= nil, root and "resolvivel" or "ausente")
+        Diag:Probe("Workspace.CurrentCamera", Workspace.CurrentCamera ~= nil, Workspace.CurrentCamera and "presente" or "ausente")
+        Diag:Probe("Lighting", Lighting ~= nil, tostring(Lighting.Brightness))
+        Diag:Feature("Universal.Status", function() return State:GetStatus() end)
+        Diag:Feature("Universal.WalkSpeed", function() return State.Toggles.WalkSpeed and (tostring(State.Values.WalkSpeed) .. " studs/s") or "off" end)
+        Diag:Feature("Universal.Fly", function() return State.Toggles.Fly and ("ON " .. tostring(State.Values.FlySpeed) .. " studs/s") or "off" end)
+        Diag:Feature("Universal.ESP", function() return State.Toggles.ESP and "ON" or "off" end)
+        Diag:Watch("Personagem", function() local c = LocalPlayer.Character; return c and c.Name or "nil" end)
+        Diag:Watch("Toggles ativos", function()
+            local count = 0
+            for _, value in pairs(State.Toggles) do if value then count += 1 end end
+            return count
+        end)
+        if type(Diag.Command) == "function" then
+            Diag:Command("universal", function()
+                return State:GetStatus()
+            end)
+            Diag:Command("universal-chat", function(argument)
+                if argument and argument ~= "" then State.Values.ChatMessage = argument end
+                return "mensagem=" .. tostring(State.Values.ChatMessage)
+            end)
+        end
+    end
+end
+
 return State

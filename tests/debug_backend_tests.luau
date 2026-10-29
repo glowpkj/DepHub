@@ -193,3 +193,28 @@ do
     check(report:find("Modulos", 1, true) ~= nil, "backend Debug report keeps the modules section")
     check(report:find("Estrutura do jogo", 1, true) ~= nil, "backend Debug report keeps the structure section")
 end
+
+-- Universal: the backend every unmapped game now loads. It must instrument the
+-- Debug tab with its own structure and toggles, so an update that breaks a
+-- generic API shows as [FALHA] instead of an empty tab.
+do
+    local ctx = sandbox(1234567890, 1234567890)
+    ctx:MountUI()
+    local diag = attachDiagnostics(ctx)
+    ctx:Run("src/games/universal.lua")
+
+    local report = diag:Report()
+    check(report:find("Universal.Status", 1, true) ~= nil, "Universal exposes its status as a live feature")
+    check(report:find("Universal.WalkSpeed", 1, true) ~= nil, "Universal exposes WalkSpeed as a live feature")
+    check(report:find("Universal.ESP", 1, true) ~= nil, "Universal exposes ESP as a live feature")
+    check(report:find("Workspace.CurrentCamera", 1, true) ~= nil, "Universal probes the current camera")
+    check(report:find("Workspace.Character", 1, true) ~= nil, "Universal probes the local character")
+
+    check(diag:RunCommand("universal"):find("desligado", 1, true) ~= nil, "Universal registers a console command")
+
+    -- Flipping a toggle is reflected in the feature read, proving the probe
+    -- tracks live state rather than a canned value.
+    local state = ctx.State.__DEPHUB.Universal
+    state.Toggles.ESP = true
+    check(diag:RunCommand("universal"):find("ESP", 1, true) ~= nil, "Universal command reflects an enabled toggle")
+end

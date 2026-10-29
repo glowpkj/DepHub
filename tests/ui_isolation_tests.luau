@@ -129,6 +129,13 @@ do
         ctx:Run("src/games/universal.lua")
         assertNoSeaCategories(ui.Library, "Universal")
         assertNoBloxTabs(ui.Library, "Universal")
+        local names = tabNames(ui.Library)
+        check(#names > 0, "Universal registers its own tabs")
+        local found = {}
+        for _, name in ipairs(names) do found[name] = true end
+        for _, expected in ipairs({"Movement", "Visuals", "Combate", "Social", "Servidor", "Status"}) do
+            check(found[expected], "Universal registers its tab: " .. expected)
+        end
     end
 
     -- Every game gets the same shared shell: the wrapper always registers the
