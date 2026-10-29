@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T22:23:38.010Z",
-  "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+  "generatedAt": "2026-10-29T22:23:55.558125+00:00",
+  "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
   "version": "0.0.75",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "df486810d40751dd91e1f4221883027553b5e99aafa8deecd2c0e3d7724deb6e",
-      "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+      "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "f95d2131772b37634e9ed9109bbf6bf719b157199c172d3b3501b1db4bb478d5",
-      "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+      "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -55,7 +55,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "cfdac6888bc4dd5709c8813fcf7b730e78976b2470bdfbdac85df6839c93fb65",
-      "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+      "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -70,7 +70,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "dc85e8a65c0e796cdec65d61e6085d36e661dc9255207bc28dd96a341557b2a0",
-      "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+      "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -89,7 +89,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "a408e9ccf94ce5f7adc418d88062002582c8405bce4ffff1f583d252a6e8ba2a",
-      "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+      "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -113,7 +113,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "6cbb98ad574fde3de9181ad12ad1487b638dcb8c99946674a603acf588a851b5",
-      "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+      "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -140,7 +140,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "9ae3ffb82beef114d4566beaa28c48edcc6a0ec7e42f60049f80c4f2f31e5e88",
-      "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+      "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -167,7 +167,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "4480a7c9e649ca1eb40bacfaa362252cf732a1b8476e9e34d7628528e33dfc0a",
-      "commit": "e2b87175de9adb44ea8667f56ec65a4d872f81c0",
+      "commit": "c863eda7892e2116013a4becf4933961d8fe0cdc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -187,6 +187,20 @@
   },
   "recentUpdates": [
     {
+      "Version": "c863eda",
+      "Date": "2026-10-29T19:23:39-03:00",
+      "Changes": [
+        "Split the UI theme into ordered modules (v0.0.75)"
+      ]
+    },
+    {
+      "Version": "ab810d2",
+      "Date": "2026-10-29T19:18:54-03:00",
+      "Changes": [
+        "Add real-theme render test ahead of the UI split (v0.0.74)"
+      ]
+    },
+    {
       "Version": "2ca44f6",
       "Date": "2026-10-29T19:03:24-03:00",
       "Changes": [
@@ -205,20 +219,6 @@
       "Date": "2026-10-29T18:51:44-03:00",
       "Changes": [
         "Self-heal a stale cached bootstrap by reloading when the remote version is newer"
-      ]
-    },
-    {
-      "Version": "b1dd721",
-      "Date": "2026-10-29T18:48:13-03:00",
-      "Changes": [
-        "Load the universal backend automatically for unrecognised games"
-      ]
-    },
-    {
-      "Version": "25b80e7",
-      "Date": "2026-10-29T18:45:33-03:00",
-      "Changes": [
-        "Resolve FPS through GetValue/Value/physics fallback so it is never stuck at 0"
       ]
     }
   ]
