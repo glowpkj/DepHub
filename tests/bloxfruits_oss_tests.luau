@@ -113,3 +113,42 @@ do
     check(sawFarm, "the shared Farm tab is created")
     check(sawSeaSuffixed, "a same-named tab in another sea category is made unique, not rejected")
 end
+
+-- Switching sea must hide the categories that belong to the other seas while
+-- keeping the shared (General) ones. This is what stops a Sea 3 feature from
+-- showing while the player is on Sea 1.
+do
+    local ctx = ossContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table", "Blox Fruits builds for the sea-filter test")
+
+    local buttons = ui.Library._STATE.CategoryButtons
+    local function visible(name)
+        local data = buttons[name]
+        return data ~= nil and data.button ~= nil and data.button.Visible == true
+    end
+
+    ui:SetCurrentSea("Sea1")
+    check(visible("Sea 1"), "on Sea 1 the Sea 1 category is shown")
+    check(not visible("Sea 2"), "on Sea 1 the Sea 2 category is hidden")
+    check(not visible("Sea 3"), "on Sea 1 the Sea 3 category is hidden")
+    check(not visible("Sea 2/3"), "on Sea 1 the Sea 2/3 category is hidden")
+
+    ui:SetCurrentSea("Sea2")
+    check(visible("Sea 2"), "on Sea 2 the Sea 2 category is shown")
+    check(not visible("Sea 1"), "on Sea 2 the Sea 1 category is hidden")
+    check(not visible("Sea 3"), "on Sea 2 the Sea 3 category is hidden")
+
+    ui:SetCurrentSea("Sea3")
+    check(visible("Sea 3"), "on Sea 3 the Sea 3 category is shown")
+    check(not visible("Sea 1"), "on Sea 3 the Sea 1 category is hidden")
+    check(not visible("Sea 2"), "on Sea 3 the Sea 2 category is hidden")
+
+    -- The sea-scoped tabs are what decide visibility per tab, and Teleport must
+    -- never be scoped (it is how the player travels between seas).
+    local teleport = ui.Tabs["General|Teleport"]
+    check(teleport ~= nil and teleport.Sea == nil, "the Teleport tab is never sea-scoped")
+    local farmSea2 = ui.Tabs["Sea 2|Farm"]
+    check(farmSea2 ~= nil and farmSea2.Sea == "Sea2", "the Sea 2 Farm tab carries its sea scope")
+end

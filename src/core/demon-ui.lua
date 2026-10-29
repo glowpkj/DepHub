@@ -145,7 +145,7 @@ function DemonUI:CreateCategory(name, icon)
     return ok
 end
 
-function DemonUI:CreateTab(name, category)
+function DemonUI:CreateTab(name, category, sea)
     if self.Destroyed then return nil end
     name = tostring(name)
     category = resolveCategory(category)
@@ -157,7 +157,10 @@ function DemonUI:CreateTab(name, category)
     -- same name was already created for this same category; otherwise make the
     -- name unique so the library accepts it.
     local existing = self.Tabs[category .. "|" .. name]
-    if existing then return existing end
+    if existing then
+        if sea ~= nil then existing.Sea = sea end
+        return existing
+    end
     local uniqueName = name
     if state and state.ContentPages and state.ContentPages[uniqueName] ~= nil then
         uniqueName = name .. " · " .. category
@@ -169,7 +172,9 @@ function DemonUI:CreateTab(name, category)
     if not ok or not tabExists then
         return nil, tostring(result or ("ContentPages[" .. uniqueName .. "] ausente"))
     end
-    local record = {Adapter = self, Name = uniqueName, DisplayName = name, Category = category, Key = category .. "|" .. name, Control = state.ContentPages[uniqueName], Sections = {}, Visible = true}
+    -- `sea` scopes the tab to one or more seas ("Sea1", "Sea2,Sea3", "All").
+    -- nil means the tab is not sea-scoped and is always shown.
+    local record = {Adapter = self, Name = uniqueName, DisplayName = name, Category = category, Key = category .. "|" .. name, Control = state.ContentPages[uniqueName], Sections = {}, Visible = true, Sea = sea}
     function record:CreateSection(title, column)
         title = tostring(title or self.Name)
         if self.Sections[title] then return self.Sections[title] end
@@ -221,11 +226,32 @@ end
 
 -- Category switch used by backends that group tabs by a value (Blox Fruits
 -- seas). Categories not managed by the backend are left untouched.
+--
+-- Visibility is decided per tab: a tab scoped to "Sea1" shows only on Sea 1, a
+-- tab scoped to "Sea2,Sea3" shows on Sea 2 and Sea 3, and a tab with no scope is
+-- always shown. This is what keeps another sea's features out of the current
+-- sea while leaving cross-sea tools (teleport, quests, info) reachable.
+function DemonUI:_tabMatchesSea(tab, sea)
+    local scope = tab.Sea
+    if scope == nil or scope == "" or scope == "All" then return true end
+    local value = tostring(scope)
+    local lower = value:lower()
+    if lower:find("sea1") and sea == "Sea1" then return true end
+    if lower:find("sea2") and sea == "Sea2" then return true end
+    if lower:find("sea3") and sea == "Sea3" then return true end
+    -- A bare sea token without a season word (already normalized values).
+    local normalized = normalizeSea(value)
+    return normalized == sea
+end
+
 function DemonUI:_refreshVisibility()
     if self.Destroyed then return end
     local state = self.Library._STATE
     if type(state) ~= "table" then return end
     local sea = normalizeSea(self.CurrentSea)
+
+    -- Hide the sea categories themselves so the header only shows the ones that
+    -- belong to the current sea (plus the shared default).
     for category, data in pairs(state.CategoryButtons or {}) do
         local visible = category == DEFAULT_CATEGORY
         if category == "Sea 1" then visible = sea == "Sea1" end
@@ -241,21 +267,35 @@ function DemonUI:_refreshVisibility()
             data.button.Parent.Visible = visible
         end
     end
-    for _, tab in pairs(self.Tabs) do
-        if not tab.Visible then
-            local page = state.ContentPages and state.ContentPages[tab.Name]
-            if page then page.Visible = false end
-        end
+    -- Reflow the visible category buttons now that some may be hidden.
+    if type(self.Library._layoutCategoryButtons) == "function" then
+        pcall(function() self.Library:_layoutCategoryButtons() end)
     end
+
+    -- Hide each tab that is scoped to a different sea. Both its content page and
+    -- its tab button are hidden, so a Sea 3 feature never appears while on Sea 1.
+    for _, tab in pairs(self.Tabs) do
+        local matches = self:_tabMatchesSea(tab, sea)
+        tab.Visible = matches
+        local page = state.ContentPages and state.ContentPages[tab.Name]
+        if page then
+            if not matches then page.Visible = false end
+        end
+        local button = tab.Button
+        if button and button.IsA and button:IsA("GuiObject") then button.Visible = matches end
+    end
+
+    -- If the tab the library thinks is active just got hidden, fall back to a
+    -- tab that is still visible so the player is not left on an empty page.
     local activeCategory = state.ActiveCategory
     local activeTab = state.ActiveTab
     local activeData = activeTab and (self.Tabs[tostring(activeCategory or DEFAULT_CATEGORY) .. "|" .. activeTab] or self.Tabs[activeTab])
     if activeData and not activeData.Visible then
-        pcall(function() self.Library:SetActiveCategory(DEFAULT_CATEGORY, "Home") end)
-    elseif activeCategory and activeCategory ~= DEFAULT_CATEGORY then
-        local catData = state.CategoryButtons and state.CategoryButtons[activeCategory]
-        if catData and catData.button and not catData.button.Visible then
-            pcall(function() self.Library:SetActiveCategory(DEFAULT_CATEGORY, "Info") end)
+        for _, tab in pairs(self.Tabs) do
+            if tab.Visible and tab.Category == (activeCategory or DEFAULT_CATEGORY) then
+                pcall(function() self.Library:SetActiveCategory(tab.Category, tab.Name) end)
+                break
+            end
         end
     end
 end

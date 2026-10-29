@@ -212,14 +212,25 @@ local function categoryForControl(sea)
     if seas.Sea3 then return "Sea 3" end
     return "General"
 end
+-- Tabs that must stay reachable no matter which sea the player is on. Teleport
+-- is the way to travel between seas (it holds the Sea 1/2/3 waypoints), and the
+-- Info/PVP/Player/Config pages are game-wide rather than belonging to a sea.
+local ALWAYS_VISIBLE = {
+    Home = true, Combat = true, Teleport = true, Player = true, Settings = true
+}
+
 local function ensureTab(name, sea)
     local category = categoryForControl(sea)
+    -- A logical tab can be shared by more than one sea (Farm, Shop). The sea
+    -- scope stored on the shell tab is what decides whether it is shown, so a
+    -- tab that carries a sea keeps it; the always-visible pages drop their scope.
+    local scope = ALWAYS_VISIBLE[name] and nil or sea
     local key = category .. "|" .. name
     if renderedTabs[key] ~= nil then return renderedTabs[key] or nil end
     -- The Blox Fruits backend owns its sea categories: the shared shell only
     -- creates "General", so this backend registers the seas it uses.
     if type(visual.CreateCategory) == "function" then visual:CreateCategory(category) end
-    local tab = visual:CreateTab(name, category)
+    local tab = visual:CreateTab(name, category, scope)
     if not tab then
         -- Remember the failure so the next control in this group does not try
         -- again: without this the same tab is retried for every control.
@@ -227,7 +238,7 @@ local function ensureTab(name, sea)
         report("BloxFruits: não foi possível criar a aba " .. name .. " (" .. category .. ")")
         return nil
     end
-    local record = {Tab = tab, Sea = sea, Name = name, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
+    local record = {Tab = tab, Sea = scope, Name = name, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
     renderedTabs[key] = record
     return record
 end
@@ -281,6 +292,20 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                 if pageName == "Info" then
                     local section = sectionFor(record, "Overview")
                     if section then section:CreateParagraph("DepHub", "Controles organizados por categoria. Apenas Anti-AFK fica ligado por padrão.") end
+                    local seaSection = sectionFor(record, "Sea")
+                    if seaSection then
+                        -- Single sea selector. The game reports the current sea
+                        -- automatically (info.lua polls Realm) and this lets the
+                        -- player override it; both paths end in applySea, which
+                        -- filters the tabs down to the chosen sea.
+                        local seaLabels = {Sea1 = "Sea 1", Sea2 = "Sea 2", Sea3 = "Sea 3"}
+                        local seaValues = {["Sea 1"] = "Sea1", ["Sea 2"] = "Sea2", ["Sea 3"] = "Sea3"}
+                        local currentLabel = seaLabels[State.Sea] or "Sea 1"
+                        seaSection:CreateDropdown("Sea", {"Sea 1", "Sea 2", "Sea 3"}, currentLabel, function(value)
+                            State:SetSea(seaValues[tostring(value)] or "Sea1")
+                            visual:Notify("Sea", "Conteúdo filtrado para " .. tostring(value))
+                        end)
+                    end
                 elseif pageName == "Config" then
                     local section = sectionFor(record, "Configuration")
                     if section then

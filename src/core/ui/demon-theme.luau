@@ -6745,7 +6745,11 @@ function Library:_layoutCategoryButtons()
     end
     local names = {}
     for _, name in ipairs(STATE.CategoryOrder or {}) do
-        if STATE.CategoryButtons[name] then table.insert(names, name) end
+        local data = STATE.CategoryButtons[name]
+        -- Skip categories the frontend has hidden (the sea filter hides the
+        -- categories of the other seas) so the visible buttons reflow without
+        -- leaving a gap where a hidden one used to be.
+        if data and (not data.button or data.button.Visible ~= false) then table.insert(names, name) end
     end
     if #names == 0 then
         if self.TabPosition == "Bottom" then
