@@ -41,7 +41,7 @@ function DemonUI.new(options)
     local export = loadLibrary()
     local library = export.new({
         Title = options.Name or "DepHub",
-        Version = options.Version or "0.0.52",
+        Version = options.Version or "0.0.53",
         Author = "DepHub",
         Theme = "Monochrome",
         TabPosition = "Side",
@@ -82,7 +82,7 @@ function DemonUI:CreateTab(name, sea)
         title = tostring(title or self.Name)
         if self.Sections[title] then return self.Sections[title] end
         local section = self.Adapter.Library:CreateSection(self.Name, title, nil, true, "Left", "layers")
-        local wrapper = {Control = section, Title = title}
+        local wrapper = {Adapter = self.Adapter, Control = section, Title = title}
         function wrapper:CreateToggle(label, initial, callback)
             return self.Adapter.Library:AddToggle(self.Control, label, initial == true, callback)
         end
