@@ -157,6 +157,9 @@ function Factory.new(context)
         local control = self:GetControl(key)
         if not control or type(control.set) ~= "function" then return false end
         local ok, result = pcall(control.set, value)
+        if ok and self.Toggles and control.kind == "toggle" then
+            self.Toggles[key] = control.get() == true
+        end
         return ok and result ~= false
     end
 
