@@ -358,7 +358,9 @@ function M.init(Core, UI)
     UI.toggle(fp, "Auto Random Fruit", "Roll the fruit gacha (Zioles) on cooldown", false, function(s) M.setRandom(s) end)
     UI.button(fp, "Fruit stock", "Open the in-game dealer menu (sea-aware)", function() M.openDealer() end)
     UI.button(fp, "Awaken all abilities", "Buy every awakening for your held fruit (uses fragments)", function() M.awakenAll() end)
+    if UI._controls["Fruit / Awaken all abilities"] then UI._controls["Fruit / Awaken all abilities"].sea = "Sea2,Sea3" end
     UI.button(fp, "Awaken menu", "Open the awakening menu (full awaken needs a raid)", function() M.openAwakening() end)
+    if UI._controls["Fruit / Awaken menu"] then UI._controls["Fruit / Awaken menu"].sea = "Sea2,Sea3" end
     local gStat = UI.section(fp, "Gacha: off")
     local gLbl = gStat and gStat:FindFirstChildWhichIsA("TextLabel")
     function M._setStatus(t) if gLbl then gLbl.Text = t end end
