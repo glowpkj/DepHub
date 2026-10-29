@@ -18,7 +18,7 @@ local LP = Players.LocalPlayer
 local M = {}
 M.config = {
     range = 120, delay = 0.15,
-    targetPlayers = true, playerRange = 60,
+    targetPlayers = false, playerRange = 60,
     fast = false,
     auraRange = 60, losCheck = true,
     aimSmooth = 0.15,
@@ -33,7 +33,7 @@ M._mobAuto, M._playerAuto, M._aura, M._autoClick, M._follow = false, false, fals
 M._wasSpectate = false
 
 M.bounty = {
-    noFriends = true, noCup = true,
+    noFriends = false, noCup = false,
     safePct = 20,
     invisKen = false,
     chatKill = false, chatMsg = "gg",
@@ -457,7 +457,7 @@ function M.init(Core, UI)
     UI.toggle(page, "Auto attack players", "Attack the nearby players", false, function(s) M.setPlayerAuto(s) end)
     UI.slider(page, "Player range", "Player detection radius", 10, 200, M.config.playerRange, function(v) M.config.playerRange = v end)
     UI.toggle(page, "Fast attack", "Minimum delay between hits", M.config.fast, function(s) M.config.fast = s end)
-    UI.toggle(page, "Attack players while farming", "Hit nearby players during auto-farm too", M.config.targetPlayers, function(s) M.config.targetPlayers = s end)
+    UI.toggle(page, "Attack players while farming", "Hit nearby players during auto-farm too", false, function(s) M.config.targetPlayers = s end)
 
     UI.section(page, "KILL AURA")
     UI.toggle(page, "Kill aura", "Hit everything in range (mobs + players)", false, function(s) M.setAura(s) end)
