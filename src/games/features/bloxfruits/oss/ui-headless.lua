@@ -87,8 +87,18 @@ function UI.onSea(fn)
     pcall(fn, UI._currentSea)
 end
 
+local function normalizeSea(sea)
+    local value = tostring(sea or "")
+    local lower = value:lower()
+    if value == "1" or lower:find("sea1") or lower:find("first") or lower == "sea 1" then return "Sea1" end
+    if value == "2" or lower:find("sea2") or lower:find("second") or lower == "sea 2" then return "Sea2" end
+    if value == "3" or lower:find("sea3") or lower:find("third") or lower == "sea 3" then return "Sea3" end
+    return value
+end
+
 function UI.setSea(sea)
-    if sea and sea ~= UI._currentSea then
+    sea = normalizeSea(sea)
+    if sea ~= "" and sea ~= UI._currentSea then
         UI._currentSea = sea
         for _, fn in ipairs(UI._seaHooks) do pcall(fn, sea) end
     end
