@@ -216,8 +216,13 @@ local function ensureTab(name, sea)
     local category = categoryForControl(sea)
     local key = category .. "|" .. name
     if renderedTabs[key] then return renderedTabs[key] end
-    local tab = visual:CreateTab(name, sea)
-    local record = {Tab = tab, Sea = sea, Name = name, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
+    local displayName = category == "General" and name or (name .. " · " .. category)
+    local tab = visual:CreateTab(displayName, sea)
+    if not tab then
+        report("BloxFruits: não foi possível criar a aba " .. displayName)
+        return nil
+    end
+    local record = {Tab = tab, Sea = sea, Name = displayName, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
     renderedTabs[key] = record
     return record
 end
@@ -237,6 +242,7 @@ local function groupFor(definition)
     return "Other"
 end
 local function sectionFor(tabRecord, group)
+    if not tabRecord or not tabRecord.Tab then return nil end
     local key = tabRecord.Key .. "|" .. group
     if renderedSections[key] then return renderedSections[key] end
     local column = tabRecord.Columns.Left <= tabRecord.Columns.Right and "Left" or "Right"
@@ -269,26 +275,28 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                 local record = ensureTab(logicalName, page.sea)
                 if pageName == "Info" then
                     local section = sectionFor(record, "Overview")
-                    section:CreateParagraph("DepHub", "Controles organizados por categoria. Apenas Anti-AFK fica ligado por padrão.")
+                    if section then section:CreateParagraph("DepHub", "Controles organizados por categoria. Apenas Anti-AFK fica ligado por padrão.") end
                 elseif pageName == "Config" then
                     local section = sectionFor(record, "Configuration")
-                    local configName = "default"
-                    section:CreateInput("Config name", "Nome da configuração", configName, function(value) configName = tostring(value or "default") end)
-                    section:CreateButton("Save config", function()
-                        local name = tostring(configName ~= "" and configName or "default")
-                        if State:SaveConfig(name) then visual:Notify("Config", "Configuração salva: " .. name) else visual:Notify("Config", "Não foi possível salvar.") end
-                    end)
-                    section:CreateButton("Load config", function()
-                        local name = tostring(configName ~= "" and configName or "default")
-                        if State:LoadConfig(name) then visual:Notify("Config", "Configuração carregada: " .. name) else visual:Notify("Config", "Não foi possível carregar.") end
-                    end)
+                    if section then
+                        local configName = "default"
+                        section:CreateInput("Nome da configuração", "Nome da configuração", configName, function(value) configName = tostring(value or "default") end)
+                        section:CreateButton("Salvar configuração", function()
+                            local name = tostring(configName ~= "" and configName or "default")
+                            if State:SaveConfig(name) then visual:Notify("Config", "Configuração salva: " .. name) else visual:Notify("Config", "Não foi possível salvar.") end
+                        end)
+                        section:CreateButton("Carregar configuração", function()
+                            local name = tostring(configName ~= "" and configName or "default")
+                            if State:LoadConfig(name) then visual:Notify("Config", "Configuração carregada: " .. name) else visual:Notify("Config", "Não foi possível carregar.") end
+                        end)
+                    end
                 end
             else
                 for _, definition in ipairs(page.controls) do
                     local sea = definition.sea or page.sea
                     local record = ensureTab(logicalName, sea)
                     local section = sectionFor(record, groupFor(definition))
-                    renderDefinition(definition, section)
+                    if section then renderDefinition(definition, section) end
                 end
             end
         end
