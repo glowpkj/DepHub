@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T17:49:17.155840+00:00",
-  "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
-  "version": "0.0.47",
+  "generatedAt": "2026-10-29T17:49:41.846956+00:00",
+  "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
+  "version": "0.0.48",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "cffde81880db6d60f0a0bd4f354fbb997b4cc482fa3724b06897fb1295123d84",
-      "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
+      "version": "53df5227716f3d89b79fd3c80b697664a78962bb7e0d5cd43b7ca194ea4047c0",
+      "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,8 +26,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "e2e217768fdff3f90e9bf7794167d12c2cd197e71a9bec57ab62e72b040f9c7b",
-      "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
+      "version": "18ebc526a2bd98df26b09ed17941c9b3f732d3339dd5a1e8430913d640db2fa8",
+      "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "8a685b068d5befb8b0cecf7d066f73ee4f65442debb32c8a6373c7a921185c48",
-      "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
+      "version": "30dd5e9fe2aa6fc5da99687bbda1b1d0240bd83a84abede6fa1e7ae925bc3ceb",
+      "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -66,8 +66,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "d91666ce62ea409f5984d66a37ff8fb03683b8e5888b61b7a6d37fa4de6c7075",
-      "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
+      "version": "f866125041d0e80e982204d776d408137bfbd7935c3858bc90f07b2e06bef49c",
+      "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -84,8 +84,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "054becb080178ba76af24fca45c9eb8c2259c1952a286c897d7ebf5aa37bc794",
-      "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
+      "version": "098c99eb5937bcea20baa5ccf5a10420a32bcec722310b5b7bc8b98cfc372343",
+      "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -107,8 +107,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "1c99c1a194f35750980b7f1a572b06b4156fd5856413df773116f8725e9f7e96",
-      "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
+      "version": "48f289fb82cc1c19f352c2d97c7009141804bcee609762b91588c9592101356c",
+      "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,8 +133,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "b3bab97eec8d8fd9dd2abaf4778e6f37c5e9e1b2c4c41c03a0db7fbb4b66ef18",
-      "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
+      "version": "d10f0200d5d6a845f959388cb87a16d785cb9bb224c3eb090f9f2b7c01777204",
+      "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "ec5b47dd98dad330324dba4fbed4c449c8ba6a99d56f80b1a3382f5ccf787d68",
-      "commit": "d1d4ace9c15b7a9dbac9d93f41c63eac00a838d3",
+      "version": "e99c2cb6f45a775ee800a1aed6087d034113cd1e8ea1148dc6565b03d593787e",
+      "commit": "c100c90683b9a7a504cd9be44d607802e4a2c477",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -174,6 +174,20 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "c100c90",
+      "Date": "2026-10-29T14:49:33-03:00",
+      "Changes": [
+        "chore(release): sync WindUI test build version"
+      ]
+    },
+    {
+      "Version": "2b5618c",
+      "Date": "2026-10-29T14:49:27-03:00",
+      "Changes": [
+        "fix(ui): log WindUI loading failures and bump test build"
+      ]
+    },
     {
       "Version": "d1d4ace",
       "Date": "2026-10-29T14:49:07-03:00",
@@ -193,20 +207,6 @@
       "Date": "2026-10-29T14:48:36-03:00",
       "Changes": [
         "chore(release): sync WindUI test version"
-      ]
-    },
-    {
-      "Version": "10730c4",
-      "Date": "2026-10-29T14:48:31-03:00",
-      "Changes": [
-        "chore(release): bump WindUI test build to 0.0.46"
-      ]
-    },
-    {
-      "Version": "6e0d00c",
-      "Date": "2026-10-29T14:47:56-03:00",
-      "Changes": [
-        "chore(release): update version to 0.0.45"
       ]
     }
   ]
