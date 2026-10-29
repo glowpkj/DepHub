@@ -103,7 +103,6 @@ function Factory.new(context)
         {"Extras", "Race V4, awakening, special bosses", "Sea3"},
         {"Player", "Player ESP and mobility"},
         {"Config", "Save and restore settings"},
-        {"Logs", "Actions and proofs"}
     }) do
         UI.addTab(tab[1], tab[2], tab[3])
     end
@@ -124,9 +123,7 @@ function Factory.new(context)
     Core.register("ui", UI)
     Core.info("DepHub adapter loaded")
 
-    local restored = false
-    pcall(function() restored = Core.loadLastConfig() end)
-    State.RestoredConfig = restored == true
+    State.RestoredConfig = false
 
     -- The sea changes the tab visibility and both info.lua and shop.lua read it
     -- during init, so publish the current sea and expose the hook the backend
