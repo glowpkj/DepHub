@@ -281,11 +281,6 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
             end
             if type(record.Tab.SetVisible) == "function" then record.Tab:SetVisible(visible) end
         end
-        for _, record in pairs(renderedTabs) do
-            if record.Tab.Visible and record.Tab.Control and record.Tab.Control.Asset and record.Tab.Control.ButtonAsset then
-                break
-            end
-        end
     end
     if type(uiModel.onSea) == "function" then uiModel.onSea(applySea) else applySea(State.Sea or "Sea1") end
     State.UIFrontend = visual
