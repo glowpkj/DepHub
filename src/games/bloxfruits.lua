@@ -188,7 +188,14 @@ local function splitSeas(value)
     return result
 end
 local function tabNameFor(pageName, pageSea, controlSea)
-    if controlSea and not pageSea then
+    if controlSea == "All" then return pageName .. " · General" end
+    if controlSea and pageSea and controlSea ~= pageSea then
+        local seas = splitSeas(controlSea)
+        if seas.Sea2 and seas.Sea3 then return pageName .. " · Sea 2/3" end
+        if seas.Sea1 then return pageName .. " · Sea 1" end
+        if seas.Sea2 then return pageName .. " · Sea 2" end
+        if seas.Sea3 then return pageName .. " · Sea 3" end
+    elseif controlSea and not pageSea then
         local seas = splitSeas(controlSea)
         if seas.Sea1 and seas.Sea2 and seas.Sea3 then return pageName end
         if seas.Sea2 and seas.Sea3 then return pageName .. " · Sea 2/3" end
@@ -241,13 +248,14 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                 if pageName == "Info" then
                     section:CreateParagraph("DepHub Blox Fruits", "Interface dinâmica por Sea. Apenas Anti-AFK fica ligado por padrão.")
                 elseif pageName == "Config" then
-                    local nameInput = section:CreateInput("Config name", "Nome da configuração", "default", function(value) end)
+                    local configName = "default"
+                    local nameInput = section:CreateInput("Config name", "Nome da configuração", configName, function(value) configName = tostring(value or "default") end)
                     section:CreateButton("Save config", function()
-                        local name = tostring(nameInput.Value or "default")
+                        local name = tostring(configName ~= "" and configName or "default")
                         if State:SaveConfig(name) then visual:Notify("Config", "Configuração salva: " .. name) else visual:Notify("Config", "Não foi possível salvar.") end
                     end)
                     section:CreateButton("Load config", function()
-                        local name = tostring(nameInput.Value or "default")
+                        local name = tostring(configName ~= "" and configName or "default")
                         if State:LoadConfig(name) then visual:Notify("Config", "Configuração carregada: " .. name) else visual:Notify("Config", "Não foi possível carregar.") end
                     end)
                 end
@@ -266,7 +274,7 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
         local current = tostring(sea or "Sea1")
         for _, record in pairs(renderedTabs) do
             local visible = true
-            if record.Sea then
+            if record.Sea and record.Sea ~= "All" then
                 local allowed = splitSeas(record.Sea)
                 visible = allowed[current] == true
             end
