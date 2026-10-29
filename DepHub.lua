@@ -251,6 +251,19 @@ local target = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "s
 if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait()
 
+local okBracket, bracketModule = loadModule("src/core/bracket.lua", false)
+if not okBracket or type(bracketModule) ~= "table" or type(bracketModule.new) ~= "function" then
+    return fail("Bracket nao carregou: " .. tostring(bracketModule))
+end
+
+local okWindow, window = pcall(bracketModule.new, {Name = "DepHub"})
+if not okWindow or type(window) ~= "table" then
+    return fail("Nao foi possivel iniciar a Bracket: " .. tostring(window))
+end
+
+env.__DEPHUB.Bracket = window
+env.__DEPHUB.UI = window
+
 local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then
     return fail("Core " .. tostring(target.Core) .. " falhou: " .. tostring(coreResult))
@@ -291,19 +304,6 @@ env.__DEPHUB.Mode = mode
 env.__DEPHUB.Backend = backend
 
 if env[STATE_KEY] ~= session then return false end
-
-local okBracket, bracketModule = loadModule("src/core/bracket.lua", false)
-if not okBracket or type(bracketModule) ~= "table" or type(bracketModule.new) ~= "function" then
-    return fail("Bracket nao carregou: " .. tostring(bracketModule))
-end
-
-local okWindow, window = pcall(bracketModule.new, {Name = "DepHub"})
-if not okWindow or type(window) ~= "table" then
-    return fail("Nao foi possivel iniciar a Bracket: " .. tostring(window))
-end
-
-env.__DEPHUB.Bracket = window
-env.__DEPHUB.UI = window
 
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
