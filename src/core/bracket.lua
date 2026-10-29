@@ -117,14 +117,19 @@ function Section:CreateDropdown(title, options, initial, callback)
 end
 
 function Section:CreateInput(title, placeholder, initial, callback)
+    local item
     local control = createSectionControl(self.Control, "Textbox", {
         Name = tostring(title),
         Value = tostring(initial or ""),
         Placeholder = tostring(placeholder or ""),
-        NumberOnly = false,
-        Callback = callback
+        NumbersOnly = false,
+        Callback = function(value)
+            if item then item.Value = tostring(value or "") end
+            if callback then callback(value) end
+        end
     })
-    return setmetatable({Control = control, Value = initial}, Item)
+    item = setmetatable({Control = control, Value = tostring(initial or "")}, Item)
+    return item
 end
 
 function Section:CreateButton(title, callback)
