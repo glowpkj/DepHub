@@ -223,7 +223,7 @@ local function sectionFor(tabRecord, pageName)
     return section
 end
 local function renderDefinition(definition, section)
-    local title = tostring(definition.page or "General") .. " · " .. tostring(definition.title or definition.key)
+    local title = tostring(definition.key or ((definition.page or "General") .. " · " .. tostring(definition.title or "Control")))
     local function set(value) State:SetControl(definition.key, value) end
     if definition.kind == "toggle" then
         section:CreateToggle(title, definition.get and definition.get() == true, set)
