@@ -227,10 +227,15 @@ function M.init(Core, UI)
         local names = {}
         for _, e in ipairs(list) do names[#names + 1] = e.name end
         local dd = UI.dropdown(page, label, hint, names, function(_) end)
+        local dropdownDef = UI._controls["Teleport / " .. label]
+        if dropdownDef then dropdownDef.sea = sea end
         g[#g + 1] = dd.frame
-        local btn = UI.button(page, "Go to " .. label:lower(), "Fly there", function()
+        local btnTitle = "Go to " .. label:lower()
+        local btn = UI.button(page, btnTitle, "Fly there", function()
             for _, e in ipairs(list) do if e.name == dd.Get() then M.go(e.pos + Vector3.new(0, 5, 0)); break end end
         end)
+        local buttonDef = UI._controls["Teleport / " .. btnTitle]
+        if buttonDef then buttonDef.sea = sea end
         g[#g + 1] = btn.Parent
     end
 
