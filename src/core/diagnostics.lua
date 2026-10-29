@@ -665,6 +665,13 @@ end
 function Diagnostics:Destroy()
     if self.Destroyed then return end
     self.Destroyed = true
+    self:Uninstall()
+end
+
+-- Detach the UI tab and the log hooks while keeping the collector alive, so the
+-- data keeps accumulating and Install can bring the tab back later. Destroy
+-- builds on this and additionally marks the collector as gone.
+function Diagnostics:Uninstall()
     if self.RenderTask then pcall(task.cancel, self.RenderTask); self.RenderTask = nil end
     self:_removeLogHooks()
     self.Installed = false

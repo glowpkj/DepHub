@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.72"
+local VERSION = "0.0.73"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -398,9 +398,46 @@ Diag:Module("demon-ui window", true, "janela criada")
 env.__DEPHUB.DemonUI = window
 env.__DEPHUB.UI = window
 
--- The Debug tab is shared by every game and installed before the backend runs,
--- so the backend's own environment, probes and feature readers land in it.
-Diag:Install(window)
+-- The Debug tab and the print/warn log hooks are opt-in. They are useful for
+-- development but add a tab to every game and intercept every print, so by
+-- default the hub runs clean. Set env.__DEPHUB_ENABLE_DEBUG = true before
+-- loading to get the tab, or call the console command `debug on` live. The
+-- collector itself is always created, so backends keep instrumenting it and the
+-- data is ready the moment the tab is shown -- nothing is thrown away.
+local function debugEnabled()
+    return env.__DEPHUB_ENABLE_DEBUG == true
+end
+if debugEnabled() then Diag:Install(window) end
+
+-- Live switch: installs or removes the Debug tab and the log hooks without a
+-- reload. Registered as a built-in console command on the collector.
+Diag:Command("debug", function(argument)
+    argument = tostring(argument or ""):lower()
+    if argument == "on" or argument == "true" or argument == "1" then
+        env.__DEPHUB_ENABLE_DEBUG = true
+        Diag:Install(window)
+        return "debug ligado (aba Debug ativa)"
+    elseif argument == "off" or argument == "false" or argument == "0" then
+        env.__DEPHUB_ENABLE_DEBUG = false
+        Diag:Uninstall()
+        return "debug desligado (aba Debug removida; coleta continua ativa)"
+    end
+    return "uso: debug on|off (atual: " .. tostring(debugEnabled()) .. ")"
+end)
+
+-- When the Debug tab is hidden there is no console to reach the command above,
+-- so expose one global the user can call straight from the executor console to
+-- bring it back: __DEPHUB_DEBUG() and __DEPHUB_DEBUG_OFF().
+env.__DEPHUB_DEBUG = function()
+    env.__DEPHUB_ENABLE_DEBUG = true
+    local ok = Diag:Install(window)
+    return ok and "aba Debug ativa" or "nao foi possivel ativar a aba Debug"
+end
+env.__DEPHUB_DEBUG_OFF = function()
+    env.__DEPHUB_ENABLE_DEBUG = false
+    Diag:Uninstall()
+    return "aba Debug removida"
+end
 
 -- Unknown game with universal disabled: keep the window, tell the player the
 -- place is unsupported and stop. No incompatible backend is forced on them.

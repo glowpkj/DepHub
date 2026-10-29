@@ -199,22 +199,24 @@ do
     diag:Destroy()
 end
 
--- The loader installs the shared Debug tab for every game, and the AOT:R
--- backend reports its own structure into it.
+-- The Debug tab is opt-in: with env.__DEPHUB_ENABLE_DEBUG the loader installs
+-- the shared tab for the game, and the AOT:R backend reports its own structure
+-- into it.
 do
     local ctx = sandbox(4658598196, 4658598196)
+    ctx.State.__DEPHUB_ENABLE_DEBUG = true
     ctx.Responses["src/version.txt"] = "0.0.3"
     ctx:MountUI()
     check(ctx:Run("DepHub.lua") == true, "loader succeeds with the diagnostics collector")
     check(ctx.State.__DEPHUB.Diagnostics ~= nil, "loader publishes the diagnostics collector")
-    check(ctx.State.__DEPHUB.Diagnostics.Installed, "loader installs the Debug tab")
+    check(ctx.State.__DEPHUB.Diagnostics.Installed, "loader installs the Debug tab when enabled")
 
     local ui = ctx.State.__DEPHUB.UI
     local names = {}
     for _, tab in ipairs(ui.Library._Tabs) do names[#names + 1] = tab.Name end
     local found = false
     for _, name in ipairs(names) do if name == "Debug" then found = true end end
-    check(found, "shared Debug tab is registered")
+    check(found, "shared Debug tab is registered when enabled")
 
     local report = ctx.State.__DEPHUB.Diagnostics:Report()
     check(report:find("Ambiente", 1, true) ~= nil, "Debug report has an environment section")
@@ -231,4 +233,25 @@ do
         if url:find("cb=" .. token, 1, true) then bustedCalls = bustedCalls + 1 end
     end
     check(bustedCalls > 0, "loader module fetches carry the cache-bust token")
+end
+
+-- By default the Debug tab is NOT installed: the collector is still built and
+-- backends still instrument it, but no tab and no print/warn hooks are added.
+do
+    local ctx = sandbox(4658598196, 4658598196)
+    ctx.Responses["src/version.txt"] = "0.0.3"
+    ctx:MountUI()
+    check(ctx:Run("DepHub.lua") == true, "loader succeeds with Debug disabled")
+    check(ctx.State.__DEPHUB.Diagnostics ~= nil, "collector is still created when Debug is off")
+    check(not ctx.State.__DEPHUB.Diagnostics.Installed, "Debug tab is not installed by default")
+
+    local ui = ctx.State.__DEPHUB.UI
+    local found = false
+    for _, tab in ipairs(ui.Library._Tabs) do if tab.Name == "Debug" then found = true end end
+    check(not found, "no Debug tab is registered by default")
+
+    -- The live switch brings the tab back without a reload.
+    check(type(ctx.State.__DEPHUB_DEBUG) == "function", "a global re-enables Debug without a reload")
+    check(ctx.State.__DEPHUB_DEBUG() ~= nil, "calling the global installs the tab")
+    check(ctx.State.__DEPHUB.Diagnostics.Installed, "Debug tab is installed after the live switch")
 end
