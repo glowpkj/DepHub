@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T16:42:56.937574+00:00",
-  "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+  "generatedAt": "2026-10-29T16:50:05.707500+00:00",
+  "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
   "version": "0.0.43",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "7a359132626349947c52109a7fb4d9e4914bfae89de479fb68ba885b28d3f9a0",
-      "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+      "version": "299fa5d8515854a2536cb88c9711082cfc364d854f3b23d083c87b1124a32e05",
+      "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,8 +26,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "df68ce4ee816edc4cd186f0eff9e25c00f3cee919446d9fdbee15020c57f95e9",
-      "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+      "version": "d4ef095089e9240222e28725ba000cd75d1f356f09fff22b014f5d79c0f2602e",
+      "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "1e67da0aea94352f5cacc5730b8174523f5f78ecc147bc29c531fa3a87738b19",
-      "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+      "version": "b830907181e9dcfc7b374969e029c0c4a201e0c4e64eadcd5914883f99dc880e",
+      "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -66,8 +66,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "da288690ac3ddf3ca0408c506c170c256f351006d51ae058cbb0703cee70d8ab",
-      "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+      "version": "d497f6ab0214bf2836db23e770ea83e73509a3fbb29d6912755ee11b0197eccd",
+      "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -84,8 +84,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "fc6ea32a43de48f16cb1dd99b5ac92359772278bad635a756dfcc0cbf35eb84c",
-      "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+      "version": "03c2a274b23a49d86a6d51a7bac5b4b5b6c3b19f81ddbac7003287b2794caa26",
+      "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -107,8 +107,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "69ce42004826ed3ee1213e856077b8a9575ec2966ec2604755e3db9e9781c853",
-      "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+      "version": "9b565dc6837aa6491e0e6361639759415692eb70c7271bb6ff7612e4c710bb6a",
+      "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,8 +133,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "34f6dd8ec78036aee4f09be0a62d9462f676f21b9ee95809c537cccb7a5ab586",
-      "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+      "version": "597e0688d86f07102642534093d67cd27f06016762537e9d33da107575d103b7",
+      "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "aa14071b425d0caac782e07f8b38206f18a843a0cc7c8c8464b872bc7c5c110f",
-      "commit": "f785af737eb1b13cb47a4ace729fb93800a10f64",
+      "version": "cedaa07f72a6f8859cb77eed726db1c9004799e66407e4f3b8ab9dd8fd946428",
+      "commit": "67792e930f7dfe81906f026f9af39baef22d136f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -174,6 +174,20 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "67792e9",
+      "Date": "2026-10-29T13:49:53-03:00",
+      "Changes": [
+        "fix(ui): restore controls when backend rejects changes"
+      ]
+    },
+    {
+      "Version": "896bb6e",
+      "Date": "2026-10-29T13:49:50-03:00",
+      "Changes": [
+        "fix(ui): align toggle hotkey and support unique control flags"
+      ]
+    },
     {
       "Version": "f785af7",
       "Date": "2026-10-29T13:42:48-03:00",
@@ -193,20 +207,6 @@
       "Date": "2026-10-29T13:19:44-03:00",
       "Changes": [
         "chore: bump loader version to 0.0.43"
-      ]
-    },
-    {
-      "Version": "50a2051",
-      "Date": "2026-10-29T13:19:30-03:00",
-      "Changes": [
-        "fix(ui): initialize visibility state before input handlers"
-      ]
-    },
-    {
-      "Version": "b8f9435",
-      "Date": "2026-10-29T13:19:10-03:00",
-      "Changes": [
-        "fix(ui): make dragging and visibility hotkey reliable"
       ]
     }
   ]
