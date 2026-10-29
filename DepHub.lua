@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.44"
+local VERSION = "0.0.45"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -309,7 +309,7 @@ env.__DEPHUB.Backend = backend
 
 if env[STATE_KEY] ~= session then return false end
 
-local okUILibrary, uiModule = loadModule("src/core/nebulatech.lua", false)
+local okUILibrary, uiModule = loadModule("src/core/windui.lua", false)
 if okUILibrary and type(uiModule) == "table" and type(uiModule.new) == "function" then
     env.__DEPHUB.UILibrary = uiModule
 end
