@@ -10,10 +10,9 @@ local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
--- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.49"
+local VERSION = "0.0.50"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -34,19 +33,14 @@ local function detectExecutor()
     return ok and tostring(name) or "Desconhecido"
 end
 
--- Backend state keys published by the game modules and by the loader below.
 local BACKEND_KEYS = {
     "AOTR", "TSB", "MM2", "NoobPiece", "BloxFruits", "Universal", "Runtime", "Volleyball42"
 }
 
--- Extra session handles the loader creates and must tear down on re-execution.
--- Window/UIGuard are legacy names from the removed frontend: kept so a session
--- started by an older version is fully cleaned up when the loader runs again.
 local HANDLE_KEYS = {
-    "Updater", "Window", "UIGuard", "TempUI", "UI", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
+    "Updater", "Window", "UIGuard", "TempUI", "UI", "Bracket", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
 }
 
--- Legacy globals that older revisions wrote directly to the shared environment.
 local LEGACY_GLOBALS = {
     "__DEPHUB_UNIVERSAL", "__DEPHUB_TSB", "__DEPHUB_TSB_FRONTEND",
     "__DEPHUB_MM2", "__DEPHUB_AOTR", "__DEPHUB_MM2_FRONTEND",
@@ -80,6 +74,7 @@ local function cleanupRuntime()
         end
         state.Frontend = nil
         state.UILibrary = nil
+        state.Bracket = nil
         state.UI = nil
     end
 
@@ -120,15 +115,9 @@ env[STATE_KEY] = {
     PlaceId = placeId, GameId = gameId, SourceRef = sourceRef
 }
 
--- Public contract kept small on purpose: anti-cheats that enumerate getgenv()
--- should see only Mode/Backend/Version plus the source base the backends and
--- updater fetch from. Diagnostics live behind __DEPHUB.Debug(), which is only
--- materialised on demand.
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
 env.__DEPHUB.SourceBaseURL = BASE_URL
--- Backends report internal failures here so a silent `return false` becomes a
--- concrete reason in the console instead of a bare "Falha desconhecida".
 env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 
@@ -169,8 +158,7 @@ local function getCache()
 end
 
 local function performRequest(url)
-    local requestFunctions = {
-    }
+    local requestFunctions = {}
     if type(request) == "function" then requestFunctions[#requestFunctions+1] = request end
     if type(http_request) == "function" then requestFunctions[#requestFunctions+1] = http_request end
     if type(syn) == "table" and type(syn.request) == "function" then requestFunctions[#requestFunctions+1] = syn.request end
@@ -189,9 +177,6 @@ local function performRequest(url)
                 end
             end
         end
-        -- Some executors expose HttpGet as a global helper, others only as a
-        -- DataModel member. Try the global first, then the member, and never
-        -- assume the member exists (reading or writing it can error).
         if type(HttpGet) == "function" then
             local ok, result = pcall(HttpGet, url)
             if ok and type(result) == "string" and #result > 0 then return true, result end
@@ -260,8 +245,6 @@ local targets = {
     ["1316421563"] = {Core = "src/games/volleyball42.lua", Volleyball42 = true}
 }
 
--- AOT:R routes lobby by PlaceId and mission places by universe GameId.
--- Source: https://www.roblox.com/games/13379208636/Attack-on-Titan-Revolution
 local gameName = tostring(game.Name or ""):lower()
 local isAOTRName = gameName:find("attack on titan") ~= nil and gameName:find("revolution") ~= nil
 local target = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "src/games/aotr.lua", AOTR = true}) or {Core = "src/games/universal.lua", Universal = true}
@@ -309,25 +292,18 @@ env.__DEPHUB.Backend = backend
 
 if env[STATE_KEY] ~= session then return false end
 
-local okUILibrary, uiModule = loadModule("src/core/bracket.lua", false)
-if okUILibrary and type(uiModule) == "table" and type(uiModule.new) == "function" then
-    env.__DEPHUB.UILibrary = uiModule
-else
-    log("WindUI nao carregou: " .. tostring(uiModule))
+local okBracket, bracketModule = loadModule("src/core/bracket.lua", false)
+if not okBracket or type(bracketModule) ~= "table" or type(bracketModule.new) ~= "function" then
+    return fail("Bracket nao carregou: " .. tostring(bracketModule))
 end
 
--- WindUI replaces the previous custom library for this test build. UI loading remains optional for headless executors.
-local okTempUI, tempUIModule = loadModule("src/core/temp-ui.lua", false)
-if okTempUI and type(tempUIModule) == "table" and type(tempUIModule.Mount) == "function" then
-    local okMount, tempUI = pcall(tempUIModule.Mount, env)
-    if okMount and type(tempUI) == "table" then
-        env.__DEPHUB.TempUI = tempUI
-    else
-        log("Interface WindUI falhou ao montar: " .. tostring(tempUI))
-    end
-elseif not okTempUI then
-    log("Frontend DepHub falhou: " .. tostring(tempUIModule))
+local okWindow, window = pcall(bracketModule.new, {Name = "DepHub"})
+if not okWindow or type(window) ~= "table" then
+    return fail("Nao foi possivel iniciar a Bracket: " .. tostring(window))
 end
+
+env.__DEPHUB.Bracket = window
+env.__DEPHUB.UI = window
 
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
