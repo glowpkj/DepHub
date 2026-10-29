@@ -51,6 +51,7 @@ local State = {
     LastContactAt = 0,
     PredictionElapsed = 0,
     SearchElapsed = 0,
+    InvalidPredictionElapsed = 0,
     LastNotification = nil
 }
 
@@ -618,11 +619,12 @@ function State:Start()
 
         if not self.CurrentBall or not self.CurrentBall:IsDescendantOf(Workspace)
             or not isValidBall(self.CurrentBall) then
+            marker.Transparency = 1
+            tracer.Enabled = false
+
             if self.SearchElapsed >= 0.25 then
                 self.SearchElapsed = 0
                 if not acquireBall() then
-                    marker.Transparency = 1
-                    tracer.Enabled = false
                     return
                 end
             else
@@ -642,7 +644,17 @@ function State:Start()
         end
 
         local velocity = estimateVelocity(root.Position, os.clock())
-        if not velocity or self.PredictionElapsed < PREDICTION_INTERVAL then
+        if not velocity then
+            self.InvalidPredictionElapsed += dt
+            if self.InvalidPredictionElapsed >= 0.25 then
+                marker.Transparency = 1
+                tracer.Enabled = false
+            end
+            updateTracerVisibility()
+            return
+        end
+
+        if self.PredictionElapsed < PREDICTION_INTERVAL then
             updateTracerVisibility()
             return
         end
@@ -651,12 +663,19 @@ function State:Start()
         local predicted = predictLanding(root, velocity)
 
         if predicted then
+            self.InvalidPredictionElapsed = 0
             marker.Position = predicted
             marker.Transparency = 0.15
             updateMarkerColor(predicted)
             updateTracerVisibility()
-        elseif marker.Transparency >= 1 then
-            tracer.Enabled = false
+        else
+            self.InvalidPredictionElapsed += PREDICTION_INTERVAL
+            if self.InvalidPredictionElapsed >= 0.25 then
+                marker.Transparency = 1
+                tracer.Enabled = false
+            else
+                updateTracerVisibility()
+            end
         end
     end)
 
