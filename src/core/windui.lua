@@ -187,14 +187,43 @@ function Tab:SetVisible(value)
     end
 end
 
+local function fetchWindUISource()
+    local requestFunctions = {}
+    if type(request) == "function" then requestFunctions[#requestFunctions + 1] = request end
+    if type(http_request) == "function" then requestFunctions[#requestFunctions + 1] = http_request end
+    if type(syn) == "table" and type(syn.request) == "function" then requestFunctions[#requestFunctions + 1] = syn.request end
+    local lastError = "Sem resposta HTTP"
+    for _, requestFunction in ipairs(requestFunctions) do
+        local ok, response = pcall(requestFunction, {Url = WINDUI_URL, Method = "GET"})
+        if ok and type(response) == "table" then
+            local body = response.Body or response.body
+            local status = tonumber(response.StatusCode or response.status_code or 200) or 200
+            if status >= 200 and status < 400 and type(body) == "string" and #body > 0 then
+                return body
+            end
+            lastError = "HTTP " .. tostring(status)
+        elseif not ok then
+            lastError = tostring(response)
+        end
+    end
+    local ok, source = pcall(function() return game:HttpGet(WINDUI_URL) end)
+    if ok and type(source) == "string" and #source > 0 then
+        return source
+    end
+    error("Falha ao baixar WindUI: " .. tostring(ok and lastError or source))
+end
+
 function WindUIAdapter.new(config)
     config = config or {}
     local loader = loadstring
     if type(loader) ~= "function" then
         error("WindUI requer loadstring neste ambiente")
     end
-    local source = game:HttpGet(WINDUI_URL)
-    local chunk = loader(source)
+    local source = fetchWindUISource()
+    local chunk, compileError = loader(source)
+    if type(chunk) ~= "function" then
+        error("Falha ao compilar WindUI: " .. tostring(compileError))
+    end
     local WindUI = chunk()
     if type(WindUI) ~= "table" or type(WindUI.CreateWindow) ~= "function" then
         error("WindUI nao retornou uma biblioteca valida")
