@@ -1,12 +1,12 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T15:11:33.356977+00:00",
+  "generatedAt": "2026-10-30T01:00:00+00:00",
   "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
-  "version": "0.0.39",
+  "version": "0.0.40",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "4e6b6017e7e67af0699a5feb3caa3b1a4373a56a614bc605c5a9f494bfa077df",
+      "version": "nebulatech-0.0.40",
       "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
       "files": [
         "DepHub.lua",
@@ -20,12 +20,13 @@
         "src/games/features/mm2/coinfarm.lua",
         "src/games/features/mm2/playerteleport.lua",
         "src/games/features/mm2/gundrop.lua",
-        "src/games/updates/66654135.txt"
+        "src/games/updates/66654135.txt",
+        "src/core/nebulatech.lua"
       ]
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "a3e18d5fdcc65382e708db537a404c59b55355ecff89cc1d0a896c779ce8ec06",
+      "version": "nebulatech-0.0.40",
       "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
       "files": [
         "DepHub.lua",
@@ -47,12 +48,13 @@
         "src/games/features/bloxfruits/team.lua",
         "src/games/features/bloxfruits/fruitvfx.lua",
         "src/games/updates/994732206.txt",
-        "src/core/updater.lua"
+        "src/core/updater.lua",
+        "src/core/nebulatech.lua"
       ]
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "dc53f99b46bd58614f8b8b92338d8dc13161f9a0fb8dc6f74576e0350e41f3ab",
+      "version": "nebulatech-0.0.40",
       "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
       "files": [
         "DepHub.lua",
@@ -60,12 +62,13 @@
         "src/core/temp-ui.lua",
         "src/core/updater.lua",
         "src/games/volleyball42.lua",
-        "src/games/updates/1316421563.txt"
+        "src/games/updates/1316421563.txt",
+        "src/core/nebulatech.lua"
       ]
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "394b3d8a1e7a974e4073a0e7bb68b200e1518cf04f987a30d37c34abd3f50768",
+      "version": "nebulatech-0.0.40",
       "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
       "files": [
         "DepHub.lua",
@@ -77,12 +80,13 @@
         "src/games/features/tsb/autoblock.lua",
         "src/games/features/tsb/autoblock-v2.lua",
         "src/games/features/tsb/autoblock-v3.lua",
-        "src/games/updates/3808081382.txt"
+        "src/games/updates/3808081382.txt",
+        "src/core/nebulatech.lua"
       ]
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "910bd08310feae1c5d22ed399edf771e4f0f60489c5ec3530105266b1165bb25",
+      "version": "nebulatech-0.0.40",
       "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
       "files": [
         "DepHub.lua",
@@ -99,12 +103,13 @@
         "src/games/features/restauranttycoon3/instant-cook.lua",
         "src/games/features/restauranttycoon3/drops.lua",
         "src/games/features/restauranttycoon3/autofarm-friends.lua",
-        "src/games/updates/119048529960596.txt"
+        "src/games/updates/119048529960596.txt",
+        "src/core/nebulatech.lua"
       ]
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "2f6c8a9e5d9efa68d40526470d97505973fdf1deb992f6771c12e6ee9613767a",
+      "version": "nebulatech-0.0.40",
       "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
       "files": [
         "DepHub.lua",
@@ -126,12 +131,13 @@
         "src/games/features/bloxfruits/team.lua",
         "src/games/features/bloxfruits/fruitvfx.lua",
         "src/games/updates/85211729168715.txt",
-        "src/core/updater.lua"
+        "src/core/updater.lua",
+        "src/core/nebulatech.lua"
       ]
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "e423072e0df745118712bb8135428e2522117f05db5156d056e83824922b571e",
+      "version": "nebulatech-0.0.40",
       "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
       "files": [
         "DepHub.lua",
@@ -151,12 +157,13 @@
         "src/games/features/noobpiece/autoquest.lua",
         "src/games/features/noobpiece/islanddata.lua",
         "src/games/features/noobpiece/islandtracker.lua",
-        "src/games/updates/84822469255086.txt"
+        "src/games/updates/84822469255086.txt",
+        "src/core/nebulatech.lua"
       ]
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "3eff03d8045665ecd67a35c87c0fe6839b02816f89d376fae5ba92f102d5e0bd",
+      "version": "nebulatech-0.0.40",
       "commit": "d37d81125470dee1cc162fb4f3457a37b137c9e1",
       "files": [
         "DepHub.lua",
@@ -165,11 +172,20 @@
         "src/core/updater.lua",
         "src/games/aotr.lua",
         "src/games/features/aotr/assistance.lua",
-        "src/games/updates/4658598196.txt"
+        "src/games/updates/4658598196.txt",
+        "src/core/nebulatech.lua"
       ]
     }
   },
   "recentUpdates": [
+    {
+      "Version": "0.0.40",
+      "Date": "2026-10-29T22:00:00-03:00",
+      "Changes": [
+        "feat(ui): add shared NebulaTech library",
+        "refactor(ui): use NebulaTech across game backends"
+      ]
+    },
     {
       "Version": "f5612e0",
       "Date": "2026-10-29T12:11:06-03:00",
