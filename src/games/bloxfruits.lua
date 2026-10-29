@@ -210,7 +210,7 @@ local function ensureTab(name, sea)
         if sea then renderedTabs[name].Sea = sea end
         return renderedTabs[name]
     end
-    local tab = visual:CreateTab(name)
+    local tab = visual:CreateTab(name, sea)
     local record = {Tab = tab, Sea = sea, Name = name}
     renderedTabs[name] = record
     return record
@@ -223,7 +223,7 @@ local function sectionFor(tabRecord, pageName)
     return section
 end
 local function renderDefinition(definition, section)
-    local title = tostring(definition.title or definition.key)
+    local title = tostring(definition.page or "General") .. " · " .. tostring(definition.title or definition.key)
     local function set(value) State:SetControl(definition.key, value) end
     if definition.kind == "toggle" then
         section:CreateToggle(title, definition.get and definition.get() == true, set)
@@ -278,13 +278,11 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                 local allowed = splitSeas(record.Sea)
                 visible = allowed[current] == true
             end
-            record.Tab.Visible = visible
-            if record.Tab.Control and record.Tab.Control.Asset then record.Tab.Control.Asset.Visible = visible end
-            if record.Tab.Control and record.Tab.Control.ButtonAsset then record.Tab.Control.ButtonAsset.Visible = visible end
+            if type(record.Tab.SetVisible) == "function" then record.Tab:SetVisible(visible) end
         end
         for _, record in pairs(renderedTabs) do
             if record.Tab.Visible and record.Tab.Control and record.Tab.Control.Asset and record.Tab.Control.ButtonAsset then
-                pcall(function() visual.Bracket.Utilities.ChooseTab(record.Tab.Control.ButtonAsset, record.Tab.Control.Asset) end)
+                pcall(function() visual:SetCurrentSea(current) end)
                 break
             end
         end
