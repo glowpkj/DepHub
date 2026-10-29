@@ -309,6 +309,7 @@ function DepHub.new(config)
                 if other.Indicator then other.Indicator:Destroy() end
             end
             page.Visible = true
+            self.SelectedTab = tab
             tabButton.TextColor3 = COLORS.Text
             navButton.BackgroundColor3 = Color3.fromRGB(25, 20, 35)
             local indicator = create("Frame", {
@@ -325,6 +326,22 @@ function DepHub.new(config)
 
         tab.Page, tab.PageGrid, tab.TabButton, tab.NavButton = page, pageGrid, tabButton, navButton
         tab.Select = selectTab
+        function tab:SetVisible(value)
+            value = value == true
+            self.Visible = value
+            self.Page.Visible = value and self.ParentWindow.SelectedTab == self
+            self.NavButton.Visible = value
+            self.TabButton.Visible = value
+            if not value and self.ParentWindow.SelectedTab == self then
+                for _, other in ipairs(self.ParentWindow.Tabs) do
+                    if other ~= self and other.Visible ~= false then
+                        other.Select()
+                        break
+                    end
+                end
+            end
+        end
+        tab.Visible = true
         table.insert(self.Tabs, tab)
         tabButton.Activated:Connect(selectTab)
         navButton.Activated:Connect(selectTab)
