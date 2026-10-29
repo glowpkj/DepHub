@@ -268,10 +268,10 @@ function TempUI.Mount(env)
 
     local handle = {Destroyed = false, Library = window}
     function handle:Show()
-        if self.Library and self.Library.SetVisible then self.Library.SetVisible(true) end
+        if self.Library and self.Library.SetVisible then self.Library:SetVisible(true) end
     end
     function handle:Hide()
-        if self.Library and self.Library.SetVisible then self.Library.SetVisible(false) end
+        if self.Library and self.Library.SetVisible then self.Library:SetVisible(false) end
     end
     function handle:Destroy()
         if self.Destroyed then return end
