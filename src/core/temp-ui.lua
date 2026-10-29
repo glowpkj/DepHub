@@ -80,14 +80,26 @@ function TempUI.Mount(env)
         local title = tostring(entry.title or entry.key or "Control")
         local key = tostring(entry.key or (pageName .. " / " .. title))
         local initial = readControl(entry, entry.default)
+        local item
+        local lastAcceptedValue = initial
+        local reverting = false
         local callback = function(value)
-            if not applyControl(backend, key, value) then
-                window:Notify("DepHub", "Nao foi possivel alterar " .. title, 3)
+            if reverting then
+                reverting = false
                 return
             end
+            if not applyControl(backend, key, value) then
+                window:Notify("DepHub", "Nao foi possivel alterar " .. title, 3)
+                if item and type(item.Set) == "function" then
+                    reverting = true
+                    pcall(item.Set, item, lastAcceptedValue)
+                end
+                window.Flags[key] = lastAcceptedValue
+                return
+            end
+            lastAcceptedValue = value
             window.Flags[key] = value
         end
-        local item
         if entry.kind == "toggle" then
             item = section:CreateToggle(title, initial == true, callback)
         elseif entry.kind == "slider" then
@@ -107,6 +119,7 @@ function TempUI.Mount(env)
         else
             item = section:CreateParagraph(title .. " (tipo nao suportado: " .. tostring(entry.kind) .. ")")
         end
+        if type(item) == "table" then item.FlagName = key end
         controlRows[key] = {Entry = entry, Item = item, Page = pageName}
         window.Flags[key] = initial
     end
