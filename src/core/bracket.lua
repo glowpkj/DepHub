@@ -65,8 +65,17 @@ end
 local Section = {}
 Section.__index = Section
 
+local function createSectionControl(section, method, config)
+    local internal = section and section.Internal
+    local fn = type(internal) == "table" and internal[method]
+    if type(fn) ~= "function" then return nil end
+    local ok, control = pcall(fn, section, config)
+    if ok then return control end
+    return nil
+end
+
 function Section:CreateToggle(title, initial, callback)
-    local control = self.Control:Toggle({Name = tostring(title), Value = initial == true, Callback = callback})
+    local control = createSectionControl(self.Control, "Toggle", {Name = tostring(title), Value = initial == true, Callback = callback})
     return setmetatable({Control = control, Value = initial == true}, Item)
 end
 
@@ -75,7 +84,7 @@ function Section:CreateCheckbox(title, initial, callback)
 end
 
 function Section:CreateSlider(title, minimum, maximum, initial, callback)
-    local control = self.Control:Slider({
+    local control = createSectionControl(self.Control, "Slider", {
         Name = tostring(title),
         Min = tonumber(minimum) or 0,
         Max = tonumber(maximum) or 100,
@@ -99,7 +108,7 @@ function Section:CreateDropdown(title, options, initial, callback)
             end
         }
     end
-    local control = self.Control:Dropdown({Name = tostring(title), List = list})
+    local control = createSectionControl(self.Control, "Dropdown", {Name = tostring(title), List = list})
     local item = setmetatable({Control = control, Value = initial}, Item)
     if initial ~= nil and type(control) == "table" and type(control.SetValue) == "function" then
         pcall(control.SetValue, control, {initial})
@@ -108,7 +117,7 @@ function Section:CreateDropdown(title, options, initial, callback)
 end
 
 function Section:CreateInput(title, placeholder, initial, callback)
-    local control = self.Control:Textbox({
+    local control = createSectionControl(self.Control, "Textbox", {
         Name = tostring(title),
         Value = tostring(initial or ""),
         Placeholder = tostring(placeholder or ""),
@@ -119,13 +128,13 @@ function Section:CreateInput(title, placeholder, initial, callback)
 end
 
 function Section:CreateButton(title, callback)
-    local control = self.Control:Button({Name = tostring(title), Callback = callback})
+    local control = createSectionControl(self.Control, "Button", {Name = tostring(title), Callback = callback})
     return setmetatable({Control = control}, Item)
 end
 
 function Section:CreateColorPicker(title, initial, callback)
     local defaultColor = typeof(initial) == "Color3" and initial or Color3.fromRGB(255, 255, 255)
-    local control = self.Control:Colorpicker({
+    local control = createSectionControl(self.Control, "Colorpicker", {
         Name = tostring(title),
         Value = {0, 0, 1, 0, false},
         Callback = function(_, color)
@@ -141,7 +150,7 @@ end
 function Section:CreateParagraph(title, description)
     local text = tostring(title or "")
     if description and tostring(description) ~= "" then text = text .. "\n" .. tostring(description) end
-    local control = self.Control:Label({Text = text})
+    local control = createSectionControl(self.Control, "Label", {Text = text})
     return setmetatable({Control = control, Value = text}, Item)
 end
 
@@ -159,7 +168,21 @@ function Tab:CreateSection(title)
 end
 
 function Tab:SetVisible(value)
-    self.Visible = value == true
+    value = value == true
+    local wasSelected = self.Control and self.Control.Asset and self.Control.Asset.Visible == true
+    self.Visible = value
+    if self.Control and self.Control.Asset then self.Control.Asset.Visible = value end
+    if self.Control and self.Control.ButtonAsset then self.Control.ButtonAsset.Visible = value end
+    if wasSelected and not value and self.Adapter then
+        for _, tab in ipairs(self.Adapter.Tabs) do
+            if tab.Visible and tab.Control and tab.Control.Asset and tab.Control.ButtonAsset then
+                pcall(function()
+                    self.Adapter.Bracket.Utilities.ChooseTab(tab.Control.ButtonAsset, tab.Control.Asset)
+                end)
+                break
+            end
+        end
+    end
 end
 
 function BracketAdapter.new(config)
@@ -198,7 +221,7 @@ end
 function BracketAdapter:CreateTab(name)
     local ok, control = call(self.RawWindow, "Tab", {Name = tostring(name)})
     if not ok or type(control) ~= "table" then error("Bracket nao conseguiu criar a aba " .. tostring(name)) end
-    local tab = setmetatable({Control = control, Title = tostring(name), Visible = true}, Tab)
+    local tab = setmetatable({Control = control, Title = tostring(name), Visible = true, Adapter = self}, Tab)
     self.Tabs[#self.Tabs + 1] = tab
     return tab
 end
