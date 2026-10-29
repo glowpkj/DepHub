@@ -26,6 +26,26 @@ function Factory.new(context)
     local loadSource = context.LoadSource
     if type(loadSource) ~= "function" then return false, "adapter requires LoadSource" end
 
+    -- The vendored modules read their globals (game, task) from the shared
+    -- environment, because the loader compiles each one with loadstring and
+    -- a chunk has no way to see the loader's locals. Publish the runtime the
+    -- same way before any module is compiled. Each target is written under
+    -- pcall: executors hand back readonly tables for some of these, and one
+    -- failure must not stop the others.
+    local runtime = {game = vendors.game, task = vendors.task}
+    local published = false
+    for _, target in ipairs({
+        (type(getgenv) == "function") and select(2, pcall(getgenv)) or nil,
+        shared,
+        _G
+    }) do
+        if type(target) == "table" then
+            local ok = pcall(function() target.__DEPHUB_OSS_RUNTIME = runtime end)
+            published = published or ok
+        end
+    end
+    if not published then return false, "no writable shared environment for __DEPHUB_OSS_RUNTIME" end
+
     local prefix = context.PathPrefix or "src/games/features/bloxfruits/oss/"
     local State = {Destroyed = false, Modules = {}, Errors = {}, Version = context.Version or "1.0"}
     local log = context.Warn or function() end

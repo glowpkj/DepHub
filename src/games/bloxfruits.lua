@@ -79,9 +79,9 @@ local Context = {
     LoadSource = loadSource
 }
 
-local okNew, State = pcall(Adapter.new, Context)
+local okNew, State, reason = pcall(Adapter.new, Context)
 if not okNew or type(State) ~= "table" then
-    report("BloxFruits: OSS nao inicializou: " .. tostring(State))
+    report("BloxFruits: OSS nao inicializou: " .. tostring(State) .. (reason and (" | " .. tostring(reason)) or ""))
     return false
 end
 

@@ -1,4 +1,9 @@
-local dephub = (getgenv and getgenv() or _G).__DEPHUB_OSS_RUNTIME
+local dephub
+do
+    local function pick(t) return type(t) == "table" and t.__DEPHUB_OSS_RUNTIME or nil end
+    dephub = (type(getgenv) == "function" and pick(select(2, pcall(getgenv)))) or pick(shared) or pick(_G)
+    if not dephub then error("DepHub OSS runtime missing: __DEPHUB_OSS_RUNTIME was not published", 0) end
+end
 local game = dephub.game
 local task = dephub.task
 
