@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T15:15:29.985816+00:00",
-  "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+  "generatedAt": "2026-10-29T15:46:04.944799+00:00",
+  "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
   "version": "0.0.40",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "8f50e085913dc6661085db68c243a0cdb8e9e2635a3f6abb958d060aec54dbd1",
-      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+      "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,28 +26,26 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "47316a1b092e953904bd76657930ecd88abac072333afe4d0d791ac6f31dd497",
-      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+      "version": "ddf6cf2a60fb0d13d1b8a36ed6cc480ede0e393b812c22fe0bc9029b8073a2e3",
+      "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
         "src/core/nebulatech.lua",
         "src/games/bloxfruits.lua",
-        "src/games/features/bloxfruits/playeresp.lua",
-        "src/games/features/bloxfruits/fruit.lua",
-        "src/games/features/bloxfruits/observation.lua",
-        "src/games/features/bloxfruits/unbreakable.lua",
-        "src/games/features/bloxfruits/camerashake.lua",
-        "src/games/features/bloxfruits/dash.lua",
-        "src/games/features/bloxfruits/flashstep.lua",
-        "src/games/features/bloxfruits/waterwalking.lua",
-        "src/games/features/bloxfruits/bladhits.lua",
-        "src/games/features/bloxfruits/autofarm.lua",
-        "src/games/features/bloxfruits/quests.lua",
-        "src/games/features/bloxfruits/config.lua",
-        "src/games/features/bloxfruits/team.lua",
-        "src/games/features/bloxfruits/fruitvfx.lua",
+        "src/games/features/bloxfruits/oss/adapter.lua",
+        "src/games/features/bloxfruits/oss/ui-headless.lua",
+        "src/games/features/bloxfruits/oss/core.lua",
+        "src/games/features/bloxfruits/oss/teleport.lua",
+        "src/games/features/bloxfruits/oss/combat.lua",
+        "src/games/features/bloxfruits/oss/farm.lua",
+        "src/games/features/bloxfruits/oss/player.lua",
+        "src/games/features/bloxfruits/oss/fruits.lua",
+        "src/games/features/bloxfruits/oss/shop.lua",
+        "src/games/features/bloxfruits/oss/events.lua",
+        "src/games/features/bloxfruits/oss/extras.lua",
+        "src/games/features/bloxfruits/oss/info.lua",
         "src/games/updates/994732206.txt",
         "src/core/updater.lua"
       ]
@@ -55,7 +53,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "2f5bba4e151408c482afa586343306915a396a941af7825d53cac926f066a6de",
-      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+      "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -69,7 +67,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "c9d91d54e236d52aadf58aeb834e17919ba1caf98bfeaccb0aab9b16b5794316",
-      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+      "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -87,7 +85,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "18d3e508e23c07e8c0fcd90ebf414325bb2c034fb2171ce1816ad2938b73f629",
-      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+      "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -109,28 +107,26 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "982d8e9f9cd0739af8fcb213fd70a45abddbbc97b765289f4044ee97518e4c8c",
-      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+      "version": "9ea20d3219414631cf24da3063a9051664f7cb09a97a63bf49934e8d34d91873",
+      "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/temp-ui.lua",
         "src/core/nebulatech.lua",
         "src/games/bloxfruits.lua",
-        "src/games/features/bloxfruits/playeresp.lua",
-        "src/games/features/bloxfruits/fruit.lua",
-        "src/games/features/bloxfruits/observation.lua",
-        "src/games/features/bloxfruits/unbreakable.lua",
-        "src/games/features/bloxfruits/camerashake.lua",
-        "src/games/features/bloxfruits/dash.lua",
-        "src/games/features/bloxfruits/flashstep.lua",
-        "src/games/features/bloxfruits/waterwalking.lua",
-        "src/games/features/bloxfruits/bladhits.lua",
-        "src/games/features/bloxfruits/autofarm.lua",
-        "src/games/features/bloxfruits/quests.lua",
-        "src/games/features/bloxfruits/config.lua",
-        "src/games/features/bloxfruits/team.lua",
-        "src/games/features/bloxfruits/fruitvfx.lua",
+        "src/games/features/bloxfruits/oss/adapter.lua",
+        "src/games/features/bloxfruits/oss/ui-headless.lua",
+        "src/games/features/bloxfruits/oss/core.lua",
+        "src/games/features/bloxfruits/oss/teleport.lua",
+        "src/games/features/bloxfruits/oss/combat.lua",
+        "src/games/features/bloxfruits/oss/farm.lua",
+        "src/games/features/bloxfruits/oss/player.lua",
+        "src/games/features/bloxfruits/oss/fruits.lua",
+        "src/games/features/bloxfruits/oss/shop.lua",
+        "src/games/features/bloxfruits/oss/events.lua",
+        "src/games/features/bloxfruits/oss/extras.lua",
+        "src/games/features/bloxfruits/oss/info.lua",
         "src/games/updates/85211729168715.txt",
         "src/core/updater.lua"
       ]
@@ -138,7 +134,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "0b2623d70457defe2dd739570d9a7f58a23266a294fdac4f9e6e918a34340154",
-      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+      "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -164,7 +160,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "406a1e6edcd29fc13b2ce9f38c233aad698d051790ec199c2cf4ed9ef210c0a6",
-      "commit": "414b2ec93d033c13faf8bd0c4ff4b8ad9527ede7",
+      "commit": "13ed93eaf0364ca62b1032a5bb25655b1765ab26",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -178,6 +174,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "13ed93e",
+      "Date": "2026-10-29T12:45:51-03:00",
+      "Changes": [
+        "feat(bloxfruits): vendor open-source script behind a headless DepHub backend"
+      ]
+    },
     {
       "Version": "fc8bdb4",
       "Date": "2026-10-29T12:15:08-03:00",
@@ -204,13 +207,6 @@
       "Date": "2026-10-29T12:12:10-03:00",
       "Changes": [
         "chore(release): bump version to 0.0.40"
-      ]
-    },
-    {
-      "Version": "fb9aecc",
-      "Date": "2026-10-29T12:11:49-03:00",
-      "Changes": [
-        "feat(ui): load shared NebulaTech library"
       ]
     }
   ]
