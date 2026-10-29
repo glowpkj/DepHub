@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.51"
+local VERSION = "0.0.52"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -38,7 +38,7 @@ local BACKEND_KEYS = {
 }
 
 local HANDLE_KEYS = {
-    "Updater", "Window", "UIGuard", "TempUI", "UI", "Bracket", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
+    "Updater", "Window", "UIGuard", "TempUI", "UI", "Bracket", "DemonUI", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
 }
 
 local LEGACY_GLOBALS = {
@@ -75,6 +75,7 @@ local function cleanupRuntime()
         state.Frontend = nil
         state.UILibrary = nil
         state.Bracket = nil
+        state.DemonUI = nil
         state.UI = nil
     end
 
@@ -251,17 +252,17 @@ local target = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "s
 if not game:IsLoaded() then game.Loaded:Wait() end
 task.wait()
 
-local okBracket, bracketModule = loadModule("src/core/bracket.lua", false)
-if not okBracket or type(bracketModule) ~= "table" or type(bracketModule.new) ~= "function" then
-    return fail("Bracket nao carregou: " .. tostring(bracketModule))
+local okDemon, demonModule = loadModule("src/core/demon-ui.lua", false)
+if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "function" then
+    return fail("DemonOfDarknessUI nao carregou: " .. tostring(demonModule))
 end
 
-local okWindow, window = pcall(bracketModule.new, {Name = "DepHub"})
+local okWindow, window = pcall(demonModule.new, {Name = "DepHub", Version = "0.0.52"})
 if not okWindow or type(window) ~= "table" then
-    return fail("Nao foi possivel iniciar a Bracket: " .. tostring(window))
+    return fail("Nao foi possivel iniciar DemonOfDarknessUI: " .. tostring(window))
 end
 
-env.__DEPHUB.Bracket = window
+env.__DEPHUB.DemonUI = window
 env.__DEPHUB.UI = window
 
 local okCore, coreResult = loadModule(target.Core, false)
