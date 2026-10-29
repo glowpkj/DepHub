@@ -330,18 +330,35 @@ end
 function Diagnostics:_collectMetrics()
     local metrics = self.Metrics
     local okStats, stats = pcall(function() return game:GetService("Stats") end)
+
+    -- FPS: executors expose FrameStats.FrameRate differently. It may be a value
+    -- object read via GetValue() or .Value, and some runtimes keep it under
+    -- RenderStats instead. Try each route, then fall back to the physics frame
+    -- rate the engine reports, so the metric is never stuck at 0 -- and this
+    -- runs even when Stats is unavailable.
+    local fps
     if okStats and stats then
-        local frame = child(stats, "FrameStats")
+        local frame = child(stats, "FrameStats") or child(stats, "RenderStats")
         if frame then
             local rate = child(frame, "FrameRate")
-            local fps = rate and safe(function() return rate.Value end)
-            if type(fps) == "number" then metrics.FPS = fps end
+            if rate then
+                fps = safe(function() return rate:GetValue() end)
+                if type(fps) ~= "number" then fps = safe(function() return rate.Value end) end
+            end
         end
+    end
+    if type(fps) ~= "number" then
+        fps = safe(function() return workspace:GetRealPhysicsFPS() end)
+    end
+    if type(fps) == "number" and fps > 0 then metrics.FPS = fps end
+
+    if okStats and stats then
         local network = child(stats, "Network")
         local serverStats = network and child(network, "ServerStatsItem")
         local pingItem = serverStats and child(serverStats, "Data Ping")
         if pingItem then
             local ping = safe(function() return pingItem:GetValue() end)
+            if type(ping) ~= "number" then ping = safe(function() return pingItem.Value end) end
             if type(ping) == "number" then metrics.Ping = ping end
         end
         local memory = safe(function() return stats:GetTotalMemoryUsageMb() end)

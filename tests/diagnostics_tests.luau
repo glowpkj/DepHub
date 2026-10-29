@@ -84,7 +84,11 @@ do
     local ctx = sandbox()
     local stats = Instance.new("Stats")
     local frameStats = Instance.new("Folder"); frameStats.Name = "FrameStats"; frameStats.Parent = stats
-    local frameRate = Instance.new("NumberValue"); frameRate.Name = "FrameRate"; frameRate.Value = 144; frameRate.Parent = frameStats
+    -- FrameRate exposed as a value object read through GetValue() (the real
+    -- shape), with no .Value, so the collector must use GetValue first.
+    local frameRate = Instance.new("ObjectValue"); frameRate.Name = "FrameRate"
+    function frameRate:GetValue() return 144 end
+    frameRate.Parent = frameStats
     local network = Instance.new("Folder"); network.Name = "Network"; network.Parent = stats
     local serverStats = Instance.new("Folder"); serverStats.Name = "ServerStatsItem"; serverStats.Parent = network
     local dataPing = Instance.new("NumberValue"); dataPing.Name = "Data Ping"
@@ -95,9 +99,21 @@ do
     local Diag = ctx:Run("src/core/diagnostics.lua")
     local diag = Diag.new()
     local metrics = diag:_collectMetrics()
-    check(metrics.FPS == 144, "metrics reads the frame rate when FrameStats exists")
+    check(metrics.FPS == 144, "metrics reads the frame rate via GetValue when FrameStats exists")
     check(metrics.Ping == 42, "metrics reads the ping when Network exists")
     check(metrics.Memory == 512, "metrics reads memory when the method exists")
+    diag:Destroy()
+end
+
+-- FPS must never sit at 0 when Stats is unusable: the physics frame rate is the
+-- fallback, so a runtime without FrameStats still shows a live FPS.
+do
+    local ctx = sandbox()
+    function ctx.Services.Workspace:GetRealPhysicsFPS() return 58.7 end
+    local Diag = ctx:Run("src/core/diagnostics.lua")
+    local diag = Diag.new()
+    local metrics = diag:_collectMetrics()
+    check(metrics.FPS == 58.7, "metrics falls back to the physics frame rate when FrameStats is absent")
     diag:Destroy()
 end
 
