@@ -11,7 +11,7 @@ local LocalPlayer=Players.LocalPlayer
 local env=type(getgenv)=="function" and getgenv() or _G
 local STATE_KEY="__DEPHUB_MM2"
 local BASE_URL=((type(getgenv)=="function" and getgenv() or _G).__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local VERSION="0.0.4"
+local VERSION="0.0.5"
 
 local previous=type(env[STATE_KEY])=="table" and env[STATE_KEY] or nil
 if previous and type(previous.Destroy)=="function" then pcall(previous.Destroy,previous) end
@@ -160,5 +160,63 @@ end
 
 if not LocalPlayer then return false end
 if not State:Start() then State:Destroy() return false end
+
+local UI=env.__DEPHUB and env.__DEPHUB.UI
+if type(UI)=="table" and type(UI.CreateTab)=="function" then
+    local function createSection(tabName,sectionName,column)
+        local tab=UI:CreateTab(tabName,"All")
+        if not tab then return nil end
+        return tab:CreateSection(sectionName,column)
+    end
+
+    local roles=createSection("Roles","Role ESP","Left")
+    if roles then
+        roles:CreateToggle("Mostrar Murder e Sheriff",false,function(value)
+            State:SetRoleESP(value)
+        end)
+        roles:CreateParagraph("Identificação","Destaca o Murder em vermelho e o Sheriff em azul.")
+    end
+
+    local coins=createSection("Coin Farm","Coletar moedas","Left")
+    if coins then
+        coins:CreateToggle("Coleta automática",false,function(value)
+            State:SetAutoCoins(value)
+        end)
+        coins:CreateSlider("Distância de segurança",0,80,State.Values.CoinSafeDistance,function(value)
+            State:SetCoinSafeDistance(value)
+        end)
+        coins:CreateSlider("Intervalo (segundos)",0.02,0.3,State.Values.CoinDelay,function(value)
+            State:SetCoinDelay(value)
+        end)
+    end
+
+    local gun=createSection("Gun Drop","Pistola caída","Left")
+    if gun then
+        gun:CreateToggle("ESP da pistola",false,function(value)
+            State:SetGunDropESP(value)
+        end)
+        gun:CreateToggle("Pegar pistola automaticamente",false,function(value)
+            State:SetAutoGetGun(value)
+        end)
+        gun:CreateSlider("Distância segura do Murder",5,80,State.Values.GunSafeDistance,function(value)
+            State:SetGunSafeDistance(value)
+        end)
+        gun:CreateSlider("Tempo de coleta",0.05,0.5,State.Values.GunPickupHold,function(value)
+            State:SetGunPickupHold(value)
+        end)
+    end
+
+    local players=createSection("Players","Jogadores vivos","Left")
+    if players then
+        players:CreateButton("Teleportar para próximo jogador vivo",function()
+            local ok,name=State:TeleportNextAlivePlayer()
+            if type(UI.Notify)=="function" then
+                UI:Notify("MM2",ok and ("Teleportado para "..tostring(name)) or tostring(name or "Não foi possível teleportar"),ok and "success" or "warning")
+            end
+        end)
+        players:CreateParagraph("Status","O teleporte percorre os jogadores vivos da rodada.")
+    end
+end
+
 return State
 
