@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T19:51:04.479Z",
-  "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+  "generatedAt": "2026-10-29T19:51:26.548506+00:00",
+  "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
   "version": "0.0.58",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "ca5b48cfb4ae02eae6901b11401502a8f22fdc713a46818e132a68ddb5ab8fc6",
-      "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+      "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -27,7 +27,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "cc6d271ee364e356df07f8b53e6351320acdeaabd31ac8674d99f80154471538",
-      "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+      "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -53,7 +53,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "4641653c6ce8940e0aab61f95f92a568f76ce994f0536f2cce2bcde90e7ced18",
-      "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+      "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -67,7 +67,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "7badd6f4bffa569a9bc3594df59c18ef0a2a5e449b94f1b126e6f68290703ea5",
-      "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+      "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -85,7 +85,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "e44581c2d3a98598146b202c4acd31fde9d52c00fe5ac95c42db1179483c9f90",
-      "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+      "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -108,7 +108,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "cce43d1566ab2e6ee68ea3dc3bfcf9144adcab96de83d33bdbf766a68dfa6a2f",
-      "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+      "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -134,7 +134,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "411dc20685dfa54d295189456e5ed5bc32e80a825d615987215dfa5dc0ee710f",
-      "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+      "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -160,7 +160,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "15a672c57feb9dda5689023bb13907fc22ec6fd181ff88f1d6553269744f6f3d",
-      "commit": "3377abe07103dcfce9ef22730a2e363ee7010eef",
+      "commit": "bea2791b253d39e3f1d966336ed26669572c6e70",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -175,38 +175,38 @@
   },
   "recentUpdates": [
     {
-      "Version": "7185cd8",
-      "Date": "2026-10-29T14:58:23-03:00",
+      "Version": "bea2791",
+      "Date": "2026-10-29T16:51:07-03:00",
       "Changes": [
-        "Bump version to 0.0.49"
+        "refactor(ui): one shared shell for every game, backends own their tabs"
       ]
     },
     {
-      "Version": "06a35bb",
-      "Date": "2026-10-29T14:58:20-03:00",
+      "Version": "9585917",
+      "Date": "2026-10-29T16:41:09-03:00",
       "Changes": [
-        "Switch DepHub UI loader to Bracket v0.0.49"
+        "feat(ui): per-game visual profiles, safer loader, TSB/Volleyball UI"
       ]
     },
     {
-      "Version": "c100c90",
-      "Date": "2026-10-29T14:49:33-03:00",
+      "Version": "223d267",
+      "Date": "2026-10-29T16:23:39-03:00",
       "Changes": [
-        "chore(release): sync WindUI test build version"
+        "Update Demon UI wrapper version"
       ]
     },
     {
-      "Version": "2b5618c",
-      "Date": "2026-10-29T14:49:27-03:00",
+      "Version": "4bb49ad",
+      "Date": "2026-10-29T16:23:36-03:00",
       "Changes": [
-        "fix(ui): log WindUI loading failures and bump test build"
+        "Bump DepHub version to 0.0.56"
       ]
     },
     {
-      "Version": "d1d4ace",
-      "Date": "2026-10-29T14:49:07-03:00",
+      "Version": "bde3f34",
+      "Date": "2026-10-29T16:23:33-03:00",
       "Changes": [
-        "chore(release): sync WindUI test version"
+        "Scope UI categories to the active game"
       ]
     }
   ]
