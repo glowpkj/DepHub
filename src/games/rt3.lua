@@ -224,7 +224,45 @@ local function registerFeature(name, module)
 
     runtime.Features[name] = module
     RegisteredFeatures = RegisteredFeatures + 1
-    return true
+    
+local UI=(env.__DEPHUB or {}).UI
+if type(UI)=="table" and type(UI.CreateTab)=="function" then
+    local tabs={}
+    local function dephubSection(ui, tabs, tabName, sectionName, column)
+    local tab=tabs[tabName]
+    if not tab then
+        tab=ui:CreateTab(tabName,"All")
+        tabs[tabName]=tab
+    end
+    if not tab then return nil end
+    return tab:CreateSection(sectionName,column or "Left")
+end
+local function dephubNotify(ui,title,message)
+    if ui and type(ui.Notify)=="function" then ui:Notify(title,message) end
+end
+
+    local farm=dephubSection(UI,tabs,"Restaurant Farm","Farm","Left")
+    if farm then
+        farm:CreateToggle("Auto farm",runtime.Features.AutoFarm and runtime.Features.AutoFarm.Enabled==true,function(v)
+            if runtime.Features.AutoFarm then runtime.Features.AutoFarm.Toggle(v) end
+        end)
+        farm:CreateToggle("Farm de amigos",runtime.Features.AutoFarmFriends and runtime.Features.AutoFarmFriends.Enabled==true,function(v)
+            if runtime.Features.AutoFarmFriends then runtime.Features.AutoFarmFriends.Toggle(v) end
+        end)
+    end
+    local kitchen=dephubSection(UI,tabs,"Kitchen","Cozinha","Left")
+    if kitchen then
+        kitchen:CreateToggle("Cozinhar instantaneamente",runtime.Features.InstantCook and runtime.Features.InstantCook.Enabled==true,function(v)
+            if runtime.Features.InstantCook then runtime.Features.InstantCook.Toggle(v) end
+        end)
+        kitchen:CreateToggle("Coletar drops",runtime.Features.AutoDrop and runtime.Features.AutoDrop.Enabled==true,function(v)
+            if runtime.Features.AutoDrop then runtime.Features.AutoDrop.Toggle(v) end
+        end)
+    end
+    local status=dephubSection(UI,tabs,"Status","Runtime","Left")
+    if status then status:CreateParagraph("DepHub","Restaurant Tycoon 3 carregado. Os controles acionam as funções registradas no runtime.") end
+end
+return true
 end
 
 registerFeature("AutoFarm", AutoFarm)
