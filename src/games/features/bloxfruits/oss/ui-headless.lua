@@ -22,6 +22,7 @@ UI._core = nil
 UI.gui = nil
 UI.notifications = {}
 UI.lastNotification = nil
+UI.stats = {}
 
 local function keyFor(page, title)
     local name = page and page.Name or "?"
@@ -38,6 +39,7 @@ local function register(page, title, api, kind, extra)
     local definition = {
         key = key,
         page = page and page.Name or "?",
+        sea = page and page.sea or nil,
         title = tostring(title),
         kind = kind,
         get = api.Get,
@@ -58,7 +60,7 @@ end
 
 function UI.build(Core)
     UI._core = Core
-    UI.tabs, UI._controls, UI._defs = {}, {}, {}
+    UI.tabs, UI._controls, UI._defs, UI.stats = {}, {}, {}, {}
     UI._current, UI._currentSea = nil, "Sea1"
     return UI
 end
@@ -112,6 +114,12 @@ end
 function UI.button(page, title, desc, callback)
     local button = {Name = tostring(title), Activated = {Connect = function() end}}
     function button:FindFirstChildWhichIsA() return nil end
+    local api = {}
+    function api.Get() return false end
+    function api.Set(value)
+        if value == true and callback then callback() end
+    end
+    register(page, title, api, "button", {default = false, description = desc})
     return button
 end
 
@@ -162,8 +170,22 @@ function UI.dropdown(page, title, desc, options, callback)
 end
 
 function UI.stat(page, label)
-    local stat = {Text = "", Name = tostring(label), ClassName = "TextLabel"}
+    local stat = {Name = tostring(label), ClassName = "TextLabel", _text = ""}
+    setmetatable(stat, {
+        __index = function(self, key)
+            if key == "Text" then return rawget(self, "_text") end
+        end,
+        __newindex = function(self, key, value)
+            if key == "Text" then
+                rawset(self, "_text", tostring(value or ""))
+                UI.stats[tostring(label)] = tostring(value or "")
+            else
+                rawset(self, key, value)
+            end
+        end
+    })
     function stat:FindFirstChildWhichIsA(class) return class == "TextLabel" and self or nil end
+    UI.stats[tostring(label)] = stat.Text
     return stat
 end
 
@@ -171,8 +193,11 @@ function UI.textbox(page, placeholder, callback)
     local box = {Text = "", PlaceholderText = placeholder or ""}
     register(page, placeholder or "textbox", {
         Get = function() return box.Text end,
-        Set = function(value) box.Text = tostring(value or "") end
-    }, "textbox", {})
+        Set = function(value)
+            box.Text = tostring(value or "")
+            if callback then callback(box.Text) end
+        end
+    }, "textbox", {default = ""})
     return box
 end
 
