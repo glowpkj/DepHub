@@ -77,11 +77,12 @@ function DemonUI:CreateTab(name, sea)
         self.Library:Notify("DepHub", "Falha ao criar aba " .. name .. ": " .. tostring(tab), "error")
         return nil
     end
-    local record = {Adapter = self, Name = name, Category = category, Control = tab, Sections = {}, Visible = true}
-    function record:CreateSection(title)
+    local record = {Adapter = self, Name = name, Category = category, Key = category .. "|" .. name, Control = tab, Sections = {}, Visible = true}
+    function record:CreateSection(title, column)
         title = tostring(title or self.Name)
         if self.Sections[title] then return self.Sections[title] end
-        local section = self.Adapter.Library:CreateSection(self.Name, title, nil, true, "Left", "layers")
+        local sectionColumn = column or "Left"
+        local section = self.Adapter.Library:CreateSection(self.Name, title, nil, true, sectionColumn, "layers")
         local wrapper = {Adapter = self.Adapter, Control = section, Title = title}
         function wrapper:CreateToggle(label, initial, callback)
             return self.Adapter.Library:AddToggle(self.Control, label, initial == true, callback)
@@ -122,7 +123,7 @@ function DemonUI:CreateTab(name, sea)
         self.Visible = visible == true
         self.Adapter:_refreshVisibility()
     end
-    self.Tabs[name] = record
+    self.Tabs[record.Key] = record
     return record
 end
 
@@ -152,7 +153,7 @@ function DemonUI:_refreshVisibility()
     end
     local activeCategory = self.Library._STATE.ActiveCategory
     local activeTab = self.Library._STATE.ActiveTab
-    local activeData = activeTab and self.Tabs[activeTab]
+    local activeData = activeTab and (self.Tabs[tostring(activeCategory or "General") .. "|" .. activeTab] or self.Tabs[activeTab])
     if activeData and not activeData.Visible then
         pcall(function() self.Library:SetActiveCategory("General", "Info") end)
     elseif activeCategory and activeCategory ~= "General" then
