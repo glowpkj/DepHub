@@ -2,7 +2,7 @@
   "schema": 2,
   "generatedAt": "2026-10-29T15:47:50.196989+00:00",
   "commit": "f5cff222897c6de8ffde250107ba4c62f7708f60",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",

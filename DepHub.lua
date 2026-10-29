@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.40"
+local VERSION = "0.0.41"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"

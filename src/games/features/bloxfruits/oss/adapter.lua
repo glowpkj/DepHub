@@ -63,17 +63,17 @@ function Factory.new(context)
         local okSource, source = readSource(loadSource, path)
         if not okSource then
             State.Errors[#State.Errors + 1] = path .. ": " .. tostring(source)
-            return false, "required module failed to load: " .. path
+            return false, "module failed to load (" .. path .. "): " .. tostring(source)
         end
         local chunk, chunkError = loadstring(source)
         if not chunk then
             State.Errors[#State.Errors + 1] = path .. ": " .. tostring(chunkError)
-            return false, "required module failed to compile: " .. path
+            return false, "module failed to compile (" .. path .. "): " .. tostring(chunkError)
         end
         local okBuild, module = pcall(chunk, vendors)
         if not okBuild or type(module) ~= "table" then
             State.Errors[#State.Errors + 1] = path .. ": " .. tostring(module)
-            return false, "required module failed to run: " .. path
+            return false, "module failed to run (" .. path .. "): " .. tostring(module)
         end
         State.Modules[name] = module
         if name == "core" then State.Core = module end
