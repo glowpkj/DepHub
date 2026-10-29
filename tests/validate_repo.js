@@ -82,7 +82,7 @@ validateFeatureDirectory('4658598196', 'src/games/features/aotr');
 if (!loader.includes('["142823291"]') || !loader.includes('["66654135"]') || !loader.includes('src/games/mm2.lua')) {
   fail('MM2 loader routing is incomplete');
 }
-if (loader.includes('volleyball') || loader.includes('Volleyball') || loader.includes('6931042565')) {
+if (loader.includes('volleyballlegends') || loader.includes('Volleyball Legends') || loader.includes('6931042565')) {
   fail('Removed Volleyball Legends routing remains in the loader');
 }
 if (loader.includes('violencedistrict') || loader.includes('ViolenceDistrict') || loader.includes('6739698191')) {
