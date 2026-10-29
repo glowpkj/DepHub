@@ -539,6 +539,19 @@ do
     check(pcall(function() library:AddToggle(section, "Enabled", false, function() end) end), "AddToggle builds a control")
     check(pcall(function() library:AddSlider(section, "Amount", 0, 100, 50, 0, function() end) end), "AddSlider builds a control")
     check(pcall(function() library:AddButton(section, "Run", function() end) end), "AddButton builds a control")
+
+    -- The fixed Dashboard tab the loader builds from every game. Against the
+    -- real theme this exercises CreateDashboardBanner (greeting/avatar + server
+    -- card) and CreatePerformanceDashboard (live metrics), which is exactly
+    -- what the loader calls -- so a break here is caught before release.
+    local dashboardTab = library:CreateTab("General", "Dashboard")
+    check(dashboardTab ~= nil and library._STATE.ContentPages["Dashboard"] ~= nil, "Dashboard tab registers a content page")
+    check(pcall(function() library:CreateDashboardBanner("Dashboard") end), "CreateDashboardBanner builds the dashboard banner")
+    check(pcall(function() library:CreatePerformanceDashboard("Dashboard", "Right") end), "CreatePerformanceDashboard builds the dashboard metrics")
+    -- The banner reads _STATE.TabTopContainers[tabName], so its presence proves
+    -- the tab really exists where the dashboard builders look for it.
+    check(library._STATE.TabTopContainers ~= nil and library._STATE.TabTopContainers["Dashboard"] ~= nil, "Dashboard tab has a top container")
+
     check(pcall(function() library:SetTheme("Monochrome") end), "SetTheme succeeds")
     check(pcall(function() library:Notify("T", "M") end), "Notify succeeds")
     check(pcall(function() library:Destroy() end), "Destroy succeeds")

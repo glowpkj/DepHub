@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.75"
+local VERSION = "0.0.76"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -397,6 +397,31 @@ Diag:Module("demon-ui window", true, "janela criada")
 
 env.__DEPHUB.DemonUI = window
 env.__DEPHUB.UI = window
+
+-- Fixed Dashboard tab: every game gets the same home screen, created here by
+-- the loader so it exists no matter which backend (or no backend) runs. It
+-- reuses the library's own dashboard builders -- CreateDashboardBanner (the
+-- player greeting/avatar card plus the game/server card) and
+-- CreatePerformanceDashboard (live framerate/latency/players/session metrics) --
+-- so there is no game-specific code and no new UI to keep in sync. The builders
+-- take the tab name, which the adapter returns on the tab record. Failures are
+-- non-fatal: a dashboard that cannot be built must never stop the hub loading.
+local function buildDashboardTab()
+    if type(window.CreateTab) ~= "function" or type(window.Library) ~= "table" then return false end
+    local ok, record = pcall(function() return window:CreateTab("Dashboard", "General") end)
+    if not ok or type(record) ~= "table" or type(record.Name) ~= "string" then
+        Diag:Note("Dashboard: CreateTab falhou: " .. tostring(record))
+        return false
+    end
+    local lib = window.Library
+    local okBanner, bannerErr = pcall(function() lib:CreateDashboardBanner(record.Name) end)
+    if not okBanner then Diag:Note("Dashboard: banner falhou: " .. tostring(bannerErr)) end
+    local okPerf, perfErr = pcall(function() lib:CreatePerformanceDashboard(record.Name, "Right") end)
+    if not okPerf then Diag:Note("Dashboard: metricas falharam: " .. tostring(perfErr)) end
+    return okBanner and okPerf
+end
+local dashboardBuilt = buildDashboardTab()
+Diag:Module("dashboard tab", dashboardBuilt, dashboardBuilt and "aba Dashboard criada" or "nao foi possivel montar a aba Dashboard")
 
 -- The Debug tab and the print/warn log hooks are opt-in. They are useful for
 -- development but add a tab to every game and intercept every print, so by

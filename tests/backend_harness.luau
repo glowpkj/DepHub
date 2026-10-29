@@ -222,6 +222,19 @@ local function NewWindow()
     end
     function library:Notify(title, message) library.Notifications = library.Notifications or {}; library.Notifications[#library.Notifications + 1] = {title, message} end
     function library:SetActiveCategory(category, tab) state.ActiveCategory = category; state.ActiveTab = tab end
+    -- The loader builds a fixed Dashboard tab from every game: a banner
+    -- (greeting/avatar + server card) and the live performance metrics. The
+    -- stub records the calls so the loader test can assert the tab is built.
+    function library:CreateDashboardBanner(tabName)
+        library.Dashboard = library.Dashboard or {}
+        library.Dashboard.Banner = tabName
+        return {Kind = "dashboardBanner", TabName = tabName}
+    end
+    function library:CreatePerformanceDashboard(tabName, column)
+        library.Dashboard = library.Dashboard or {}
+        library.Dashboard.Performance = {TabName = tabName, Column = column}
+        return {Kind = "performanceDashboard", TabName = tabName, Column = column}
+    end
     function library:Destroy() library.Destroyed = true end
     return library
 end

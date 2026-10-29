@@ -26,6 +26,25 @@ do
 end
 
 do
+    -- Fixed Dashboard tab: the loader builds it from the library's own builders
+    -- before any backend runs, so every game has the same home screen. The stub
+    -- records the calls, so this asserts the loader actually builds it -- and
+    -- that it does not depend on a game backend being loaded.
+    local ctx=sandbox()
+    ctx.Responses["src/version.txt"]="0.0.37"
+    local backend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
+    ctx:Provide("src/games/universal.lua",backend)
+    ctx:Provide("src/core/updater.lua",{new=function() return {Start=function() end} end})
+    check(ctx:Run("DepHub.lua")==true,"loader starts with the dashboard")
+    local window=ctx.State.__DEPHUB.UI
+    check(type(window)=="table" and type(window.Library)=="table","loader publishes the UI window")
+    local dashboard=window.Library.Dashboard
+    check(type(dashboard)=="table","loader built the fixed Dashboard tab")
+    check(dashboard.Banner=="Dashboard","dashboard banner built against the Dashboard tab")
+    check(type(dashboard.Performance)=="table" and dashboard.Performance.TabName=="Dashboard","dashboard performance metrics built against the Dashboard tab")
+end
+
+do
     -- Unknown game: the universal backend is the automatic fallback, so the
     -- player gets a working window instead of an empty "unsupported" state.
     -- A game-specific backend must still never be forced onto an unknown place.
