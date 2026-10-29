@@ -215,7 +215,7 @@ function DepHub.new(config)
     config = config or {}
     local self = setmetatable({}, DepHub)
     self.Name = config.Name or "DepHub"
-    self.ToggleKeyCode = config.ToggleKeyCode or Enum.KeyCode.Insert
+    self.ToggleKeyCode = config.ToggleKeyCode or Enum.KeyCode.LeftControl
     self.Tabs = {}
     self.Flags = {}
     self.Connections = {}
