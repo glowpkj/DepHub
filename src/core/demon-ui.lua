@@ -26,7 +26,8 @@ local function normalizeSea(sea)
     return value
 end
 
-local function categoryFor(sea)
+local function categoryFor(sea, mode)
+    if mode ~= "BloxFruits" then return "General" end
     if not sea or sea == "" or sea == "All" then return "General" end
     if sea == "Sea1" then return "Sea 1" end
     if sea == "Sea2" then return "Sea 2" end
@@ -61,17 +62,21 @@ function DemonUI.new(options)
         CurrentSea = "Sea1",
         Destroyed = false
     }, DemonUI)
-    for _, category in ipairs({"General", "Sea 1", "Sea 2", "Sea 3", "Sea 1/2", "Sea 2/3"}) do
+    local categories = options.Mode == "BloxFruits"
+        and {"General", "Sea 1", "Sea 2", "Sea 3", "Sea 1/2", "Sea 2/3"}
+        or {"General"}
+    for _, category in ipairs(categories) do
         library:CreateCategory(category, "layers")
         self.Categories[category] = true
     end
+    self.Mode = options.Mode or "Game"
     return self
 end
 
 function DemonUI:CreateTab(name, sea)
     if self.Destroyed then return nil end
     name = tostring(name)
-    local category = categoryFor(sea)
+    local category = categoryFor(sea, self.Mode)
     local ok, result = pcall(function() self.Library:CreateTab(category, name) end)
     local tabExists = self.Library._STATE
         and self.Library._STATE.ContentPages
