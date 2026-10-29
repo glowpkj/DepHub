@@ -261,9 +261,9 @@ local function sandbox(placeId, gameId)
     function game:HttpGet(url)
         context.Requests[#context.Requests + 1] = url
         assert(not url:find("src/ui/", 1, true), "Frontend download attempted")
-        -- The Demon UI wrapper prefers the vendored library; the test double
-        -- stands in for it so the wrapper can build a window without a client.
-        if url:find("demon-of-darkness-ui", 1, true) or url:find("DemonOfDarknessUI", 1, true) then
+        -- The theme module is a normal repo file; the test double stands in for
+        -- it so the wrapper can build a window without a real client.
+        if url:find("demon-theme", 1, true) or url:find("demon-of-darkness-ui", 1, true) or url:find("DemonOfDarknessUI", 1, true) then
             return DOD_LIBRARY_STUB
         end
         local path = url:gsub("^https://raw.githubusercontent.com/glowpkj/DepHub/main/", ""):gsub("%?.*$", "")

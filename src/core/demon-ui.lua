@@ -17,8 +17,6 @@
 local DemonUI = {}
 DemonUI.__index = DemonUI
 
-local LIBRARY_URL = "https://raw.githubusercontent.com/rapzxcwxcorparation/DemonOfDarknessUI/refs/heads/main/DOD.luau"
-
 -- Window options are shared by every game so the interface is identical
 -- everywhere. Changing anything here changes it for all games at once.
 local WINDOW_OPTIONS = {
@@ -40,22 +38,23 @@ local WINDOW_OPTIONS = {
 -- Blox Fruits sea categories) create them explicitly through CreateCategory.
 local DEFAULT_CATEGORY = "General"
 
--- The library is vendored so a bundled build stays self-contained. Prefer the
--- vendored copy through the shared resolver; only fall back to the network when
--- no local copy is reachable.
-local LIBRARY_PATHS = {
-    "src/core/vendor/demon-of-darkness-ui.luau",
-    "src/core/vendor/demon-of-darkness-ui.lua"
+-- The theme module lives in the repository as a normal, editable source file.
+-- It is not fetched from a third-party URL and not re-compiled from a blob:
+-- it is loaded through the same module path everything else uses, so editing
+-- src/core/ui/demon-theme.luau is editing the UI directly.
+local THEME_PATHS = {
+    "src/core/ui/demon-theme.luau",
+    "src/core/ui/demon-theme.lua"
 }
 
-local function fetchVendored()
+local function fetchThemeSource()
     local env = type(getgenv) == "function" and getgenv() or _G
     local resolver = (type(env.__dephubHttpGet) == "function" and env.__dephubHttpGet)
         or (type(env.__DEPHUB_HTTP_GET) == "function" and env.__DEPHUB_HTTP_GET)
         or (type(_G.__dephubHttpGet) == "function" and _G.__dephubHttpGet)
         or (type(_G.__DEPHUB_HTTP_GET) == "function" and _G.__DEPHUB_HTTP_GET)
     local base = (env.__DEPHUB and env.__DEPHUB.SourceBaseURL) or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-    for _, path in ipairs(LIBRARY_PATHS) do
+    for _, path in ipairs(THEME_PATHS) do
         if resolver then
             local ok, source = pcall(resolver, base .. path)
             if ok and type(source) == "string" and #source > 0 then return source end
@@ -66,21 +65,21 @@ local function fetchVendored()
     return nil
 end
 
-local function loadLibrary()
-    local source = fetchVendored()
-    if not source then
-        local ok, remote = pcall(function() return game:HttpGet(LIBRARY_URL) end)
-        if ok and type(remote) == "string" and #remote > 0 then source = remote end
-    end
+local cachedTheme = nil
+
+local function loadTheme()
+    if cachedTheme then return cachedTheme end
+    local source = fetchThemeSource()
     if type(source) ~= "string" or #source == 0 then
-        error("Falha ao baixar DemonOfDarknessUI: nenhuma copia local ou remota disponivel")
+        error("Falha ao carregar src/core/ui/demon-theme.luau: nenhuma copia disponivel")
     end
     local chunk, compileError = loadstring(source)
-    if not chunk then error("Falha ao compilar DemonOfDarknessUI: " .. tostring(compileError)) end
+    if not chunk then error("Falha ao compilar demon-theme.luau: " .. tostring(compileError)) end
     local okRun, export = pcall(chunk)
     if not okRun or type(export) ~= "table" or type(export.new) ~= "function" then
-        error("DemonOfDarknessUI não retornou uma biblioteca válida: " .. tostring(export))
+        error("demon-theme.luau não retornou uma biblioteca válida: " .. tostring(export))
     end
+    cachedTheme = export
     return export
 end
 
@@ -109,7 +108,7 @@ end
 
 function DemonUI.new(options)
     options = options or {}
-    local export = loadLibrary()
+    local export = loadTheme()
     local library = export.new({
         Title = options.Name or WINDOW_OPTIONS.Title,
         Version = options.Version or "0.0.0",

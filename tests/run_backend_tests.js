@@ -17,7 +17,7 @@ const manifestConfig = JSON.parse(fs.readFileSync(path.join(root, '.github/dephu
 // the harness, so the test list can never drift from what the game ships.
 for (const game of Object.values(manifestConfig)) {
   for (const file of game.files) {
-    if ((file.endsWith('.lua') || file.endsWith('.luau')) && !file.includes('vendor/') && !files.includes(file)) files.push(file);
+    if ((file.endsWith('.lua') || file.endsWith('.luau')) && !file.includes('demon-theme') && !files.includes(file)) files.push(file);
   }
 }
 for (const game of Object.values(manifestConfig)) {
