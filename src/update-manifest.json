@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T16:06:17.622445+00:00",
-  "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
-  "version": "0.0.41",
+  "generatedAt": "2026-10-29T16:06:39.200496+00:00",
+  "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
+  "version": "0.0.42",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "2ebac6c4079f190b65554f09dce3b05ed538be0278460ab6e0988198f3f1a317",
-      "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
+      "version": "d4158fd5d76eb058507eabc816d79a60e388bd5563a76b68693d9bb679f51002",
+      "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,8 +26,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "b88e3f6a87fb139c0ffaac0cdabb1d7b92197d72d5e9e7cf76ca53520cf3a7c1",
-      "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
+      "version": "0fde8948d0baf5ad31262351ac5b1ce9a58bd72f52cc6436c18d55bc79f1c50b",
+      "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "e9ccde1bb837410db23b3553a1a50073f636b256400c10127eadd0eb690b396e",
-      "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
+      "version": "a1b51d1a9fbd3961135f2fdeef60aed702794f19b2678a41f33abf86cb006c26",
+      "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -66,8 +66,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "c614ce11f890e4e3c8faba9793d579da0bdc216fd1cf5083d073755dc6f5e51a",
-      "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
+      "version": "50539361c767008a4b75a5aa50fb9ac82346ee1add70a745730c9e4fe7dfd58a",
+      "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -84,8 +84,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "5347772c214acaedb39711789acbef402c27ce4083a5f79e69b9e02d273a19dd",
-      "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
+      "version": "0895ec7f004ce8284553b805b9da6dc7be410129859a19392f712d5bb351494d",
+      "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -107,8 +107,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "d1ba02313426c9d17f0c8d852766a877c3cad31170eac1de5fe3cda767f71716",
-      "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
+      "version": "83fd22f40115fc4d120ea42abd08b00ed04baba0191a48d50c42c288dff39004",
+      "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,8 +133,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "17904d53710e251f880fc5d8e73568df21f9ad12b24f057ffc5c05c480ce2050",
-      "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
+      "version": "db798bfa0df59ad8f788f7546f9c2705cdf53b11047d8c46c5bddc0e987f7840",
+      "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "a4a7a4ed44a4d90055f5d061f6eb54fa4ccd5a9056aaee31be835203f9f17749",
-      "commit": "15ead69a7fc0adbe233f94528a73de95c2e5459a",
+      "version": "f4a428bebef6af7a1d2c4302c1e48bc50f9a5e71191b95808d74caab8035a07b",
+      "commit": "7fa0a816b2a1a5746afc47d4fce5c797acd5d0ed",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -174,6 +174,20 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "7fa0a81",
+      "Date": "2026-10-29T13:06:30-03:00",
+      "Changes": [
+        "release: bump loader to 0.0.42"
+      ]
+    },
+    {
+      "Version": "5d6e6aa",
+      "Date": "2026-10-29T13:06:27-03:00",
+      "Changes": [
+        "release: bump DepHub UI contracts to 0.0.42"
+      ]
+    },
     {
       "Version": "15ead69",
       "Date": "2026-10-29T13:06:09-03:00",
@@ -193,20 +207,6 @@
       "Date": "2026-10-29T13:05:24-03:00",
       "Changes": [
         "feat(bloxfruits): expose stats notifications config and safer control values"
-      ]
-    },
-    {
-      "Version": "69122ff",
-      "Date": "2026-10-29T13:05:01-03:00",
-      "Changes": [
-        "feat(bloxfruits): publish buttons and live stats in headless UI"
-      ]
-    },
-    {
-      "Version": "240adca",
-      "Date": "2026-10-29T13:04:30-03:00",
-      "Changes": [
-        "feat(ui): render backend controls by page and support sea gates"
       ]
     }
   ]
