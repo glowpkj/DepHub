@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T20:54:59.778Z",
-  "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+  "generatedAt": "2026-10-29T20:55:21.488533+00:00",
+  "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
   "version": "0.0.63",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "921e329a42ea5dc5e21d544645a664bbfda0ac53f1b528fc48dd6f747dd3a982",
-      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+      "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -28,7 +28,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "d2f12a72b39138659492ac1f28b1b4d71c55826adc997b058da1a265d3f9a54a",
-      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+      "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -55,7 +55,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "1fafcaa91813a272edadfb0b021178a2686de9df4d1f892ef72572bff5de8bd9",
-      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+      "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -70,7 +70,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "29bc659b4d5a4ae9123fc3c9b544c9e152680ea3e06d96a211d88fdd01bd3f8b",
-      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+      "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -89,7 +89,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "db43d301276fe00895b15caaa064d55405280a5858b41fc4a28adb78c8534dba",
-      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+      "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -113,7 +113,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "b12414be2aa51ca5b32f670f1d20504b09f2dc6151315005c25406c84fd1cf0d",
-      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+      "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -140,7 +140,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "47a9a1f0828d3943fbef38f422ad6cf45c121f1f80c83521a8dfba9e0fc5c5b3",
-      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+      "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -167,7 +167,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "7067ed7754d285f7f70db539ebadc2f4fc7ea2b64d30d558ccef7e2864c9062f",
-      "commit": "f75cf046f3e5bc1474ffe64ef62e3a6700029210",
+      "commit": "d3872e94cadcdbb0787314f931d76c923fb9c50f",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -187,38 +187,38 @@
   },
   "recentUpdates": [
     {
-      "Version": "7185cd8",
-      "Date": "2026-10-29T14:58:23-03:00",
+      "Version": "d3872e9",
+      "Date": "2026-10-29T17:55:00-03:00",
       "Changes": [
-        "Bump version to 0.0.49"
+        "Add a shared Debug tab for diagnostics in every game"
       ]
     },
     {
-      "Version": "06a35bb",
-      "Date": "2026-10-29T14:58:20-03:00",
+      "Version": "c501181",
+      "Date": "2026-10-29T17:47:13-03:00",
       "Changes": [
-        "Switch DepHub UI loader to Bracket v0.0.49"
+        "AOTR: restore combat/autofarm behind the shared UI"
       ]
     },
     {
-      "Version": "c100c90",
-      "Date": "2026-10-29T14:49:33-03:00",
+      "Version": "e55d732",
+      "Date": "2026-10-29T17:16:01-03:00",
       "Changes": [
-        "chore(release): sync WindUI test build version"
+        "feat(bloxfruits): filter tabs by the current sea"
       ]
     },
     {
-      "Version": "2b5618c",
-      "Date": "2026-10-29T14:49:27-03:00",
+      "Version": "990ff00",
+      "Date": "2026-10-29T17:02:49-03:00",
       "Changes": [
-        "fix(ui): log WindUI loading failures and bump test build"
+        "fix(ui): stop rejecting same-named tabs across categories"
       ]
     },
     {
-      "Version": "d1d4ace",
-      "Date": "2026-10-29T14:49:07-03:00",
+      "Version": "77e6c68",
+      "Date": "2026-10-29T16:59:21-03:00",
       "Changes": [
-        "chore(release): sync WindUI test version"
+        "refactor(ui): ship the theme as an editable repo module, drop the remote blob"
       ]
     }
   ]
