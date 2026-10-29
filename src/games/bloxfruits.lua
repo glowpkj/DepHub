@@ -272,6 +272,7 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
     end
     local function applySea(sea)
         local current = tostring(sea or "Sea1")
+        if type(visual.SetCurrentSea) == "function" then visual:SetCurrentSea(current) end
         for _, record in pairs(renderedTabs) do
             local visible = true
             if record.Sea and record.Sea ~= "All" then
@@ -282,7 +283,6 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
         end
         for _, record in pairs(renderedTabs) do
             if record.Tab.Visible and record.Tab.Control and record.Tab.Control.Asset and record.Tab.Control.ButtonAsset then
-                pcall(function() visual:SetCurrentSea(current) end)
                 break
             end
         end
