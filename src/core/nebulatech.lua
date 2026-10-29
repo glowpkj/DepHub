@@ -187,9 +187,8 @@ function NebulaTech.new(config)
     padding(content, 16, 16, 14, 16)
     self.Content = content
 
-    local grid = create("UIGridLayout", {
-        CellSize = UDim2.new(0.5, -6, 0, 190),
-        CellPadding = UDim2.fromOffset(12, 12),
+    local grid = create("UIListLayout", {
+        Padding = UDim.new(0, 12),
         SortOrder = Enum.SortOrder.LayoutOrder
     }, content)
     self.Grid = grid
@@ -294,9 +293,8 @@ function NebulaTech.new(config)
             Visible = false
         }, content)
         page.LayoutOrder = #self.Tabs + 1
-        local pageGrid = create("UIGridLayout", {
-            CellSize = UDim2.new(0.5, -6, 0, 190),
-            CellPadding = UDim2.fromOffset(12, 12),
+        local pageGrid = create("UIListLayout", {
+            Padding = UDim.new(0, 12),
             SortOrder = Enum.SortOrder.LayoutOrder
         }, page)
         pageGrid:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
