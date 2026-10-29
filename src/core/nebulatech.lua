@@ -456,7 +456,7 @@ function NebulaTech.new(config)
                 local function render()
                     toggle.BackgroundColor3 = value and COLORS.Accent or COLORS.Track
                     knob2.Position = value and UDim2.new(1, -15, 0.5, -6) or UDim2.new(0, 2, 0.5, -6)
-                    self.ParentWindow.Flags[name] = value
+                    section.ParentWindow.Flags[name] = value
                 end
                 local item = register(name, function(available)
                     toggle.Active = available
@@ -485,12 +485,12 @@ function NebulaTech.new(config)
                 function item:Set(nextValue)
                     value = nextValue == true
                     check.Text = value and "✓" or ""
-                    self.ParentWindow.Flags[name] = value
+                    section.ParentWindow.Flags[name] = value
                     if callback then callback(value) end
                 end
                 check.Activated:Connect(function() if item.Available then item:Set(not value) end end)
                 item:SetAvailableState(section.Enabled)
-                self.ParentWindow.Flags[name] = value
+                section.ParentWindow.Flags[name] = value
                 return item
             end
 
@@ -524,7 +524,7 @@ function NebulaTech.new(config)
                     selected = nextValue
                     dd.Text = tostring(selected) .. "  ▾"
                     popup.Visible = false
-                    self.ParentWindow.Flags[name] = selected
+                    section.ParentWindow.Flags[name] = selected
                     if callback then callback(selected) end
                 end
                 for _, option in ipairs(options) do
@@ -535,7 +535,7 @@ function NebulaTech.new(config)
                     opt.Activated:Connect(function() if item.Available then item:Set(option) end end)
                 end
                 dd.Activated:Connect(function() if item.Available then popup.Visible = not popup.Visible end end)
-                self.ParentWindow.Flags[name] = selected
+                section.ParentWindow.Flags[name] = selected
                 item:SetAvailableState(section.Enabled)
                 return item
             end
