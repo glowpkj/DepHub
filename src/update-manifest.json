@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-29T17:41:37.678828+00:00",
-  "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+  "generatedAt": "2026-10-29T17:44:04.497937+00:00",
+  "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
   "version": "0.0.43",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "7b12188d705ff1a4d2d90972ecc3aa62f34ef91fc4b43e3f64597256677fc717",
-      "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+      "version": "1851c8f854f755599054234e542d81ce67b11389f20eae7e5f574a6cefb8b27d",
+      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -26,8 +26,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "b2e0b57d651d2dad8340bf397b3110cb5566998080b2f7eeb4d94224e48f53d7",
-      "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+      "version": "4af9473671a531e14ecea1ea57660dd6952fbb5dd2675bb965c1851b7a0bd7a1",
+      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -52,8 +52,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "3ff2bc6935e2ce65e0dbcb373fcf1b64112f3304950995c4d46bbd5d20e283c5",
-      "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+      "version": "c6f8856a0d8e965366c4b319fcc0683e30c265f7f8f54f3fbf27abdb93aa9154",
+      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -66,8 +66,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "74686de92edcbd3e12b6995f74b927771e27b5c59de17cb48092ff6783b1e505",
-      "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+      "version": "1d969cb483f707c442ae5fe8ef174c437d55618fb8313db11c42062da05f73e4",
+      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -84,8 +84,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "55b1651d9eba6d6b92881261238ce3b6596727b87c1b29606961dbcf6ec8abea",
-      "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+      "version": "b357ae6a5ca3764de596f035c2f792cf9294a7d3cc322d5ea8609b9883d3b2c5",
+      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -107,8 +107,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "2768e07c5ea266ffa7e09ff6304d4a2ab50a98ef42d6b68a29419be369bdf5f3",
-      "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+      "version": "6158875046121e1f6b0da3aba995ff56489aa186fca5423012d20de97a9d7c2f",
+      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,8 +133,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "5ec921df968ef232bc189cc92e7dbac60672e221a17252e3638ee7d2d08431de",
-      "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+      "version": "087610c866f00f9b2eabc0ab10956fb354e20ffdb3dbd83871dca12bad263d0d",
+      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "c2338074db084c76926aa3ff9cf70b1f6b14a0101e45c47099e12cd67827cbad",
-      "commit": "7b885a792671cd305428a6088a808e0fa468d099",
+      "version": "1b730731c2dae533f3cff2584e3b1858a001e09690b6737c151f3e75ac6fd10a",
+      "commit": "4ec567ed7bc81dfbcc3ce4c5944473d4dcefc225",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -174,6 +174,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "4ec567e",
+      "Date": "2026-10-29T14:43:56-03:00",
+      "Changes": [
+        "fix(ui): improve control hotkey and window dragging"
+      ]
+    },
     {
       "Version": "7b885a7",
       "Date": "2026-10-29T14:41:27-03:00",
@@ -200,13 +207,6 @@
       "Date": "2026-10-29T13:42:48-03:00",
       "Changes": [
         "Update nebulatech.lua"
-      ]
-    },
-    {
-      "Version": "3527d31",
-      "Date": "2026-10-29T13:19:47-03:00",
-      "Changes": [
-        "chore: bump version to 0.0.43"
       ]
     }
   ]
