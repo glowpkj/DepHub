@@ -174,6 +174,17 @@ end
 
 function Tab:SetVisible(value)
     self.Visible = value == true
+    local control = self.Control
+    if type(control) ~= "table" then return end
+    if type(control.SetVisible) == "function" then
+        pcall(control.SetVisible, control, self.Visible)
+    elseif type(control.Page) == "Instance" then
+        pcall(function()
+            control.Page.Visible = self.Visible
+            if control.NavButton then control.NavButton.Visible = self.Visible end
+            if control.TabButton then control.TabButton.Visible = self.Visible end
+        end)
+    end
 end
 
 function WindUIAdapter.new(config)
