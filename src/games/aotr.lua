@@ -137,6 +137,38 @@ if Diag and type(Diag.Probe)=="function" then
  Diag:Feature("AOTR.TravelSpeed",function() return tostring(M.Values.TravelSpeed).." studs/s" end)
  Diag:Feature("AOTR.ShadowBan",function() return M.Combat and M.Combat.CheckResult or "sem modulo" end)
  Diag:Feature("AOTR.LastError",function() return M.LastError end)
+ -- Structure watch: entity/part changes become timestamped console events.
+ Diag:Watch("Titans",function() return #titans() end)
+ Diag:Watch("Nape vivo",function()
+  for _,model in ipairs(titans()) do if nape(model) then return true end end
+  return false
+ end)
+ Diag:Watch("Personagem",function() return character() and character().Name or "nil" end)
+ Diag:Watch("Remotes",function()
+  return tostring(getRemote~=nil).."/"..tostring(postRemote~=nil)
+ end)
+ -- Sniff the two legacy remotes the farm drives, so every GET/POST the hub
+ -- sends shows up in the console with its arguments.
+ if type(Diag.SniffRemote)=="function" then
+  Diag:SniffRemote(getRemote,"AOTR.GET")
+  Diag:SniffRemote(postRemote,"AOTR.POST")
+ end
+ -- Console commands this backend adds on top of the built-ins.
+ if type(Diag.Command)=="function" then
+  Diag:Command("aotr",function()
+   local parts={"titans="..#titans()}
+   parts[#parts+1]="nape="..tostring((function() for _,model in ipairs(titans()) do if nape(model) then return true end end return false end)())
+   parts[#parts+1]="refill="..tostring(refillFound)
+   parts[#parts+1]="speed="..tostring(M.Values.TravelSpeed)
+   parts[#parts+1]="lastError="..tostring(M.LastError)
+   return table.concat(parts," ")
+  end)
+  Diag:Command("aotr-titanesp",function(argument)
+   local on=argument~="off"
+   M:SetToggle("TitanESP",on)
+   return "TitanESP="..tostring(on)
+  end)
+ end
 end
 function M:Refresh()
  if self.Destroyed then return end

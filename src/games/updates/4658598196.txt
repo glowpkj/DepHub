@@ -1,1 +1,2 @@
+0.0.64 | Live Debug console: streaming log, live FPS/ping/memory/uptime metrics, feature state auto-refresh, warn/print/error hooks, remote sniffer and terminal commands in every game.
 AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, farm noclip, travel speed, ShadowBan check) behind the shared UI. Added the shared Debug tab (module health, structure probes, live feature state, copyable report). Runtime testing pending.

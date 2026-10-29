@@ -1,2 +1,3 @@
+0.0.64 | Live Debug console: streaming log, live FPS/ping/memory/uptime metrics, feature state auto-refresh, warn/print/error hooks, remote sniffer and terminal commands in every game.
 0.0.63 | Shared Debug tab: module health, game-structure probes, live feature state and a copyable diagnostic report in every game.
 0.0.2 | Universal UI, lifecycle hardening and diagnostics

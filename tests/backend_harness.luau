@@ -78,7 +78,13 @@ local function typeof(value)
     return builtinTypeof(value)
 end
 local methods, instanceMeta = {}, {}
-function instanceMeta:__index(key) return methods[key] or self._props[key] end
+function instanceMeta:__index(key)
+    -- An own value (set by a feature or by an executor-style hook) wins over
+    -- the shared method table, so per-instance overrides are observable.
+    local own = self._props[key]
+    if own ~= nil then return own end
+    return methods[key]
+end
 function instanceMeta:__newindex(key, value)
     if key == "Parent" then
         local old = self._props.Parent

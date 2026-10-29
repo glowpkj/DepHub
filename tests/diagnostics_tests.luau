@@ -24,7 +24,8 @@ do
     check(report:find("[FALHA] Assets.Remotes.GET: ausente", 1, true) ~= nil, "diagnostics report includes a failing probe")
     check(report:find("Feature.A: rodando", 1, true) ~= nil, "diagnostics report reads a live feature")
     check(report:find("Feature.B: ERRO DE LEITURA", 1, true) ~= nil, "diagnostics report contains a throwing feature instead of failing")
-    check(report:find("linha livre", 1, true) ~= nil and report:find("[loader] iniciando", 1, true) ~= nil, "diagnostics report includes notes and log lines")
+    check(report:find("linha livre", 1, true) ~= nil and report:find("iniciando", 1, true) ~= nil, "diagnostics report includes notes and log lines")
+    check(report:find("Metricas", 1, true) ~= nil or report:find("FPS", 1, true) ~= nil, "diagnostics report includes live metrics")
 
     local summary = diag:Summary()
     check(summary:find("1 falha", 1, true) ~= nil, "diagnostics summary counts failures")
@@ -33,6 +34,22 @@ do
     diag:Feature("Feature.C", function() return nil + 1 end)
     check(type(diag:Report()) == "string", "diagnostics always returns a report string")
 
+    -- Console commands: built-ins and a backend-added one, unknown names reported.
+    check(diag:RunCommand("metrics"):find("fps=", 1, true) ~= nil, "console runs the metrics command")
+    check(diag:RunCommand("sniff off") == "sniff de remotes desligado" and diag.SniffEnabled == false, "console toggles remote sniffing")
+    check(diag:RunCommand("naoExiste"):find("desconhecido", 1, true) ~= nil, "console reports an unknown command")
+    local ran = false
+    diag:Command("custom", function(argument) ran = argument; return "feito:" .. tostring(argument) end)
+    check(diag:RunCommand("custom 42") == "feito:42" and ran == "42", "console dispatches a registered command with its argument")
+
+    -- Watch: a change is turned into a timestamped log line.
+    local watched = 1
+    diag:Watch("contador", function() return watched end)
+    diag:_pollWatches()
+    watched = 2
+    diag:_pollWatches()
+    check(diag:LogText():find("contador: 1 -> 2", 1, true) ~= nil, "watch turns a change into a log event")
+
     -- Copy prefers the executor clipboard and still prints.
     local copiedText = nil
     ctx.State.setclipboard = function(text) copiedText = text end
@@ -40,6 +57,56 @@ do
     check(copied and copiedText == text, "diagnostics copies the full report to the clipboard")
     ctx.State.setclipboard = nil
 
+    diag:Destroy()
+end
+
+-- The console listens to the game's own logging and to the remotes the hub
+-- drives, and removes its hooks on destroy so nothing is left wrapped.
+do
+    local ctx = sandbox()
+    local Diag = ctx:Run("src/core/diagnostics.lua")
+    local diag = Diag.new()
+
+    -- Global warn/print capture: install, emit through the executor's warn,
+    -- and confirm the line landed in the console log.
+    diag:_installLogHooks()
+    check(diag.Hooks.warn ~= nil, "diagnostics installs a warn hook")
+    if type(ctx.Env.warn) == "function" then ctx.Env.warn("linha do jogo 123") end
+    check(diag:LogText():find("linha do jogo 123", 1, true) ~= nil, "game warn lines reach the console")
+
+    -- Remote sniffer: an executor exposes hookfunction, so the sniffer wraps
+    -- the method instead of relying on field assignment (which real Instances
+    -- shadow through their metatable). Confirm the call is both logged and
+    -- still forwarded to the original implementation.
+    local remote = Instance.new("RemoteFunction")
+    remote.Name = "GET"
+    local forwarded = nil
+    remote.InvokeServer = function(_, ...) forwarded = {...}; return "resp" end
+    -- Provide an executor-style hookfunction that swaps a method on its owner.
+    local originalMethod = remote.InvokeServer
+    local hookCalls = 0
+    ctx.State.hookfunction = function(target, replacement)
+        hookCalls = hookCalls + 1
+        -- Route the replacement to the method it corresponds to, the way a
+        -- real hookfunction patches the closure in place.
+        if target == originalMethod then
+            remote._props.InvokeServer = replacement
+        else
+            remote._props.FireServer = replacement
+        end
+        return target
+    end
+    -- Make the double resolve InvokeServer from _props so the hook is visible.
+    remote._props.InvokeServer = originalMethod
+    diag:SniffRemote(remote, "Test.GET")
+    check(hookCalls == 2, "sniffer hooks both the invoke and fire methods")
+    local result = remote:InvokeServer("S_Skills", "Usage", "108")
+    check(result == "resp" and forwarded and forwarded[1] == "S_Skills", "sniffed remote still forwards the call")
+    check(diag:LogText():find("GET Test.GET(S_Skills, Usage, 108)", 1, true) ~= nil, "sniffed remote call is logged with arguments")
+    ctx.State.hookfunction = nil
+
+    diag:_removeLogHooks()
+    check(diag.Hooks.warn == nil, "diagnostics removes its log hooks on teardown")
     diag:Destroy()
 end
 

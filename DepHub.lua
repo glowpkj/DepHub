@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.63"
+local VERSION = "0.0.64"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -57,6 +57,12 @@ local function cleanupRuntime()
         pcall(oldLoading.Destroy, oldLoading)
         env.__DEPHUB_LOADING_INSTANCE = nil
     end
+
+    -- Release the previous diagnostics console first so its log hooks (warn/
+    -- print interception) are removed before the new session installs its own.
+    local previousDiag = env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if previousDiag and type(previousDiag.Destroy) == "function" then pcall(previousDiag.Destroy, previousDiag) end
+    if env.__DEPHUB then env.__DEPHUB.Diagnostics = nil end
 
     env.__DEPHUB_UNIVERSAL = nil
     env.__DEPHUB_FRONTEND = nil
@@ -239,8 +245,10 @@ do
     end
     if not Diag then
         Diag = {SetEnvironment=function() end, RegisterModule=function() end, Module=function() end,
-            Probe=function() end, Feature=function() end, Note=function() end, Log=function() end,
+            Probe=function() end, Feature=function() end, Watch=function() end, Command=function() end,
+            SniffRemote=function() end, RunCommand=function() return "" end, Note=function() end, Log=function() end,
             Install=function() return false end, Report=function() return "diagnostico indisponivel" end,
+            LogText=function() return "" end, MetricsLine=function() return "" end, Destroy=function() end,
             Copy=function() return false, "diagnostico indisponivel" end}
         Diag.__stub = true
     end

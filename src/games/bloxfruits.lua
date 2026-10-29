@@ -371,6 +371,23 @@ do
             return #parts > 0 and table.concat(parts, ", ") or "nenhum"
         end)
         Diag:Feature("BloxFruits.LastError", function() return tostring(State.LastError or "none") end)
+        if type(Diag.Watch) == "function" then
+            Diag:Watch("BloxFruits sea", function() return tostring(State.Sea or "?") end)
+            Diag:Watch("BloxFruits modulos", function()
+                local loaded = 0
+                for _, module in pairs(State.Modules or {}) do if type(module) == "table" then loaded = loaded + 1 end end
+                return loaded
+            end)
+        end
+        if type(Diag.Command) == "function" then
+            Diag:Command("bf", function()
+                return "sea=" .. tostring(State.Sea or "?") .. " modulos=" .. tostring((function()
+                    local n = 0
+                    for _, module in pairs(State.Modules or {}) do if type(module) == "table" then n = n + 1 end end
+                    return n
+                end)())
+            end)
+        end
     end
 end
 
