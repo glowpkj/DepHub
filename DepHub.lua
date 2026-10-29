@@ -13,7 +13,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 -- Optional chunk argument lets a one-line loadstring select the same revision for every module.
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.38"
+local VERSION = "0.0.39"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -36,7 +36,7 @@ end
 
 -- Backend state keys published by the game modules and by the loader below.
 local BACKEND_KEYS = {
-    "AOTR", "TSB", "MM2", "NoobPiece", "BloxFruits", "Universal", "Runtime"
+    "AOTR", "TSB", "MM2", "NoobPiece", "BloxFruits", "Universal", "Runtime", "Volleyball42"
 }
 
 -- Extra session handles the loader creates and must tear down on re-execution.
@@ -90,7 +90,7 @@ local function sessionHealthy()
     local state = env.__DEPHUB
     if type(state) ~= "table" then return false end
     local backend = state.AOTR or state.TSB or state.MM2 or state.NoobPiece
-        or state.BloxFruits or state.Universal or state.Runtime
+        or state.BloxFruits or state.Universal or state.Runtime or state.Volleyball42
     return type(backend) == "table" and not backend.Destroyed
 end
 
@@ -253,7 +253,9 @@ local targets = {
     ["3808081382"] = {Core = "src/games/tsb.lua", TSB = true},
     ["142823291"] = {Core = "src/games/mm2.lua", MM2 = true},
     ["66654135"] = {Core = "src/games/mm2.lua", MM2 = true},
-    ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true}
+    ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true},
+    ["3840352284"] = {Core = "src/games/volleyball42.lua", Volleyball42 = true},
+    ["1316421563"] = {Core = "src/games/volleyball42.lua", Volleyball42 = true}
 }
 
 -- AOT:R routes lobby by PlaceId and mission places by universe GameId.
@@ -273,6 +275,7 @@ local isTSB = target.TSB == true
 local isMM2 = target.MM2 == true
 local isAOTR = target.AOTR == true
 local isNoobPiece = target.NoobPiece == true
+local isVolleyball42 = target.Volleyball42 == true
 
 if isRT3 then
     if coreResult ~= true then return fail("Modulo RT3 nao inicializou") end
@@ -281,11 +284,12 @@ elseif type(coreResult) ~= "table" then
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isMM2 and not isAOTR and not isNoobPiece and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isMM2 and not isAOTR and not isNoobPiece and not isVolleyball42 and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
 env.__DEPHUB.MM2 = isMM2 and coreResult or nil
 env.__DEPHUB.AOTR = isAOTR and coreResult or nil
 env.__DEPHUB.NoobPiece = isNoobPiece and coreResult or nil
+env.__DEPHUB.Volleyball42 = isVolleyball42 and coreResult or nil
 
 local mode
 local backend
@@ -295,6 +299,7 @@ elseif isTSB then mode = "TSB" backend = coreResult
 elseif isMM2 then mode = "MM2" backend = coreResult
 elseif isAOTR then mode = "AOTR" backend = coreResult
 elseif isNoobPiece then mode = "NoobPiece" backend = coreResult
+elseif isVolleyball42 then mode = "Volleyball42" backend = coreResult
 else mode = "BloxFruits" backend = coreResult end
 
 env.__DEPHUB.Mode = mode
