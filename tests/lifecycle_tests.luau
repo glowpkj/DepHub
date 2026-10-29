@@ -1,6 +1,5 @@
 do
     local ctx=sandbox()
-    ctx.State.__DEPHUB_FORCE_UNIVERSAL = true
     ctx.Responses["src/version.txt"]="0.0.37"
     local backend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
     ctx:Provide("src/games/universal.lua",backend)
@@ -17,7 +16,6 @@ end
 
 do
     local ctx=sandbox()
-    ctx.State.__DEPHUB_FORCE_UNIVERSAL = true
     ctx.Responses["src/version.txt"]="0.0.37"
     local backend={Destroyed=false,Destroy=function(self) self.Destroyed=true end}
     ctx:Provide("src/games/universal.lua",backend)
@@ -28,22 +26,29 @@ do
 end
 
 do
-    -- Unknown game: the loader must show a safe, informative state and never
-    -- silently run a backend (in particular not Blox Fruits or Universal).
+    -- Unknown game: the universal backend is the automatic fallback, so the
+    -- player gets a working window instead of an empty "unsupported" state.
+    -- A game-specific backend must still never be forced onto an unknown place.
     local ctx=sandbox(1234567890, 1234567890)
     ctx.Responses["src/version.txt"]="0.0.37"
+    local backend={Destroyed=false}
+    ctx:Provide("src/games/universal.lua",backend)
     check(ctx:Run("DepHub.lua")==true,"unknown game still completes the loader run")
-    check(ctx.State.__DEPHUB_LOADER_STATE.status=="unsupported","unknown game records the unsupported state")
-    check(ctx.State.__DEPHUB.Mode=="Unsupported" and ctx.State.__DEPHUB.Backend==nil,"unknown game loads no backend")
-    check(ctx.State.__DEPHUB.BloxFruits==nil and ctx.State.__DEPHUB.Universal==nil,"unknown game is not handed Blox Fruits or Universal")
+    check(ctx.State.__DEPHUB.Mode=="universal" and ctx.State.__DEPHUB.Backend==backend,"unknown game loads the universal fallback")
+    check(ctx.State.__DEPHUB.Universal==backend,"unknown game publishes the universal handle")
+    check(ctx.State.__DEPHUB.BloxFruits==nil and ctx.State.__DEPHUB.AOTR==nil,"unknown game is not handed a game-specific backend")
 end
 
 do
-    -- Universal is opt-in only: without the flag the same place stays unsupported.
+    -- Opt out: with the universal fallback disabled the same place returns to
+    -- the plain unsupported state and no backend is loaded.
     local ctx=sandbox(1234567890, 1234567890)
+    ctx.State.__DEPHUB_DISABLE_UNIVERSAL = true
     ctx.Responses["src/version.txt"]="0.0.37"
-    ctx:Run("DepHub.lua")
-    check(ctx.State.__DEPHUB.Mode=="Unsupported","Universal is not a silent fallback")
+    check(ctx:Run("DepHub.lua")==true,"unknown game with universal disabled completes the loader run")
+    check(ctx.State.__DEPHUB_LOADER_STATE.status=="unsupported","disabling universal records the unsupported state")
+    check(ctx.State.__DEPHUB.Mode=="Unsupported" and ctx.State.__DEPHUB.Backend==nil,"disabling universal loads no backend")
+    check(ctx.State.__DEPHUB.Universal==nil,"disabling universal publishes no universal handle")
 end
 
 do

@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.69"
+local VERSION = "0.0.70"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -306,10 +306,12 @@ local targets = {
 local gameName = tostring(game.Name or ""):lower()
 local isAOTRName = gameName:find("attack on titan") ~= nil and gameName:find("revolution") ~= nil
 -- A known place/game id wins. The AOT:R name check is a documented fallback for
--- its newer universe. Universal is opt-in only (env.__DEPHUB_FORCE_UNIVERSAL),
--- so an unknown game is never silently handed a backend it was not built for.
+-- its newer universe. Any other game falls back to the universal backend, which
+-- is built to run anywhere (movement, ESP, aim, chat, server hop) instead of
+-- leaving the player with an empty window. Set env.__DEPHUB_DISABLE_UNIVERSAL
+-- to true to opt out and get the plain "unsupported" state instead.
 local knownTarget = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "src/games/aotr.lua", AOTR = true}) or nil
-if not knownTarget and env.__DEPHUB_FORCE_UNIVERSAL == true then
+if not knownTarget and env.__DEPHUB_DISABLE_UNIVERSAL ~= true then
     knownTarget = {Core = "src/games/universal.lua", Universal = true}
 end
 if not game:IsLoaded() then game.Loaded:Wait() end
@@ -343,18 +345,18 @@ env.__DEPHUB.UI = window
 -- so the backend's own environment, probes and feature readers land in it.
 Diag:Install(window)
 
--- Unknown game: keep the window, tell the player the place is unsupported and
--- stop. No backend is loaded, so no incompatible features can run.
+-- Unknown game with universal disabled: keep the window, tell the player the
+-- place is unsupported and stop. No incompatible backend is forced on them.
 if not knownTarget then
-    Diag:Note("Jogo nao reconhecido: nenhum backend carregado.")
+    Diag:Note("Jogo nao reconhecido: nenhum backend carregado (universal desativado).")
     pcall(function()
         local tab = window:CreateTab("Incompativel")
         if tab then
             local section = tab:CreateSection("Estado", "Left")
             if section then
                 section:CreateParagraph("Jogo nao reconhecido",
-                    "O DepHub nao tem suporte para este lugar.\nPlaceId: " .. placeId ..
-                    "\nGameId: " .. gameId .. "\nNenhum script foi carregado.")
+                    "O DepHub nao tem suporte especifico para este lugar e o backend universal foi desativado.\nPlaceId: " .. placeId ..
+                    "\nGameId: " .. gameId .. "\nPara usar o backend universal, defina env.__DEPHUB_DISABLE_UNIVERSAL = false (ou nil) e recarregue.")
             end
         end
     end)

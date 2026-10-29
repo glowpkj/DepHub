@@ -9,7 +9,6 @@ do
     }
     for _, case in ipairs(cases) do
         local ctx = sandbox(case[1], case[2])
-        if case[3] == "universal" then ctx.State.__DEPHUB_FORCE_UNIVERSAL = true end
         ctx.Responses["src/version.txt"] = "0.0.3"
         local result = case[3] == "rt3" and true or {}
         if case[3] == "rt3" then ctx.State.__DEPHUB = {Runtime={Destroyed=false}} end
@@ -34,14 +33,12 @@ do
     end
     for _, name in ipairs({"bloxfruits", "universal", "rt3"}) do
         local ctx = sandbox(name == "rt3" and 119048529960596 or name == "bloxfruits" and 994732206 or 1, 2)
-        if name == "universal" then ctx.State.__DEPHUB_FORCE_UNIVERSAL = true end
         ctx.Responses["src/version.txt"] = "0.0.3"
         ctx:Provide("src/games/" .. name .. ".lua", false)
         check(ctx:Run("DepHub.lua") == false and ctx.State.__DEPHUB_LOADER_STATE.status == "failed", "failed " .. name .. " cannot report loader success")
     end
     do
         local ctx = sandbox()
-        ctx.State.__DEPHUB_FORCE_UNIVERSAL = true
         local removed = {}
         local function old(name) return {Destroy=function() removed[name] = true end} end
         ctx.State.__DEPHUB = {Universal=old("Universal"), Updater=old("Updater"), Runtime=old("Runtime"), Window=old("Window")}
