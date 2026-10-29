@@ -148,6 +148,10 @@
       "src/core/updater.lua",
       "src/games/aotr.lua",
       "src/games/features/aotr/assistance.lua",
+      "src/games/features/aotr/properties.lua",
+      "src/games/features/aotr/targets.lua",
+      "src/games/features/aotr/movement.lua",
+      "src/games/features/aotr/combat.lua",
       "src/games/updates/4658598196.txt"
     ]
   }

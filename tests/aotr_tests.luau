@@ -62,3 +62,45 @@ do
     check(ctx.State.__DEPHUB.AOTR==nil and not backend:SetToggle("AntiAFK",true),"AOTR destroy clears runtime and rejects enable")
     check(not backend:SetNapeMultiplier(1) and not backend:TeleportToRefill(),"AOTR destroyed backend rejects mutation")
 end
+
+-- Combat integration: the restored combat module is wired through the backend's
+-- own toggle contract, so the combat toggles must route to the module rather
+-- than being stored as inert booleans on the backend.
+do
+    local ctx=sandbox()
+    ctx.Services.TweenService={Create=function(_,_,_,_)
+        return {Play=function() end,Cancel=function() end,Completed={Connect=function() return {Disconnect=function() end} end}}
+    end}
+    ctx.Player.Name="Tester"
+    local function object(class,name,parent)
+        local item=Instance.new(class);item.Name=name;item.Parent=parent;return item
+    end
+    -- Remote contract: Assets.Remotes.GET (RemoteFunction) and POST (RemoteEvent).
+    local assets=object("Folder","Assets",ctx.Services.ReplicatedStorage)
+    local remotes=object("Folder","Remotes",assets)
+    local get=object("RemoteFunction","GET",remotes)
+    local post=object("RemoteEvent","POST",remotes)
+    -- A live titan with a resolvable nape.
+    local folder=object("Folder","Titans",ctx.Services.Workspace)
+    local model=object("Model","Titan",folder)
+    local humanoid=object("Humanoid","Humanoid",model);humanoid.Health=100
+    local hit=object("Folder","Hit",object("Folder","Hitboxes",model))
+    local nape=object("Part","Nape",hit);nape.Size=Vector3.new(15,9,11);nape.Transparency=1
+    -- Local character with a rooted humanoid.
+    local character=object("Model","Character",ctx.Player);ctx.Player.Character=character
+    local charHumanoid=object("Humanoid","Humanoid",character);charHumanoid.Health=100
+    local root=object("Part","HumanoidRootPart",character)
+    local backend=ctx:Run("src/games/aotr.lua")
+    check(backend.Combat~=nil,"AOTR loads the combat module when its dependencies resolve")
+    check(backend:SetToggle("ClassicAutofarm",true),"AOTR routes the ClassicAutofarm toggle to the combat module")
+    check(backend.Toggles.ClassicAutofarm==true,"AOTR records the routed combat toggle state")
+    check(backend:SetToggle("ClassicAutofarm",false),"AOTR disables the ClassicAutofarm toggle")
+    check(backend:SetToggle("SkillAutofarm",true) and backend:SetToggle("SkillAutofarm",false),"AOTR routes the SkillAutofarm toggle")
+    check(backend:SetToggle("ClassicNoclip",false) and backend:SetToggle("ClassicNoclip",true),"AOTR routes the farm noclip toggle to the movement module")
+    check(backend:SetTravelSpeed(1500) and backend.Values.TravelSpeed==1500,"AOTR applies travel speed through the combat module")
+    check(not backend:SetTravelSpeed(10) and not backend:SetTravelSpeed(9000),"AOTR rejects out-of-range travel speed")
+    check(backend:CheckShadowBan()==true,"AOTR exposes the combat diagnostic through CheckShadowBan")
+    check(not backend:SetToggle("NotAFeature",true),"AOTR rejects unknown toggles")
+    backend:Destroy()
+    check(ctx.State.__DEPHUB.AOTR==nil,"AOTR combat teardown releases the backend")
+end

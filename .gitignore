@@ -19,3 +19,6 @@ Thumbs.db
 
 # Local safety copies made before risky edits; never published.
 _backup_*/
+
+# Third-party reference material used during development; never published.
+opensources/

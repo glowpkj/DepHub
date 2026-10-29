@@ -11,31 +11,62 @@ local function jitter(base, spread)
  spread = spread or 0.15
  return task.wait(base * (1 + (math.random() * 2 - 1) * spread))
 end
-local M={Destroyed=false,Toggles={TitanESP=false,NapeVisible=false,NapeExtend=false,ErenExtend=false,AutoBladeRefill=false,AutoGrabEscape=false,AntiInjury=false,AutoRetry=false,AntiAFK=false},Values={NapeMultiplier=1},Connections={},Originals={},Highlights={},LastError="none"}
+local M={Version="0.2.0",Destroyed=false,Toggles={TitanESP=false,NapeVisible=false,NapeExtend=false,ErenExtend=false,AutoBladeRefill=false,AutoGrabEscape=false,AntiInjury=false,AutoRetry=false,AntiAFK=false,TitanRipper=false,SkillAutofarm=false,ClassicAutofarm=false,ClassicNoclip=true},Values={NapeMultiplier=1,TravelSpeed=1000},Connections={},Highlights={},LastError="none"}
 local function warnError(message)
  local nextError=tostring(message)
  if M.LastError~=nextError then warn("[DepHub/AOTR] "..nextError) end
  M.LastError=nextError
 end
 local base=(env.__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
-local okHelpers,helpers=pcall(function()
- local source=game:HttpGet(base.."src/games/features/aotr/assistance.lua")
+-- Prefer the bundle's resolver published on the shared environment. It is only
+-- present in a bundled build; a source checkout resolves through the executor's
+-- own HttpGet, so fall back to that. Either way the module is plain repo source,
+-- not a remote blob fetched from a third party.
+local function fetch(path)
+ local url=base..path
+ local resolver=(type(env.__dephubHttpGet)=="function" and env.__dephubHttpGet)
+  or (type(env.__DEPHUB_HTTP_GET)=="function" and env.__DEPHUB_HTTP_GET)
+  or (type(_G.__dephubHttpGet)=="function" and _G.__dephubHttpGet)
+  or (type(_G.__DEPHUB_HTTP_GET)=="function" and _G.__DEPHUB_HTTP_GET)
+ if resolver then
+  local ok,source=pcall(resolver,url)
+  if ok and type(source)=="string" and #source>0 then return true,source end
+ end
+ local ok,source=pcall(function() return game:HttpGet(url) end)
+ if ok and type(source)=="string" and #source>0 then return true,source end
+ return false,tostring(source)
+end
+local function loadFeature(name)
+ local okFetch,source=fetch("src/games/features/aotr/"..name..".lua")
+ if not okFetch then return nil,tostring(source) end
  local chunk,err=loadstring(source)
- assert(chunk,err)
- return chunk().new({Player=player,Warn=warnError})
-end)
-if okHelpers and type(helpers)=="table" then M.Assistance=helpers else warnError("Assistance unavailable: "..tostring(helpers)) end
+ if not chunk then return nil,tostring(err) end
+ local okRun,module=pcall(chunk)
+ if not okRun or type(module)~="table" then return nil,tostring(module) end
+ return module
+end
+local properties,propertiesError=loadFeature("properties")
+if not properties then return false,warnError("properties: "..tostring(propertiesError)) end
+M.Properties=properties.new(warnError)
+local helpers,helpersError=loadFeature("assistance")
+if helpers then M.Assistance=helpers.new({Player=player,Warn=warnError}) else warnError("Assistance unavailable: "..tostring(helpersError)) end
+local targets,targetsError=loadFeature("targets")
+local movement,movementError=loadFeature("movement")
+local combat,combatError=loadFeature("combat")
+if targets and movement and combat then
+ M.Combat=combat.new({Player=player,Workspace=Workspace,ReplicatedStorage=game:GetService("ReplicatedStorage"),RunService=game:GetService("RunService"),TweenService=TweenService,Targets=targets,Movement=movement,Properties=M.Properties,Warn=warnError,Now=os.clock,
+  CancelTeleport=function() M:CancelTeleport() end,
+  FindRefill=function() return M:FindRefill() end,
+  IsTeleporting=function() return M.TeleportTween and M.TeleportTween.PlaybackState==Enum.PlaybackState.Playing end})
+else
+ warnError("Combat unavailable: "..tostring(targetsError or movementError or combatError))
+end
 local function child(parent,name) return parent and parent:FindFirstChild(name) end
 local function descendants(parent,name)
  if not parent then return nil end
  return parent:FindFirstChild(name,true)
 end
 local function character() return player and player.Character end
-local function main() return child(character(),"Main") end
-local function remote(name)
- local assets=child(game:GetService("ReplicatedStorage"),"Assets")
- return child(child(assets,"Remotes"),name)
-end
 local function titanFolder() return child(Workspace,"Titans") end
 local function titans()
  local result={}
@@ -50,44 +81,22 @@ end
 local function nape(model)
  return child(child(child(model,"Hitboxes"),"Hit"),"Nape")
 end
-local function remember(part)
- if not M.Originals[part] then
-  M.Originals[part]={Size=part.Size,Transparency=part.Transparency}
- end
-end
-local function restore()
- for part,values in pairs(M.Originals) do
-  if part and part.Parent then
-   pcall(function() part.Size=values.Size;part.Transparency=values.Transparency end)
-  end
- end
- M.Originals={}
-end
 function M:Refresh()
  if self.Destroyed then return end
- local desired={}
+ local visual,eren={},{}
  for _,model in ipairs(titans()) do
   local part=nape(model)
   if part and part:IsA("BasePart") then
    if self.Toggles.NapeVisible or self.Toggles.NapeExtend then
-    desired[part]=true
-    remember(part)
-    local original=self.Originals[part]
-    part.Transparency=self.Toggles.NapeVisible and 0.65 or original.Transparency
-    part.Size=self.Toggles.NapeExtend and original.Size*(self.Values.NapeMultiplier or 1) or original.Size
-   elseif self.Originals[part] then
-    local original=self.Originals[part]
-    part.Size=original.Size;part.Transparency=original.Transparency
-    self.Originals[part]=nil
+    visual[part]={}
+    if self.Toggles.NapeVisible then visual[part].Transparency=0.65 end
+    if self.Toggles.NapeExtend then visual[part].Size=self.Properties:Original(part,"Size")*(self.Values.NapeMultiplier or 1) end
    end
   end
   if model.Name=="Attack_Titan" and self.Toggles.ErenExtend then
-   local marker=child(model,"Marker")
-   local hit=child(child(model,"Hitboxes"),"Hit")
-   local target=marker and (marker:IsA("Highlight") or marker:IsA("BillboardGui") or marker:IsA("SelectionBox")) and marker.Adornee
-   if target and hit and target:IsA("BasePart") and target:IsDescendantOf(hit) then
-    remember(target);desired[target]=true
-    target.Size=Vector3.new(95,95,95);target.Transparency=0.94
+   local target=targets and targets.Marker(model)
+   if target then
+    eren[target]={Size=Vector3.new(95,95,95),Transparency=0.94}
    end
   end
   local highlight=self.Highlights[model]
@@ -104,15 +113,8 @@ function M:Refresh()
    end
   elseif highlight then highlight:Destroy();self.Highlights[model]=nil end
  end
- for part,original in pairs(self.Originals) do
-  if not desired[part] then
-   if part.Parent then
-    local ok,err=pcall(function() part.Size=original.Size;part.Transparency=original.Transparency end)
-    if not ok then warnError(err) end
-   end
-   self.Originals[part]=nil
-  end
- end
+ self.Properties:Set("Visual",visual,10)
+ self.Properties:Set("Eren",eren,20)
  for model,highlight in pairs(self.Highlights) do
   if model.Parent~=titanFolder() or not self.Toggles.TitanESP then
    pcall(function() highlight:Destroy() end);self.Highlights[model]=nil
@@ -123,6 +125,16 @@ function M:SetToggle(name,value)
  if self.Destroyed or self.Toggles[name]==nil then return false end
  value=value==true
  if self.Toggles[name]==value then return true end
+ if name=="ClassicNoclip" then
+  if not self.Combat then warnError("Combat dependencies unavailable");return false end
+  local ok,result=pcall(self.Combat.SetNoclip,self.Combat,value)
+  if not ok or result==false then warnError(result);return false end
+ end
+ if name=="TitanRipper" or name=="SkillAutofarm" or name=="ClassicAutofarm" then
+  if not self.Combat then warnError("Combat dependencies unavailable");return false end
+  local ok,result=pcall(self.Combat.SetToggle,self.Combat,name,value)
+  if not ok or result==false then warnError(result);return false end
+ end
  if name=="AutoBladeRefill" or name=="AutoGrabEscape" or name=="AntiInjury" or name=="AutoRetry" or name=="AntiAFK" then
   if not self.Assistance then warnError("Assistance module unavailable");return false end
   if not self.Assistance:SetToggle(name,value) then return false end
@@ -132,11 +144,24 @@ function M:SetToggle(name,value)
  if not ok then warnError(err) end
  return true
 end
+function M:SetTravelSpeed(value)
+ value=tonumber(value)
+ if self.Destroyed or not value or value~=value or value<50 or value>2000 or not self.Combat then return false end
+ if not self.Combat:SetMovementSpeed(value) then return false end
+ self.Values.TravelSpeed=value
+ return true
+end
+function M:CheckShadowBan()
+ if self.Destroyed or not self.Combat then return false end
+ return self.Combat:CheckShadowBan()
+end
 function M:GetToggle(name) return self.Toggles[name]==true end
 function M:SetNapeMultiplier(value)
  value=tonumber(value)
  if self.Destroyed or not value or value~=value or value<0 or value>2 then return false end
- self.Values.NapeMultiplier=value;self:Refresh();return true
+ self.Values.NapeMultiplier=value
+ local ok,err=pcall(self.Refresh,self);if not ok then warnError(err) end
+ return ok
 end
 function M:FindRefill()
  for _,rootName in ipairs({"Unclimbable","Climbable"}) do
@@ -160,9 +185,12 @@ function M:TeleportToRefill()
  local root=child(character(),"HumanoidRootPart")
  local refill=self:FindRefill()
  if not root or not root:IsA("BasePart") or not refill then warnError("Root or GasTanks.Refill unavailable");return false end
+ local humanoid=character() and character():FindFirstChildOfClass("Humanoid")
+ if root.Anchored or not humanoid or humanoid.Health<=0 then warnError("Character unavailable for refill travel");return false end
  self:CancelTeleport()
+ if self.Combat then self.Combat:PauseMovement() end
  local distance=(root.Position-refill.Position).Magnitude
- local tween=TweenService:Create(root,TweenInfo.new(math.max(0.1,distance/225),Enum.EasingStyle.Linear),{CFrame=refill.CFrame+Vector3.new(0,3,0)})
+ local tween=TweenService:Create(root,TweenInfo.new(math.max(0.03,distance/(self.Values.TravelSpeed or 1000)),Enum.EasingStyle.Linear),{CFrame=refill.CFrame+Vector3.new(0,3,0)})
  tween:Play()
  self.TeleportTween=tween
  return true
@@ -181,7 +209,14 @@ function M:GetStatus()
    if self.Toggles[name] then assistance=assistance.."\n"..name..": "..tostring(self.Assistance.States[name] or "starting") end
   end
  end
- return "PlaceId: "..tostring(game.PlaceId).." | GameId: "..tostring(game.GameId).."\ntitans: "..tostring(#titans())..
+ if self.Combat then
+  for _,name in ipairs({"TitanRipper","SkillAutofarm","ClassicAutofarm"}) do
+   local key=name=="TitanRipper" and "Ripper" or name
+   assistance=assistance.."\n"..name..": "..tostring(self.Combat.States[key] or "Disabled")
+  end
+  assistance=assistance.."\nShadowBan: "..self.Combat.CheckResult
+ end
+ return "AOTR "..self.Version.." | speed: "..self.Values.TravelSpeed.." studs/s | farm noclip: "..tostring(self.Toggles.ClassicNoclip).."\nPlaceId: "..tostring(game.PlaceId).." | GameId: "..tostring(game.GameId).."\ntitans: "..tostring(#titans())..
   "\nhotbar: "..(hotbar and "found" or "missing")..
   "\nrefill: "..(self:FindRefill() and "found" or "missing")..
   "\nblade hud: "..(descendants(top,"Blade") and "found" or "missing")..
@@ -193,9 +228,10 @@ function M:Destroy()
  if self.RefreshTask then pcall(task.cancel,self.RefreshTask);self.RefreshTask=nil end
  self:CancelTeleport()
  if self.Assistance then self.Assistance:Destroy() end
+ if self.Combat then self.Combat:Destroy() end
  for _,connection in ipairs(self.Connections) do pcall(function() connection:Disconnect() end) end
  for _,highlight in pairs(self.Highlights) do pcall(function() highlight:Destroy() end) end
- restore()
+ if self.Properties then self.Properties:Destroy() end
  self.Highlights={}
  if env.__DEPHUB_AOTR==self then env.__DEPHUB_AOTR=nil end
  if env.__DEPHUB and env.__DEPHUB.AOTR==self then env.__DEPHUB.AOTR=nil end
@@ -248,13 +284,27 @@ end
     end
     local movement=dephubSection(UI,tabs,"Movement","Movimento","Left")
     if movement then
+        movement:CreateToggle("Noclip do farm",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
+        movement:CreateSlider("Travel speed",50,2000,M.Values.TravelSpeed,function(v) M:SetTravelSpeed(v) end)
         movement:CreateButton("Ir até o refill",function()
             local ok=M:TeleportToRefill()
             dephubNotify(UI,"AOT:R",ok and "Indo até o refill." or "Refill não encontrado.")
         end)
         movement:CreateButton("Cancelar movimento",function() M:CancelTeleport() end)
     end
+    local combat=dephubSection(UI,tabs,"Farm","Combate","Left")
+    if combat then
+        combat:CreateToggle("Titan Ripper",M.Toggles.TitanRipper,function(v) M:SetToggle("TitanRipper",v) end)
+        combat:CreateToggle("Skill autofarm",M.Toggles.SkillAutofarm,function(v) M:SetToggle("SkillAutofarm",v) end)
+        combat:CreateToggle("Classic autofarm",M.Toggles.ClassicAutofarm,function(v) M:SetToggle("ClassicAutofarm",v) end)
+    end
     local status=dephubSection(UI,tabs,"Status","Diagnóstico","Left")
-    if status then status:CreateParagraph("Estado atual",M:GetStatus()) end
+    if status then
+        status:CreateParagraph("Estado atual",M:GetStatus())
+        status:CreateButton("Checar ShadowBan",function()
+            M:CheckShadowBan()
+            dephubNotify(UI,"AOT:R","Diagnóstico solicitado.")
+        end)
+    end
 end
 return M
