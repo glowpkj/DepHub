@@ -28,7 +28,13 @@ do
     local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
     local humanoid = Instance.new("Humanoid")
     humanoid.WalkSpeed, humanoid.JumpPower, humanoid.UseJumpPower, humanoid.Health = 16, 55, false, 100
+    humanoid.JumpHeight = 7.2
     humanoid.GetState = function() return "Running" end
+    -- A jump-lock double: the game "disables" the jumping state and zeroes the
+    -- values, which is exactly what the bypass has to undo each frame.
+    local states = {}
+    humanoid.SetStateEnabled = function(_, state, enabled) states[state] = enabled end
+    humanoid.GetStateEnabled = function(_, state) return states[state] ~= false end
     humanoid.Parent = character
     local root = Instance.new("Part"); root.Name, root.Parent = "HumanoidRootPart", character
     root.CFrame = CFrame.new(0, 0, 0)
@@ -67,6 +73,30 @@ do
 
     state:SetToggle("JumpBoost", false)
     check(humanoid.JumpPower == 55 and humanoid.UseJumpPower == false, "disabling jump boost restores the original values")
+
+    -- Jump Bypass: the game trips a no-jump zone (power zeroed, state disabled),
+    -- and the bypass must undo it on the next frame.
+    state:SetToggle("JumpBypass", true)
+    humanoid.JumpPower, humanoid.JumpHeight = 0, 0
+    humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
+    tick()
+    check(humanoid.JumpPower == state.Config.bypassJumpPower, "jump bypass restores the jump power the zone zeroed")
+    check(humanoid.JumpHeight >= 7.2, "jump bypass restores a usable jump height")
+    check(humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) == true, "jump bypass re-enables the jumping state")
+
+    state.Config.bypassJumpPower = 300
+    tick()
+    check(humanoid.JumpPower == 300, "changing the bypass power slider sticks")
+
+    -- Auto Jump makes the humanoid jump each frame while the bypass is on.
+    state.Config.autoJump = true
+    humanoid.Jump = false
+    tick()
+    check(humanoid.Jump == true, "auto jump triggers the humanoid jump")
+
+    state:SetToggle("JumpBypass", false)
+    check(humanoid.JumpPower == 55 and humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) == true,
+        "disabling jump bypass restores the game's values")
 
     -- Look at Ball: the camera rotates onto the ball, keeping its position.
     local camera = ctx.Services.Workspace.CurrentCamera
@@ -120,7 +150,7 @@ do
     for _, control in ipairs(ui.Library._Controls) do
         if control.Label then labels[control.Label] = true end
     end
-    for _, expected in ipairs({"Auto Position", "Instantâneo", "Olhar pra bola", "Jump Boost", "Jump Power", "Alcance da previsão"}) do
+    for _, expected in ipairs({"Auto Position", "Instantâneo", "Olhar pra bola", "Jump Boost", "Jump Power", "Alcance da previsão", "Jump Bypass", "Jump Bypass Power", "Auto Jump"}) do
         check(labels[expected] == true, "Volleyball registers its control: " .. expected)
     end
 end

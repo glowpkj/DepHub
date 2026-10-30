@@ -43,6 +43,9 @@ local Config = {
     lookAtBall = false,       -- point the camera at the ball every frame
     jumpBoost = false,        -- enable the jump-power override
     jumpPower = 120,          -- JumpPower value used while jumpBoost is on
+    jumpBypass = false,       -- force jumping on, overriding zones that lock it
+    bypassJumpPower = 120,    -- JumpPower used while jumpBypass is on
+    autoJump = false,         -- keep making the humanoid jump while bypass is on
     maxPredictDistance = 0,   -- 0 = predict at any distance; >0 ignores balls past it
 }
 
@@ -52,12 +55,13 @@ local State = {
     Started = false,
     Mode = "Personal",
     Modes = {"Personal", "Match", "Future"},
-    Toggles = {BallPredict = true, AutoPosition = false, LookAtBall = false, JumpBoost = false},
+    Toggles = {BallPredict = true, AutoPosition = false, LookAtBall = false, JumpBoost = false, JumpBypass = false},
     ToggleLabels = {
         BallPredict = "Ball Predict",
         AutoPosition = "Auto Position",
         LookAtBall = "Look at Ball",
         JumpBoost = "Jump Boost",
+        JumpBypass = "Jump Bypass",
     },
     Config = Config,
     Connections = {},
@@ -76,6 +80,8 @@ local State = {
     LastPrediction = nil,
     BaseJumpPower = nil,
     BaseUseJumpPower = nil,
+    BaseJumpHeight = nil,
+    BaseJumpStates = nil,
     LastNotification = nil
 }
 
@@ -155,6 +161,7 @@ local function rememberBaseJump()
     if humanoid and State.BaseJumpPower == nil then
         State.BaseJumpPower = humanoid.JumpPower
         State.BaseUseJumpPower = humanoid.UseJumpPower
+        State.BaseJumpHeight = humanoid.JumpHeight
     end
 end
 
@@ -178,7 +185,53 @@ local function restoreJump()
     pcall(function()
         humanoid.JumpPower = State.BaseJumpPower
         if State.BaseUseJumpPower ~= nil then humanoid.UseJumpPower = State.BaseUseJumpPower end
+        if State.BaseJumpHeight ~= nil then humanoid.JumpHeight = State.BaseJumpHeight end
     end)
+    -- Put the humanoid states back the way the game had them.
+    if State.BaseJumpStates then
+        for state, enabled in pairs(State.BaseJumpStates) do
+            pcall(function() humanoid:SetStateEnabled(state, enabled) end)
+        end
+    end
+end
+
+-- Jump Bypass: some maps stage a no-jump zone by zeroing JumpPower/JumpHeight
+-- and disabling the Jumping state on the client humanoid. Everything the client
+-- owns here is re-asserted every frame, so the moment the zone trips it the loop
+-- writes the boosted values straight back. The base values (power, height, the
+-- jumping/climbing state flags) are captured on first use so turning it off or
+-- unloading restores exactly what the game had.
+local BYPASS_STATES = {Enum.HumanoidStateType.Jumping, Enum.HumanoidStateType.Climbing}
+
+local function rememberBaseJumpStates(humanoid)
+    if State.BaseJumpStates then return end
+    local states = {}
+    for _, state in ipairs(BYPASS_STATES) do
+        local ok, enabled = pcall(function() return humanoid:GetStateEnabled(state) end)
+        states[state] = ok and enabled or true
+    end
+    State.BaseJumpStates = states
+end
+
+local function applyJumpBypass()
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+
+    rememberBaseJump()
+    rememberBaseJumpStates(humanoid)
+    pcall(function()
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = Config.bypassJumpPower
+        humanoid.JumpHeight = math.max(tonumber(humanoid.JumpHeight) or 0, 7.2)
+    end)
+    for _, state in ipairs(BYPASS_STATES) do
+        pcall(function() humanoid:SetStateEnabled(state, true) end)
+    end
+
+    if Config.autoJump and humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
+        pcall(function() humanoid.Jump = true end)
+    end
 end
 
 local function isException(part)
@@ -687,6 +740,13 @@ function State:SetToggle(name, value)
         return true
     end
 
+    if name == "JumpBypass" then
+        self.Toggles.JumpBypass = value == true
+        Config.jumpBypass = self.Toggles.JumpBypass
+        if not self.Toggles.JumpBypass then restoreJump() end
+        return true
+    end
+
     return false
 end
 
@@ -735,6 +795,9 @@ function State:Start()
         -- Jump boost is independent of the ball: apply it as soon as it is on,
         -- and it re-applies each frame because the game can reset the humanoid.
         if Config.jumpBoost then applyJumpOverride() end
+        -- Jump bypass re-asserts the jump values/states every frame so a no-jump
+        -- zone never gets a foothold.
+        if Config.jumpBypass then applyJumpBypass() end
 
         if not self.Toggles.BallPredict or self.Mode == "Future" then
             marker.Transparency = 1
@@ -922,6 +985,23 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
         end)
         movement:CreateParagraph("Jump Boost", "Força o JumpPower enquanto ligado e restaura o valor original ao desligar.")
     end
+
+    -- Jump Bypass: beats a no-jump zone by re-asserting the jump values and
+    -- states every frame, which is what a map does to block jumping.
+    local bypass = section("Ball Predict", "Pular em qualquer lugar", "Right")
+    if bypass then
+        bypass:CreateToggle("Jump Bypass", State.Toggles.JumpBypass, function(v)
+            State:SetToggle("JumpBypass", v)
+            notify(v and "Jump Bypass LIGADO: pular liberado" or "Jump Bypass desligado")
+        end)
+        bypass:CreateSlider("Jump Bypass Power", 50, 500, Config.bypassJumpPower, function(v)
+            Config.bypassJumpPower = tonumber(v) or 120
+        end)
+        bypass:CreateToggle("Auto Jump", Config.autoJump, function(v)
+            Config.autoJump = v == true
+        end)
+        bypass:CreateParagraph("Jump Bypass", "Reaplica JumpPower, JumpHeight e o estado de pulo todo frame, então zonas que bloqueiam pular deixam de valer. Auto Jump pula sozinho enquanto ligado. Ao desligar, restaura o que o jogo tinha.")
+    end
 end
 
 -- Report this backend's own structure and live state into the shared Debug tab.
@@ -964,6 +1044,15 @@ do
         Diag:Feature("Volleyball.AutoPosition",function() return State.Toggles.AutoPosition and "ON" or "off" end)
         Diag:Feature("Volleyball.LookAtBall",function() return State.Toggles.LookAtBall and "ON" or "off" end)
         Diag:Feature("Volleyball.JumpBoost",function() return State.Toggles.JumpBoost and ("ON "..tostring(Config.jumpPower)) or "off" end)
+        Diag:Feature("Volleyball.JumpBypass",function() return State.Toggles.JumpBypass and ("ON "..tostring(Config.bypassJumpPower)) or "off" end)
+        Diag:Feature("Volleyball.PodePular",function()
+            local ch=LocalPlayer.Character
+            local h=ch and ch:FindFirstChildOfClass("Humanoid")
+            if not h then return "sem humanoid" end
+            local ok,enabled=pcall(function() return h:GetStateEnabled(Enum.HumanoidStateType.Jumping) end)
+            return string.format("jumping=%s power=%s height=%s",
+                tostring(ok and enabled or "?"),tostring(h.JumpPower),tostring(h.JumpHeight))
+        end)
         Diag:Feature("Volleyball.Ponto previsto",function()
             local p=State.LastPrediction
             return p and string.format("(%.1f,%.1f,%.1f)",p.X,p.Y,p.Z) or "sem previsão"
@@ -1002,6 +1091,15 @@ do
                 end
                 State:SetToggle("JumpBoost",true)
                 return "JumpBoost=on power="..tostring(Config.jumpPower)
+            end)
+            Diag:Command("vb-bypass",function(argument)
+                local on=argument~="off"
+                if argument and argument~="" and argument~="off" then
+                    local value=tonumber(argument)
+                    if value then Config.bypassJumpPower=value end
+                end
+                State:SetToggle("JumpBypass",on)
+                return "JumpBypass="..tostring(on).." power="..tostring(Config.bypassJumpPower)
             end)
         end
     end
