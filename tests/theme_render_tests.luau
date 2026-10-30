@@ -540,12 +540,13 @@ do
     check(pcall(function() library:AddSlider(section, "Amount", 0, 100, 50, 0, function() end) end), "AddSlider builds a control")
     check(pcall(function() library:AddButton(section, "Run", function() end) end), "AddButton builds a control")
 
-    -- The fixed Dashboard tab the loader builds from every game. Against the
-    -- real theme this exercises CreateDashboardBanner (greeting/avatar + server
-    -- card) and CreatePerformanceDashboard (live metrics), which is exactly
-    -- what the loader calls -- so a break here is caught before release.
-    local dashboardTab = library:CreateTab("General", "Dashboard")
-    check(dashboardTab ~= nil and library._STATE.ContentPages["Dashboard"] ~= nil, "Dashboard tab registers a content page")
+    local dashboardTab = library:CreateStandaloneTab("Dashboard", "house")
+    check(dashboardTab ~= nil and library._STATE.ContentPages["Dashboard"] ~= nil, "Dashboard standalone destination registers a content page")
+    check(library._STATE.CategoryButtons.Dashboard.isStandalone == true, "Dashboard is not nested inside General")
+    check(library._STATE.TabCategories.Dashboard == "Dashboard", "Dashboard owns its top-level navigation category")
+    local configurableToggle = library:AddToggle(section, "Configurable", false, function() end)
+    local toggleSettings = configurableToggle:CreateSettings("CONFIGURAÇÕES")
+    check(type(toggleSettings) == "table" and type(toggleSettings.CreateSlider) == "function", "toggle exposes expandable settings controls")
     check(pcall(function() library:CreateDashboardBanner("Dashboard") end), "CreateDashboardBanner builds the dashboard banner")
     check(pcall(function() library:CreatePerformanceDashboard("Dashboard", "Right") end), "CreatePerformanceDashboard builds the dashboard metrics")
     -- The banner reads _STATE.TabTopContainers[tabName], so its presence proves
