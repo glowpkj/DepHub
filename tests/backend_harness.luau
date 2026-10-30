@@ -100,6 +100,10 @@ local function typeof(value)
     if type(value) == "table" and value.__cframe then return "CFrame" end
     return builtinTypeof(value)
 end
+-- GUI-only members the harness rejects on non-GUI instances (see __newindex).
+-- Position is deliberately absent: it is a real BasePart property.
+local GUI_ONLY_MEMBERS = {Visible = true, BackgroundColor3 = true, TextSize = true, Text = true, ZIndex = true}
+local GUI_CLASSES = {Frame = true, TextButton = true, TextLabel = true, ImageLabel = true, ScrollingFrame = true, ScreenGui = true}
 local methods, instanceMeta = {}, {}
 function instanceMeta:__index(key)
     -- An own value (set by a feature or by an executor-style hook) wins over
@@ -115,6 +119,13 @@ function instanceMeta:__newindex(key, value)
         self._props.Parent = value
         if value then value._children[#value._children + 1] = self end
     else
+        -- Guard against writing a GUI-only property onto a non-GUI instance:
+        -- "Visible is not a valid member of Part" only shows up in a real client,
+        -- so catching it here keeps that class of bug out of the bundle.
+        local class = self._props.ClassName
+        if GUI_ONLY_MEMBERS[key] and not GUI_CLASSES[class] then
+            error(string.format("%s is not a valid member of %s", tostring(key), tostring(class)), 2)
+        end
         self._props[key] = value
     end
 end

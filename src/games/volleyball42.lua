@@ -155,8 +155,7 @@ hitbox.CanQuery = false
 hitbox.CastShadow = false
 hitbox.Material = Enum.Material.ForceField
 hitbox.Color = Color3.fromRGB(0, 170, 255)
-hitbox.Transparency = 0.75
-hitbox.Visible = false
+hitbox.Transparency = 1
 hitbox.Parent = folder
 
 local function connect(list, signal, callback)
@@ -674,12 +673,12 @@ end
 
 local function positionHitbox(position)
     if not Config.hitboxVisible then
-        hitbox.Visible = false
+        hitbox.Transparency = 1
         return
     end
     hitbox.Size = Vector3.new(Config.hitboxSize, Config.hitboxSize, Config.hitboxSize)
     hitbox.Position = position + Vector3.new(0, Config.positionOffsetY, 0)
-    hitbox.Visible = true
+    hitbox.Transparency = 0.75
 end
 
 local function disconnectTouches()
@@ -1055,7 +1054,7 @@ function State:Destroy()
     resetBall()
     restoreJump()
     setCeilingNoClip(false)
-    hitbox.Visible = false
+    hitbox.Transparency = 1
 
     if folder.Parent then
         folder:Destroy()
@@ -1131,11 +1130,11 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
     if hitboxSection then
         hitboxSection:CreateToggle("Usar hitbox", Config.hitboxEnabled, function(v)
             Config.hitboxEnabled = v == true
-            if not Config.hitboxEnabled then hitbox.Visible = false end
+            if not Config.hitboxEnabled then hitbox.Transparency = 1 end
         end)
         hitboxSection:CreateToggle("Hitbox visível", Config.hitboxVisible, function(v)
             Config.hitboxVisible = v == true
-            if not Config.hitboxVisible then hitbox.Visible = false end
+            if not Config.hitboxVisible then hitbox.Transparency = 1 end
         end)
         hitboxSection:CreateSlider("Tamanho da hitbox", 2, 40, Config.hitboxSize, function(v)
             Config.hitboxSize = tonumber(v) or 12
