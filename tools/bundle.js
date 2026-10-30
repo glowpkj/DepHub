@@ -153,10 +153,11 @@ const bundleHeader = [
 // to the network, which keeps the updater/marker paths working or failing
 // gracefully instead of hard-erroring.
 const originalHttpGet = `local function httpGet(path, useCache)
+    local base = resolveBase()
     local cache = getCache()
     if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
     local separator = path:find("?", 1, true) and "&" or "?"
-    local ok, result = performRequest(BASE_URL .. path .. separator .. "cb=" .. CACHE_BUST)
+    local ok, result = performRequest(base .. path .. separator .. "cb=" .. CACHE_BUST)
     if not ok then return false, result end
     if useCache ~= false then cache[path] = result end
     return true, result
@@ -165,10 +166,11 @@ end`;
 const bundledHttpGet = `local function httpGet(path, useCache)
     local bundled = BUNDLED_SOURCES[path]
     if type(bundled) == "string" and #bundled > 0 then return true, bundled end
+    local base = resolveBase()
     local cache = getCache()
     if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
     local separator = path:find("?", 1, true) and "&" or "?"
-    local ok, result = performRequest(BASE_URL .. path .. separator .. "cb=" .. CACHE_BUST)
+    local ok, result = performRequest(base .. path .. separator .. "cb=" .. CACHE_BUST)
     if not ok then return false, result end
     if useCache ~= false then cache[path] = result end
     return true, result

@@ -433,7 +433,13 @@ local function sandbox(placeId, gameId)
         if url:find("demon-theme", 1, true) or url:find("demon-of-darkness-ui", 1, true) or url:find("DemonOfDarknessUI", 1, true) then
             return DOD_LIBRARY_STUB
         end
-        local path = url:gsub("^https://raw.githubusercontent.com/glowpkj/DepHub/main/", ""):gsub("%?.*$", "")
+        -- Any of the loader's source hosts maps to the same repo path, so strip
+        -- whichever prefix the URL carries before looking the response up.
+        local path = url
+            :gsub("^https://raw%.githubusercontent%.com/glowpkj/DepHub/[^/]+/", "")
+            :gsub("^https://github%.com/glowpkj/DepHub/raw/[^/]+/", "")
+            :gsub("^https://cdn%.jsdelivr%.net/gh/glowpkj/DepHub@[^/]+/", "")
+            :gsub("%?.*$", "")
         return assert(context.Responses[path], "Unexpected HTTP: " .. path)
     end
     local env = setmetatable({game=game, workspace=services.Workspace, Color3=Color3, Vector3=Vector3, CFrame=CFrame, typeof=typeof, Instance=Instance, Enum=Enum,

@@ -11,8 +11,19 @@ local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
-local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.89"
+-- Source hosts in fallback order. raw.githubusercontent.com serves a branch ref
+-- through an edge cache whose TTL can keep a whole revision behind, so a "bump
+-- main" can go unseen by the loader (and by every module) for minutes. jsDelivr
+-- re-resolves from git per request, and github.com/<ref>/raw/ is a third origin;
+-- the first host that answers the version probe wins for the whole session, and
+-- its base is published so every module fetches from the same live mirror.
+local HOST_TEMPLATES = {
+    "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
+    "https://github.com/glowpkj/DepHub/raw/" .. sourceRef .. "/",
+    "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/",
+}
+local BASE_URL = HOST_TEMPLATES[1]
+local VERSION = "0.0.90"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -126,6 +137,10 @@ end
 cleanupRuntime()
 env[EXECUTED_KEY] = false
 
+-- The source-host resolver is defined once performRequest exists (below), but it
+-- is referenced while publishing state, so it is forward-declared here.
+local resolveBase
+
 env[STATE_KEY] = {
     status = "running", startedAt = os.clock(), Version = VERSION,
     PlaceId = placeId, GameId = gameId, SourceRef = sourceRef
@@ -133,7 +148,10 @@ env[STATE_KEY] = {
 
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
-env.__DEPHUB.SourceBaseURL = BASE_URL
+-- Provisional: the first candidate host. httpGet refines this through
+-- resolveBase() on the first module fetch and stores the winner back, so the
+-- value a later module reads is the host that actually served the current build.
+env.__DEPHUB.SourceBaseURL = env.__DEPHUB.SourceBaseURL or BASE_URL
 -- Published so each backend can make its own module URLs unique per session and
 -- avoid an executor serving a cached older revision (see CACHE_BUST above).
 env.__DEPHUB.SourceCacheBust = CACHE_BUST
@@ -148,6 +166,8 @@ env.__DEPHUB.Debug = function()
     return {
         Executor = detectExecutor(),
         RemoteVersion = env.__DEPHUB.RemoteVersion,
+        SourceBaseURL = env.__DEPHUB.SourceBaseURL,
+        BaseVersion = env.__DEPHUB.BaseVersion,
         State = env[STATE_KEY],
         Cache = env[CACHE_KEY],
         Version = VERSION
@@ -217,11 +237,65 @@ local function performRequest(url)
     return false, lastError
 end
 
+-- Pick the source host that actually serves the current version. Probing with
+-- src/version.txt is enough: a host may be reachable yet still hand back a stale
+-- cached tree, so the probe reads the version and only accepts a host whose
+-- content parses, preferring the one that reports the newest version seen. The
+-- winner is stored in env so later sessions and every module reuse the same
+-- mirror instead of each re-probing.
+resolveBase = function()
+    if type(env.__DEPHUB) == "table" and type(env.__DEPHUB.SourceBaseURL) == "string"
+        and env.__DEPHUB.SourceBaseRef == sourceRef then
+        return env.__DEPHUB.SourceBaseURL
+    end
+
+    local bestBase, bestVersion
+    local function segments(v)
+        local out = {}
+        for part in tostring(v):gmatch("%d+") do out[#out + 1] = tonumber(part) or 0 end
+        return out
+    end
+    local function newer(a, b)
+        if not a then return false end
+        if not b then return true end
+        local sa, sb = segments(a), segments(b)
+        for i = 1, math.max(#sa, #sb) do
+            local x, y = sa[i] or 0, sb[i] or 0
+            if x ~= y then return x > y end
+        end
+        return false
+    end
+
+    for _, base in ipairs(HOST_TEMPLATES) do
+        local token = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
+        local ok, body = performRequest(base .. "src/version.txt?cb=" .. token)
+        if ok and type(body) == "string" then
+            local version = tostring(body):match("[%d%.]+")
+            if version and newer(version, bestVersion) then
+                bestBase, bestVersion = base, version
+            end
+            -- A host serving the local version or newer is good enough: stop at
+            -- the earliest one, so the preferred mirror wins as soon as it is
+            -- current. Probing continues only while hosts come back older
+            -- (stale cache) or unreachable.
+            if version and not newer(VERSION, version) then break end
+        end
+    end
+
+    local base = bestBase or BASE_URL
+    env.__DEPHUB = env.__DEPHUB or {}
+    env.__DEPHUB.SourceBaseURL = base
+    env.__DEPHUB.SourceBaseRef = sourceRef
+    env.__DEPHUB.BaseVersion = bestVersion
+    return base
+end
+
 local function httpGet(path, useCache)
+    local base = resolveBase()
     local cache = getCache()
     if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
     local separator = path:find("?", 1, true) and "&" or "?"
-    local ok, result = performRequest(BASE_URL .. path .. separator .. "cb=" .. CACHE_BUST)
+    local ok, result = performRequest(base .. path .. separator .. "cb=" .. CACHE_BUST)
     if not ok then return false, result end
     if useCache ~= false then cache[path] = result end
     return true, result
@@ -287,6 +361,7 @@ log("GameId: " .. gameId)
 
 local okVersion, remoteVersion = httpGet("src/version.txt", false)
 if okVersion then env.__DEPHUB.RemoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION end
+log("Fonte: " .. tostring(env.__DEPHUB.SourceBaseURL) .. " (remoto " .. tostring(env.__DEPHUB.RemoteVersion or "?") .. ")")
 
 -- Compare two dotted version strings numerically, segment by segment. Returns
 -- true only when "a" is strictly newer than "b", so an older remote (a test
@@ -319,7 +394,7 @@ if okVersion and type(remV) == "string" and versionIsNewer(remV, VERSION) and en
     env.__DEPHUB_SELF_UPDATE_ATTEMPT = remV
     log("Versao remota " .. remV .. " difere da local " .. VERSION .. "; recarregando loader.")
     local token = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
-    local fetched, freshSource = performRequest(BASE_URL .. "DepHub.lua?cb=" .. token)
+    local fetched, freshSource = performRequest(resolveBase() .. "DepHub.lua?cb=" .. token)
     if fetched and type(freshSource) == "string" and #freshSource > 0 then
         local okCompile, freshChunk = compile(freshSource)
         if okCompile then

@@ -21,9 +21,10 @@ do
         check(ctx:Run("DepHub.lua") == true, "loader succeeds for route " .. case[3])
         check(ctx.State.__DEPHUB_LOADER_STATE.status == "success", "successful loader records success state")
         check(ctx.State.__DEPHUB.Mode == case[3], "loader records the backend label")
-        check(#ctx.Logs == 4, "loader emits four startup identity lines")
+        check(#ctx.Logs == 5, "loader emits its startup identity lines plus the source host")
         check(ctx.Logs[1] and ctx.Logs[1]:match("^Iniciando loader v%d+%.%d+%.%d+$") ~= nil and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
         check(ctx.Logs[3] == "PlaceId: " .. case[1] and ctx.Logs[4] == "GameId: " .. case[2], "game identity logs preserved")
+        check(ctx.Logs[5] and ctx.Logs[5]:match("^Fonte: https://") ~= nil, "loader logs the resolved source host")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
         check(ctx.State.__DEPHUB.Updater.Started, "updater still starts using fresh code")
@@ -52,6 +53,46 @@ do
         check(ctx:Run("DepHub.lua") == true, "old UI session migrates without duplicate-success guard blocking it")
         check(removed.Loading and removed.Universal and removed.Updater and removed.Runtime and removed.Window, "migration destroys legacy handles despite missing game keys")
         check(ctx.State.__DEPHUB_UI_MODULES == nil and ctx.State.__DEPHUB_UI_LOADING == nil and ctx.State.__DEPHUB.Window == nil, "legacy frontend handles cleared")
+    end
+end
+
+do
+    -- Source-host resolution: the loader probes its candidate hosts and keeps the
+    -- first one that serves the current build, publishing that base so every
+    -- module fetches from the same live mirror instead of the stale raw branch
+    -- cache. The harness answers every host by path, so the primary (jsDelivr)
+    -- wins and is used for all module URLs.
+    local ctx = sandbox(1, 2)
+    ctx.Responses["src/version.txt"] = "0.0.3"
+    ctx:Provide("src/games/universal.lua", {})
+    check(ctx:Run("DepHub.lua") == true, "loader succeeds and resolves a source host")
+    check(ctx.State.__DEPHUB.SourceBaseURL == "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@main/",
+        "loader prefers the first candidate host for the current build")
+    check(ctx.State.__DEPHUB.BaseVersion == "0.0.3", "loader records the version the chosen host served")
+
+    -- Every module fetch goes through the resolved base, so no module URL (as
+    -- opposed to the host probes) still targets the stale raw branch host.
+    for _, url in ipairs(ctx.Requests) do
+        if not url:find("src/version.txt", 1, true) then
+            check(url:find("glowpkj/DepHub/main/", 1, true) == nil, "no module fetch uses the stale raw host: " .. url)
+        end
+    end
+end
+
+do
+    -- A current primary host stops the probe immediately: the preferred mirror is
+    -- used, and no other host (in particular the stale raw branch) is contacted
+    -- for the version.
+    local ctx = sandbox(1, 2)
+    local localVersion = ctx.Sources["DepHub.lua"]:match('local VERSION = "([^"]+)"')
+    ctx.Responses["src/version.txt"] = localVersion
+    ctx:Provide("src/games/universal.lua", {})
+    check(ctx:Run("DepHub.lua") == true, "loader runs with a current primary host")
+    check(ctx.State.__DEPHUB.SourceBaseURL == "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@main/",
+        "a current primary host is chosen without falling back")
+    for _, url in ipairs(ctx.Requests) do
+        check(url:find("raw.githubusercontent.com/glowpkj/DepHub", 1, true) == nil,
+            "a current primary host keeps the stale raw host out of every request: " .. url)
     end
 end
 
