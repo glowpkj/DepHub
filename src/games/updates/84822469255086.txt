@@ -1,3 +1,4 @@
+0.0.99 | Shared UI: Dashboard is now a true standalone navigation destination. Toggles can expose expandable, responsive settings panels directly beneath the option when enabled; panels collapse when disabled. Narrow layouts stack columns instead of squeezing controls.
 0.0.85 | Blox Fruits: raid pacing, player ESP range, fly speed, persisted waypoints, legendary poll interval, extras summon wait, plus panel descriptions, feature search and automation status.
 0.0.84 | Blox Fruits fruits: cap the fruit ESP distance, limit how far fruits are auto-collected, skip specific fruits on pickup, keep chosen fruits out of the auto-store, and set the chest cooldown.
 0.0.83 | Blox Fruits config: delete, rename and reset a saved config, plus reset every control to its default or just one module at a time. The test harness now has an in-memory filesystem and JSON codec, so Save/Load is actually covered.
