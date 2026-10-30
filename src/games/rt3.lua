@@ -242,7 +242,7 @@ local function dephubNotify(ui,title,message)
     if ui and type(ui.Notify)=="function" then ui:Notify(title,message) end
 end
 
-    local farm=dephubSection(UI,tabs,"Restaurant Farm","Farm","Left")
+    local farm=dephubSection(UI,tabs,"Farm","Farm","Left")
     if farm then
         farm:CreateToggle("Auto farm",runtime.Features.AutoFarm and runtime.Features.AutoFarm.Enabled==true,function(v)
             if runtime.Features.AutoFarm then runtime.Features.AutoFarm.Toggle(v) end
@@ -251,7 +251,7 @@ end
             if runtime.Features.AutoFarmFriends then runtime.Features.AutoFarmFriends.Toggle(v) end
         end)
     end
-    local kitchen=dephubSection(UI,tabs,"Kitchen","Cozinha","Left")
+    local kitchen=dephubSection(UI,tabs,"Cozinha","Cozinha","Left")
     if kitchen then
         kitchen:CreateToggle("Cozinhar instantaneamente",runtime.Features.InstantCook and runtime.Features.InstantCook.Enabled==true,function(v)
             if runtime.Features.InstantCook then runtime.Features.InstantCook.Toggle(v) end
@@ -260,7 +260,7 @@ end
             if runtime.Features.AutoDrop then runtime.Features.AutoDrop.Toggle(v) end
         end)
     end
-    local status=dephubSection(UI,tabs,"Status","Runtime","Left")
+    local status=dephubSection(UI,tabs,"Diagnóstico","Runtime","Left")
     if status then status:CreateParagraph("DepHub","Restaurant Tycoon 3 carregado. Os controles acionam as funções registradas no runtime.") end
 end
 return true
