@@ -39,7 +39,7 @@ do
         assertNoBloxTabs(ui.Library, "MM2")
         local names = tabNames(ui.Library)
         check(#names > 0, "MM2 registers its own tabs")
-        for _, expected in ipairs({"Roles", "Coin Farm", "Gun Drop", "Players"}) do
+        for _, expected in ipairs({"ESP", "Farm", "Itens", "Jogadores"}) do
             local found = false
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "MM2 registers its tab: " .. expected)
@@ -56,7 +56,7 @@ do
         assertNoSeaCategories(ui.Library, "AOTR")
         assertNoBloxTabs(ui.Library, "AOTR")
         local names = tabNames(ui.Library)
-        for _, expected in ipairs({"Titan ESP", "Assistência", "Movement", "Status"}) do
+        for _, expected in ipairs({"ESP", "Assistência", "Movimento", "Diagnóstico"}) do
             local found = false
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "AOTR registers its tab: " .. expected)
@@ -80,7 +80,7 @@ do
         assertNoSeaCategories(ui.Library, "NoobPiece")
         assertNoBloxTabs(ui.Library, "NoobPiece")
         local names = tabNames(ui.Library)
-        for _, expected in ipairs({"Farm", "ESP", "Travel", "Team"}) do
+        for _, expected in ipairs({"Farm", "ESP", "Teleporte", "Equipe"}) do
             local found = false
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "Noob Piece registers its tab: " .. expected)
@@ -98,7 +98,7 @@ do
         assertNoSeaCategories(ui.Library, "TSB")
         assertNoBloxTabs(ui.Library, "TSB")
         local names = tabNames(ui.Library)
-        for _, expected in ipairs({"Autoblock", "Ranges", "Detection", "Prediction", "Debug"}) do
+        for _, expected in ipairs({"Combate", "Alcance", "Detecção", "Previsão", "Diagnóstico"}) do
             local found = false
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "TSB registers its tab: " .. expected)
@@ -116,8 +116,11 @@ do
         assertNoBloxTabs(ui.Library, "Volleyball42")
         local names = tabNames(ui.Library)
         local found = false
-        for _, name in ipairs(names) do if name == "Ball Predict" then found = true end end
-        check(found, "Volleyball 4.2 registers its Ball Predict tab")
+        for _, expected in ipairs({"Previsão", "Posicionamento", "Pulo", "Colisão"}) do
+            found = false
+            for _, name in ipairs(names) do if name == expected then found = true end end
+            check(found, "Volleyball 4.2 registers its " .. expected .. " tab")
+        end
         check(#ui.Library._Controls > 0, "Volleyball 4.2 builds controls")
     end
 
@@ -133,7 +136,7 @@ do
         check(#names > 0, "Universal registers its own tabs")
         local found = {}
         for _, name in ipairs(names) do found[name] = true end
-        for _, expected in ipairs({"Movement", "Visuals", "Combate", "Social", "Servidor", "Status"}) do
+        for _, expected in ipairs({"Movimento", "ESP", "Combate", "Social", "Servidor", "Diagnóstico"}) do
             check(found[expected], "Universal registers its tab: " .. expected)
         end
     end
