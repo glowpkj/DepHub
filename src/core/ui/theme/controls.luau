@@ -117,6 +117,10 @@ function Library:AddToggle(page, text, default, callback)
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
     local state = default
+    local settingsPanel
+    local settingsContent
+    local settingsLayout
+    local refreshSettings
 
     local function updateVisual(animate)
         local tInfo = TweenInfo.new(0.2, Enum.EasingStyle.Quart, Enum.EasingDirection.Out)
@@ -148,6 +152,7 @@ function Library:AddToggle(page, text, default, callback)
         state = not state
         self:PlaySound(state and "ToggleOn" or "ToggleOff")
         updateVisual(true)
+        if refreshSettings then refreshSettings(true) end
         callback(state)
         self:_triggerAutoSave()
     end
@@ -187,6 +192,7 @@ function Library:AddToggle(page, text, default, callback)
             if state == v then return end
             state = v
             updateVisual(false)
+            if refreshSettings then refreshSettings(false) end
             if not silent then
                 callback(state)
                 self:_triggerAutoSave()
@@ -222,8 +228,118 @@ function Library:AddToggle(page, text, default, callback)
         if state == v then return end
         state = v
         updateVisual(false)
+        if refreshSettings then refreshSettings(false) end
         if not silent then callback(state); self:_triggerAutoSave() end
     end
+    _h.CreateSettings = function(_, title, description)
+        if settingsPanel then return _h.Settings end
+        settingsPanel = Instance.new("Frame")
+        settingsPanel.Name = "ToggleSettings"
+        settingsPanel.Position = UDim2.new(0, 8, 0, _rowH + 7)
+        settingsPanel.Size = UDim2.new(1, -16, 0, 42)
+        settingsPanel.BackgroundColor3 = self._Colors.Bg2
+        settingsPanel.BackgroundTransparency = 0.22
+        settingsPanel.BorderSizePixel = 0
+        settingsPanel.Visible = state
+        settingsPanel.Parent = holder
+        Instance.new("UICorner", settingsPanel).CornerRadius = UDim.new(0, 8)
+        local panelStroke = Instance.new("UIStroke", settingsPanel)
+        panelStroke.Color = self._Colors.Border
+        panelStroke.Transparency = 0.55
+        panelStroke.Thickness = 1
+
+        local panelTitle = Instance.new("TextLabel", settingsPanel)
+        panelTitle.Name = "SettingsTitle"
+        panelTitle.Position = UDim2.fromOffset(10, 7)
+        panelTitle.Size = UDim2.new(1, -20, 0, 15)
+        panelTitle.BackgroundTransparency = 1
+        panelTitle.Font = Enum.Font.GothamBold
+        panelTitle.TextSize = 10
+        panelTitle.TextColor3 = self._Colors.Accent
+        panelTitle.TextXAlignment = Enum.TextXAlignment.Left
+        panelTitle.Text = tostring(title or "CONFIGURAÇÕES"):upper()
+
+        if type(description) == "string" and description ~= "" then
+            panelTitle.Text = tostring(title or "CONFIGURAÇÕES"):upper() .. "  ·  " .. description
+        end
+
+        settingsContent = Instance.new("Frame", settingsPanel)
+        settingsContent.Name = "SettingsContent"
+        settingsContent.Position = UDim2.new(0, 10, 0, 29)
+        settingsContent.Size = UDim2.new(1, -20, 0, 0)
+        settingsContent.BackgroundTransparency = 1
+        settingsContent.AutomaticSize = Enum.AutomaticSize.Y
+
+        settingsLayout = Instance.new("UIListLayout", settingsContent)
+        settingsLayout.SortOrder = Enum.SortOrder.LayoutOrder
+        settingsLayout.Padding = UDim.new(0, 7)
+
+        local contentPadding = Instance.new("UIPadding", settingsContent)
+        contentPadding.PaddingBottom = UDim.new(0, 9)
+
+        local function resizePanel(animate)
+            if not settingsPanel or not settingsPanel.Parent then return end
+            local panelHeight = 29 + settingsLayout.AbsoluteContentSize.Y
+            local targetPanel = UDim2.new(1, -16, 0, math.max(42, panelHeight))
+            local targetHolder = UDim2.new(1, 0, 0, state and (_rowH + 7 + math.max(42, panelHeight) + 7) or _rowH)
+            if animate and not SharedReduced.value then
+                TweenService:Create(settingsPanel, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = targetPanel}):Play()
+                TweenService:Create(holder, TweenInfo.new(0.22, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {Size = targetHolder}):Play()
+            else
+                settingsPanel.Size = targetPanel
+                holder.Size = targetHolder
+            end
+        end
+
+        refreshSettings = function(animate)
+            if not settingsPanel then return end
+            settingsPanel.Visible = state
+            resizePanel(animate)
+        end
+
+        settingsLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+            if state then resizePanel(true) end
+        end)
+
+        self:_registerThemeRefresher(function()
+            if settingsPanel and settingsPanel.Parent then
+                settingsPanel.BackgroundColor3 = self._Colors.Bg2
+                panelStroke.Color = self._Colors.Border
+                panelTitle.TextColor3 = self._Colors.Accent
+            end
+        end)
+
+        local api = {Library = self, Page = settingsContent}
+        function api:CreateToggle(label, initial, callback)
+            return self.Library:AddToggle(self.Page, label, initial == true, callback)
+        end
+        function api:CreateSlider(label, minimum, maximum, initial, callback, decimals)
+            return self.Library:AddSlider(self.Page, label, tonumber(minimum) or 0, tonumber(maximum) or 100, tonumber(initial) or tonumber(minimum) or 0, tonumber(decimals) or 0, callback)
+        end
+        function api:CreateDropdown(label, options, initial, callback)
+            local list = {}
+            for _, option in ipairs(type(options) == "table" and options or {}) do list[#list + 1] = tostring(option) end
+            if #list == 0 then list = {"None"} end
+            local index = 1
+            for i, option in ipairs(list) do if option == tostring(initial) then index = i break end end
+            return self.Library:AddDropdown(self.Page, label, list, index, function(_, value)
+                if callback then callback(value) end
+            end)
+        end
+        function api:CreateButton(label, callback)
+            return self.Library:AddButton(self.Page, label, callback)
+        end
+        function api:CreateInput(label, placeholder, initial, callback)
+            return self.Library:AddTextbox(self.Page, label, tostring(placeholder or initial or ""), callback)
+        end
+        function api:CreateParagraph(titleText, bodyText)
+            return self.Library:AddParagraph(self.Page, tostring(titleText or ""), tostring(bodyText or ""))
+        end
+        _h.Settings = api
+        refreshSettings(false)
+        return api
+    end
+    _h.AddSettings = _h.CreateSettings
     _h.SetValue = _h.Set
     _h.GetValue = _h.Get
     local _defaultToggleState = default
