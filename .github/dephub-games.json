@@ -31,6 +31,19 @@
       "src/games/updates/114234929420007.txt"
     ]
   },
+  "107778070777162": {
+    "name": "Steal An Egg",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/demon-ui.lua",
+      "src/core/ui/demon-theme.luau",
+      "src/core/updater.lua",
+      "src/core/diagnostics.lua",
+      "src/games/steal-a-egg.lua",
+      "src/games/updates/107778070777162.txt"
+    ]
+  },
   "994732206": {
     "name": "Blox Fruits Sea 2",
     "files": [

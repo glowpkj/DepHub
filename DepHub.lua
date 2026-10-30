@@ -12,7 +12,7 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 local BASE_URL = "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/"
-local VERSION = "0.0.77"
+local VERSION = "0.0.78"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -358,7 +358,8 @@ local targets = {
     ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true},
     ["3840352284"] = {Core = "src/games/volleyball42.lua", Volleyball42 = true},
     ["1316421563"] = {Core = "src/games/volleyball42.lua", Volleyball42 = true},
-    ["114234929420007"] = {Core = "src/games/bloodstrike.lua", BloodStrike = true}
+    ["114234929420007"] = {Core = "src/games/bloodstrike.lua", BloodStrike = true},
+    ["107778070777162"] = {Core = "src/games/steal-a-egg.lua", StealAnEgg = true}
 }
 
 local gameName = tostring(game.Name or ""):lower()
@@ -503,6 +504,7 @@ local isAOTR = target.AOTR == true
 local isNoobPiece = target.NoobPiece == true
 local isVolleyball42 = target.Volleyball42 == true
 local isBloodStrike = target.BloodStrike == true
+local isStealAnEgg = target.StealAnEgg == true
 
 if isRT3 then
     if coreResult ~= true then
@@ -518,13 +520,14 @@ else
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isMM2 and not isAOTR and not isNoobPiece and not isVolleyball42 and not isBloodStrike and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isMM2 and not isAOTR and not isNoobPiece and not isVolleyball42 and not isBloodStrike and not isStealAnEgg and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
 env.__DEPHUB.MM2 = isMM2 and coreResult or nil
 env.__DEPHUB.AOTR = isAOTR and coreResult or nil
 env.__DEPHUB.NoobPiece = isNoobPiece and coreResult or nil
 env.__DEPHUB.Volleyball42 = isVolleyball42 and coreResult or nil
 env.__DEPHUB.BloodStrike = isBloodStrike and coreResult or nil
+env.__DEPHUB.StealAnEgg = isStealAnEgg and coreResult or nil
 
 local backend
 if target.Universal then backend = coreResult
@@ -535,6 +538,7 @@ elseif isAOTR then backend = coreResult
 elseif isNoobPiece then backend = coreResult
 elseif isVolleyball42 then backend = coreResult
 elseif isBloodStrike then backend = coreResult
+elseif isStealAnEgg then backend = coreResult
 else backend = coreResult end
 
 -- Informational only: the shell no longer changes per game, so this label
