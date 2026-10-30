@@ -44,9 +44,20 @@ vectorMeta.__eq = function(a, b) return a.X == b.X and a.Y == b.Y and a.Z == b.Z
 function vectorMeta:Lerp(goal, alpha)
     return Vector3.new(self.X + (goal.X - self.X) * alpha, self.Y + (goal.Y - self.Y) * alpha, self.Z + (goal.Z - self.Z) * alpha)
 end
+-- Real Vector3.Unit: Roblox exposes this as a property, so each vector carries
+-- its normalised form from construction (there is no live mutation here). The
+-- unit vector is built directly, without recursing into Vector3.new.
 function Vector3.new(x, y, z)
     if type(x) == "table" then y, z = x.Y, x.Z; x = x.X end
-    return setmetatable({X=x or 0, Y=y or 0, Z=z or 0, __vector=true, Magnitude=math.sqrt((x or 0)^2+(y or 0)^2+(z or 0)^2)}, vectorMeta)
+    x, y, z = x or 0, y or 0, z or 0
+    local magnitude = math.sqrt(x^2 + y^2 + z^2)
+    local vector = setmetatable({X=x, Y=y, Z=z, __vector=true, Magnitude=magnitude}, vectorMeta)
+    if magnitude == 0 then
+        vector.Unit = setmetatable({X=0, Y=0, Z=0, __vector=true, Magnitude=0}, vectorMeta)
+    else
+        vector.Unit = setmetatable({X=x/magnitude, Y=y/magnitude, Z=z/magnitude, __vector=true, Magnitude=1}, vectorMeta)
+    end
+    return vector
 end
 -- Vector3.zero is a value in Roblox, not a function: features read it as a value
 -- (hrp.AssemblyLinearVelocity = Vector3.zero). Matching the real API here keeps
@@ -72,6 +83,11 @@ function cframeMeta:Lerp(goal, alpha)
     local look
     if goal.LookAt then look = goal.LookAt end
     return setmetatable({Position = position, LookAt = look, __cframe = true}, cframeMeta)
+end
+-- The double carries no rotation, so object space is just world space rebased on
+-- the frame's position. Court-inside tests rely on this.
+function cframeMeta:PointToObjectSpace(point)
+    return point - self.Position
 end
 -- Enough for offset math (target.CFrame * CFrame.new(dx, dy, dz)): positions add.
 cframeMeta.__mul = function(a, b)

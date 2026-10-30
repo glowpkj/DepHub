@@ -37,10 +37,18 @@ local RED = Color3.fromRGB(255, 45, 45)
 local Config = {
     autoPosition = false,     -- teleport the character to the predicted landing
     instantMove = false,      -- true = snap CFrame every frame; false = smooth lerp
+    moveMode = "Walk",        -- "Teleport" | "Instantâneo" | "Walk"
     positionOffsetY = 3,      -- studs above the landing point to stand
     moveThreshold = 2,        -- only move when further than this from the target (studs)
     moveSmoothing = 0.35,     -- lerp factor per frame for the safe (non-instant) path
+    walkSpeed = 40,           -- studs/sec the Walk mode glides at
     lookAtBall = false,       -- point the camera at the ball every frame
+    turnToBall = false,       -- rotate the character to face the ball (yaw only)
+    courtOnly = true,         -- look/turn only act while the ball is in a court
+    hitboxEnabled = false,    -- auto position only moves when the ball enters the hitbox
+    hitboxSize = 12,          -- hitbox side length in studs
+    hitboxVisible = true,     -- draw the hitbox
+    ceilingNoClip = true,     -- remove collision from Ceiling parts
     jumpBoost = false,        -- enable the jump-power override
     jumpPower = 120,          -- JumpPower value used while jumpBoost is on
     jumpBypass = false,       -- force jumping on, overriding zones that lock it
@@ -55,13 +63,15 @@ local State = {
     Started = false,
     Mode = "Personal",
     Modes = {"Personal", "Match", "Future"},
-    Toggles = {BallPredict = true, AutoPosition = false, LookAtBall = false, JumpBoost = false, JumpBypass = false},
+    Toggles = {BallPredict = true, AutoPosition = false, LookAtBall = false, TurnToBall = false, JumpBoost = false, JumpBypass = false, CeilingNoClip = true},
     ToggleLabels = {
         BallPredict = "Ball Predict",
         AutoPosition = "Auto Position",
         LookAtBall = "Look at Ball",
+        TurnToBall = "Turn to Ball",
         JumpBoost = "Jump Boost",
         JumpBypass = "Jump Bypass",
+        CeilingNoClip = "Ceiling NoClip",
     },
     Config = Config,
     Connections = {},
@@ -82,6 +92,8 @@ local State = {
     BaseUseJumpPower = nil,
     BaseJumpHeight = nil,
     BaseJumpStates = nil,
+    BaseWalkSpeed = nil,
+    BaseCeilingCollide = nil,
     LastNotification = nil
 }
 
@@ -128,6 +140,24 @@ tracer.Color = ColorSequence.new(GREEN)
 tracer.Transparency = NumberSequence.new(0.05)
 tracer.Enabled = false
 tracer.Parent = folder
+
+-- Hitbox the Auto Position reacts to: while enabled, the character is only pulled
+-- when the ball's predicted path actually enters this box, so it chases landings
+-- that matter instead of every prediction. Drawn when hitboxVisible is on.
+local hitbox = Instance.new("Part")
+hitbox.Name = "PositionHitbox"
+hitbox.Shape = Enum.PartType.Block
+hitbox.Size = Vector3.new(Config.hitboxSize, Config.hitboxSize, Config.hitboxSize)
+hitbox.Anchored = true
+hitbox.CanCollide = false
+hitbox.CanTouch = false
+hitbox.CanQuery = false
+hitbox.CastShadow = false
+hitbox.Material = Enum.Material.ForceField
+hitbox.Color = Color3.fromRGB(0, 170, 255)
+hitbox.Transparency = 0.75
+hitbox.Visible = false
+hitbox.Parent = folder
 
 local function connect(list, signal, callback)
     local ok, connection = pcall(signal.Connect, signal, callback)
@@ -231,6 +261,25 @@ local function applyJumpBypass()
 
     if Config.autoJump and humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
         pcall(function() humanoid.Jump = true end)
+    end
+end
+
+-- Ceiling noclip: the "Ceiling" parts are what the ball bounces off, but they can
+-- also block the player. Turning this on clears CanCollide on each cached ceiling
+-- and re-asserts it as parts get added; the original collide flags are captured so
+-- switching it off puts them back.
+local function setCeilingNoClip(enabled)
+    for _, part in ipairs(State.Ceilings) do
+        if part.Parent then
+            if enabled then
+                if State.BaseCeilingCollide == nil then
+                    State.BaseCeilingCollide = part.CanCollide
+                end
+                pcall(function() part.CanCollide = false end)
+            elseif State.BaseCeilingCollide ~= nil then
+                pcall(function() part.CanCollide = State.BaseCeilingCollide end)
+            end
+        end
     end
 end
 
@@ -424,8 +473,11 @@ local function updateBallAttachment(part)
     end
 end
 
-local function updateMarkerColor(position)
-    local inside = false
+-- True when a world position sits inside one of the courts ("green" areas): the
+-- same test the marker colour already used, promoted so auto-look, the character
+-- turn and auto-position can all share the one definition of "where the ball
+-- counts".
+local function isInsideCourt(position)
     local halfX = marker.Size.X / 2
     local halfZ = marker.Size.Z / 2
     local offsets = {
@@ -458,12 +510,16 @@ local function updateMarkerColor(position)
             end
 
             if courtInside then
-                inside = true
-                break
+                return true, court
             end
         end
     end
 
+    return false, nil
+end
+
+local function updateMarkerColor(position)
+    local inside = isInsideCourt(position)
     local color = inside and GREEN or RED
     marker.Color = color
     tracer.Color = ColorSequence.new(color)
@@ -543,26 +599,46 @@ local function predictLanding(part, velocity)
     return nil
 end
 
--- Move the character toward the predicted landing point. Two paths:
---   instant = true  -> set CFrame directly every frame (fast, may rubber-band)
---   instant = false -> lerp the CFrame a fraction per frame and zero velocity,
---                      which is the smooth/safe path the game is less likely to
---                      fight. Never Anchor the character: anchoring makes the
---                      physics engine reject contacts and the ball stops hitting.
-local function moveToLanding(target)
+-- Horizontal (yaw-only) direction: keep the original Y so the camera never tilts
+-- up or down, only rotates left/right toward the ball.
+local function faceBallYaw(cframe, ballPosition)
+    local flatTarget = Vector3.new(ballPosition.X, cframe.Position.Y, ballPosition.Z)
+    if (flatTarget - cframe.Position).Magnitude < 0.01 then return cframe end
+    return CFrame.lookAt(cframe.Position, flatTarget)
+end
+
+-- Move the character toward the predicted landing point. Three modes:
+--   "Teleport"    -> snap straight to the target (fastest, most visible)
+--   "Instantâneo" -> same snap, kept for the original toggle naming
+--   "Walk"        -> glide at walkSpeed studs/sec, the least obvious path
+-- Always zeroes AssemblyLinearVelocity and never Anchors the character: anchoring
+-- makes the engine reject ball contacts.
+local function moveToLanding(target, dt)
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
     local goal = target + Vector3.new(0, Config.positionOffsetY, 0)
-    if (root.CFrame.Position - goal).Magnitude <= Config.moveThreshold then return end
+    local delta = goal - root.CFrame.Position
+    if delta.Magnitude <= Config.moveThreshold then return end
 
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
 
-    if Config.instantMove then
+    local mode = Config.moveMode
+    if mode == "Teleport" or mode == "Instantâneo" or Config.instantMove then
         pcall(function()
             root.CFrame = CFrame.new(goal)
+            root.AssemblyLinearVelocity = Vector3.zero
+        end)
+    elseif mode == "Walk" then
+        -- Glide at a capped speed so it reads like running, not a teleport.
+        local step = math.max(0, (tonumber(Config.walkSpeed) or 40) * (tonumber(dt) or 0.016))
+        local nextPosition = delta.Magnitude <= step
+            and goal
+            or root.CFrame.Position + delta.Unit * step
+        pcall(function()
+            root.CFrame = CFrame.new(nextPosition)
             root.AssemblyLinearVelocity = Vector3.zero
         end)
     else
@@ -575,15 +651,35 @@ local function moveToLanding(target)
     end
 end
 
--- Point the camera at the ball while keeping its current position. Only the
--- rotation is rewritten, so the player's zoom/view distance is preserved.
+-- Rotate the character to face the ball on the horizontal plane only.
+local function turnToBall(ballPosition)
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local target = faceBallYaw(root.CFrame, ballPosition)
+    pcall(function() root.CFrame = target end)
+end
+
+-- Point the camera at the ball while keeping its current position, and only on
+-- the yaw axis: the look target shares the camera's Y, so the view never tilts up
+-- or down toward the ball.
 local function lookAtBall(ballRoot)
     if not ballRoot then return end
     local camera = Workspace.CurrentCamera
     if not camera then return end
     pcall(function()
-        camera.CFrame = CFrame.lookAt(camera.CFrame.Position, ballRoot.Position)
+        camera.CFrame = faceBallYaw(camera.CFrame, ballRoot.Position)
     end)
+end
+
+local function positionHitbox(position)
+    if not Config.hitboxVisible then
+        hitbox.Visible = false
+        return
+    end
+    hitbox.Size = Vector3.new(Config.hitboxSize, Config.hitboxSize, Config.hitboxSize)
+    hitbox.Position = position + Vector3.new(0, Config.positionOffsetY, 0)
+    hitbox.Visible = true
 end
 
 local function disconnectTouches()
@@ -733,6 +829,19 @@ function State:SetToggle(name, value)
         return true
     end
 
+    if name == "TurnToBall" then
+        self.Toggles.TurnToBall = value == true
+        Config.turnToBall = self.Toggles.TurnToBall
+        return true
+    end
+
+    if name == "CeilingNoClip" then
+        self.Toggles.CeilingNoClip = value == true
+        Config.ceilingNoClip = self.Toggles.CeilingNoClip
+        if not self.Toggles.CeilingNoClip then setCeilingNoClip(false) end
+        return true
+    end
+
     if name == "JumpBoost" then
         self.Toggles.JumpBoost = value == true
         Config.jumpBoost = self.Toggles.JumpBoost
@@ -798,6 +907,9 @@ function State:Start()
         -- Jump bypass re-asserts the jump values/states every frame so a no-jump
         -- zone never gets a foothold.
         if Config.jumpBypass then applyJumpBypass() end
+        -- Ceiling parts stay non-colliding for the player while this is on; a
+        -- re-assert each frame covers ceilings that stream in later.
+        if Config.ceilingNoClip then setCeilingNoClip(true) end
 
         if not self.Toggles.BallPredict or self.Mode == "Future" then
             marker.Transparency = 1
@@ -850,7 +962,21 @@ function State:Start()
 
         -- Look-at-ball is a per-frame camera follow: it does not depend on a
         -- fresh prediction, so the camera keeps tracking while the ball moves.
-        if Config.lookAtBall then lookAtBall(root) end
+        -- Both the camera follow and the character turn are yaw-only and, when
+        -- courtOnly is on, only act while the ball is inside a court (the green
+        -- area where the ball counts). Off a court nothing is touched.
+        local ballInsideCourt, _ = isInsideCourt(root.Position)
+        local actionAllowed = not Config.courtOnly or ballInsideCourt
+        if actionAllowed and Config.lookAtBall then lookAtBall(root) end
+        if actionAllowed and Config.turnToBall then turnToBall(root.Position) end
+
+        -- The hitbox follows the character every frame so it always shows the
+        -- current catch zone, whether or not there is a fresh prediction.
+        local character = LocalPlayer.Character
+        local myRoot = character and character:FindFirstChild("HumanoidRootPart")
+        if Config.hitboxEnabled then
+            positionHitbox(myRoot and myRoot.CFrame.Position or hitbox.Position)
+        end
 
         local velocity = estimateVelocity(root.Position, os.clock())
         if not velocity then
@@ -879,8 +1005,24 @@ function State:Start()
             updateMarkerColor(predicted)
             updateTracerVisibility()
 
-            -- Auto Position walks the character to the predicted landing spot.
-            if Config.autoPosition then moveToLanding(predicted) end
+            -- Auto Position only chases a landing that is on a court (the green
+            -- area). The hitbox is the character's catch zone: the move only
+            -- happens when the predicted landing falls outside that zone, so once
+            -- the character is covering the spot it stops instead of jittering.
+            local predictedInCourt = isInsideCourt(predicted)
+            if Config.autoPosition and predictedInCourt then
+                -- With the hitbox off, always move to the landing. With it on,
+                -- move only when the landing falls outside the catch zone.
+                local shouldMove = true
+                if Config.hitboxEnabled then
+                    local half = Config.hitboxSize / 2
+                    local current = hitbox.Position
+                    local withinHitbox = math.abs(predicted.X - current.X) <= half
+                        and math.abs(predicted.Z - current.Z) <= half
+                    shouldMove = not withinHitbox
+                end
+                if shouldMove then moveToLanding(predicted, dt) end
+            end
         else
             self.InvalidPredictionElapsed += PREDICTION_INTERVAL
             if self.InvalidPredictionElapsed >= 0.25 then
@@ -912,6 +1054,8 @@ function State:Destroy()
     disconnectTouches()
     resetBall()
     restoreJump()
+    setCeilingNoClip(false)
+    hitbox.Visible = false
 
     if folder.Parent then
         folder:Destroy()
@@ -962,17 +1106,42 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
         predict:CreateParagraph("Como funciona", "Personal prevê a bola do próprio jogador; Match cobre as equipes; Future ainda não está configurado.")
     end
 
-    -- Assistance: walk the character to the predicted landing and keep the
-    -- camera on the ball. "Instantâneo" trades safety for snapping.
+    -- Assistance: move the character to the predicted landing, aim the camera and
+    -- turn the character toward the ball -- all of it only on the yaw axis and,
+    -- by default, only while the ball is on a court.
     local assist = section("Ball Predict", "Assistência", "Right")
     if assist then
         assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
-        assist:CreateToggle("Instantâneo", Config.instantMove, function(v) Config.instantMove = v == true end)
+        assist:CreateDropdown("Modo de movimento", {"Teleport", "Instantâneo", "Walk"}, Config.moveMode, function(v)
+            Config.moveMode = tostring(v)
+        end)
+        assist:CreateSlider("Walk speed", 5, 200, Config.walkSpeed, function(v) Config.walkSpeed = tonumber(v) or 40 end)
         assist:CreateSlider("Offset acima do chão", 0, 20, Config.positionOffsetY, function(v) Config.positionOffsetY = tonumber(v) or 0 end)
         assist:CreateSlider("Distância mínima", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
-        assist:CreateSlider("Suavidade do movimento", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
         assist:CreateToggle("Olhar pra bola", State.Toggles.LookAtBall, function(v) State:SetToggle("LookAtBall", v) end)
-        assist:CreateParagraph("Assistência", "Auto Position leva o personagem ao ponto de queda. Instantâneo teleporta direto; desligado usa movimento suave (mais seguro).")
+        assist:CreateToggle("Virar o personagem", State.Toggles.TurnToBall, function(v) State:SetToggle("TurnToBall", v) end)
+        assist:CreateToggle("Só nas áreas verdes", Config.courtOnly, function(v) Config.courtOnly = v == true end)
+        assist:CreateParagraph("Assistência", "Auto Position leva o personagem ao ponto de queda no modo escolhido: Teleport/Instantâneo dão snap, Walk desliza na velocidade definida (mais discreto). Olhar e Virar agem só no eixo horizontal (sem inclinar pra cima) e só nas áreas verdes onde a bola conta.")
+    end
+
+    -- Hitbox: the catch zone around the character. While on, Auto Position only
+    -- moves when the landing falls outside it, so the character settles once it is
+    -- covering the spot. The box is drawn so you can see it.
+    local hitboxSection = section("Ball Predict", "Hitbox", "Right")
+    if hitboxSection then
+        hitboxSection:CreateToggle("Usar hitbox", Config.hitboxEnabled, function(v)
+            Config.hitboxEnabled = v == true
+            if not Config.hitboxEnabled then hitbox.Visible = false end
+        end)
+        hitboxSection:CreateToggle("Hitbox visível", Config.hitboxVisible, function(v)
+            Config.hitboxVisible = v == true
+            if not Config.hitboxVisible then hitbox.Visible = false end
+        end)
+        hitboxSection:CreateSlider("Tamanho da hitbox", 2, 40, Config.hitboxSize, function(v)
+            Config.hitboxSize = tonumber(v) or 12
+            hitbox.Size = Vector3.new(Config.hitboxSize, Config.hitboxSize, Config.hitboxSize)
+        end)
+        hitboxSection:CreateParagraph("Hitbox", "A caixa em volta do personagem onde a bola é pega. Com a hitbox ligada, o Auto Position só se move se o ponto de queda cair fora dela.")
     end
 
     -- Movement: a jump-power override with a real, restorable base value.
@@ -1001,6 +1170,14 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
             Config.autoJump = v == true
         end)
         bypass:CreateParagraph("Jump Bypass", "Reaplica JumpPower, JumpHeight e o estado de pulo todo frame, então zonas que bloqueiam pular deixam de valer. Auto Jump pula sozinho enquanto ligado. Ao desligar, restaura o que o jogo tinha.")
+    end
+
+    -- Ceiling parts are what the ball bounces off; clearing their collision
+    -- removes them as an obstacle for the player. On by default.
+    local nocli = section("Ball Predict", "Colisão", "Right")
+    if nocli then
+        nocli:CreateToggle("Ceiling sem colisão", State.Toggles.CeilingNoClip, function(v) State:SetToggle("CeilingNoClip", v) end)
+        nocli:CreateParagraph("Ceiling", "Tira a colisão das parts Ceiling para você (padrão ligado). A bola continua batendo nelas. Ao desligar, a colisão volta ao original.")
     end
 end
 
@@ -1045,6 +1222,11 @@ do
         Diag:Feature("Volleyball.LookAtBall",function() return State.Toggles.LookAtBall and "ON" or "off" end)
         Diag:Feature("Volleyball.JumpBoost",function() return State.Toggles.JumpBoost and ("ON "..tostring(Config.jumpPower)) or "off" end)
         Diag:Feature("Volleyball.JumpBypass",function() return State.Toggles.JumpBypass and ("ON "..tostring(Config.bypassJumpPower)) or "off" end)
+        Diag:Feature("Volleyball.TurnToBall",function() return State.Toggles.TurnToBall and "ON" or "off" end)
+        Diag:Feature("Volleyball.MoveMode",function() return tostring(Config.moveMode) end)
+        Diag:Feature("Volleyball.Hitbox",function() return Config.hitboxEnabled and ("ON "..tostring(Config.hitboxSize)) or "off" end)
+        Diag:Feature("Volleyball.CourtOnly",function() return Config.courtOnly and "ON" or "off" end)
+        Diag:Feature("Volleyball.CeilingNoClip",function() return State.Toggles.CeilingNoClip and "ON" or "off" end)
         Diag:Feature("Volleyball.PodePular",function()
             local ch=LocalPlayer.Character
             local h=ch and ch:FindFirstChildOfClass("Humanoid")
@@ -1082,7 +1264,14 @@ do
                 local on=argument~="off"
                 State:SetToggle("AutoPosition",on)
                 State:SetToggle("LookAtBall",on)
-                return "AutoPosition="..tostring(on).." LookAtBall="..tostring(on)
+                State:SetToggle("TurnToBall",on)
+                return "AutoPosition="..tostring(on).." LookAtBall="..tostring(on).." TurnToBall="..tostring(on)
+            end)
+            Diag:Command("vb-move",function(argument)
+                if argument and (argument=="Walk" or argument=="Teleport" or argument=="Instantâneo") then
+                    Config.moveMode=argument
+                end
+                return "MoveMode="..tostring(Config.moveMode)
             end)
             Diag:Command("vb-jump",function(argument)
                 if argument and argument~="" then
