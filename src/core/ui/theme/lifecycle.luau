@@ -403,16 +403,7 @@ function Library:Minimize()
     
     self:PlaySound("ToggleOff")
     
-    self._overGui = false
-    if self._savedMouseIconEnabled ~= nil then
-        UserInputService.MouseIconEnabled = self._savedMouseIconEnabled
-    else
-        UserInputService.MouseIconEnabled = true
-    end
-    if UI.CustomCursor then UI.CustomCursor.Visible = false end
-    if self._savedMouseBehavior then
-        UserInputService.MouseBehavior = self._savedMouseBehavior
-    end
+    self:_restoreMouse()
     
     -- OPTIMIZED: Removed the 40-particle burst and consolidated the
     -- 6 separate tween calls. This slides the window up smoothly with
@@ -552,17 +543,7 @@ function Library:Toggle()
             if _entry and _entry.close then pcall(_entry.close) end
         end
         STATE.GuiVisible = false
-        self._overGui = false
-        -- Hand the OS cursor back the way the game had it, not always "visible".
-        if self._savedMouseIconEnabled ~= nil then
-            UserInputService.MouseIconEnabled = self._savedMouseIconEnabled
-        else
-            UserInputService.MouseIconEnabled = true
-        end
-        if UI.CustomCursor then UI.CustomCursor.Visible = false end
-        if self._savedMouseBehavior then
-            UserInputService.MouseBehavior = self._savedMouseBehavior
-        end
+        self:_restoreMouse()
         
         STATE.SavedPos = UI.MainContainer.Position
         local targetPos = UDim2.new(STATE.SavedPos.X.Scale, STATE.SavedPos.X.Offset, STATE.SavedPos.Y.Scale, STATE.SavedPos.Y.Offset + 30)
@@ -594,11 +575,11 @@ function Library:Toggle()
     else
         -- OPEN ANIMATION (Smooth Slide Up + Fade In)
         self:PlaySound("ToggleOn")
-        -- Capture the current game mouse behavior right before we start
-        -- forcing Default. Doing this at open time (not at construction)
-        -- keeps the value fresh if the game locked the mouse mid-session
-        -- (combat, aiming, cutscene, etc). Close path restores this value.
-        self._savedMouseBehavior = UserInputService.MouseBehavior
+        -- Capture the game's current mouse state (cursor visibility AND behavior)
+        -- right before we start forcing ours. Doing this at open time, not at
+        -- construction, keeps the restore target fresh if the game hid the cursor
+        -- or locked the mouse mid-session (combat, aiming, cutscene, etc).
+        self:_captureMouse()
         if not self._isMobile and UI.CustomCursor then 
             UI.CustomCursor.Visible = true 
         end
@@ -812,15 +793,7 @@ function Library:Destroy()
         if self._initialized then self:SaveThemeConfig("settings", true) end
     end)
 
-    self._overGui = false
-    if self._savedMouseIconEnabled ~= nil then
-        UserInputService.MouseIconEnabled = self._savedMouseIconEnabled
-    else
-        UserInputService.MouseIconEnabled = true
-    end
-    if self._savedMouseBehavior then
-        UserInputService.MouseBehavior = self._savedMouseBehavior
-    end
+    self:_restoreMouse()
 
     STATE.WeatherEnabled = false
     if STATE.GuiTween then

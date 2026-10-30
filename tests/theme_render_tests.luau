@@ -552,6 +552,38 @@ do
     -- the tab really exists where the dashboard builders look for it.
     check(library._STATE.TabTopContainers ~= nil and library._STATE.TabTopContainers["Dashboard"] ~= nil, "Dashboard tab has a top container")
 
+    -- Mouse hand-back: the game's cursor state is captured afresh on open, and the
+    -- close paths restore exactly that. The old code captured MouseIconEnabled once
+    -- at construction (and never at open), so a second cycle could restore a stale
+    -- value and leave the OS cursor hidden -- the "mouse travado" bug. Simulate a
+    -- game that hides its cursor while playing, open the panel, then close it and
+    -- confirm the game's hidden cursor comes back untouched.
+    -- The window starts open, so close it first to reach the closed state.
+    if library._STATE.GuiVisible then library:Toggle() end
+    library._STATE.AnimatingGui = false
+    check(library._STATE.GuiVisible == false, "the window starts open and closes on first toggle")
+
+    userInput.MouseIconEnabled = false
+    userInput.MouseBehavior = ThemeEnum.MouseBehavior.LockCenter
+    library:Toggle() -- open: must capture the game's hidden/locked state now
+    check(library._savedMouseIconEnabled == false, "opening captures the game's live cursor visibility")
+    check(library._savedMouseBehavior == ThemeEnum.MouseBehavior.LockCenter, "opening captures the game's live mouse behaviour")
+    runService.RenderStepped:Fire(0.016)
+    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default, "an open panel unlocks the mouse")
+    library._STATE.AnimatingGui = false
+    library:Toggle() -- close: must hand the game's hidden/locked state straight back
+    check(userInput.MouseIconEnabled == false, "closing restores the game's cursor visibility")
+    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.LockCenter, "closing restores the game's mouse behaviour")
+    library._STATE.AnimatingGui = false
+
+    -- While the panel is closed nothing may touch the mouse, so hovering the
+    -- restore pill can no longer hide the OS cursor out from under the game.
+    userInput.MouseIconEnabled = true
+    userInput.MouseBehavior = ThemeEnum.MouseBehavior.Default
+    runService.RenderStepped:Fire(0.016)
+    check(userInput.MouseIconEnabled == true, "a closed panel leaves the cursor visible")
+    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default, "a closed panel leaves the mouse behaviour alone")
+
     check(pcall(function() library:SetTheme("Monochrome") end), "SetTheme succeeds")
     check(pcall(function() library:Notify("T", "M") end), "Notify succeeds")
     check(pcall(function() library:Destroy() end), "Destroy succeeds")

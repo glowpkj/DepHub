@@ -78,11 +78,37 @@ function Library:_initMainGui()
     UI.CustomCursor.ZIndex = 100000
     UI.CustomCursor.Visible = false
 
-    -- Remember the game's own cursor/camera state so closing the UI can hand it
-    -- back instead of permanently unlocking the mouse.
+    -- The game's cursor state is captured afresh every time the panel opens (see
+    -- Library:_captureMouse) so closing always hands back what the game had at
+    -- that moment. Capturing once here was the bug: games toggle MouseIconEnabled
+    -- during play, so a second open/close restored a stale value and could leave
+    -- the OS cursor hidden. _overGui tracks whether the pointer is over our UI.
     self._savedMouseIconEnabled = UserInputService.MouseIconEnabled
     self._savedMouseBehavior = UserInputService.MouseBehavior
     self._overGui = false
+
+    -- Capture the game's mouse state right before forcing ours. Called on every
+    -- open so the restore target is always current.
+    function Library:_captureMouse()
+        self._savedMouseIconEnabled = UserInputService.MouseIconEnabled
+        self._savedMouseBehavior = UserInputService.MouseBehavior
+    end
+
+    -- Hand the mouse back exactly as the game had it and stop showing our custom
+    -- cursor. The single restore path for Toggle close, Minimize and Destroy, so
+    -- the three can never drift apart again.
+    function Library:_restoreMouse()
+        self._overGui = false
+        if self._UI and self._UI.CustomCursor then self._UI.CustomCursor.Visible = false end
+        if self._savedMouseIconEnabled ~= nil then
+            UserInputService.MouseIconEnabled = self._savedMouseIconEnabled
+        else
+            UserInputService.MouseIconEnabled = true
+        end
+        if self._savedMouseBehavior then
+            UserInputService.MouseBehavior = self._savedMouseBehavior
+        end
+    end
 
     local function pointIn(frame, mx, my)
         if not frame or not frame.Parent or not frame.Visible then return false end
@@ -107,6 +133,9 @@ function Library:_initMainGui()
         local mouse = UserInputService:GetMouseLocation()
         local overGui = false
 
+        -- Only the open panel owns the mouse. While it is minimized/closed nothing
+        -- here touches MouseIconEnabled or MouseBehavior, so hovering the restore
+        -- pill can no longer hide the OS cursor and leave the game without one.
         if self._STATE.GuiVisible then
             overGui = pointIn(UI.MainContainer, mouse.X, mouse.Y)
             if not overGui then
@@ -120,8 +149,6 @@ function Library:_initMainGui()
                     end
                 end
             end
-        else
-            overGui = pointIn(UI.MinimizeButton, mouse.X, mouse.Y)
         end
 
         -- Transition-only writes: this used to touch UserInputService, the cursor
@@ -134,29 +161,21 @@ function Library:_initMainGui()
             if UserInputService.MouseIconEnabled ~= (not overGui) then
                 UserInputService.MouseIconEnabled = not overGui
             end
-            -- NOTE: MouseBehaviour is intentionally NOT set here anymore. The old
-            -- code restored _savedMouseBehavior whenever the pointer left the
-            -- panel's bounds. If the game had LockCenter / LockCurrentPosition
-            -- cached at construction time, the mouse would snap back to the
-            -- center of the screen as soon as the cursor moved outside the panel,
-            -- producing the "barely can move" feel. MouseBehaviour is now managed
-            -- below (always Default while GUI is open) and restored only when the
-            -- GUI closes (Toggle close path / Minimize / Destroy).
         end
 
         -- FIX: while the GUI is visible, keep the mouse unlocked no matter where
         -- the pointer is. This is the entire point of a free-mouse GUI overlay.
+        -- Only runs while visible: once closed the game owns MouseBehavior again.
         if self._STATE.GuiVisible then
             if UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
                 UserInputService.MouseBehavior = Enum.MouseBehavior.Default
             end
-        end
-
-        -- MOUSE FIX: force Default while GUI is visible, regardless of where
-        -- the pointer is. Without this, the game snaps the cursor back to
-        -- center the moment the pointer leaves the panel bounds.
-        if self._STATE.GuiVisible and UserInputService.MouseBehavior ~= Enum.MouseBehavior.Default then
-            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        else
+            -- Closed: if a stale _overGui ever hid our custom cursor, drop it now.
+            if UI.CustomCursor and UI.CustomCursor.Visible then
+                UI.CustomCursor.Visible = false
+            end
+            self._overGui = false
         end
 
         if overGui and UI.CustomCursor then
