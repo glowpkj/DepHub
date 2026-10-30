@@ -547,6 +547,9 @@ do
     local configurableToggle = library:AddToggle(section, "Configurable", false, function() end)
     local toggleSettings = configurableToggle:CreateSettings("CONFIGURAÇÕES")
     check(type(toggleSettings) == "table" and type(toggleSettings.CreateSlider) == "function", "toggle exposes expandable settings controls")
+    for _, method in ipairs({"CreateToggle", "CreateSlider", "CreateDropdown", "CreateButton", "CreateInput", "CreateParagraph", "CreateKeybind", "CreateMultiDropdown", "CreateColorPicker", "CreateLabel", "CreateSeparator", "CreateChipBar"}) do
+        check(type(toggleSettings[method]) == "function", "toggle settings expose " .. method)
+    end
     check(pcall(function() library:CreateDashboardBanner("Dashboard") end), "CreateDashboardBanner builds the dashboard banner")
     check(pcall(function() library:CreatePerformanceDashboard("Dashboard", "Right") end), "CreatePerformanceDashboard builds the dashboard metrics")
     -- The banner reads _STATE.TabTopContainers[tabName], so its presence proves
