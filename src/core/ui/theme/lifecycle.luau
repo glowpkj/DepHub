@@ -575,10 +575,9 @@ function Library:Toggle()
     else
         -- OPEN ANIMATION (Smooth Slide Up + Fade In)
         self:PlaySound("ToggleOn")
-        -- Capture the game's current mouse state (cursor visibility AND behavior)
-        -- right before we start forcing ours. Doing this at open time, not at
-        -- construction, keeps the restore target fresh if the game hid the cursor
-        -- or locked the mouse mid-session (combat, aiming, cutscene, etc).
+        -- Take the mouse for the open panel: free it and hide the OS cursor behind
+        -- the custom one. MouseBehavior is never snapshotted (the game's camera
+        -- owns it and re-asserts it once we stop).
         self:_captureMouse()
         if not self._isMobile and UI.CustomCursor then 
             UI.CustomCursor.Visible = true 

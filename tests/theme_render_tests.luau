@@ -552,37 +552,40 @@ do
     -- the tab really exists where the dashboard builders look for it.
     check(library._STATE.TabTopContainers ~= nil and library._STATE.TabTopContainers["Dashboard"] ~= nil, "Dashboard tab has a top container")
 
-    -- Mouse hand-back: the game's cursor state is captured afresh on open, and the
-    -- close paths restore exactly that. The old code captured MouseIconEnabled once
-    -- at construction (and never at open), so a second cycle could restore a stale
-    -- value and leave the OS cursor hidden -- the "mouse travado" bug. Simulate a
-    -- game that hides its cursor while playing, open the panel, then close it and
-    -- confirm the game's hidden cursor comes back untouched.
+    -- Mouse ownership is scoped to the panel being open. MouseBehavior belongs to
+    -- the game's camera controller and is never snapshotted/restored: doing that
+    -- re-locked the pointer to the centre on close whenever the game had been
+    -- holding LockCenter -- the "mouse travado" bug. Only MouseIconEnabled is ours
+    -- while open, and close always returns a visible cursor.
     -- The window starts open, so close it first to reach the closed state.
     if library._STATE.GuiVisible then library:Toggle() end
     library._STATE.AnimatingGui = false
     check(library._STATE.GuiVisible == false, "the window starts open and closes on first toggle")
 
+    -- Simulate a game that hides its cursor and locks it to the centre while play
+    -- is in progress (first person / aiming), then open the panel.
     userInput.MouseIconEnabled = false
     userInput.MouseBehavior = ThemeEnum.MouseBehavior.LockCenter
-    library:Toggle() -- open: must capture the game's hidden/locked state now
-    check(library._savedMouseIconEnabled == false, "opening captures the game's live cursor visibility")
-    check(library._savedMouseBehavior == ThemeEnum.MouseBehavior.LockCenter, "opening captures the game's live mouse behaviour")
+    library:Toggle() -- open: must free the mouse and take over cursor visibility
+    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default, "opening frees the mouse")
+    check(userInput.MouseIconEnabled == false, "opening hides the OS cursor behind the custom one")
     runService.RenderStepped:Fire(0.016)
-    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default, "an open panel unlocks the mouse")
+    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default, "an open panel keeps the mouse free")
+
     library._STATE.AnimatingGui = false
-    library:Toggle() -- close: must hand the game's hidden/locked state straight back
-    check(userInput.MouseIconEnabled == false, "closing restores the game's cursor visibility")
-    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.LockCenter, "closing restores the game's mouse behaviour")
-    library._STATE.AnimatingGui = false
+    library:Toggle() -- close: hand the mouse back to the game and show a cursor
+    check(userInput.MouseIconEnabled == true, "closing hands back a visible cursor")
+    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default,
+        "closing never re-locks the mouse to the game's old LockCenter")
 
     -- While the panel is closed nothing may touch the mouse, so hovering the
     -- restore pill can no longer hide the OS cursor out from under the game.
     userInput.MouseIconEnabled = true
-    userInput.MouseBehavior = ThemeEnum.MouseBehavior.Default
+    userInput.MouseBehavior = ThemeEnum.MouseBehavior.LockCenter -- the game re-locks it itself
     runService.RenderStepped:Fire(0.016)
     check(userInput.MouseIconEnabled == true, "a closed panel leaves the cursor visible")
-    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default, "a closed panel leaves the mouse behaviour alone")
+    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.LockCenter,
+        "a closed panel leaves the game's mouse behaviour alone")
 
     check(pcall(function() library:SetTheme("Monochrome") end), "SetTheme succeeds")
     check(pcall(function() library:Notify("T", "M") end), "Notify succeeds")
