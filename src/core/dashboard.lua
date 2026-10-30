@@ -28,6 +28,24 @@ local function safeCall(callback, fallback)
 end
 
 local function httpGet(url)
+    local requestFunctions = {}
+    if type(request) == "function" then requestFunctions[#requestFunctions + 1] = request end
+    if type(http_request) == "function" then requestFunctions[#requestFunctions + 1] = http_request end
+    if type(syn) == "table" and type(syn.request) == "function" then
+        requestFunctions[#requestFunctions + 1] = syn.request
+    end
+
+    for _, requestFunction in ipairs(requestFunctions) do
+        local ok, response = pcall(requestFunction, {Url = url, Method = "GET"})
+        if ok and type(response) == "table" then
+            local body = response.Body or response.body
+            local status = tonumber(response.StatusCode or response.status_code or 200) or 200
+            if status >= 200 and status < 400 and type(body) == "string" and #body > 0 then
+                return true, body
+            end
+        end
+    end
+
     local ok, result = pcall(function()
         return game:HttpGet(url)
     end)
@@ -121,19 +139,30 @@ function Dashboard.new(options)
     self.Data = {}
     self.OnUpdate = options.OnUpdate
     self.RecentUpdates = {}
+    self._refreshingUpdates = false
     return self
 end
 
 function Dashboard:RefreshUpdates(force)
+    if self.Destroyed or self._refreshingUpdates then return false end
     local now = os_clock()
     if not force and now - self.LastReleaseCheck < self.ManifestInterval then
-        return
+        return false
     end
 
-    local updates, version = getRecentUpdates(game.PlaceId)
-    self.RecentUpdates = updates
-    self.ScriptVersion = version
     self.LastReleaseCheck = now
+    self._refreshingUpdates = true
+    task.spawn(function()
+        local ok, updates, version = pcall(getRecentUpdates, game.PlaceId)
+        self._refreshingUpdates = false
+        if self.Destroyed then return end
+        if ok and type(updates) == "table" and #updates > 0 then
+            self.RecentUpdates = updates
+            self.ScriptVersion = version or self.ScriptVersion
+            if self.Started then self:Collect() end
+        end
+    end)
+    return true
 end
 
 function Dashboard:Collect()
@@ -184,8 +213,8 @@ function Dashboard:Start()
     end
 
     self.Started = true
-    self:RefreshUpdates(true)
     self:Collect()
+    self:RefreshUpdates(true)
 
     self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function(deltaTime)
         if deltaTime > 0 then

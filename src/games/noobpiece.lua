@@ -421,7 +421,7 @@ end
         visuals:CreateToggle("ESP de ilhas",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
         visuals:CreateToggle("ESP de NPCs",backend.Toggles.GachaESP,function(v) backend:SetGachaESP(v) end)
     end
-    local travel=dephubSection(UI,tabs,"Travel","Teleporte","Left")
+    local travel=dephubSection(UI,tabs,"Teleporte","Teleporte","Left")
     if travel then
         local islands=backend:GetIslandNames()
         if type(islands)=="table" and #islands>0 then
@@ -437,7 +437,7 @@ end
             dephubNotify(UI,"Noob Piece",ok and "Teleporte iniciado." or "Gacha não encontrado.")
         end)
     end
-    local team=dephubSection(UI,tabs,"Team","Equipe","Left")
+    local team=dephubSection(UI,tabs,"Equipe","Equipe","Left")
     if team then
         local teams=backend:GetTeams()
         if type(teams)=="table" and #teams>0 then

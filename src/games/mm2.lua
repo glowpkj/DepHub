@@ -170,7 +170,7 @@ if type(UI)=="table" and type(UI.CreateTab)=="function" then
         return tab:CreateSection(sectionName,column)
     end
 
-    local roles=createSection("Roles","Role ESP","Left")
+    local roles=createSection("ESP","Role ESP","Left")
     if roles then
         roles:CreateToggle("Mostrar Murder e Sheriff",false,function(value)
             State:SetRoleESP(value)
@@ -178,7 +178,7 @@ if type(UI)=="table" and type(UI.CreateTab)=="function" then
         roles:CreateParagraph("Identificação","Destaca o Murder em vermelho e o Sheriff em azul.")
     end
 
-    local coins=createSection("Coin Farm","Coletar moedas","Left")
+    local coins=createSection("Farm","Coletar moedas","Left")
     if coins then
         coins:CreateToggle("Coleta automática",false,function(value)
             State:SetAutoCoins(value)
@@ -191,7 +191,7 @@ if type(UI)=="table" and type(UI.CreateTab)=="function" then
         end)
     end
 
-    local gun=createSection("Gun Drop","Pistola caída","Left")
+    local gun=createSection("Itens","Pistola caída","Left")
     if gun then
         gun:CreateToggle("ESP da pistola",false,function(value)
             State:SetGunDropESP(value)
@@ -207,7 +207,7 @@ if type(UI)=="table" and type(UI.CreateTab)=="function" then
         end)
     end
 
-    local players=createSection("Players","Jogadores vivos","Left")
+    local players=createSection("Jogadores","Jogadores vivos","Left")
     if players then
         players:CreateButton("Teleportar para próximo jogador vivo",function()
             local ok,name=State:TeleportNextAlivePlayer()

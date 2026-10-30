@@ -603,7 +603,7 @@ do
             if type(UI.Notify) == "function" then UI:Notify(title, message) end
         end
 
-        local movement = section("Movement", "Movimento")
+        local movement = section("Movimento", "Movimento")
         if movement then
             movement:CreateToggle("WalkSpeed", State.Toggles.WalkSpeed, function(v)
                 State:SetWalkSpeedEnabled(v)
@@ -629,7 +629,7 @@ do
             end)
         end
 
-        local visuals = section("Visuals", "Visual")
+        local visuals = section("ESP", "Visual")
         if visuals then
             visuals:CreateToggle("ESP", State.Toggles.ESP, function(v) State:SetESP(v) end)
             visuals:CreateToggle("Nomes", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
@@ -692,7 +692,7 @@ do
             end)
         end
 
-        local status = section("Status", "Diagnóstico")
+        local status = section("Diagnóstico", "Diagnóstico")
         if status then
             status:CreateParagraph("Estado atual", State:GetStatus())
             status:CreateButton("Atualizar status", function()

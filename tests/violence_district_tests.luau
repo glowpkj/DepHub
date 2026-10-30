@@ -85,7 +85,10 @@ do
 
     -- A map with generators built from GeneratorPointN parts.
     local map = object("Folder", "Map", ctx.Services.Workspace)
-    local genModel = object("Model", "Generator1", map)
+    local mapRuntime = object("Folder", "Runtime", map)
+    local mapEntities = object("Folder", "Entities", mapRuntime)
+    local generatorsFolder = object("Folder", "Generators", mapEntities)
+    local genModel = object("Model", "Generator1", generatorsFolder)
     local genPoint = object("Part", "GeneratorPoint1", genModel); genPoint.Position = Vector3.new(10, 0, 0)
 
     local backend = ctx:Run("src/games/violence-district.lua")
@@ -101,8 +104,14 @@ do
     do
         local UI = ctx.State.__DEPHUB.UI
         local lib = UI and UI.Library
-        check(lib ~= nil and lib._STATE.ContentPages["Violence District"] ~= nil,
-            "Violence District creates its tab")
+        check(lib ~= nil and lib._STATE.ContentPages["ESP"] ~= nil,
+            "the player and world ESP have their own tab")
+        check(lib._STATE.ContentPages["Geradores"] ~= nil,
+            "generator automation has its own tab")
+        check(lib._STATE.ContentPages["Combate"] ~= nil,
+            "combat has its own tab")
+        check(lib._STATE.ContentPages["Violence District"] == nil,
+            "the game name is not used as a feature tab")
         local labels = {}
         for _, control in ipairs(lib and lib._Controls or {}) do
             if control.Label then labels[control.Label] = true end
@@ -111,8 +120,12 @@ do
             "the ESP toggle is mounted in the Violence District tab")
         check(labels[backend.ToggleLabels.AutoRepair] == true,
             "the auto-repair toggle is mounted in the Violence District tab")
+        check(labels[backend.ToggleLabels.GeneratorESP] == true,
+            "the generator ESP toggle is mounted in the ESP tab")
+        check(labels[backend.ToggleLabels.AutoRepair] == true,
+            "the auto-repair toggle is mounted in the generator tab")
         check(labels[backend.ToggleLabels.AutoParry] == true,
-            "the auto-parry toggle is mounted in the Violence District tab")
+            "the auto-parry toggle is mounted in the combat tab")
     end
     check(backend.Toggles.ESP == false, "ESP starts off")
     check(next(backend.ESPObjects) == nil, "ESP stays empty while disabled")
@@ -122,6 +135,17 @@ do
     check(backend.ESPObjects[killerChar] ~= nil, "ESP tags the killer")
     check(backend.ESPObjects[survivorChar] ~= nil, "ESP tags the survivor")
     check(backend.ESPObjects[localChar] == nil, "ESP never tags the local player")
+
+    check(next(backend.GeneratorESPObjects) == nil, "generator ESP stays off by default")
+    backend:SetGeneratorESP(true)
+    local generatorRecord = backend.GeneratorESPObjects[genModel]
+    check(generatorRecord ~= nil, "generator ESP discovers models inside a nested Generators folder")
+    check(generatorRecord and generatorRecord.Highlight.Adornee == genModel,
+        "generator ESP highlights the discovered machine rather than its repair point")
+    check(generatorRecord and generatorRecord.Label.Text:find("GERADOR", 1, true) ~= nil,
+        "generator ESP labels machines")
+    backend:SetGeneratorESP(false)
+    check(next(backend.GeneratorESPObjects) == nil, "disabling generator ESP cleans its highlights")
 
     local killerRecord = backend.ESPObjects[killerChar]
     check(killerRecord.Role == "Killer", "the killer record carries the killer role")
@@ -217,7 +241,8 @@ do
     -- Destroy clears everything and releases the runtime.
     backend:Destroy()
     backend:Destroy()
-    check(next(backend.ESPObjects) == nil, "destroy clears the ESP records")
+    check(next(backend.ESPObjects) == nil, "destroy clears the player ESP records")
+    check(next(backend.GeneratorESPObjects) == nil, "destroy clears the generator ESP records")
     check(backend.Destroyed == true and backend:SetToggle("ESP", true) == false, "destroyed backend rejects toggles")
     check(ctx.State.__DEPHUB.ViolenceDistrict == nil, "destroy releases the published runtime")
 end

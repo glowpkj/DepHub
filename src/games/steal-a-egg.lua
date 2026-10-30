@@ -269,7 +269,7 @@ do
     local UI = env.__DEPHUB and env.__DEPHUB.UI
     if type(UI) == "table" and type(UI.CreateTab) == "function" then
         -- Speed tab
-        local okSpeed, speedTab = pcall(function() return UI:CreateTab("Speed", "All") end)
+        local okSpeed, speedTab = pcall(function() return UI:CreateTab("Movimento", "All") end)
         if okSpeed and speedTab then
             local section = sectionFor(speedTab, "Movimento", "Left")
             if section then
@@ -279,7 +279,7 @@ do
         end
 
         -- Teleport tab
-        local okTp, tpTab = pcall(function() return UI:CreateTab("Teleport", "All") end)
+        local okTp, tpTab = pcall(function() return UI:CreateTab("Teleporte", "All") end)
         if okTp and tpTab then
             local fly = sectionFor(tpTab, "Voo", "Left")
             if fly then

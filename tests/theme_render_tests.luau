@@ -512,7 +512,7 @@ do
         Theme = "Monochrome",
         TabPosition = "Side",
         CategoryAlign = "Center",
-        ToggleKey = ThemeEnum.KeyCode.RightControl,
+        ToggleKey = ThemeEnum.KeyCode.N,
         Acrylic = true,
         AcrylicBlur = 18,
         Size = ThemeUDim2.fromOffset(900, 580),
@@ -540,12 +540,20 @@ do
     check(pcall(function() library:AddSlider(section, "Amount", 0, 100, 50, 0, function() end) end), "AddSlider builds a control")
     check(pcall(function() library:AddButton(section, "Run", function() end) end), "AddButton builds a control")
 
-    -- The fixed Dashboard tab the loader builds from every game. Against the
-    -- real theme this exercises CreateDashboardBanner (greeting/avatar + server
-    -- card) and CreatePerformanceDashboard (live metrics), which is exactly
-    -- what the loader calls -- so a break here is caught before release.
-    local dashboardTab = library:CreateTab("General", "Dashboard")
-    check(dashboardTab ~= nil and library._STATE.ContentPages["Dashboard"] ~= nil, "Dashboard tab registers a content page")
+    local dashboardTab = library:CreateStandaloneTab("Dashboard", "house")
+    check(dashboardTab ~= nil and library._STATE.ContentPages["Dashboard"] ~= nil, "Dashboard standalone destination registers a content page")
+    check(library._STATE.CategoryButtons.Dashboard.isStandalone == true, "Dashboard is not nested inside General")
+    check(library._STATE.TabCategories.Dashboard == "Dashboard", "Dashboard owns its top-level navigation category")
+    local configurableToggle = library:AddToggle(section, "Configurable", false, function() end)
+    local toggleSettings = configurableToggle:CreateSettings("CONFIGURAÇÕES")
+    check(type(toggleSettings) == "table" and type(toggleSettings.CreateSlider) == "function", "toggle exposes expandable settings controls")
+    for _, method in ipairs({"CreateToggle", "CreateSlider", "CreateDropdown", "CreateButton", "CreateInput", "CreateParagraph", "CreateKeybind", "CreateMultiDropdown", "CreateColorPicker", "CreateLabel", "CreateSeparator", "CreateChipBar"}) do
+        check(type(toggleSettings[method]) == "function", "toggle settings expose " .. method)
+    end
+    local invalidImport = library:ImportConfig("invalid")
+    check(invalidImport == false, "ImportConfig rejects non-table payloads")
+    local validImport, appliedImport, totalImport = library:ImportConfig({_controls = "invalid"}, true)
+    check(validImport == true and appliedImport == 0 and totalImport == 0, "ImportConfig safely ignores malformed control maps")
     check(pcall(function() library:CreateDashboardBanner("Dashboard") end), "CreateDashboardBanner builds the dashboard banner")
     check(pcall(function() library:CreatePerformanceDashboard("Dashboard", "Right") end), "CreatePerformanceDashboard builds the dashboard metrics")
     -- The banner reads _STATE.TabTopContainers[tabName], so its presence proves

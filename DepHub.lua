@@ -23,7 +23,7 @@ local HOST_TEMPLATES = {
     "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.0.98"
+local VERSION = "0.0.99"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -486,16 +486,20 @@ env.__DEPHUB.UI = window
 -- take the tab name, which the adapter returns on the tab record. Failures are
 -- non-fatal: a dashboard that cannot be built must never stop the hub loading.
 local function buildDashboardTab()
-    if type(window.CreateTab) ~= "function" or type(window.Library) ~= "table" then return false end
-    local ok, record = pcall(function() return window:CreateTab("Dashboard", "General") end)
-    if not ok or type(record) ~= "table" or type(record.Name) ~= "string" then
-        Diag:Note("Dashboard: CreateTab falhou: " .. tostring(record))
+    local lib = window.Library
+    if type(lib) ~= "table" or type(lib.CreateStandaloneTab) ~= "function" then
+        Diag:Note("Dashboard: CreateStandaloneTab indisponivel")
         return false
     end
-    local lib = window.Library
-    local okBanner, bannerErr = pcall(function() lib:CreateDashboardBanner(record.Name) end)
+    local ok, tab = pcall(function() return lib:CreateStandaloneTab("Dashboard", "house") end)
+    if not ok or not tab then
+        Diag:Note("Dashboard: aba independente falhou: " .. tostring(tab))
+        return false
+    end
+    pcall(function() lib:SetActiveCategory("Dashboard") end)
+    local okBanner, bannerErr = pcall(function() lib:CreateDashboardBanner("Dashboard") end)
     if not okBanner then Diag:Note("Dashboard: banner falhou: " .. tostring(bannerErr)) end
-    local okPerf, perfErr = pcall(function() lib:CreatePerformanceDashboard(record.Name, "Right") end)
+    local okPerf, perfErr = pcall(function() lib:CreatePerformanceDashboard("Dashboard", "Right") end)
     if not okPerf then Diag:Note("Dashboard: metricas falharam: " .. tostring(perfErr)) end
     return okBanner and okPerf
 end

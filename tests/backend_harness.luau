@@ -226,6 +226,18 @@ local function NewWindow()
         state.CategoryTabs[name] = state.CategoryTabs[name] or {}
         return {Name = name}
     end
+    function library:CreateStandaloneTab(name, icon)
+        if state.ContentPages[name] or state.CategoryButtons[name] then
+            error("[DoD UI] standalone tab already exists")
+        end
+        self:CreateCategory(name, icon)
+        state.CategoryButtons[name].isStandalone = true
+        state.StandaloneTabs = state.StandaloneTabs or {}
+        state.StandaloneTabs[name] = true
+        library.StandaloneTabs = library.StandaloneTabs or {}
+        library.StandaloneTabs[name] = true
+        return self:CreateTab(name, name)
+    end
     function library:CreateTab(category, name)
         -- Mirror the real library: a tab name is global, so a duplicate name is
         -- an error, and the category must exist first.
@@ -284,9 +296,7 @@ local function NewWindow()
     end
     function library:Notify(title, message) library.Notifications = library.Notifications or {}; library.Notifications[#library.Notifications + 1] = {title, message} end
     function library:SetActiveCategory(category, tab) state.ActiveCategory = category; state.ActiveTab = tab end
-    -- The loader builds a fixed Dashboard tab from every game: a banner
-    -- (greeting/avatar + server card) and the live performance metrics. The
-    -- stub records the calls so the loader test can assert the tab is built.
+    -- The loader creates a standalone Dashboard destination before loading a backend.
     function library:CreateDashboardBanner(tabName)
         library.Dashboard = library.Dashboard or {}
         library.Dashboard.Banner = tabName
@@ -332,6 +342,7 @@ local function sandbox(placeId, gameId)
     local services = {Players=players, RunService=run, UserInputService=input, TeleportService=teleport,
         TweenService=tween, VirtualInputManager=vim, VirtualUser=vuser,
         Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting={},
+        Stats={FindFirstChild=function() return nil end},
         ReplicatedStorage=Instance.new("ReplicatedStorage"), TextChatService=Instance.new("TextChatService"), HttpService={}}
     -- Minimal JSON codec for config round-trips: the config is flat scalars plus
     -- at most one level of nesting (keys, bounty), which is all this needs to

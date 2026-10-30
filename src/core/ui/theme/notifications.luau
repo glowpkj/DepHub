@@ -289,8 +289,7 @@ function Library:ExportConfig()
 end
 
 function Library:ImportConfig(config, silent)
-    if self:_isDead() then return end
-    if type(config) ~= "table" then return end
+    if self:_isDead() or type(config) ~= "table" then return false, 0, 0 end
     if config._theme and D.Themes[config._theme] then
         self:SetTheme(config._theme, true)
     end
@@ -307,7 +306,8 @@ function Library:ImportConfig(config, silent)
         self:_applySearchFilter()
     end
     local applied, total = 0, 0
-    for id, val in pairs(config._controls or {}) do
+    local controls = type(config._controls) == "table" and config._controls or {}
+    for id, val in pairs(controls) do
         total = total + 1
         local entry = self._STATE.ConfigRegistry and self._STATE.ConfigRegistry[id]
         if entry and entry.set then
@@ -319,8 +319,10 @@ function Library:ImportConfig(config, silent)
         end
     end
     if not silent then
-        self:Notify("CONFIG", "Imported " .. applied .. "/" .. total .. " settings", "success")
+        local complete = applied == total
+        self:Notify("CONFIG", "Imported " .. applied .. "/" .. total .. " settings", complete and "success" or "warning")
     end
+    return true, applied, total
 end
 
 function Library:GetConfigs(force)
@@ -445,8 +447,8 @@ function Library:LoadConfig(name, silent)
         if not silent then self:Notify("CONFIG", "Decode failed", "error") end
         return false
     end
-    self:ImportConfig(data, silent)
-    return true
+    local imported = self:ImportConfig(data, silent)
+    return imported == true
 end
 
 function Library:EnableAutoSave(name)
