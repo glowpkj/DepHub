@@ -290,10 +290,13 @@ end
 
 -- ---------------------------------------------------------------------------
 -- Presentation: the shared shell. Tabs and sections are the backend's job.
--- ---------------------------------------------------------------------------
-local function sectionFor(tab, name, column, summary)
+-- The shared shell adapter's tab:CreateSection(title, column) takes the title
+-- and the column ("Left"/"Right") only; the library rejects any other column.
+-- Passing a summary where the column belongs made the section error inside the
+-- pcall and the whole tab came up empty. Keep the two arguments it reads.
+local function sectionFor(tab, name, column)
     if not (tab and type(tab.CreateSection) == "function") then return nil end
-    local ok, section = pcall(function() return tab:CreateSection(name, summary, column) end)
+    local ok, section = pcall(function() return tab:CreateSection(name, column) end)
     if ok then return section end
     return nil
 end
@@ -303,13 +306,13 @@ do
     if type(UI) == "table" and type(UI.CreateTab) == "function" then
         local okTab, tab = pcall(function() return UI:CreateTab("ESP", "All") end)
         if okTab and tab then
-            local visual = sectionFor(tab, "Jogadores", "Left", "Contorno e informacao sobre os inimigos")
+            local visual = sectionFor(tab, "Jogadores", "Left")
             if visual then
                 visual:CreateToggle("ESP ativado", State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
                 visual:CreateToggle("Ignorar time aliado", State.Toggles.TeamCheck, function(v) State:SetToggle("TeamCheck", v) end)
                 visual:CreateToggle("Chams (contorno)", State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
             end
-            local info = sectionFor(tab, "Informacao", "Right", "O que aparece em cima de cada alvo")
+            local info = sectionFor(tab, "Informacao", "Right")
             if info then
                 info:CreateToggle("Mostrar nome", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
                 info:CreateToggle("Mostrar distancia", State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)

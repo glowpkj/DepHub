@@ -254,9 +254,13 @@ end
 -- ---------------------------------------------------------------------------
 -- Presentation: the shared shell. Tabs and sections are the backend's job.
 -- ---------------------------------------------------------------------------
-local function sectionFor(tab, name, column, summary)
+-- The shared shell adapter's tab:CreateSection(title, column) takes the title
+-- and the column ("Left"/"Right") only; the library rejects any other column.
+-- Passing a summary where the column belongs made the section error inside the
+-- pcall and the whole tab came up empty. Keep the two arguments it reads.
+local function sectionFor(tab, name, column)
     if not (tab and type(tab.CreateSection) == "function") then return nil end
-    local ok, section = pcall(function() return tab:CreateSection(name, summary, column) end)
+    local ok, section = pcall(function() return tab:CreateSection(name, column) end)
     if ok then return section end
     return nil
 end
@@ -267,7 +271,7 @@ do
         -- Speed tab
         local okSpeed, speedTab = pcall(function() return UI:CreateTab("Speed", "All") end)
         if okSpeed and speedTab then
-            local section = sectionFor(speedTab, "Movimento", "Left", "Velocidade de caminhada")
+            local section = sectionFor(speedTab, "Movimento", "Left")
             if section then
                 section:CreateToggle("Speed boost", State.Toggles.Speed, function(v) State:SetToggle("Speed", v) end)
                 section:CreateSlider("Walk speed", 16, 300, State.Values.WalkSpeed, function(v) State:SetSpeed(v) end)
@@ -277,7 +281,7 @@ do
         -- Teleport tab
         local okTp, tpTab = pcall(function() return UI:CreateTab("Teleport", "All") end)
         if okTp and tpTab then
-            local fly = sectionFor(tpTab, "Voo", "Left", "Teleporte suave (tween), sem ancorar o personagem")
+            local fly = sectionFor(tpTab, "Voo", "Left")
             if fly then
                 fly:CreateSlider("Velocidade do voo", 50, 1000, State.Values.FlySpeed, function(v) State:SetFlySpeed(v) end)
                 fly:CreateButton("Notificar posicao atual", function()
@@ -293,7 +297,7 @@ do
                 end)
             end
 
-            local wp = sectionFor(tpTab, "Waypoints", "Right", "Pontos salvos neste jogo")
+            local wp = sectionFor(tpTab, "Waypoints", "Right")
             if wp then
                 for _, waypoint in ipairs(State.Waypoints) do
                     wp:CreateButton("Ir: " .. waypoint.name, function() State:Go(waypoint.pos) end)

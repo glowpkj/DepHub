@@ -248,8 +248,15 @@ local function NewWindow()
         return {Name = name, Button = button}
     end
     function library:CreateSection(tabName, title, _, _, column)
+        -- Mirror the real library's contract: the column must be "Left" or
+        -- "Right" (or nil -> "Left"). A backend that passes a summary/other
+        -- string where the column belongs would have its section silently
+        -- dropped in game; failing here keeps that bug from reaching the panel.
+        if column ~= nil and column ~= "Left" and column ~= "Right" then
+            error("[DoD UI] CreateSection column must be 'Left' or 'Right'.")
+        end
         if not state.ContentPages[tabName] then return nil end
-        return {TabName = tabName, Title = title, Column = column}
+        return {TabName = tabName, Title = title, Column = column or "Left"}
     end
     function library:AddToggle(_, label, default, callback)
         library._Controls[#library._Controls + 1] = {Kind = "toggle", Label = label, Callback = callback}

@@ -525,9 +525,15 @@ end
 -- ---------------------------------------------------------------------------
 -- Presentation: the shared shell. Tabs and sections are the backend's job.
 -- ---------------------------------------------------------------------------
-local function sectionFor(tab, name, column, summary)
+-- The shared shell's tab:CreateSection(title, column) adapter takes the title
+-- and the column ("Left"/"Right") only; the library rejects any other column
+-- value with an error. Passing a summary string as the second argument made the
+-- column invalid, the pcall swallowed the error, and the whole tab came up empty
+-- (which is exactly what happened here). Keep the call to the two arguments the
+-- adapter actually reads.
+local function sectionFor(tab, name, column)
     if not (tab and type(tab.CreateSection) == "function") then return nil end
-    local ok, section = pcall(function() return tab:CreateSection(name, summary, column) end)
+    local ok, section = pcall(function() return tab:CreateSection(name, column) end)
     if ok then return section end
     return nil
 end
@@ -537,7 +543,7 @@ do
     if type(UI) == "table" and type(UI.CreateTab) == "function" then
         local okTab, tab = pcall(function() return UI:CreateTab("Violence District", "All") end)
         if okTab and tab then
-            local esp = sectionFor(tab, "ESP", "Left", "Contorno e nome de Killer e Survivors")
+            local esp = sectionFor(tab, "ESP", "Left")
             if esp then
                 esp:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
                 esp:CreateToggle(State.ToggleLabels.ESPKiller, State.Toggles.ESPKiller, function(v) State:SetToggle("ESPKiller", v) end)
@@ -548,13 +554,13 @@ do
                 esp:CreateSlider("Distancia maxima", 50, 5000, State.Values.Range, function(v) State:SetValue("Range", v) end)
                 esp:CreateSlider("Tamanho do texto", 8, 30, State.Values.TextSize, function(v) State:SetValue("TextSize", v) end)
             end
-            local gen = sectionFor(tab, "Gerador", "Right", "Repara para voce e acerta o skill check")
+            local gen = sectionFor(tab, "Gerador", "Right")
             if gen then
                 gen:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
                 gen:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
                 gen:CreateSlider("Alcance do reparo", 4, 40, State.Values.RepairRange, function(v) State:SetValue("RepairRange", v) end)
             end
-            local combat = sectionFor(tab, "Combate", "Right", "Parry automatico (precisa ter a Parrying Dagger)")
+            local combat = sectionFor(tab, "Combate", "Right")
             if combat then
                 combat:CreateToggle(State.ToggleLabels.AutoParry, State.Toggles.AutoParry, function(v) State:SetToggle("AutoParry", v) end)
                 combat:CreateToggle(State.ToggleLabels.AutoEquip, State.Toggles.AutoEquip, function(v) State:SetToggle("AutoEquip", v) end)

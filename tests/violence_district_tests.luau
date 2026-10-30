@@ -92,6 +92,28 @@ do
     -- Resolve the deferred remote lookup and killer watch before driving events.
     ctx:FlushDeferred()
     check(type(backend) == "table" and backend.Destroyed == false, "Violence District entry returns a live backend")
+
+    -- The tab must actually mount its controls. A wrong CreateSection argument
+    -- (the shell adapter takes title + column and rejects any column other than
+    -- "Left"/"Right") made every section fail silently inside its pcall, leaving
+    -- the tab present but empty -- the exact in-game "aba vazia" symptom. Assert
+    -- the known controls really reached the shared library.
+    do
+        local UI = ctx.State.__DEPHUB.UI
+        local lib = UI and UI.Library
+        check(lib ~= nil and lib._STATE.ContentPages["Violence District"] ~= nil,
+            "Violence District creates its tab")
+        local labels = {}
+        for _, control in ipairs(lib and lib._Controls or {}) do
+            if control.Label then labels[control.Label] = true end
+        end
+        check(labels[backend.ToggleLabels.ESP] == true,
+            "the ESP toggle is mounted in the Violence District tab")
+        check(labels[backend.ToggleLabels.AutoRepair] == true,
+            "the auto-repair toggle is mounted in the Violence District tab")
+        check(labels[backend.ToggleLabels.AutoParry] == true,
+            "the auto-parry toggle is mounted in the Violence District tab")
+    end
     check(backend.Toggles.ESP == false, "ESP starts off")
     check(next(backend.ESPObjects) == nil, "ESP stays empty while disabled")
 
