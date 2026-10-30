@@ -146,24 +146,16 @@ do
     check(moved.X > -500 and moved.Z > -500, "auto position moves the character toward the landing point")
     check(moved.X < 0, "auto position eases part-way rather than snapping with no instant mode")
 
-    -- The move mode dropdown: "Teleport" snaps straight onto the landing point.
-    state.Config.moveMode = "Teleport"
+    -- Instant mode snaps straight onto the landing point instead of lerping.
+    state.Config.instantMove = true
     root.CFrame = CFrame.new(-500, 0, -500)
     ballPart.Position = Vector3.new(10, 40, 10); tick()
     ballPart.Position = Vector3.new(12, 40, 12); tick()
-    check(root.CFrame.Position.X == 0 and root.CFrame.Position.Z == 0, "Teleport mode snaps the character onto the landing point")
-
-    -- "Walk" mode glides a capped distance per tick instead of snapping.
-    state.Config.moveMode = "Walk"
-    state.Config.walkSpeed = 8
-    root.CFrame = CFrame.new(-500, 0, -500)
-    ballPart.Position = Vector3.new(14, 40, 14); tick()
-    ballPart.Position = Vector3.new(16, 40, 16); tick()
-    local walked = root.CFrame.Position
-    check(walked.X > -500 and walked.X < 0, "Walk mode glides part-way toward the landing point")
+    check(root.CFrame.Position.X == 0 and root.CFrame.Position.Z == 0, "instant mode snaps the character onto the landing point")
+    state.Config.instantMove = false
 
     -- A landing off the court (red) is not chased even with Auto Position on.
-    state.Config.moveMode = "Teleport"
+    state.Config.instantMove = true
     root.CFrame = CFrame.new(0, 0, 0)
     local held = root.CFrame.Position
     ballPart.Position = Vector3.new(0, 40, 60); tick()
@@ -180,7 +172,7 @@ do
     state.Config.hitboxEnabled, state.Config.hitboxVisible = false, false
 
     -- A far ball is ignored while the distance gate is set.
-    state.Config.moveMode = "Teleport"
+    state.Config.instantMove = true
     state.Config.maxPredictDistance = 5
     root.CFrame = CFrame.new(0, 0, 0)
     local before = root.CFrame.Position
@@ -209,7 +201,7 @@ do
     for _, control in ipairs(ui.Library._Controls) do
         if control.Label then labels[control.Label] = true end
     end
-    for _, expected in ipairs({"Auto Position", "Modo de movimento", "Walk speed", "Olhar pra bola", "Virar o personagem", "Só nas áreas verdes", "Usar hitbox", "Hitbox visível", "Tamanho da hitbox", "Jump Boost", "Jump Power", "Alcance da previsão", "Jump Bypass", "Jump Bypass Power", "Auto Jump", "Ceiling sem colisão"}) do
+    for _, expected in ipairs({"Auto Position", "Instantâneo", "Suavidade do movimento", "Olhar pra bola", "Virar o personagem", "Só nas áreas verdes", "Usar hitbox", "Hitbox visível", "Tamanho da hitbox", "Jump Boost", "Jump Power", "Alcance da previsão", "Jump Bypass", "Jump Bypass Power", "Auto Jump", "Ceiling sem colisão"}) do
         check(labels[expected] == true, "Volleyball registers its control: " .. expected)
     end
 end

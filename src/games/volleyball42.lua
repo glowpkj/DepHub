@@ -37,11 +37,9 @@ local RED = Color3.fromRGB(255, 45, 45)
 local Config = {
     autoPosition = false,     -- teleport the character to the predicted landing
     instantMove = false,      -- true = snap CFrame every frame; false = smooth lerp
-    moveMode = "Walk",        -- "Teleport" | "Instantâneo" | "Walk"
     positionOffsetY = 3,      -- studs above the landing point to stand
     moveThreshold = 2,        -- only move when further than this from the target (studs)
     moveSmoothing = 0.35,     -- lerp factor per frame for the safe (non-instant) path
-    walkSpeed = 40,           -- studs/sec the Walk mode glides at
     lookAtBall = false,       -- point the camera at the ball every frame
     turnToBall = false,       -- rotate the character to face the ball (yaw only)
     courtOnly = true,         -- look/turn only act while the ball is in a court
@@ -606,38 +604,25 @@ local function faceBallYaw(cframe, ballPosition)
     return CFrame.lookAt(cframe.Position, flatTarget)
 end
 
--- Move the character toward the predicted landing point. Three modes:
---   "Teleport"    -> snap straight to the target (fastest, most visible)
---   "Instantâneo" -> same snap, kept for the original toggle naming
---   "Walk"        -> glide at walkSpeed studs/sec, the least obvious path
--- Always zeroes AssemblyLinearVelocity and never Anchors the character: anchoring
--- makes the engine reject ball contacts.
-local function moveToLanding(target, dt)
+-- Move the character toward the predicted landing point. Two paths:
+--   instant = true  -> set CFrame directly every frame (fast, may rubber-band)
+--   instant = false -> lerp the CFrame a fraction per frame and zero velocity,
+--                      which is the smooth/safe path. Never Anchor the character:
+--                      anchoring makes the physics engine reject ball contacts.
+local function moveToLanding(target)
     local character = LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
     local goal = target + Vector3.new(0, Config.positionOffsetY, 0)
-    local delta = goal - root.CFrame.Position
-    if delta.Magnitude <= Config.moveThreshold then return end
+    if (root.CFrame.Position - goal).Magnitude <= Config.moveThreshold then return end
 
     local humanoid = character:FindFirstChildOfClass("Humanoid")
     if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
 
-    local mode = Config.moveMode
-    if mode == "Teleport" or mode == "Instantâneo" or Config.instantMove then
+    if Config.instantMove then
         pcall(function()
             root.CFrame = CFrame.new(goal)
-            root.AssemblyLinearVelocity = Vector3.zero
-        end)
-    elseif mode == "Walk" then
-        -- Glide at a capped speed so it reads like running, not a teleport.
-        local step = math.max(0, (tonumber(Config.walkSpeed) or 40) * (tonumber(dt) or 0.016))
-        local nextPosition = delta.Magnitude <= step
-            and goal
-            or root.CFrame.Position + delta.Unit * step
-        pcall(function()
-            root.CFrame = CFrame.new(nextPosition)
             root.AssemblyLinearVelocity = Vector3.zero
         end)
     else
@@ -1020,7 +1005,7 @@ function State:Start()
                         and math.abs(predicted.Z - current.Z) <= half
                     shouldMove = not withinHitbox
                 end
-                if shouldMove then moveToLanding(predicted, dt) end
+                if shouldMove then moveToLanding(predicted) end
             end
         else
             self.InvalidPredictionElapsed += PREDICTION_INTERVAL
@@ -1111,16 +1096,14 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
     local assist = section("Ball Predict", "Assistência", "Right")
     if assist then
         assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
-        assist:CreateDropdown("Modo de movimento", {"Teleport", "Instantâneo", "Walk"}, Config.moveMode, function(v)
-            Config.moveMode = tostring(v)
-        end)
-        assist:CreateSlider("Walk speed", 5, 200, Config.walkSpeed, function(v) Config.walkSpeed = tonumber(v) or 40 end)
+        assist:CreateToggle("Instantâneo", Config.instantMove, function(v) Config.instantMove = v == true end)
         assist:CreateSlider("Offset acima do chão", 0, 20, Config.positionOffsetY, function(v) Config.positionOffsetY = tonumber(v) or 0 end)
         assist:CreateSlider("Distância mínima", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
+        assist:CreateSlider("Suavidade do movimento", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
         assist:CreateToggle("Olhar pra bola", State.Toggles.LookAtBall, function(v) State:SetToggle("LookAtBall", v) end)
         assist:CreateToggle("Virar o personagem", State.Toggles.TurnToBall, function(v) State:SetToggle("TurnToBall", v) end)
         assist:CreateToggle("Só nas áreas verdes", Config.courtOnly, function(v) Config.courtOnly = v == true end)
-        assist:CreateParagraph("Assistência", "Auto Position leva o personagem ao ponto de queda no modo escolhido: Teleport/Instantâneo dão snap, Walk desliza na velocidade definida (mais discreto). Olhar e Virar agem só no eixo horizontal (sem inclinar pra cima) e só nas áreas verdes onde a bola conta.")
+        assist:CreateParagraph("Assistência", "Auto Position leva o personagem ao ponto de queda. Instantâneo teleporta direto; desligado usa movimento suave (mais seguro). Olhar e Virar agem só no eixo horizontal (sem inclinar pra cima) e só nas áreas verdes onde a bola conta.")
     end
 
     -- Hitbox: the catch zone around the character. While on, Auto Position only
@@ -1222,7 +1205,7 @@ do
         Diag:Feature("Volleyball.JumpBoost",function() return State.Toggles.JumpBoost and ("ON "..tostring(Config.jumpPower)) or "off" end)
         Diag:Feature("Volleyball.JumpBypass",function() return State.Toggles.JumpBypass and ("ON "..tostring(Config.bypassJumpPower)) or "off" end)
         Diag:Feature("Volleyball.TurnToBall",function() return State.Toggles.TurnToBall and "ON" or "off" end)
-        Diag:Feature("Volleyball.MoveMode",function() return tostring(Config.moveMode) end)
+        Diag:Feature("Volleyball.InstantMove",function() return Config.instantMove and "ON" or "off" end)
         Diag:Feature("Volleyball.Hitbox",function() return Config.hitboxEnabled and ("ON "..tostring(Config.hitboxSize)) or "off" end)
         Diag:Feature("Volleyball.CourtOnly",function() return Config.courtOnly and "ON" or "off" end)
         Diag:Feature("Volleyball.CeilingNoClip",function() return State.Toggles.CeilingNoClip and "ON" or "off" end)
@@ -1266,11 +1249,9 @@ do
                 State:SetToggle("TurnToBall",on)
                 return "AutoPosition="..tostring(on).." LookAtBall="..tostring(on).." TurnToBall="..tostring(on)
             end)
-            Diag:Command("vb-move",function(argument)
-                if argument and (argument=="Walk" or argument=="Teleport" or argument=="Instantâneo") then
-                    Config.moveMode=argument
-                end
-                return "MoveMode="..tostring(Config.moveMode)
+            Diag:Command("vb-instant",function(argument)
+                Config.instantMove = argument~="off"
+                return "InstantMove="..tostring(Config.instantMove)
             end)
             Diag:Command("vb-jump",function(argument)
                 if argument and argument~="" then
