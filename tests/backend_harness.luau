@@ -342,6 +342,7 @@ local function sandbox(placeId, gameId)
     local services = {Players=players, RunService=run, UserInputService=input, TeleportService=teleport,
         TweenService=tween, VirtualInputManager=vim, VirtualUser=vuser,
         Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting={},
+        Stats={FindFirstChild=function() return nil end},
         ReplicatedStorage=Instance.new("ReplicatedStorage"), TextChatService=Instance.new("TextChatService"), HttpService={}}
     -- Minimal JSON codec for config round-trips: the config is flat scalars plus
     -- at most one level of nesting (keys, bounty), which is all this needs to
