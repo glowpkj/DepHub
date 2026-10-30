@@ -1,7 +1,7 @@
--- Volleyball 4.2: the new assistance features must drive real state, not just
+-- Volleyball 4.2: the assistance features must drive real state, not just
 -- register controls. Auto Position moves the character's root toward the
--- predicted landing, Look at Ball rotates the camera onto the ball, and Jump
--- Boost applies and then restores the humanoid's jump values.
+-- predicted landing, Jump Boost/Bypass apply and then restore the humanoid's
+-- jump values, and Ceiling noclip clears and restores collision.
 do
     local ctx = sandbox(1316421563, 1316421563)
     local ui = ctx:MountUI()
@@ -106,36 +106,9 @@ do
     check(humanoid.JumpPower == 55 and humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) == true,
         "disabling jump bypass restores the game's values")
 
-    -- Look at Ball: the camera rotates onto the ball, keeping its position, and
-    -- only on the yaw axis (the look target keeps the camera's own Y).
-    local camera = ctx.Services.Workspace.CurrentCamera
-    camera.CFrame = CFrame.new(0, 0, -10)
-    state:SetToggle("LookAtBall", true)
-    tick()
-    check(camera.CFrame.LookAt ~= nil, "look at ball points the camera at the ball")
-    check(camera.CFrame.Position.X == 0 and camera.CFrame.Position.Z == -10, "look at ball preserves the camera position")
-    check(camera.CFrame.LookAt.Y == camera.CFrame.Position.Y, "look at ball does not tilt the camera up or down")
-
-    -- Turn to Ball: the character yaws toward the ball, face-only, still level.
-    state:SetToggle("TurnToBall", true)
-    root.CFrame = CFrame.new(0, 0, 0)
-    tick()
-    check(root.CFrame.LookAt ~= nil and root.CFrame.LookAt.Y == root.CFrame.Position.Y,
-        "turn to ball yaws the character at the ball without tilting")
-
-    -- Court gating: off a court (the red area) nothing is touched even when the
-    -- toggles are on.
-    local frozenCamera, frozenRoot = CFrame.new(0, 0, -10), root.CFrame
-    camera.CFrame = frozenCamera
-    ballPart.Position = Vector3.new(0, 40, 40); tick()
-    check(camera.CFrame.LookAt == nil, "off-court ball leaves the camera alone")
-    check(root.CFrame.Position == frozenRoot.Position, "off-court ball leaves the character alone")
-    state:SetToggle("LookAtBall", false)
-    state:SetToggle("TurnToBall", false)
-
-    -- Auto Position: the root moves toward the predicted landing point, but only
-    -- for a landing on a court. The ball keeps moving so the prediction stays
-    -- valid (a static ball reads as a zero velocity).
+    -- Auto Position: the root moves toward the predicted landing point. The ball
+    -- keeps moving so the prediction stays valid (a static ball reads as a zero
+    -- velocity).
     state:SetToggle("AutoPosition", true)
     state.Config.moveThreshold = 1
     state.Config.moveSmoothing = 0.5
@@ -153,23 +126,6 @@ do
     ballPart.Position = Vector3.new(12, 40, 12); tick()
     check(root.CFrame.Position.X == 0 and root.CFrame.Position.Z == 0, "instant mode snaps the character onto the landing point")
     state.Config.instantMove = false
-
-    -- A landing off the court (red) is not chased even with Auto Position on.
-    state.Config.instantMove = true
-    root.CFrame = CFrame.new(0, 0, 0)
-    local held = root.CFrame.Position
-    ballPart.Position = Vector3.new(0, 40, 60); tick()
-    ballPart.Position = Vector3.new(0, 40, 64); tick()
-    check(root.CFrame.Position.Z == held.Z, "auto position ignores a landing off the court")
-
-    -- Hitbox: with it on, the character is left alone once the landing is inside
-    -- the box, and the box is drawn where the character is.
-    state.Config.hitboxEnabled, state.Config.hitboxVisible = true, true
-    root.CFrame = CFrame.new(0, 0, 0)
-    ballPart.Position = Vector3.new(1, 40, 1); tick()
-    ballPart.Position = Vector3.new(2, 40, 2); tick()
-    check(root.CFrame.Position.X == 0, "hitbox leaves the character alone when the landing is already covered")
-    state.Config.hitboxEnabled, state.Config.hitboxVisible = false, false
 
     -- A far ball is ignored while the distance gate is set.
     state.Config.instantMove = true
@@ -201,7 +157,7 @@ do
     for _, control in ipairs(ui.Library._Controls) do
         if control.Label then labels[control.Label] = true end
     end
-    for _, expected in ipairs({"Auto Position", "Instantâneo", "Suavidade do movimento", "Olhar pra bola", "Virar o personagem", "Só nas áreas verdes", "Usar hitbox", "Hitbox visível", "Tamanho da hitbox", "Jump Boost", "Jump Power", "Alcance da previsão", "Jump Bypass", "Jump Bypass Power", "Auto Jump", "Ceiling sem colisão"}) do
+    for _, expected in ipairs({"Auto Position", "Instantâneo", "Suavidade do movimento", "Offset acima do chão", "Distância mínima", "Jump Boost", "Jump Power", "Alcance da previsão", "Jump Bypass", "Jump Bypass Power", "Auto Jump", "Ceiling sem colisão"}) do
         check(labels[expected] == true, "Volleyball registers its control: " .. expected)
     end
 end
