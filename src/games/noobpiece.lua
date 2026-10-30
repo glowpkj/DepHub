@@ -437,7 +437,7 @@ end
             dephubNotify(UI,"Noob Piece",ok and "Teleporte iniciado." or "Gacha não encontrado.")
         end)
     end
-    local team=dephubSection(UI,tabs,"Team","Equipe","Left")
+    local team=dephubSection(UI,tabs,"Equipe","Equipe","Left")
     if team then
         local teams=backend:GetTeams()
         if type(teams)=="table" and #teams>0 then
