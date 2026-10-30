@@ -206,6 +206,16 @@ local function categoryForControl(sea)
     if value == "All" or value == "" then return "General" end
     local seas = splitSeas(value)
     if seas.Sea1 and seas.Sea2 and seas.Sea3 then return "General" end
+    -- A control scoped to more than one sea belongs to whichever of those seas the
+    -- player is on right now: on Sea 2, "Sea2,Sea3" is a Sea 2 feature. The header
+    -- therefore only ever shows the current sea's category, never a combined one,
+    -- so a shared feature never drags another sea's category into view.
+    local current = tostring(State.Sea or "Sea1")
+    if seas[current] then
+        if current == "Sea1" then return "Sea 1" end
+        if current == "Sea2" then return "Sea 2" end
+        if current == "Sea3" then return "Sea 3" end
+    end
     if seas.Sea1 and seas.Sea2 then return "Sea 1/2" end
     if seas.Sea2 and seas.Sea3 then return "Sea 2/3" end
     if seas.Sea1 then return "Sea 1" end
@@ -229,8 +239,11 @@ local function ensureTab(name, sea)
     local key = category .. "|" .. name
     if renderedTabs[key] ~= nil then return renderedTabs[key] or nil end
     -- The Blox Fruits backend owns its sea categories: the shared shell only
-    -- creates "General", so this backend registers the seas it uses.
-    if type(visual.CreateCategory) == "function" then visual:CreateCategory(category) end
+    -- creates "General", so this backend registers the seas it uses. Each sea
+    -- category gets its own icon so the header reads as designed rather than a
+    -- row of identical "layers" glyphs.
+    local CATEGORY_ICONS = {["General"] = "layers", ["Sea 1"] = "waves", ["Sea 2"] = "sailboat", ["Sea 3"] = "skull", ["Sea 1/2"] = "waves", ["Sea 2/3"] = "waves"}
+    if type(visual.CreateCategory) == "function" then visual:CreateCategory(category, CATEGORY_ICONS[category]) end
     local tab = visual:CreateTab(name, category, scope)
     if not tab then
         -- Remember the failure so the next control in this group does not try

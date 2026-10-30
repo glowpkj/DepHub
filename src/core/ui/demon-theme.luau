@@ -92,6 +92,11 @@ local _FallbackIcons = {
     ["code"] = "rbxassetid://7733991600",
     ["move"] = "rbxassetid://7734028058",
     ["cpu"] = "rbxassetid://7734005169",
+    -- Sea category glyphs for the Blox Fruits header.
+    ["layers"] = "rbxassetid://7733951517",
+    ["waves"] = "rbxassetid://7734083361",
+    ["sailboat"] = "rbxassetid://7734054207",
+    ["skull"] = "rbxassetid://7734069485",
 }
 
 local function GetIcon(name)

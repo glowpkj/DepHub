@@ -134,16 +134,22 @@ do
     check(not visible("Sea 2"), "on Sea 1 the Sea 2 category is hidden")
     check(not visible("Sea 3"), "on Sea 1 the Sea 3 category is hidden")
     check(not visible("Sea 2/3"), "on Sea 1 the Sea 2/3 category is hidden")
+    check(not visible("Sea 1/2"), "on Sea 1 the Sea 1/2 category is hidden")
 
     ui:SetCurrentSea("Sea2")
     check(visible("Sea 2"), "on Sea 2 the Sea 2 category is shown")
     check(not visible("Sea 1"), "on Sea 2 the Sea 1 category is hidden")
     check(not visible("Sea 3"), "on Sea 2 the Sea 3 category is hidden")
+    -- The header must never show a combined category: a cross-sea feature is
+    -- filed under the current sea, so only General + the current sea remain.
+    check(not visible("Sea 2/3"), "on Sea 2 the Sea 2/3 category is hidden")
+    check(not visible("Sea 1/2"), "on Sea 2 the Sea 1/2 category is hidden")
 
     ui:SetCurrentSea("Sea3")
     check(visible("Sea 3"), "on Sea 3 the Sea 3 category is shown")
     check(not visible("Sea 1"), "on Sea 3 the Sea 1 category is hidden")
     check(not visible("Sea 2"), "on Sea 3 the Sea 2 category is hidden")
+    check(not visible("Sea 2/3"), "on Sea 3 the Sea 2/3 category is hidden")
 
     -- The sea-scoped tabs are what decide visibility per tab, and Teleport must
     -- never be scoped (it is how the player travels between seas).
@@ -151,4 +157,14 @@ do
     check(teleport ~= nil and teleport.Sea == nil, "the Teleport tab is never sea-scoped")
     local farmSea2 = ui.Tabs["Sea 2|Farm"]
     check(farmSea2 ~= nil and farmSea2.Sea == "Sea2", "the Sea 2 Farm tab carries its sea scope")
+
+    -- A tab scoped to several seas is re-filed into the current sea's category, so
+    -- the header stays on a single sea and the feature stays reachable: on Sea 2 a
+    -- "Sea2,Sea3" tab lives under "Sea 2", not under a hidden combined category.
+    ui:SetCurrentSea("Sea2")
+    local eventsTab = ui.Tabs["Sea 2/3|Events"]
+    check(eventsTab ~= nil and eventsTab.Category == "Sea 2", "a Sea2,Sea3 tab is re-filed under Sea 2 on Sea 2")
+    local travelTab = ui.Tabs["Sea 1|Travel"]
+    check(travelTab ~= nil and travelTab.Category == "Sea 2", "a Sea1,Sea2 tab is re-filed under Sea 2 on Sea 2")
+    check(not visible("Sea 1/2") and not visible("Sea 2/3"), "no combined category is shown on Sea 2")
 end

@@ -175,6 +175,9 @@ function DemonUI:CreateTab(name, category, sea)
     -- `sea` scopes the tab to one or more seas ("Sea1", "Sea2,Sea3", "All").
     -- nil means the tab is not sea-scoped and is always shown.
     local record = {Adapter = self, Name = uniqueName, DisplayName = name, Category = category, Key = category .. "|" .. name, Control = state.ContentPages[uniqueName], Sections = {}, Visible = true, Sea = sea}
+    -- The library owns the tab button; keep a handle so the sea filter can show,
+    -- hide, and move it between category lists as the sea changes.
+    record.Button = self:_findTabButton(category, uniqueName)
     function record:CreateSection(title, column)
         title = tostring(title or self.Name)
         if self.Sections[title] then return self.Sections[title] end
@@ -244,21 +247,89 @@ function DemonUI:_tabMatchesSea(tab, sea)
     return normalized == sea
 end
 
+-- Locate the tab's button inside its category's TabList. The real library names
+-- them "SubTab_<tabName>"; the harness mirror does the same. Returns nil when the
+-- library does not expose a list (older stubs), so callers must handle nil.
+function DemonUI:_findTabButton(category, tabName)
+    local state = self.Library._STATE
+    local data = state and state.CategoryButtons and state.CategoryButtons[category]
+    local list = data and data.tabList
+    if not list then return nil end
+    local wanted = "SubTab_" .. tostring(tabName)
+    for _, child in ipairs(list:GetChildren()) do
+        if child.Name == wanted then return child end
+    end
+    return nil
+end
+
+function DemonUI:_seaCategoryName(sea)
+    if sea == "Sea1" then return "Sea 1" end
+    if sea == "Sea2" then return "Sea 2" end
+    if sea == "Sea3" then return "Sea 3" end
+    return nil
+end
+
+-- A tab scoped to one or more seas is filed under the current sea's category. The
+-- backend builds its tabs before the game reports the sea (the Blox Fruits realm
+-- poll is async), so a shared "Sea2,Sea3" tab can start life under a combined
+-- "Sea 2/3" category. This moves it to the current sea instead, so the header can
+-- show a single sea and the feature stays reachable on that sea. The tab's button
+-- is reparented between category tab lists; its page is category-independent, so
+-- navigation (SetActiveCategory by category+name) resolves it either way.
+function DemonUI:_refileSeaTabs(sea)
+    local state = self.Library._STATE
+    if type(state) ~= "table" then return end
+    local target = self:_seaCategoryName(sea)
+    if not target then return end
+    if not self.Categories[target] then self:CreateCategory(target) end
+    local targetData = state.CategoryButtons and state.CategoryButtons[target]
+    local targetList = targetData and targetData.tabList
+    if not targetList then return end
+    local categoryTabs = state.CategoryTabs or {}
+    for _, tab in pairs(self.Tabs) do
+        if self:_tabMatchesSea(tab, sea) and tab.Category ~= target and tab.Category ~= DEFAULT_CATEGORY then
+            local button = tab.Button
+            local fromList = button and button.Parent
+            if button and fromList and fromList ~= targetList then
+                local fromName = tab.Category
+                pcall(function() button.Parent = targetList end)
+                -- Keep the library's per-category tab order in step with the move.
+                if categoryTabs[fromName] then
+                    for i, name in ipairs(categoryTabs[fromName]) do
+                        if name == tab.Name then table.remove(categoryTabs[fromName], i) break end
+                    end
+                end
+                categoryTabs[target] = categoryTabs[target] or {}
+                local already = false
+                for _, name in ipairs(categoryTabs[target]) do if name == tab.Name then already = true break end end
+                if not already then categoryTabs[target][#categoryTabs[target] + 1] = tab.Name end
+                tab.Category = target
+                tab.Key = target .. "|" .. tab.Name
+            end
+        end
+    end
+end
+
 function DemonUI:_refreshVisibility()
     if self.Destroyed then return end
     local state = self.Library._STATE
     if type(state) ~= "table" then return end
     local sea = normalizeSea(self.CurrentSea)
 
-    -- Hide the sea categories themselves so the header only shows the ones that
-    -- belong to the current sea (plus the shared default).
+    -- Move current-sea features into the current sea's category before deciding
+    -- what to show, so nothing is left filed under a hidden combined category.
+    pcall(function() self:_refileSeaTabs(sea) end)
+
+    -- Hide the sea categories themselves so the header only shows the one that
+    -- belongs to the current sea (plus the shared default). A combined category
+    -- ("Sea 1/2", "Sea 2/3") never shows: a feature scoped to several seas is
+    -- filed under the current sea instead, so the header stays on a single sea.
     for category, data in pairs(state.CategoryButtons or {}) do
         local visible = category == DEFAULT_CATEGORY
         if category == "Sea 1" then visible = sea == "Sea1" end
         if category == "Sea 2" then visible = sea == "Sea2" end
         if category == "Sea 3" then visible = sea == "Sea3" end
-        if category == "Sea 1/2" then visible = sea == "Sea1" or sea == "Sea2" end
-        if category == "Sea 2/3" then visible = sea == "Sea2" or sea == "Sea3" end
+        if category == "Sea 1/2" or category == "Sea 2/3" then visible = false end
         local button = data.button or data
         if button and button:IsA("GuiObject") then button.Visible = visible end
         if data.group and data.group:IsA("GuiObject") then data.group.Visible = visible end

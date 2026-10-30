@@ -180,11 +180,19 @@ end})
 -- control so tests can assert per-game isolation without a Roblox client.
 local DOD_LIBRARY_STUB = [==[
 local function NewWindow()
-    local state = {ContentPages = {}, CategoryButtons = {}, ActiveCategory = "General", ActiveTab = nil}
+    local state = {ContentPages = {}, CategoryButtons = {}, CategoryTabs = {}, ActiveCategory = "General", ActiveTab = nil}
     local library = {_STATE = state, _Categories = {}, _Tabs = {}, _Controls = {}}
     function library:CreateCategory(name, icon)
         self._Categories[name] = true
-        state.CategoryButtons[name] = {button = {Visible = true, IsA = function(_, c) return c == "GuiObject" end}}
+        -- Mirror the real library: each category owns a "TabList" frame that holds
+        -- its tab buttons, and CATEGORY_TABS tracks the ordered names per category.
+        -- The backend moves sea-scoped tabs between these lists, so the harness has
+        -- to model the container and its Parent, not just a visibility flag.
+        local tabList = {ClassName = "Frame", Name = "TabList", Visible = true, _children = {}, _props = {}}
+        tabList.IsA = function(_, c) return c == "GuiObject" or c == "Frame" end
+        tabList.GetChildren = function(self) return self._children end
+        state.CategoryButtons[name] = {button = {Visible = true, IsA = function(_, c) return c == "GuiObject" end}, tabList = tabList}
+        state.CategoryTabs[name] = state.CategoryTabs[name] or {}
         return {Name = name}
     end
     function library:CreateTab(category, name)
@@ -198,7 +206,15 @@ local function NewWindow()
         end
         self._Tabs[#self._Tabs + 1] = {Category = category, Name = name}
         state.ContentPages[name] = {Visible = true}
-        return {Name = name}
+        -- A tab button parented to its category's TabList, named like the real
+        -- library so a move can be observed by reading the Parent's Name.
+        local list = state.CategoryButtons[category] and state.CategoryButtons[category].tabList
+        local button = {ClassName = "TextButton", Name = "SubTab_" .. name, Visible = true, Parent = list, _props = {}, _children = {}}
+        button.IsA = function(_, c) return c == "GuiObject" or c == "TextButton" end
+        if list then list._children[#list._children + 1] = button end
+        state.CategoryTabs[category] = state.CategoryTabs[category] or {}
+        state.CategoryTabs[category][#state.CategoryTabs[category] + 1] = name
+        return {Name = name, Button = button}
     end
     function library:CreateSection(tabName, title, _, _, column)
         if not state.ContentPages[tabName] then return nil end
