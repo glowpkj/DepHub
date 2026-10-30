@@ -512,7 +512,7 @@ do
         Theme = "Monochrome",
         TabPosition = "Side",
         CategoryAlign = "Center",
-        ToggleKey = ThemeEnum.KeyCode.RightControl,
+        ToggleKey = ThemeEnum.KeyCode.N,
         Acrylic = true,
         AcrylicBlur = 18,
         Size = ThemeUDim2.fromOffset(900, 580),
