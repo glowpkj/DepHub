@@ -933,7 +933,7 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
     end
 
     -- Left column: prediction and the Auto Position that uses it.
-    local predict = section("Ball Predict", "Previsão", "Left")
+    local predict = section("Previsão", "Previsão", "Left")
     if predict then
         predict:CreateToggle("Ball Predict", State.Toggles.BallPredict, function(v) State:SetToggle("BallPredict", v) end)
         predict:CreateDropdown("Modo", State.Modes, State.Mode, function(v)
@@ -951,7 +951,7 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
         predict:CreateParagraph("Previsão", "Personal prevê a bola do próprio jogador; Match cobre as equipes; Future ainda não está configurado. O marcador fica verde dentro da quadra (onde a bola conta) e vermelho fora.")
     end
 
-    local assist = section("Ball Predict", "Auto Position", "Left")
+    local assist = section("Posicionamento", "Auto Position", "Left")
     if assist then
         assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
         assist:CreateToggle("Instantâneo", Config.instantMove, function(v) Config.instantMove = v == true end)
@@ -962,7 +962,7 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
     end
 
     -- Right column: movement (jump) and collision.
-    local movement = section("Ball Predict", "Pulo", "Right")
+    local movement = section("Pulo", "Pulo", "Left")
     if movement then
         movement:CreateToggle("Pulo forçado", State.Toggles.JumpForce, function(v)
             State:SetToggle("JumpForce", v)
@@ -980,7 +980,7 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
 
     -- Ceiling parts are what the ball bounces off; clearing their collision
     -- removes them as an obstacle for the player. On by default.
-    local collision = section("Ball Predict", "Colisão", "Right")
+    local collision = section("Colisão", "Colisão", "Left")
     if collision then
         collision:CreateToggle("Ceiling sem colisão", State.Toggles.CeilingNoClip, function(v) State:SetToggle("CeilingNoClip", v) end)
         collision:CreateParagraph("Colisão", "Tira a colisão das parts Ceiling para você (padrão ligado). A bola continua batendo nelas. Ao desligar, a colisão volta ao original.")
