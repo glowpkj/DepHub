@@ -44,7 +44,10 @@ function Vector3.new(x, y, z)
     if type(x) == "table" then y, z = x.Y, x.Z; x = x.X end
     return setmetatable({X=x or 0, Y=y or 0, Z=z or 0, __vector=true, Magnitude=math.sqrt((x or 0)^2+(y or 0)^2+(z or 0)^2)}, vectorMeta)
 end
-function Vector3.zero() return Vector3.new(0, 0, 0) end
+-- Vector3.zero is a value in Roblox, not a function: features read it as a value
+-- (hrp.AssemblyLinearVelocity = Vector3.zero). Matching the real API here keeps
+-- a value-vs-call mixup from hiding behind the double.
+Vector3.zero = Vector3.new(0, 0, 0)
 local vectors = Vector3
 
 -- Minimal CFrame double: enough for camera lerp/aim tests. Tracks Position and a
@@ -160,6 +163,11 @@ function ColorSequence.new(color) return {__colorSequence = true, Color = color}
 function ColorSequence.new(colorA, colorB) return {__colorSequence = true, Color = colorA, Color2 = colorB} end
 local NumberSequence = {}
 function NumberSequence.new(value) return {__numberSequence = true, Value = value} end
+-- TweenInfo double: the fly/tween features construct one before Create.
+local TweenInfo = {}
+function TweenInfo.new(time, style, direction)
+    return {__tweenInfo = true, Time = time or 1, Style = style, Direction = direction}
+end
 -- RaycastParams double: enough for prediction code to construct and mutate it.
 local RaycastParams = {}
 function RaycastParams.new() return {FilterType = nil, FilterDescendantsInstances = {}, IgnoreWater = false} end
@@ -297,7 +305,7 @@ local function sandbox(placeId, gameId)
         return assert(context.Responses[path], "Unexpected HTTP: " .. path)
     end
     local env = setmetatable({game=game, workspace=services.Workspace, Color3=Color3, Vector3=Vector3, CFrame=CFrame, typeof=typeof, Instance=Instance, Enum=Enum,
-        UDim=UDim, UDim2=UDim2, ColorSequence=ColorSequence, NumberSequence=NumberSequence, RaycastParams=RaycastParams,
+        UDim=UDim, UDim2=UDim2, ColorSequence=ColorSequence, NumberSequence=NumberSequence, RaycastParams=RaycastParams, TweenInfo=TweenInfo,
         getgenv=function() return context.State end, identifyexecutor=function() return "Test" end,
         print=function(message) context.Logs[#context.Logs + 1] = tostring(message) end,
         warn=function(message) context.Logs[#context.Logs + 1] = tostring(message) end,

@@ -52,6 +52,46 @@ do
 
     check(backend:GetToggle("Speed") == false and backend:SetToggle("Nope", true) == false, "unknown toggles are rejected")
 
+    -- Teleport: the CFrame tween fly ported from Blox Fruits. Go() tweens the
+    -- HumanoidRootPart to the target; capture it on the existing TweenService
+    -- (the backend grabbed the service at load time, so it must be mutated in
+    -- place, not swapped after Run).
+    local root = object("Part", "HumanoidRootPart", character); root.Position = Vector3.new(0, 0, 0)
+    backend.Values.FlySpeed = 200
+    check(backend:SetFlySpeed(300) and backend.Values.FlySpeed == 300, "fly speed is settable")
+    check(backend:SetFlySpeed(0) == false and backend:SetFlySpeed("x") == false, "fly speed rejects invalid values")
+    local captured = nil
+    local realCreate = ctx.Services.TweenService.Create
+    ctx.Services.TweenService.Create = function(_, target, info, goal)
+        captured = {Target = target, Goal = goal}
+        return {Play = function() captured.Played = true end, Cancel = function() captured.Cancelled = true end, Completed = {Connect = function() end}}
+    end
+    local okGo = backend:Go(Vector3.new(100, 0, 0))
+    check(okGo == true, "Go starts a fly")
+    check(captured ~= nil and captured.Target == root, "fly tweens the HumanoidRootPart")
+    check(captured.Goal ~= nil and captured.Goal.CFrame.Position == Vector3.new(100, 0, 0), "fly tweens to the requested position")
+    check(captured.Played == true, "fly plays the tween")
+    -- While a fly is active the heartbeat zeroes velocity and strips collision.
+    root.AssemblyLinearVelocity = Vector3.new(5, 5, 5)
+    root.CanCollide = true   -- Roblox defaults a Part's CanCollide to true
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(root.AssemblyLinearVelocity == Vector3.new(0, 0, 0), "fly heartbeat zeroes linear velocity")
+    -- The same heartbeat strips collision (noclip) while the fly is active.
+    check(root.CanCollide == false, "fly heartbeat disables collision")
+    backend:CancelFly()
+    check(captured.Cancelled == true and backend.Tween == nil, "cancel stops the active fly")
+    check(backend:Go("not a vector") == false, "Go rejects a non-vector target")
+    ctx.Services.TweenService.Create = realCreate
+
+    -- Waypoints: saved in game (the map is not known ahead of time), keyed by the
+    -- current position when no name is given.
+    local before = #backend.Waypoints
+    check(backend:AddWaypoint("Base") == true and #backend.Waypoints == before + 1, "AddWaypoint stores a waypoint")
+    local wp = backend.Waypoints[#backend.Waypoints]
+    check(wp.name == "Base" and wp.pos ~= nil, "waypoint carries a name and a position")
+    check(backend:RemoveWaypoint("Base") == true and #backend.Waypoints == before, "RemoveWaypoint drops it")
+    check(backend:RemoveWaypoint("Nope") == false, "RemoveWaypoint rejects an unknown name")
+
     backend:Destroy()
     backend:Destroy()
     check(backend.Destroyed == true and backend:SetToggle("Speed", true) == false, "destroyed backend rejects toggles")
