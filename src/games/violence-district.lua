@@ -88,28 +88,26 @@ local function track(connection)
     return connection
 end
 
-local function waitFor(parent, name, timeout)
-    if not parent then return nil end
-    local ok, child = pcall(function() return parent:WaitForChild(name, timeout or 5) end)
-    if ok then return child end
-    return parent:FindFirstChild(name)
-end
-
 local function removed(object)
     return not object or object.Parent == nil
 end
 
 -- ---------------------------------------------------------------------------
--- Remotes: resolved once at load. Each is nil-safe; the feature that needs it
+-- Remotes are resolved lazily: a slow (or absent) remote must never block or
+-- delay the panel building, so the tab is created first and resolveRemotes()
+-- fills them in right after. Each stays nil-safe; the feature that needs it
 -- simply does nothing while it is missing.
--- ---------------------------------------------------------------------------
-local Remotes = waitFor(ReplicatedStorage, "Remotes", 10)
-local GenRemotes = waitFor(Remotes, "Generator")
-local RepairEvent = waitFor(GenRemotes, "RepairEvent")
-local SkillCheckResult = waitFor(GenRemotes, "SkillCheckResultEvent")
-local ItemRemotes = waitFor(Remotes, "Items")
-local DaggerFolder = waitFor(ItemRemotes, "Parrying Dagger")
-local ParryEvent = waitFor(DaggerFolder, "parry")
+local RepairEvent, SkillCheckResult, ParryEvent
+
+local function resolveRemotes()
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local generators = remotes and remotes:FindFirstChild("Generator")
+    local items = remotes and remotes:FindFirstChild("Items")
+    local dagger = items and items:FindFirstChild("Parrying Dagger")
+    RepairEvent = (generators and generators:FindFirstChild("RepairEvent")) or RepairEvent
+    SkillCheckResult = (generators and generators:FindFirstChild("SkillCheckResultEvent")) or SkillCheckResult
+    ParryEvent = (dagger and dagger:FindFirstChild("parry")) or ParryEvent
+end
 
 -- ---------------------------------------------------------------------------
 -- Shared helpers.
@@ -428,8 +426,8 @@ end
 
 local function watchKiller(character)
     if State.Destroyed or not character then return end
-    local humanoid = waitFor(character, "Humanoid", 5)
-    local animator = humanoid and waitFor(humanoid, "Animator", 5)
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local animator = humanoid and humanoid:FindFirstChild("Animator")
     if not animator then return end
     track(animator.AnimationPlayed:Connect(function(track_)
         if State.Destroyed or not State.Toggles.AutoParry then return end
@@ -445,10 +443,13 @@ end
 
 local function watchPlayerForKiller(player)
     if player == LocalPlayer or not player then return end
-    if roleOf(player) == "Killer" and player.Character then watchKiller(player.Character) end
-    track(player.CharacterAdded:Connect(function(character)
-        if roleOf(player) == "Killer" then watchKiller(character) end
-    end))
+    local function try(character)
+        task.defer(function()
+            if not State.Destroyed and roleOf(player) == "Killer" then watchKiller(character) end
+        end)
+    end
+    if player.Character then try(player.Character) end
+    track(player.CharacterAdded:Connect(try))
 end
 
 -- ---------------------------------------------------------------------------
@@ -486,6 +487,11 @@ end
 function State:Start()
     if self.Started or self.Destroyed then return false end
     self.Started = true
+
+    resolveRemotes()
+    task.defer(function()
+        if not self.Destroyed then resolveRemotes() end
+    end)
 
     for _, player in ipairs(Players:GetPlayers()) do
         watchPlayerForKiller(player)

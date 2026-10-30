@@ -7,7 +7,7 @@ do
     -- Routing: the loader must pick this backend from the place id and the
     -- universe id, and keep it distinct from the other games.
     local ctx = sandbox(93978595733734, 93978595733734)
-    ctx.Responses["src/version.txt"] = "0.0.95"
+    ctx.Responses["src/version.txt"] = "0.0.96"
     ctx:Provide("src/games/violence-district.lua", {Destroyed = false})
     check(ctx:Run("DepHub.lua") == true, "Violence District routes from its place id")
     check(ctx.State.__DEPHUB.ViolenceDistrict ~= nil, "Violence District route exposes its backend")
@@ -18,7 +18,7 @@ end
 
 do
     local ctx = sandbox(6739698191, 6739698191)
-    ctx.Responses["src/version.txt"] = "0.0.95"
+    ctx.Responses["src/version.txt"] = "0.0.96"
     ctx:Provide("src/games/violence-district.lua", {Destroyed = false})
     check(ctx:Run("DepHub.lua") == true, "Violence District routes from its universe id")
     check(ctx.State.__DEPHUB.ViolenceDistrict ~= nil, "universe id route exposes the backend")
@@ -89,6 +89,8 @@ do
     local genPoint = object("Part", "GeneratorPoint1", genModel); genPoint.Position = Vector3.new(10, 0, 0)
 
     local backend = ctx:Run("src/games/violence-district.lua")
+    -- Resolve the deferred remote lookup and killer watch before driving events.
+    ctx:FlushDeferred()
     check(type(backend) == "table" and backend.Destroyed == false, "Violence District entry returns a live backend")
     check(backend.Toggles.ESP == false, "ESP starts off")
     check(next(backend.ESPObjects) == nil, "ESP stays empty while disabled")
