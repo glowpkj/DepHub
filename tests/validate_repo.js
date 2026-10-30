@@ -85,8 +85,12 @@ if (!loader.includes('["142823291"]') || !loader.includes('["66654135"]') || !lo
 if (loader.includes('volleyballlegends') || loader.includes('Volleyball Legends') || loader.includes('6931042565')) {
   fail('Removed Volleyball Legends routing remains in the loader');
 }
-if (loader.includes('violencedistrict') || loader.includes('ViolenceDistrict') || loader.includes('6739698191')) {
-  fail('Removed Violence District routing remains in the loader');
+// Violence District is a supported game again, routed from its place and
+// universe ids. What must never come back is the retired *frontend* it once
+// shipped (the compact/dephubViolenceDistrict panel), which is covered by the
+// retired-marker checks below.
+if (!loader.includes('["93978595733734"]') || !loader.includes('["6739698191"]') || !loader.includes('src/games/violence-district.lua')) {
+  fail('Violence District loader routing is incomplete');
 }
 // The loader must not pull in the retired third-party library or the removed
 // in-repo frontend. The retired markers below are banned outright.

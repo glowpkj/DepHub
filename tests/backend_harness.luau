@@ -449,6 +449,10 @@ local function sandbox(placeId, gameId)
         warn=function(message) context.Logs[#context.Logs + 1] = tostring(message) end,
         task={wait=function() end, cancel=function() end,
             defer=function(fn, ...) context.Deferred[#context.Deferred + 1] = {Fn=fn, Args={...}} end,
+            -- task.delay is scheduled as deferred work so tests can run it with
+            -- ctx:FlushDeferred() instead of sleeping; the delay itself is not
+            -- modelled because the harness has no clock to advance.
+            delay=function(_, fn, ...) context.Deferred[#context.Deferred + 1] = {Fn=fn, Args={...}} end,
             spawn=function(fn, ...) context.Spawned[#context.Spawned + 1] = {Fn=fn, Args={...}}; return fn end}}, {__index=getfenv(0)})
     function env.loadstring(source)
         local fn, err = loadstring(source)

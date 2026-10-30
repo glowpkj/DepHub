@@ -171,6 +171,19 @@
       "src/games/updates/84822469255086.txt"
     ]
   },
+  "93978595733734": {
+    "name": "Violence District",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/demon-ui.lua",
+      "src/core/ui/demon-theme.luau",
+      "src/core/updater.lua",
+      "src/core/diagnostics.lua",
+      "src/games/violence-district.lua",
+      "src/games/updates/93978595733734.txt"
+    ]
+  },
   "4658598196": {
     "name": "Attack on Titan Revolution",
     "files": [
