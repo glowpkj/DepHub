@@ -224,11 +224,22 @@ listConfigs/unload`; prefixo `DepHub_BF_`; `cfg_<name>.json`; `lastcfg.txt`.
 
 | Pedido | Estado | Nota |
 |---|---|---|
-| Salvar/Carregar/Criar com nome/Listar | **Impl** | existe |
-| Renomear / Excluir | **Gap** | não existe |
-| Restaurar padrões | **Gap** | não existe |
-| Config por módulo / restaurar só um módulo | **Gap** | config é global |
-| Presets (Default/Safe/Fast/Custom) | **Gap** | não existe |
+| Salvar/Carregar/Criar com nome/Listar | **Impl** Auto | existe |
+| Excluir | **Impl** Auto | botão "Excluir configuração" → `deleteNamedConfig` (delfile) |
+| Renomear | **Impl** Auto | botão "Renomear" → `renameNamedConfig` (lê/grava/apaga) |
+| Restaurar padrões (tudo) | **Impl** Auto | botão "Restaurar padrões" → `resetToDefaults` (usa o `default` de cada `_def` |
+| Config por módulo / restaurar só um módulo | **Impl** Auto | dropdown "Módulo" + "Restaurar módulo" → `resetModule` via `moduleForPage` |
+| Presets (Default/Safe/Fast/Custom) | **Gap** | não existe; ver nota abaixo |
+
+> Os testes de Config rodam contra um **filesystem em memória** e um **codec JSON**
+> adicionados ao harness — antes o `HttpService` era `{}` e não havia `writefile`,
+> então nenhum Save/Load era testável.
+
+**Nota sobre presets:** "Default" agora existe de fato (restaurar padrões). "Safe"
+e "Fast" seriam combinações **nomeadas de valores** — implementáveis, mas só fazem
+sentido depois que os módulos que eles juntam (Farm/PVP/Fruits) tiverem suas
+configs fechadas; senão viram nomes bonitos sem efeito. Fica para depois dos
+módulos, para não violar a §12.
 
 ---
 

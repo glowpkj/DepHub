@@ -207,10 +207,34 @@ function Factory.new(context)
         return {}
     end
 
+    function State:DeleteConfig(name)
+        local ok, result = pcall(Core.deleteNamedConfig, name)
+        return ok and result == true
+    end
+
+    function State:RenameConfig(from, to)
+        local ok, result = pcall(Core.renameNamedConfig, from, to)
+        return ok and result == true
+    end
+
+    function State:ResetDefaults()
+        local ok, result = pcall(Core.resetToDefaults)
+        return ok and result == true
+    end
+
+    function State:ResetModule(moduleName)
+        local ok, result = pcall(Core.resetModule, moduleName)
+        return ok and (tonumber(result) or 0)
+    end
+
     State.Config = {
         Save = function(name) return State:SaveConfig(name) end,
         Load = function(name) return State:LoadConfig(name) end,
-        List = function() return State:ListConfigs() end
+        List = function() return State:ListConfigs() end,
+        Delete = function(name) return State:DeleteConfig(name) end,
+        Rename = function(from, to) return State:RenameConfig(from, to) end,
+        ResetDefaults = function() return State:ResetDefaults() end,
+        ResetModule = function(moduleName) return State:ResetModule(moduleName) end
     }
 
     function State:Unload()

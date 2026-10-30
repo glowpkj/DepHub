@@ -294,6 +294,90 @@ local function sandbox(placeId, gameId)
         TweenService=tween, VirtualInputManager=vim, VirtualUser=vuser,
         Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting={},
         ReplicatedStorage=Instance.new("ReplicatedStorage"), TextChatService=Instance.new("TextChatService"), HttpService={}}
+    -- Minimal JSON codec for config round-trips: the config is flat scalars plus
+    -- at most one level of nesting (keys, bounty), which is all this needs to
+    -- support. Real HttpService is provided by the executor at runtime.
+    do
+        local function esc(s)
+            return '"' .. s:gsub('[%c"\\]', function(c)
+                if c == '"' then return '\\"' elseif c == '\\' then return '\\\\' else return string.format('\\u%04x', c:byte()) end
+            end) .. '"'
+        end
+        local function isArray(t)
+            local n = 0
+            for _ in pairs(t) do n = n + 1 end
+            return n == #t
+        end
+        local encode
+        encode = function(v)
+            local ty = type(v)
+            if ty == "nil" then return "null" elseif ty == "boolean" then return v and "true" or "false"
+            elseif ty == "number" then return tostring(v) elseif ty == "string" then return esc(v) end
+            if ty == "table" then
+                local parts = {}
+                if isArray(v) then
+                    for _, item in ipairs(v) do parts[#parts + 1] = encode(item) end
+                    return "[" .. table.concat(parts, ",") .. "]"
+                end
+                for k, item in pairs(v) do parts[#parts + 1] = esc(tostring(k)) .. ":" .. encode(item) end
+                return "{" .. table.concat(parts, ",") .. "}"
+            end
+            return "null"
+        end
+        local function decode(str)
+            local pos = 1
+            local function skip() while pos <= #str and str:sub(pos, pos):match("%s") do pos = pos + 1 end end
+            local parse
+            local function parseString()
+                pos = pos + 1
+                local out = {}
+                while pos <= #str do
+                    local c = str:sub(pos, pos)
+                    if c == '"' then pos = pos + 1 break
+                    elseif c == "\\" then
+                        local n = str:sub(pos + 1, pos + 1)
+                        if n == 'u' then out[#out + 1] = string.char(tonumber(str:sub(pos + 2, pos + 5), 16)); pos = pos + 6
+                        else out[#out + 1] = n; pos = pos + 2 end
+                    else out[#out + 1] = c; pos = pos + 1 end
+                end
+                return table.concat(out)
+            end
+            local function parseValue()
+                skip()
+                local c = str:sub(pos, pos)
+                if c == "{" then
+                    pos = pos + 1; local obj = {}; skip()
+                    if str:sub(pos, pos) == "}" then pos = pos + 1 return obj end
+                    while true do
+                        skip(); local k = parseString(); skip(); pos = pos + 1  -- skip ':'
+                        obj[k] = parseValue(); skip()
+                        local d = str:sub(pos, pos); pos = pos + 1
+                        if d == "}" then break end
+                    end
+                    return obj
+                elseif c == "[" then
+                    pos = pos + 1; local arr = {}; skip()
+                    if str:sub(pos, pos) == "]" then pos = pos + 1 return arr end
+                    while true do
+                        arr[#arr + 1] = parseValue(); skip()
+                        local d = str:sub(pos, pos); pos = pos + 1
+                        if d == "]" then break end
+                    end
+                    return arr
+                elseif c == '"' then return parseString()
+                elseif str:sub(pos, pos + 3) == "true" then pos = pos + 4 return true
+                elseif str:sub(pos, pos + 4) == "false" then pos = pos + 5 return false
+                elseif str:sub(pos, pos + 3) == "null" then pos = pos + 4 return nil
+                else
+                    local num = str:match("^-?%d+%.?%d*[eE]?[-+]?%d*", pos)
+                    pos = pos + #num; return tonumber(num)
+                end
+            end
+            return parseValue()
+        end
+        services.HttpService.JSONEncode = function(_, v) return encode(v) end
+        services.HttpService.JSONDecode = function(_, s) return decode(s) end
+    end
     services.Workspace.CurrentCamera = {CFrame = CFrame.new(0, 0, 0)}
     -- Workspace/instance container signals the feature modules connect to.
     services.Workspace.ChildAdded = signal()
@@ -359,6 +443,22 @@ local function sandbox(placeId, gameId)
         return window, window.Library
     end
     env._provided = {}
+    -- In-memory executor filesystem so config save/load (writefile/readfile/
+    -- isfile/listfiles/delfile) is exercised end to end without touching disk.
+    local fs = {}
+    context.Files = fs
+    env.writefile = function(name, data) fs[name] = tostring(data) end
+    env.readfile = function(name) return fs[name] end
+    env.isfile = function(name) return fs[name] ~= nil end
+    env.delfile = function(name) fs[name] = nil end
+    env.listfiles = function(dir)
+        local out = {}
+        for name in pairs(fs) do
+            if dir == nil or dir == "" or name:sub(1, #dir) == dir then out[#out + 1] = name end
+        end
+        return out
+    end
+    env.appendfile = function(name, data) fs[name] = (fs[name] or "") .. tostring(data) end
     context.Env = env
     context.Sources = sources
     -- Core modules that the loader always fetches are served straight from the

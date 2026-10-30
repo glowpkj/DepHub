@@ -324,6 +324,7 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                     local section = sectionFor(record, "Configuration")
                     if section then
                         local configName = "default"
+                        local renameTo = ""
                         section:CreateInput("Nome da configuração", "Nome da configuração", configName, function(value) configName = tostring(value or "default") end)
                         section:CreateButton("Salvar configuração", function()
                             local name = tostring(configName ~= "" and configName or "default")
@@ -332,6 +333,39 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                         section:CreateButton("Carregar configuração", function()
                             local name = tostring(configName ~= "" and configName or "default")
                             if State:LoadConfig(name) then visual:Notify("Config", "Configuração carregada: " .. name) else visual:Notify("Config", "Não foi possível carregar.") end
+                        end)
+                        section:CreateButton("Excluir configuração", function()
+                            local name = tostring(configName ~= "" and configName or "default")
+                            if State:DeleteConfig(name) then visual:Notify("Config", "Configuração excluída: " .. name) else visual:Notify("Config", "Não foi possível excluir (inexistente?).") end
+                        end)
+                        section:CreateButton("Listar configurações", function()
+                            local names = State:ListConfigs()
+                            if #names == 0 then visual:Notify("Config", "Nenhuma configuração salva.") else visual:Notify("Config", table.concat(names, ", "), 6) end
+                        end)
+                        -- Rename reads the "Nome" box as the source and a second box
+                        -- as the target, so no extra state is needed beyond the two.
+                        section:CreateInput("Renomear para", "Novo nome", renameTo, function(value) renameTo = tostring(value or "") end)
+                        section:CreateButton("Renomear configuração", function()
+                            local from = tostring(configName ~= "" and configName or "default")
+                            local to = tostring(renameTo ~= "" and renameTo or "")
+                            if to == "" then visual:Notify("Config", "Informe o novo nome no campo acima.") return end
+                            if State:RenameConfig(from, to) then visual:Notify("Config", "Renomeada: " .. from .. " -> " .. to) else visual:Notify("Config", "Não foi possível renomear (origem inexistente ou destino já existe).") end
+                        end)
+                    end
+                    local reset = sectionFor(record, "Reset")
+                    if reset then
+                        reset:CreateButton("Restaurar padrões (tudo)", function()
+                            State:ResetDefaults()
+                            visual:Notify("Config", "Todos os controles voltaram ao padrão.")
+                        end)
+                        -- Reset a single module without touching the others. The
+                        -- page names map to modules in the core module registry.
+                        local modules = {"combat", "farm", "player", "fruits", "shop", "events", "extras", "teleport"}
+                        local chosen = "combat"
+                        reset:CreateDropdown("Módulo", modules, chosen, function(value) chosen = tostring(value or "combat") end)
+                        reset:CreateButton("Restaurar módulo", function()
+                            local n = State:ResetModule(chosen)
+                            if n > 0 then visual:Notify("Config", "Módulo " .. chosen .. " restaurado (" .. n .. " controles).") else visual:Notify("Config", "Nenhum controle restaurável em " .. chosen .. ".") end
                         end)
                     end
                 end

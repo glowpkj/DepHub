@@ -129,6 +129,71 @@ do
     check(state:SetToggle("Kill aura", true) == false, "destroyed backend rejects further toggles")
 end
 
+-- Config management: save/load/list/delete/rename and the reset operations.
+-- Exercised against the in-memory filesystem the harness exposes.
+do
+    local ctx = ossContext(994732206, 994732206)
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table", "Blox Fruits builds for the config test")
+    local core = state.Core
+    check(type(core) == "table" and type(core.gatherConfig) == "function", "the core module is reachable through the adapter")
+
+    -- Save then load a named config; the value must survive the round trip.
+    -- Config is gathered from the live controls, so the test drives the control
+    -- (exactly what the panel does) rather than poking the module table.
+    local combat = state.Modules.combat
+    local aimControl
+    for _, d in ipairs(combat and state:ListControls() or {}) do
+        if d.kind == "slider" and d.key:find("Aimbot range", 1, true) then aimControl = d break end
+    end
+    check(aimControl ~= nil, "the aimbot range control is reachable for the config test")
+    aimControl.set(777)
+    check(state:SaveConfig("t1"), "a named config is saved")
+    aimControl.set(100)
+    check(state:LoadConfig("t1"), "the named config loads back")
+    check(combat.config.aimRange == 777, "a saved value is restored on load")
+
+    local names = state:ListConfigs()
+    local found = false
+    for _, n in ipairs(names) do if n == "t1" then found = true end end
+    check(found, "the saved config appears in the list")
+
+    -- Rename moves the file and drops the old name.
+    check(state:RenameConfig("t1", "t2"), "a config can be renamed")
+    local names2 = state:ListConfigs()
+    local has2, has1 = false, false
+    for _, n in ipairs(names2) do if n == "t2" then has2 = true end; if n == "t1" then has1 = true end end
+    check(has2 and not has1, "rename replaces the old name with the new one")
+    check(state:RenameConfig("t2", "t2") == false, "renaming onto itself is rejected")
+
+    -- Delete removes it.
+    check(state:DeleteConfig("t2"), "a config can be deleted")
+    check(state:DeleteConfig("nope") == false, "deleting a missing config reports false")
+
+    -- Reset one module leaves other modules alone. Drive values through the
+    -- controls so the reset has live state to undo.
+    local player = state.Modules.player
+    local walkControl
+    for _, d in ipairs(state:ListControls()) do
+        if d.kind == "slider" and d.key:find("Walk speed", 1, true) then walkControl = d break end
+    end
+    check(walkControl ~= nil, "the walk speed control is reachable for the reset test")
+    aimControl.set(999)
+    walkControl.set(250)
+    local resetCount = state:ResetModule("combat")
+    check(resetCount > 0, "resetting a module touches at least one control")
+    check(combat.config.aimRange == 300, "the reset module went back to its registered default")
+    check(player.config.walkSpeed == 250, "another module was left untouched by a single-module reset")
+
+    -- Reset everything restores defaults across every module.
+    aimControl.set(999)
+    check(state:ResetDefaults(), "reset defaults runs")
+    check(combat.config.aimRange == 300 and player.config.walkSpeed == 50, "reset defaults restores every module")
+
+    local status = state:GetStatus()
+    check(type(status.Errors) == "table" and #status.Errors == 0, "no error surfaced during config operations")
+end
+
 -- The standalone ui.lua created real instances; the DepHub frontend renders the
 -- same controls, so the backend must be reachable and never build a ScreenGui.
 do

@@ -163,6 +163,80 @@ function Core.loadLastConfig()
     return false
 end
 
+-- Delete a named config. delfile is executor-provided, so guard it like the other
+-- file APIs. The last-config pointer is cleared when it named this file. A
+-- missing file reports false rather than pretending it deleted something.
+function Core.deleteNamedConfig(name)
+    if not name or name == "" or not delfile then return false end
+    if isfile then
+        local exists = pcall(isfile, cfgFile(name)) and isfile(cfgFile(name))
+        if not exists then return false end
+    end
+    local ok = pcall(delfile, cfgFile(name))
+    if ok and writefile and isfile and pcall(isfile, LAST_FILE) and isfile(LAST_FILE) then
+        local rok, last = pcall(readfile, LAST_FILE)
+        if rok and last == name then pcall(writefile, LAST_FILE, "") end
+    end
+    return ok
+end
+
+-- Rename a config: read its data, write it under the new name, then drop the old
+-- file. Returns false if the source is missing or the target already exists.
+function Core.renameNamedConfig(from, to)
+    if not (from and to and from ~= "" and to ~= "" and from ~= to) then return false end
+    if not (isfile and readfile and writefile and delfile) then return false end
+    if pcall(isfile, cfgFile(to)) and isfile(cfgFile(to)) then return false, "exists" end
+    if not (pcall(isfile, cfgFile(from)) and isfile(cfgFile(from))) then return false, "missing" end
+    local rok, s = pcall(readfile, cfgFile(from))
+    if not rok or type(s) ~= "string" then return false, "read" end
+    local wok = pcall(writefile, cfgFile(to), s)
+    if not wok then return false, "write" end
+    pcall(delfile, cfgFile(from))
+    return true
+end
+
+-- Reset every control back to the default it registered with. The ui model keeps
+-- the default on each _defs entry, so this restores the same values a fresh
+-- session starts from without needing a hardcoded table.
+function Core.resetToDefaults()
+    local ui = Core.modules.ui
+    if not (ui and ui._defs and ui._controls) then return false end
+    for _, definition in ipairs(ui._defs) do
+        local control = ui._controls[definition.key]
+        if control and definition.default ~= nil then pcall(control.set, definition.default) end
+    end
+    return true
+end
+
+-- Which module a control belongs to, by the page it was registered on. Pages map
+-- to modules one-to-one for the Blox Fruits backend, which is what "reset just
+-- this module" needs.
+local PAGE_MODULE = {
+    ["PVP"] = "combat", ["Farm"] = "farm", ["Farm 2"] = "farm", ["Farm 3"] = "farm",
+    ["Player"] = "player", ["Fruit"] = "fruits", ["Shop"] = "shop", ["Shop 2"] = "shop",
+    ["Shop 3"] = "shop", ["Raids/Events"] = "events", ["Extras"] = "extras",
+    ["Teleport"] = "teleport", ["Sea"] = "teleport",
+}
+function Core.moduleForPage(page) return PAGE_MODULE[tostring(page)] end
+
+-- Reset only the controls registered for one module, leaving every other module's
+-- settings untouched. Returns the number of controls reset.
+function Core.resetModule(moduleName)
+    local ui = Core.modules.ui
+    if not (ui and ui._defs and ui._controls) or not moduleName then return 0 end
+    local count = 0
+    for _, definition in ipairs(ui._defs) do
+        if Core.moduleForPage(definition.page) == moduleName then
+            local control = ui._controls[definition.key]
+            if control and definition.default ~= nil then
+                pcall(control.set, definition.default)
+                count = count + 1
+            end
+        end
+    end
+    return count
+end
+
 function Core.unload()
     for _, m in pairs(Core.modules) do
         if type(m) == "table" and type(m.stop) == "function" then pcall(m.stop) end
