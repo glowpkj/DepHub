@@ -159,6 +159,13 @@ function Library:AddToggle(page, text, default, callback)
     holder.InputBegan:Connect(function(inp)
         if inp.UserInputType ~= Enum.UserInputType.MouseButton1
             and inp.UserInputType ~= Enum.UserInputType.Touch then return end
+        if settingsPanel and settingsPanel.Visible then
+            local mp = inp.Position
+            local pp, ps = settingsPanel.AbsolutePosition, settingsPanel.AbsoluteSize
+            if mp.X >= pp.X and mp.X <= pp.X + ps.X and mp.Y >= pp.Y and mp.Y <= pp.Y + ps.Y then
+                return
+            end
+        end
         local starBtn = holder:FindFirstChild("FavoriteStar")
         if starBtn and starBtn.Parent and starBtn.Visible then
             local mp = inp.Position
