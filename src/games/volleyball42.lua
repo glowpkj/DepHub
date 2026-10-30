@@ -17,16 +17,17 @@ if not LocalPlayer then
 end
 
 local MAX_TIME = 4.5
-local STEP = 0.05
+local SIMULATION_STEP = 1 / 30
 local MAX_SPEED = 700
-local HISTORY_WINDOW = 0.09
-local VELOCITY_SMOOTHING = 0.7
+local HISTORY_WINDOW = 0.16
 local STOP_SPEED = 0.5
 local SURFACE_OFFSET = 0.03
 local MARKER_DIAMETER = 2.5
-local CIRCLE_SAMPLES = 48
-local PREDICTION_INTERVAL = 0.075
-local CONTACT_DEBOUNCE = 0.08
+local PREDICTION_INTERVAL = 0.08
+local STABLE_PREDICTION_INTERVAL = 0.25
+local MAX_BOUNCES = 5
+local MIN_LANDING_NORMAL = 0.68
+local CONTACT_DEBOUNCE = 0.06
 
 local GREEN = Color3.fromRGB(0, 255, 100)
 local RED = Color3.fromRGB(255, 45, 45)
@@ -48,7 +49,7 @@ local Config = {
 }
 
 local State = {
-    Version = "0.1.0",
+    Version = "0.2.0",
     Destroyed = false,
     Started = false,
     Mode = "Personal",
@@ -74,6 +75,10 @@ local State = {
     PredictionElapsed = 0,
     SearchElapsed = 0,
     InvalidPredictionElapsed = 0,
+    PredictionDirty = true,
+    LastSimulationAt = 0,
+    LastSimulationPosition = nil,
+    LastSimulationVelocity = nil,
     LastPrediction = nil,
     BaseJumpPower = nil,
     BaseUseJumpPower = nil,
@@ -149,6 +154,13 @@ end
 local function clearHistory()
     table.clear(State.History)
     State.CurrentVelocity = nil
+    State.PredictionDirty = true
+    State.LastSimulationAt = 0
+    State.LastSimulationPosition = nil
+    State.LastSimulationVelocity = nil
+    State.LastPrediction = nil
+    marker.Transparency = 1
+    tracer.Enabled = false
 end
 
 -- Jump power override. The base values are captured the first time the loop
@@ -489,24 +501,21 @@ local function getRaycastParams(ball)
         exclusions[#exclusions + 1] = LocalPlayer.Character
     end
 
-    for _, part in ipairs(State.Courts) do
-        if part.Parent then
-            exclusions[#exclusions + 1] = part
-        end
-    end
-
-    for _, part in ipairs(State.Ceilings) do
-        if part.Parent then
-            exclusions[#exclusions + 1] = part
-        end
-    end
-
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = exclusions
     params.IgnoreWater = true
+    pcall(function()
+        params.RespectCanCollide = true
+    end)
 
-    return params, exclusions
+    return params
+end
+
+local function getBallRadius(part)
+    local size = part.Size
+    local radius = math.min(size.X, size.Y, size.Z) * 0.5
+    return math.clamp(radius * 0.9, 0.25, 2.5)
 end
 
 local function predictLanding(part, velocity)
@@ -514,39 +523,87 @@ local function predictLanding(part, velocity)
         return nil
     end
 
-    local origin = part.Position
-    local gravity = Workspace.Gravity
-    local params, exclusions = getRaycastParams(State.CurrentBall)
-    local ignored = {}
-    local previousPosition = origin
+    local position = part.Position
+    local currentVelocity = velocity
+    local gravity = Vector3.new(0, -Workspace.Gravity, 0)
+    local radius = getBallRadius(part)
+    local params = getRaycastParams(State.CurrentBall)
+    local bounceCount = 0
+    local steps = math.ceil(MAX_TIME / SIMULATION_STEP)
 
-    for t = STEP, MAX_TIME, STEP do
-        local nextPosition = origin
-            + velocity * t
-            + Vector3.new(0, -0.5 * gravity * t * t, 0)
+    for _ = 1, steps do
+        local dt = SIMULATION_STEP
+        local nextVelocity = currentVelocity + gravity * dt
+        local displacement = (currentVelocity + nextVelocity) * (0.5 * dt)
 
-        local result = Workspace:Raycast(
-            previousPosition,
-            nextPosition - previousPosition,
-            params
-        )
+        if displacement.Magnitude > 0.001 then
+            local result
+            local castOk, castResult = pcall(function()
+                return Workspace:Spherecast(position, radius, displacement, params)
+            end)
 
-        if result and result.Instance and result.Instance.CanCollide
-            and not isException(result.Instance)
-            and not isPlayerPart(result.Instance) then
-            if result.Normal.Y >= 0.45 then
-                return result.Position
-                    + result.Normal * (marker.Size.Y / 2 + SURFACE_OFFSET)
+            if castOk then
+                result = castResult
+            else
+                local rayOk, rayResult = pcall(function()
+                    return Workspace:Raycast(position, displacement, params)
+                end)
+                if rayOk then
+                    result = rayResult
+                end
             end
 
-            if not ignored[result.Instance] then
-                ignored[result.Instance] = true
-                exclusions[#exclusions + 1] = result.Instance
-                params.FilterDescendantsInstances = exclusions
+            if result then
+                local hitPart = result.Instance
+                if isPlayerPart(hitPart) then
+                    return nil
+                end
+
+                local distance = math.clamp(result.Distance, 0, displacement.Magnitude)
+                local fraction = distance / math.max(displacement.Magnitude, 0.001)
+                local direction = displacement.Unit
+                local impactVelocity = currentVelocity + gravity * (dt * fraction)
+                local normal = result.Normal
+
+                if normal.Y >= MIN_LANDING_NORMAL and impactVelocity:Dot(normal) < -1 then
+                    return result.Position + normal * (marker.Size.Y * 0.5 + SURFACE_OFFSET)
+                end
+
+                local normalSpeed = impactVelocity:Dot(normal)
+                if normalSpeed < 0 then
+                    local ballElasticity = 0.45
+                    local surfaceElasticity = 0.45
+                    local surfaceFriction = 0.3
+
+                    pcall(function()
+                        ballElasticity = State.RootPart.CurrentPhysicalProperties.Elasticity
+                    end)
+                    pcall(function()
+                        local properties = hitPart.CurrentPhysicalProperties
+                        surfaceElasticity = properties.Elasticity
+                        surfaceFriction = properties.Friction
+                    end)
+
+                    local restitution = math.clamp(math.max(ballElasticity, surfaceElasticity), 0.15, 0.9)
+                    impactVelocity = impactVelocity - normal * ((1 + restitution) * normalSpeed)
+                    local tangentVelocity = impactVelocity - normal * impactVelocity:Dot(normal)
+                    impactVelocity = impactVelocity - tangentVelocity * math.clamp(surfaceFriction * 0.03, 0, 0.12)
+                end
+
+                position = position + direction * distance + normal * 0.06
+                currentVelocity = impactVelocity + gravity * (dt * (1 - fraction))
+                bounceCount += 1
+
+                if bounceCount > MAX_BOUNCES then
+                    return nil
+                end
+            else
+                position = position + displacement
+                currentVelocity = nextVelocity
             end
+        else
+            currentVelocity = nextVelocity
         end
-
-        previousPosition = nextPosition
     end
 
     return nil
@@ -599,10 +656,11 @@ end
 
 local function onBallContact(otherPart)
     if State.Destroyed or not State.Toggles.BallPredict
-        or not otherPart or not otherPart:IsA("BasePart")
-        or not otherPart.CanCollide
-        or isException(otherPart)
-        or isPlayerPart(otherPart) then
+        or not otherPart or not otherPart:IsA("BasePart") then
+        return
+    end
+
+    if not otherPart.CanCollide and not isPlayerPart(otherPart) then
         return
     end
 
@@ -663,25 +721,67 @@ end
 
 local function estimateVelocity(position, now)
     local history = State.History
+    local previous = history[#history]
+
+    if previous then
+        local sampleDt = now - previous.Time
+        if sampleDt > 0.002 and sampleDt < 0.12 then
+            local instantaneous = (position - previous.Position) / sampleDt
+            if instantaneous.Magnitude > MAX_SPEED then
+                clearHistory()
+                history[1] = {Position = position, Time = now}
+                return nil
+            end
+
+            local oldVelocity = State.CurrentVelocity
+            if oldVelocity and oldVelocity.Magnitude > 8 and instantaneous.Magnitude > 8 then
+                local directionDot = oldVelocity.Unit:Dot(instantaneous.Unit)
+                local velocityDelta = (instantaneous - oldVelocity).Magnitude
+                if directionDot < 0.78 or velocityDelta > math.max(75, oldVelocity.Magnitude * 0.65) then
+                    table.clear(history)
+                    history[1] = {Position = position, Time = now}
+                    State.CurrentVelocity = instantaneous
+                    State.PredictionDirty = true
+                    State.LastSimulationAt = 0
+                    return instantaneous
+                end
+            end
+        end
+    end
+
     history[#history + 1] = {Position = position, Time = now}
 
     while #history > 1 and now - history[1].Time > HISTORY_WINDOW do
         table.remove(history, 1)
     end
 
-    if #history < 2 then
+    if #history < 3 then
         return State.CurrentVelocity
     end
 
-    local first = history[1]
-    local last = history[#history]
-    local dt = last.Time - first.Time
+    local meanTime = 0
+    local meanPosition = Vector3.zero
+    for _, sample in ipairs(history) do
+        meanTime += sample.Time
+        meanPosition += sample.Position
+    end
+    meanTime /= #history
+    meanPosition /= #history
 
-    if dt <= 0.003 then
+    local numerator = Vector3.zero
+    local denominator = 0
+    for _, sample in ipairs(history) do
+        local timeOffset = sample.Time - meanTime
+        numerator += (sample.Position - meanPosition) * timeOffset
+        denominator += timeOffset * timeOffset
+    end
+
+    if denominator <= 0.000001 then
         return State.CurrentVelocity
     end
 
-    local velocity = (last.Position - first.Position) / dt
+    local gravityCorrection = Vector3.new(0, -Workspace.Gravity, 0) * (now - meanTime)
+    local velocity = numerator / denominator + gravityCorrection
 
     if velocity.Magnitude > MAX_SPEED then
         clearHistory()
@@ -689,7 +789,9 @@ local function estimateVelocity(position, now)
     end
 
     if State.CurrentVelocity then
-        State.CurrentVelocity = State.CurrentVelocity:Lerp(velocity, VELOCITY_SMOOTHING)
+        local difference = (velocity - State.CurrentVelocity).Magnitude
+        local alpha = difference > math.max(30, State.CurrentVelocity.Magnitude * 0.25) and 0.82 or 0.58
+        State.CurrentVelocity = State.CurrentVelocity:Lerp(velocity, alpha)
     else
         State.CurrentVelocity = velocity
     end
@@ -839,7 +941,8 @@ function State:Start()
             end
         end
 
-        local velocity = estimateVelocity(root.Position, os.clock())
+        local now = os.clock()
+        local velocity = estimateVelocity(root.Position, now)
         if not velocity then
             self.InvalidPredictionElapsed += dt
             if self.InvalidPredictionElapsed >= 0.25 then
@@ -850,12 +953,37 @@ function State:Start()
             return
         end
 
-        if self.PredictionElapsed < PREDICTION_INTERVAL then
+        local shouldRecalculate = self.PredictionDirty or self.LastSimulationAt == 0
+        if self.LastSimulationVelocity then
+            local velocityDelta = (velocity - self.LastSimulationVelocity).Magnitude
+            local directionChanged = false
+            if velocity.Magnitude > 5 and self.LastSimulationVelocity.Magnitude > 5 then
+                directionChanged = velocity.Unit:Dot(self.LastSimulationVelocity.Unit) < 0.985
+            end
+            if velocityDelta >= math.max(14, self.LastSimulationVelocity.Magnitude * 0.12) or directionChanged then
+                shouldRecalculate = true
+            end
+        end
+
+        local predictionExpired = now - self.LastSimulationAt >= STABLE_PREDICTION_INTERVAL
+        if not shouldRecalculate and not predictionExpired then
+            updateTracerVisibility()
+            if Config.autoPosition and self.LastPrediction then
+                moveToLanding(self.LastPrediction)
+            end
+            return
+        end
+
+        if self.PredictionElapsed < PREDICTION_INTERVAL and not shouldRecalculate then
             updateTracerVisibility()
             return
         end
 
         self.PredictionElapsed = 0
+        self.PredictionDirty = false
+        self.LastSimulationAt = now
+        self.LastSimulationPosition = root.Position
+        self.LastSimulationVelocity = velocity
         local predicted = predictLanding(root, velocity)
 
         if predicted then
