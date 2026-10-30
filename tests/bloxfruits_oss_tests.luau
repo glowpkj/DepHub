@@ -125,7 +125,7 @@ do
     local fruits = state.Modules and state.Modules.fruits
     check(fruits ~= nil and type(fruits.config) == "table", "the fruits module exposes its config")
 
-    local espRange = controlFor("ESP max distance")
+    local espRange = controlFor("Fruit / ESP max distance")
     check(espRange ~= nil and espRange.kind == "slider", "fruit ESP max distance is a slider")
     espRange.set(400)
     check(fruits.config.espRange == 400, "ESP max distance writes through to fruits config")
@@ -151,6 +151,81 @@ do
     check(chestCd ~= nil and chestCd.kind == "slider", "chest cooldown is a slider")
     chestCd.set(2)
     check(fruits.config.chestCooldown == 2, "chest cooldown writes through to fruits config")
+
+    -- Events: the raid loop's pacing was hardcoded; the three waits now drive it.
+    local events = state.Modules and state.Modules.events
+    check(events ~= nil and type(events.config) == "table", "the events module exposes its config")
+
+    local waveWait = controlFor("Wave wait")
+    check(waveWait ~= nil and waveWait.kind == "slider", "raid wave wait is a slider")
+    waveWait.set(0.75)
+    check(events.config.waveWait == 0.75, "wave wait writes through to events config")
+
+    local startWait = controlFor("Start wait")
+    check(startWait ~= nil and startWait.kind == "slider", "raid start wait is a slider")
+    startWait.set(4)
+    check(events.config.startWait == 4, "start wait writes through to events config")
+
+    local chipWait = controlFor("Chip wait")
+    check(chipWait ~= nil and chipWait.kind == "slider", "raid chip wait is a slider")
+    chipWait.set(3)
+    check(events.config.chipWait == 3, "chip wait writes through to events config")
+
+    local raidElement = controlFor("Raid element")
+    check(raidElement ~= nil and raidElement.kind == "dropdown", "raid element is a dropdown")
+    raidElement.set("Ice")
+    check(events.config.element == "Ice", "raid element writes through to events config")
+    check(controlFor("Next raid hint") ~= nil, "the raid hint button is now exposed")
+
+    -- Player: ESP range/name and the mobility toggles all exist as real controls.
+    local player = state.Modules and state.Modules.player
+    check(player ~= nil and type(player.config) == "table", "the player module exposes its config")
+
+    local pEspRange = controlFor("Player / ESP max distance")
+    check(pEspRange ~= nil and pEspRange.kind == "slider", "player ESP max distance is a slider")
+    pEspRange.set(900)
+    check(player.config.espRange == 900, "player ESP max distance writes through to player config")
+
+    local espName = controlFor("ESP show name")
+    check(espName ~= nil and espName.kind == "toggle", "ESP show name is a toggle")
+    espName.set(false)
+    check(player.config.espName == false, "ESP show name writes through to player config")
+
+    -- Teleport: flight speed gates how fast every teleport flies.
+    local teleport = state.Modules and state.Modules.teleport
+    check(teleport ~= nil and type(teleport.config) == "table", "the teleport module exposes its config")
+
+    local flySpeed = controlFor("Fly speed")
+    check(flySpeed ~= nil and flySpeed.kind == "slider", "fly speed is a slider")
+    flySpeed.set(120)
+    check(teleport.config.speed == 120, "fly speed writes through to teleport config")
+
+    -- Teleport waypoints are data persisted through Core blobs, not controls: the
+    -- panel renders a fixed set of slots and each reads the current list.
+    check(type(teleport.saveWaypoints) == "function" and type(teleport.loadWaypoints) == "function", "waypoints expose save/load")
+    teleport.waypoints = { { name = "Home", pos = Vector3.new(1, 2, 3) } }
+    teleport.saveWaypoints()
+    local blob = state.Core.loadBlob and state.Core.loadBlob("waypoints")
+    check(type(blob) == "table" and blob[1] and blob[1].name == "Home", "a waypoint round-trips through the blob store")
+    check(controlFor("Go to waypoint #1") ~= nil and controlFor("Clear waypoint #1") ~= nil, "waypoint slots are fixed controls")
+
+    -- Shop: the legendary poll interval drives the auto-buy loop's cadence.
+    local shop = state.Modules and state.Modules.shop
+    check(shop ~= nil and type(shop.config) == "table", "the shop module exposes its config")
+
+    local poll = controlFor("Legendary poll interval")
+    check(poll ~= nil and poll.kind == "slider", "legendary poll interval is a slider")
+    poll.set(7)
+    check(shop.config.legendaryPoll == 7, "legendary poll interval writes through to shop config")
+
+    -- Extras: the summon wait drives the gap between summoning and farming.
+    local extras = state.Modules and state.Modules.extras
+    check(extras ~= nil and type(extras.config) == "table", "the extras module exposes its config")
+
+    local summonWait = controlFor("Summon wait")
+    check(summonWait ~= nil and summonWait.kind == "slider", "summon wait is a slider")
+    summonWait.set(2)
+    check(extras.config.spawnWait == 2, "summon wait writes through to extras config")
 
     local status = state:GetStatus()
     check(status.Controls == #controls and status.Sea == "Sea3", "status reports the live control count and sea")
@@ -321,4 +396,46 @@ do
     local travelTab = ui.Tabs["Sea 1|Travel"]
     check(travelTab ~= nil and travelTab.Category == "Sea 2", "a Sea1,Sea2 tab is re-filed under Sea 2 on Sea 2")
     check(not visible("Sea 1/2") and not visible("Sea 2/3"), "no combined category is shown on Sea 2")
+end
+
+-- §11 panel: the feature search narrows the visible tabs by name and combines
+-- with the sea filter, and clearing it restores exactly the sea-filtered set.
+do
+    local ctx = ossContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table", "Blox Fruits builds for the search test")
+    check(state.UIFrontend == ui, "the backend publishes the mounted frontend for the panel controls")
+
+    ui:SetCurrentSea("Sea3")
+    local function visibleCount()
+        local n = 0
+        for _, tab in pairs(ui.Tabs) do if tab.Visible then n = n + 1 end end
+        return n
+    end
+    local baseline = visibleCount()
+    check(baseline > 0, "the sea filter leaves at least one tab visible")
+
+    ui:Search("farm")
+    local hiddenSeen = false
+    for _, tab in pairs(ui.Tabs) do if not tab.Visible then hiddenSeen = true end end
+    check(hiddenSeen, "search hides tabs whose name does not contain the query")
+    local farmShown = false
+    for _, tab in pairs(ui.Tabs) do
+        if tab.DisplayName == "Farm" and tab.Visible then farmShown = true end
+    end
+    check(farmShown, "a tab matching the query stays visible")
+
+    -- A hidden tab must stay hidden when the sea changes (search is re-applied on
+    -- top of the sea filter, not replaced by it).
+    ui:SetCurrentSea("Sea2")
+    local shopHidden = true
+    for _, tab in pairs(ui.Tabs) do
+        if tab.DisplayName == "Shop" and tab.Visible then shopHidden = false end
+    end
+    check(shopHidden, "a non-matching tab stays hidden across a sea change")
+
+    ui:Search("")
+    ui:SetCurrentSea("Sea3")
+    check(visibleCount() == baseline, "clearing the search restores the sea-filtered baseline")
 end

@@ -1,3 +1,4 @@
+0.0.85 | Blox Fruits: raid pacing, player ESP range, fly speed, persisted waypoints, legendary poll interval, extras summon wait, plus panel descriptions, feature search and automation status.
 0.0.84 | Blox Fruits fruits: cap the fruit ESP distance, limit how far fruits are auto-collected, skip specific fruits on pickup, keep chosen fruits out of the auto-store, and set the chest cooldown.
 0.0.83 | Blox Fruits config: delete, rename and reset a saved config, plus reset every control to its default or just one module at a time. The test harness now has an in-memory filesystem and JSON codec, so Save/Load is actually covered.
 0.0.82 | Blox Fruits PVP: aimbot gains a max range and a body-part picker, the skill rotation follows a configurable order (it used to fire in random order every session), and Auto Bounty takes an ignore list.

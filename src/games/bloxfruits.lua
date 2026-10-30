@@ -283,6 +283,14 @@ local function sectionFor(tabRecord, group)
 end
 local function renderDefinition(definition, section)
     local title = tostring(definition.title or definition.key or "Control")
+    -- Show the control's own description as a caption when the modules provided
+    -- one that adds information beyond the title. This is the §11 "descrições"
+    -- pass: the text already flowed into the control registry, it was just never
+    -- rendered.
+    local description = tostring(definition.description or "")
+    if description ~= "" and description:lower() ~= title:lower() and section.CreateParagraph then
+        section:CreateParagraph(title, description)
+    end
     local function set(value) State:SetControl(definition.key, value) end
     if definition.kind == "toggle" then
         section:CreateToggle(title, definition.get and definition.get() == true, set)
@@ -306,6 +314,39 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                 if pageName == "Info" then
                     local section = sectionFor(record, "Overview")
                     if section then section:CreateParagraph("DepHub", "Controles organizados por categoria. Apenas Anti-AFK fica ligado por padrão.") end
+                    -- Feature search: filters the tab buttons by name so a feature
+                    -- can be found without knowing which sea holds it. Clearing the
+                    -- box shows everything again.
+                    local searchSection = sectionFor(record, "Find")
+                    if searchSection then
+                        searchSection:CreateInput("Search features", "Type to filter tabs...", "", function(value)
+                            if type(visual.Search) == "function" then visual:Search(tostring(value or "")) end
+                        end)
+                        searchSection:CreateButton("Clear search", function()
+                            if type(visual.Search) == "function" then visual:Search("") end
+                        end)
+                    end
+                    -- Automation status: a live read of which toggles are on. The
+                    -- paragraph is a snapshot taken at load; the button reports the
+                    -- current state so the player can confirm at any time.
+                    local statusSection = sectionFor(record, "Status")
+                    if statusSection then
+                        local function activeList()
+                            local parts = {}
+                            for key, value in pairs(State.Toggles or {}) do
+                                if value then parts[#parts + 1] = tostring(key) end
+                            end
+                            table.sort(parts)
+                            return parts
+                        end
+                        local snapshot = activeList()
+                        statusSection:CreateParagraph("Automations ON",
+                            #snapshot > 0 and table.concat(snapshot, ", ") or "Nenhuma automação ligada.")
+                        statusSection:CreateButton("Refresh status", function()
+                            local parts = activeList()
+                            visual:Notify("Status", #parts > 0 and table.concat(parts, ", ") or "Nenhuma automação ligada.", 6)
+                        end)
+                    end
                     local seaSection = sectionFor(record, "Sea")
                     if seaSection then
                         -- Single sea selector. The game reports the current sea

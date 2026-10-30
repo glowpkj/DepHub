@@ -129,6 +129,7 @@ function DemonUI.new(options)
         Tabs = {},
         Categories = {},
         CurrentSea = "Sea1",
+        SearchQuery = "",
         Destroyed = false
     }, DemonUI)
     self:CreateCategory(DEFAULT_CATEGORY, "layers")
@@ -369,11 +370,49 @@ function DemonUI:_refreshVisibility()
             end
         end
     end
+
+    -- Re-apply the active search query on top of the sea filter, so switching
+    -- seas or refiling tabs never resurrects a hidden search result.
+    if self.SearchQuery and self.SearchQuery ~= "" then
+        for _, tab in pairs(self.Tabs) do
+            if tab.Visible then
+                local label = tostring(tab.DisplayName or tab.Name or ""):lower()
+                if not label:find(self.SearchQuery, 1, true) then
+                    tab.Visible = false
+                    local button = tab.Button
+                    if button and button.IsA and button:IsA("GuiObject") then button.Visible = false end
+                end
+            end
+        end
+    end
 end
 
 function DemonUI:SetCurrentSea(sea)
     self.CurrentSea = normalizeSea(sea)
     self:_refreshVisibility()
+end
+
+-- Feature search. Filters tab buttons by name so a player can find a feature
+-- without knowing which sea or category it lives in. Visibilities combine with
+-- the sea filter: a tab shows only when it matches the sea AND the query (an
+-- empty query matches everything). The library's own tab list is not rebuilt,
+-- only each known tab button's Visible flag is set, so nothing is left orphaned.
+function DemonUI:Search(query)
+    self.SearchQuery = tostring(query or ""):lower()
+    local state = self.Library and self.Library._STATE
+    if type(state) ~= "table" then return end
+    local sea = normalizeSea(self.CurrentSea)
+    for _, tab in pairs(self.Tabs) do
+        local matchesSea = self:_tabMatchesSea(tab, sea)
+        local label = tostring(tab.DisplayName or tab.Name or ""):lower()
+        local matchesQuery = self.SearchQuery == "" or label:find(self.SearchQuery, 1, true) ~= nil
+        local visible = matchesSea and matchesQuery
+        tab.Visible = visible
+        local button = tab.Button
+        if button and button.IsA and button:IsA("GuiObject") then button.Visible = visible end
+        local page = state.ContentPages and state.ContentPages[tab.Name]
+        if page and not visible then page.Visible = false end
+    end
 end
 
 function DemonUI:Notify(title, message, kind)

@@ -166,69 +166,92 @@ mecanismo — em vez de criar um controle que não muda nada.
 
 ## 5. RAIDS / EVENTS
 
-Arquivo: `events.lua`. `config.element`; `raidLoc` por sea; `serverHop`.
+Arquivo: `events.lua`. Config: `element`, além das novas `waveWait`, `startWait`,
+`chipWait`; `raidLoc` por sea; `serverHop`.
 
 | Pedido | Estado | Nota |
 |---|---|---|
-| Auto Raid: elemento / iniciar / skills / distância | **Parcial** | `element` só; skills via Combat |
-| Auto Raid: intervalo / condições / recursos | **Gap** | sem verificação de recursos/beleza |
+| Auto Raid: elemento / iniciar / skills / distância | **Impl** Auto | dropdown "Raid element"; skills/distância via Combat |
+| Auto Raid: intervalo / condições / recursos | **Impl** Auto | sliders "Wave wait"/"Start wait"/"Chip wait" — eram `task.wait` fixos no loop |
 | Eventos: seleção / filtros / prioridade | **Gap** | eventos fixos, sem seleção |
-| Eventos: teleporte / intervalo de verificação | **Parcial** | teleporta; sem intervalo config |
+| Eventos: teleporte / intervalo de verificação | **Parcial** | teleporta; sem verificação automática contínua |
 | Elite Hunter / Leviathan / Server Hop | **Impl** | controles existem (Elite/Leviathan sea-scoped) |
+| Raid hint (próximo raid) | **Impl** Auto | botão "Next raid hint" → `M.raidHint()` (estava implementado e **nunca exposto**) |
+
+**Resumo Events:** a rodada expôs o pacing do raid (os três `task.wait` fixos
+viraram sliders reais, lidos pelo loop via `math.max(0, config[key])`) e ligou o
+`raidHint()` que existia no código mas não tinha botão. Seleção de eventos e
+verificação automática contínua continuam **Gap**: dependem de um sinal de evento
+ativo que não é exposto de forma estável.
 
 ---
 
 ## 6. PLAYER
 
 Arquivo: `player.lua`. Config: `noclip`, `walkWater`, `speedOn`,
-`walkSpeed`, `jumpOn`, `jumpPower`, `ken`, `buso`, `antiAfk`.
+`walkSpeed`, `jumpOn`, `jumpPower`, `ken`, `buso`, `antiAfk`, além das novas
+`espRange`, `espName`.
 
 | Pedido | Estado | Nota |
 |---|---|---|
-| ESP (dist/nome/filtros) | **Parcial** | `_esp` existe; `_espOn`; sem filtros |
-| WalkSpeed / JumpPower | **Impl** | sliders existem |
-| Presets de movimento / restaurar | **Gap** | não há preset nem restore |
+| ESP (dist/nome/filtros) | **Impl** Auto | sliders "ESP max distance" (`espRange`, 0=todos) + toggle "ESP show name" (`espName`) |
+| WalkSpeed / JumpPower | **Impl** Auto | sliders existem e escrevem no config |
+| Presets de movimento / restaurar | **Impl** Auto | desligar Speed/Jump restaura o valor-base capturado no spawn; `stop()` idem (antes era 16/50 chumbados) |
 | NoClip / Walk on Water / Auto Ken / Buso / Anti-AFK | **Impl** | todos presentes |
+
+**Resumo Player:** ESP ganhou distância máxima e alternância de nome; e o
+"restaurar" virou **real** — `rememberBase()` guarda `WalkSpeed`/`JumpPower`
+originais no `CharacterAdded` (e no init), então desligar a feature (ou `stop`)
+devolve o valor do jogo em vez de um número fixo.
 
 ---
 
 ## 7. TELEPORT / SEA
 
-Arquivo: `teleport.lua`. `config.speed`; `islands`, `waypoints`.
+Arquivo: `teleport.lua`. `config.speed` (agora com controle); `islands`,
+`waypoints` (agora persistidos).
 
 | Pedido | Estado | Nota |
 |---|---|---|
-| Favoritos / waypoints personalizados | **Gap** | o plano diz que waypoints aparecem soltos no menu `/` |
-| Organização por categoria | **Gap** | islands e waypoints misturados |
-| Pesquisa de destinos | **Gap** | sem busca |
+| Velocidade / cancelar / destino inválido | **Impl** Auto | slider "Fly speed" → `config.speed` (50–1000); `M.cancel()` existe |
+| Favoritos / waypoints personalizados | **Impl** Auto | 12 slots fixos "Go to waypoint #N" / "Clear waypoint #N" |
+| Persistência de waypoints | **Impl** Auto | `Core.saveBlob/loadBlob` em `DepHub_BF_data_waypoints.json` (sobrevivem a rejoin) |
+| Organização por categoria | **Impl** | seções ISLANDS/BOSSES/WAYPOINTS/FLIGHT |
+| Pesquisa de destinos | **Gap** | sem busca na lista (dropdown do painel já navega) |
 | Histórico de teleporte | **Gap** | não existe |
-| Velocidade / cancelar / destino inválido | **Parcial** | `speed`; sem cancel/validação visível |
-| Organização por Sea / infos | **Parcial** | listas por sea, sem info por destino |
+| Organização por Sea / infos | **Parcial** | listas por sea; sem info por destino |
+
+**Resumo Teleport:** os waypoints eram só em memória e sem forma de apagar. Agora
+são **dados persistidos** (blob próprio) com slots fixos de Go/Clear (o painel
+renderiza uma vez; nada de re-registrar controles duplicados) e "Clear all". A
+velocidade de voo deixou de ser constante cravada. Busca/histórico ficam pendentes
+(mecanismo novo, não só config).
 
 ---
 
 ## 8. SHOP
 
 Arquivo: `shop.lua`. `buy(action,arg)`; dealers por sea; auto-buy swords
-(Rengoku/Oroshi/Shizu).
+(Rengoku/Oroshi/Shizu); config `legendaryPoll`.
 
 | Pedido | Estado | Nota |
 |---|---|---|
-| Separar por categoria / filtros / busca | **Gap** | compra por dealer; sem busca |
-| Favoritos / compra individual | **Parcial** | há botões de compra |
-| Compra automática / verif. dinheiro / requisitos | **Parcial** | auto-buy existe; sem checagem explícita |
+| Separar por categoria / filtros / busca | **Parcial** | seções SWORDS/GUNS/STYLES/ACCESSORIES; sem busca |
+| Favoritos / compra individual | **Impl** | botões de compra por item |
+| Compra automática / verif. dinheiro / requisitos | **Impl** Auto | slider "Legendary poll interval" → `legendaryPoll` (era 4s fixo); resultado tratado (0=dinheiro, 1=ok, 2=já tem) |
 | Feedback de compra/falha | **Impl** | `notify` no `buy` |
 
 ---
 
 ## 9. EXTRAS
 
-Arquivo: `extras.lua` (65 linhas). Race V4, V4 Trial, Race Upgrade/Reroll,
-Cake Prince, Rip Indra.
+Arquivo: `extras.lua`. Race V4, V4 Trial, Race Upgrade/Reroll, Cake Prince,
+Rip Indra; config `spawnWait`.
 
 | Pedido | Estado | Nota |
 |---|---|---|
-| Config própria por sistema | **Gap** | só botões de ação, sem config/condição/status |
+| Config própria por sistema | **Impl** Auto | slider "Summon wait" → `spawnWait` (era 0.5 fixo) |
+| Auto Cake Prince / Auto Rip Indra | **Impl** Auto | agora **desligam sozinhos** e avisam quando o boss não está na lista (antes ficavam presas ligadas sem fazer nada) |
 | `farmBoss` reusa o farm | **Impl** | liga o Farm Boss com nome |
 
 ---
@@ -236,14 +259,16 @@ Cake Prince, Rip Indra.
 ## 10. CONFIG
 
 Arquivo: `core.lua`. `gatherConfig/applyConfig/saveNamedConfig/loadNamedConfig/
-listConfigs/unload`; prefixo `DepHub_BF_`; `cfg_<name>.json`; `lastcfg.txt`.
+listConfigs/unload`, além de `deleteNamedConfig/renameNamedConfig/resetToDefaults/
+resetModule` e os novos `saveBlob/loadBlob/deleteBlob`; prefixo `DepHub_BF_`;
+`cfg_<name>.json`; `data_<name>.json`; `lastcfg.txt`.
 
 | Pedido | Estado | Nota |
 |---|---|---|
 | Salvar/Carregar/Criar com nome/Listar | **Impl** Auto | existe |
 | Excluir | **Impl** Auto | botão "Excluir configuração" → `deleteNamedConfig` (delfile) |
 | Renomear | **Impl** Auto | botão "Renomear" → `renameNamedConfig` (lê/grava/apaga) |
-| Restaurar padrões (tudo) | **Impl** Auto | botão "Restaurar padrões" → `resetToDefaults` (usa o `default` de cada `_def` |
+| Restaurar padrões (tudo) | **Impl** Auto | botão "Restaurar padrões" → `resetToDefaults` (usa o `default` de cada `_def`) |
 | Config por módulo / restaurar só um módulo | **Impl** Auto | dropdown "Módulo" + "Restaurar módulo" → `resetModule` via `moduleForPage` |
 | Presets (Default/Safe/Fast/Custom) | **Gap** | não existe; ver nota abaixo |
 
@@ -264,21 +289,27 @@ módulos, para não violar a §12.
 | Pedido | Estado | Nota |
 |---|---|---|
 | Seções organizadas / nomes claros | **Impl** | `groupFor`/`sectionFor` agrupam |
-| Descrições úteis | **Parcial** | `UI.toggle/slider` têm `desc`; backend não renderiza tooltip |
-| Pesquisa de features/config | **Gap** | sem busca no painel |
-| Status das automações | **Parcial** | estado no backend; sem linha de status visual |
-| Abas organizadas | **Impl** | feitas nesta rodada (sea atual) |
+| Descrições úteis | **Impl** Auto | `renderDefinition` agora emite a `description` de cada controle como parágrafo (antes era capturada e descartada) |
+| Pesquisa de features/config | **Impl** Auto | input "Search features" → `DemonUI:Search(q)` filtra abas por nome e combina com o filtro de sea |
+| Status das automações | **Impl** Auto | seção "Status" na Home: parágrafo com o snapshot + botão "Refresh status" ao vivo |
+| Abas organizadas | **Impl** | sidebar mostra só General + sea atual (v0.0.80) |
 
 ---
 
-## Ordem de execução (a partir daqui)
+## Ordem de execução (estado)
 
-1. **Farm** (§2): expor `hoverRange`, `questInterval`, `attackInterval`, e um
-   alcance de detecção próprio; adicionar comportamento ao perder alvo/morrer
-   onde já há gancho. Só depois migrar para os sistemas (maestria/armas).
-2. **PVP** (§3): lista de ignorados, parte do corpo + tecla do aimbot, ordem de skills.
-3. **Fruits** (§4): maior trabalho — ESP/Store/Chest são features novas.
-4. **Events/Player/Teleport/Shop/Extras/Config/Painel** conforme §14.
+1. **Farm** (§2): ✅ config de risco baixo exposta. Gaps de sistema pendentes.
+2. **PVP** (§3): ✅ ignorados, parte/alcance do aimbot, ordem de skills (bug corrigido).
+3. **Fruits** (§4): ✅ ESP/coleta/store/chest configurados; raridade/inventário pendentes.
+4. **Config** (§10): ✅ excluir/renomear/reset-tudo/reset-módulo.
+5. **Raids/Events** (§5): ✅ pacing + raid hint.
+6. **Player** (§6): ✅ ESP range/nome + restore real de movimento.
+7. **Teleport** (§7): ✅ fly speed + waypoints persistidos.
+8. **Shop** (§8): ✅ legendário configurável.
+9. **Extras** (§9): ✅ summon wait + auto-toggles com auto-off.
+10. **Painel** (§11): ✅ descrições, busca de features, status de automações.
 
 Cada etapa: suite verde + bundle + validate + bump + commit/push, declarando
-**Impl / Auto / Game / Pendente** por funcionalidade.
+**Impl / Auto / Game / Pendente** por funcionalidade. Gaps sem mecanismo real
+(raridade de fruta, capacidade de inventário, bind de tecla do aimbot, histórico
+de teleporte, presets Safe/Fast) ficam registrados com o motivo, não simulados.

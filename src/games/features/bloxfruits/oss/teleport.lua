@@ -252,18 +252,65 @@ function M.init(Core, UI)
         end
     end)
 
+    -- Flight speed. Lower it if the anti-cheat loopbacks on the huge Sea 3 map.
+    UI.section(page, "FLIGHT")
+    UI.slider(page, "Fly speed", "Studs per second used by every teleport (lower if you get kicked)", 50, 1000, M.config.speed, function(v) M.config.speed = v end)
+
     UI.section(page, "WAYPOINTS")
-    local function addBtn(w) UI.button(page, "Go: " .. w.name, "Saved waypoint", function() M.go(w.pos) end) end
-    for _, w in ipairs(M.waypoints) do addBtn(w) end
+    -- Waypoints are data, not controls: the panel renders a fixed set of slots
+    -- once, and each slot reads whatever waypoint currently sits at its index.
+    -- That avoids re-registering controls (which would spawn duplicate buttons).
+    -- The list itself persists to disk through Core blobs.
+    local WP_FILE = "waypoints"
+    local WP_SLOTS = 12
+    M.saveWaypoints = function()
+        if Core.saveBlob then Core.saveBlob(WP_FILE, M.waypoints) end
+    end
+    M.loadWaypoints = function()
+        local data = Core.loadBlob and Core.loadBlob(WP_FILE)
+        if type(data) == "table" then
+            local clean = {}
+            for _, w in ipairs(data) do
+                if type(w) == "table" and w.name then
+                    local p = w.pos or {}
+                    clean[#clean + 1] = { name = tostring(w.name), pos = Vector3.new(tonumber(p.X) or 0, tonumber(p.Y) or 0, tonumber(p.Z) or 0) }
+                end
+            end
+            M.waypoints = clean
+        end
+    end
+    M.loadWaypoints()
+
     local nameBox = UI.textbox(page, "New waypoint name...")
     UI.button(page, "Save current position", "Store your position as a waypoint", function()
         local hrp = M.hrp()
         if not hrp then UI.notify("No character"); return end
+        if #M.waypoints >= WP_SLOTS then UI.notify("Waypoint list full (" .. WP_SLOTS .. ")"); return end
         local name = (nameBox.Text ~= "" and nameBox.Text) or ("WP " .. (#M.waypoints + 1))
-        local w = { name = name, pos = hrp.Position }
-        M.waypoints[#M.waypoints + 1] = w
-        addBtn(w); nameBox.Text = ""
-        UI.notify("Saved: " .. name)
+        -- Replace a same-named waypoint instead of stacking duplicates.
+        for i, w in ipairs(M.waypoints) do if w.name == name then table.remove(M.waypoints, i) break end end
+        M.waypoints[#M.waypoints + 1] = { name = name, pos = hrp.Position }
+        M.saveWaypoints()
+        nameBox.Text = ""
+        UI.notify("Saved: " .. name .. " (#" .. #M.waypoints .. ")")
+    end)
+    -- Slot controls are registered once; their labels are generic (#1..#12) so no
+    -- per-waypoint control ever needs creating. Add/remove only rewrites the data.
+    for slot = 1, WP_SLOTS do
+        UI.button(page, ("Go to waypoint #%d"):format(slot), "Fly to the saved waypoint in this slot", function()
+            local w = M.waypoints[slot]
+            if w then M.go(w.pos) else UI.notify("Slot " .. slot .. " is empty") end
+        end)
+        UI.button(page, ("Clear waypoint #%d"):format(slot), "Delete the waypoint in this slot", function()
+            local w = M.waypoints[slot]
+            if w then table.remove(M.waypoints, slot); M.saveWaypoints(); UI.notify("Removed: " .. w.name)
+            else UI.notify("Slot " .. slot .. " is empty") end
+        end)
+    end
+    UI.button(page, "Clear all waypoints", "Delete every saved waypoint", function()
+        M.waypoints = {}
+        M.saveWaypoints()
+        UI.notify("Waypoints cleared")
     end)
 
     local seaPage = UI.page("Sea")

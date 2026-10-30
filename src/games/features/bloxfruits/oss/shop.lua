@@ -11,6 +11,7 @@ local task = dephub.task
 local RS = game:GetService("ReplicatedStorage")
 
 local M = {}
+M.config = { legendaryPoll = 4 }   -- seconds between legendary-dealer polls
 local function commF() local r = RS:FindFirstChild("Remotes"); return r and r:FindFirstChild("CommF_") end
 
 function M.buy(action, arg)
@@ -90,7 +91,7 @@ function M.setAutoLegendary(on)
                     if M._legendaryToggle then M._legendaryToggle.Set(false) end
                 end
             end
-            task.wait(4)
+            task.wait(math.max(1, tonumber(M.config.legendaryPoll) or 4))
         end
     end)
 end
@@ -178,6 +179,9 @@ function M.init(Core, UI)
             UI.notify(res == 1 and ("Bought: " .. name) or res == 0 and "Not enough money" or res == 2 and "Already owned" or "Gone")
         end)
         M._legendaryToggle = UI.toggle(page, "Auto Buy Legendary Sword", "Poll the random dealer and buy when it appears", false, function(s) M.setAutoLegendary(s) end)
+        -- The poll interval used to be a hardcoded 4s; it is the only knob that
+        -- changes how often the auto-buy loop checks the dealer.
+        UI.slider(page, "Legendary poll interval", "Seconds between dealer checks", 1, 30, M.config.legendaryPoll, function(v) M.config.legendaryPoll = v end)
     end
 
     buildShop(UI.page("Shop"), { swords = M.swords, guns = M.guns, styles = M.styles, haki = M.haki, items = M.items })

@@ -163,6 +163,29 @@ function Core.loadLastConfig()
     return false
 end
 
+-- Named blobs hold module data that is not a control value (waypoints, for
+-- example). Same executor file APIs and JSON codec as the config path, but a
+-- separate namespace so a config save never overwrites module data.
+local function blobFile(name) return FILE_PREFIX .. "data_" .. tostring(name) .. ".json" end
+function Core.saveBlob(name, data)
+    if not (writefile and name) then return false end
+    local ok, s = pcall(function() return HttpService:JSONEncode(data or {}) end)
+    if not ok then return false end
+    return pcall(writefile, blobFile(name), s)
+end
+function Core.loadBlob(name)
+    if not (isfile and readfile and name) then return nil end
+    local file = blobFile(name)
+    if not (pcall(isfile, file) and isfile(file)) then return nil end
+    local ok, data = pcall(function() return HttpService:JSONDecode(readfile(file)) end)
+    if ok and type(data) == "table" then return data end
+    return nil
+end
+function Core.deleteBlob(name)
+    if not (delfile and name) then return false end
+    return pcall(delfile, blobFile(name))
+end
+
 -- Delete a named config. delfile is executor-provided, so guard it like the other
 -- file APIs. The last-config pointer is cleared when it named this file. A
 -- missing file reports false rather than pretending it deleted something.

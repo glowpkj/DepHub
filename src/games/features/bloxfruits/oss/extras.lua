@@ -11,6 +11,7 @@ local task = dephub.task
 local RS = game:GetService("ReplicatedStorage")
 
 local M = {}
+M.config = { spawnWait = 0.5 }   -- seconds to wait after summoning before selecting the boss
 local function commF() local r = RS:FindFirstChild("Remotes"); return r and r:FindFirstChild("CommF_") end
 local function call(action, ...)
     local c = commF(); if not c then return end
@@ -54,17 +55,38 @@ function M.init(Core, UI)
         local ok = call("CakePrinceSpawner", true)
         UI.notify(ok and "Cake Prince summoned" or "Cake Prince error")
     end)
-    UI.toggle(page, "Auto Cake Prince", "Summon Cake Prince then farm it", false, function(s)
-        if s then call("CakePrinceSpawner", true); task.wait(0.5); if not farmBoss("Cake Prince") then UI.notify("Cake Prince not in boss list") end
-        else local farm = Core.modules.farm; if farm then farm.setBossFarm(false) end end
+    local cakeToggle
+    cakeToggle = UI.toggle(page, "Auto Cake Prince", "Summon Cake Prince then farm it", false, function(s)
+        if s then
+            call("CakePrinceSpawner", true)
+            task.wait(math.max(0, tonumber(M.config.spawnWait) or 0.5))
+            if not farmBoss("Cake Prince") then
+                -- No boss to farm: say so and drop the switch instead of leaving
+                -- it on while doing nothing.
+                UI.notify("Cake Prince not in boss list")
+                if cakeToggle then cakeToggle.Set(false) end
+            end
+        else
+            local farm = Core.modules.farm; if farm then farm.setBossFarm(false) end
+        end
     end)
     UI.button(page, "Talk to Indra", "Trigger rip_indra (raid boss)", function()
         call("IndraTalk"); UI.notify("Indra triggered")
     end)
-    UI.toggle(page, "Auto Rip Indra", "Talk to Indra then farm rip_indra", false, function(s)
-        if s then call("IndraTalk"); task.wait(0.5); if not farmBoss("rip_indra") then UI.notify("rip_indra not in boss list") end
-        else local farm = Core.modules.farm; if farm then farm.setBossFarm(false) end end
+    local indraToggle
+    indraToggle = UI.toggle(page, "Auto Rip Indra", "Talk to Indra then farm rip_indra", false, function(s)
+        if s then
+            call("IndraTalk")
+            task.wait(math.max(0, tonumber(M.config.spawnWait) or 0.5))
+            if not farmBoss("rip_indra") then
+                UI.notify("rip_indra not in boss list")
+                if indraToggle then indraToggle.Set(false) end
+            end
+        else
+            local farm = Core.modules.farm; if farm then farm.setBossFarm(false) end
+        end
     end)
+    UI.slider(page, "Summon wait", "Seconds to wait after summoning before farming", 0, 10, M.config.spawnWait, function(v) M.config.spawnWait = v end)
 
     Core.register("extras", M)
     return M

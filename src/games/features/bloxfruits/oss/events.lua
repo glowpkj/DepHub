@@ -14,7 +14,12 @@ local TPS = game:GetService("TeleportService")
 local LP = Players.LocalPlayer
 
 local M = {}
-M.config = { element = "Flame" }
+M.config = {
+    element = "Flame",
+    waveWait = 0.35,     -- seconds between attack passes while clearing a wave
+    startWait = 2.5,     -- seconds to wait after pressing the raid start button
+    chipWait = 1.5,      -- seconds to wait when the microchip is missing
+}
 M._raidOn, M._inRaid, M._clearing = false, false, false
 M.raidLoc = {
     Sea2 = { tube = Vector3.new(-6546.1, 310.5, -4767.7), button = Vector3.new(-6530.7, 304.8, -4798.4) },
@@ -138,6 +143,9 @@ function M.setAutoRaid(on)
     if not M._core then return end
     M._core.spawn(function()
         local tp = M._core.modules.teleport
+        local function pause(key, fallback)
+            task.wait(math.max(0, tonumber(M.config[key]) or fallback))
+        end
         while M._raidOn do
             if M._inRaid then
                 setClearing(false)
@@ -159,7 +167,7 @@ function M.setAutoRaid(on)
                 else
                     M._status("Raid: waiting for next wave")
                 end
-                task.wait(0.35)
+                pause("waveWait", 0.35)
             else
                 setClearing(false)
                 if not chipTool() then M.buyChip(); task.wait(0.8) end
@@ -167,7 +175,7 @@ function M.setAutoRaid(on)
                 if not eq then
                     M._status("Raid: no Microchip — buy/hold one")
                     if M._core then M._core.warn("auto raid: chip not equipped (found=" .. tostring(chipTool() ~= nil) .. ")") end
-                    task.wait(1.5)
+                    pause("chipWait", 1.5)
                 else
                     local loc = M.currentRaidLoc()
                     if tp then tp.go(loc.tube + Vector3.new(0, 3, 0)) end
@@ -176,7 +184,7 @@ function M.setAutoRaid(on)
                     local n = triggerAround(loc.button, 60)
                     M._status(("Raid: pressing button... chip=%s fired=%d"):format(tostring(chipEquipped()), n))
                     if M._core then M._core.info("auto raid", "tube button", "chip=" .. tostring(chipEquipped()), "n=" .. n) end
-                    task.wait(2.5)
+                    pause("startWait", 2.5)
                 end
             end
         end
@@ -246,7 +254,21 @@ function M.init(Core, UI)
     UI.section(page, "AUTO RAID")
     UI.dropdown(page, "Raid element", "Microchip element (your fruit to awaken)", M.elements, function(s) M.config.element = s end)
     UI.toggle(page, "Auto Raid", "Buy chip, start the raid, then clear all waves", false, function(s) M.setAutoRaid(s) end)
+    -- These three paced the raid loop with hardcoded waits; they are the only
+    -- knobs that actually change how the loop behaves, so they get controls.
+    UI.slider(page, "Wave wait", "Seconds between attack passes while clearing", 0.1, 3, M.config.waveWait, function(v) M.config.waveWait = v end)
+    UI.slider(page, "Start wait", "Seconds to wait after pressing the raid button", 0.5, 10, M.config.startWait, function(v) M.config.startWait = v end)
+    UI.slider(page, "Chip wait", "Seconds to wait when the microchip is missing", 0.5, 10, M.config.chipWait, function(v) M.config.chipWait = v end)
     UI.button(page, "Check raid status", "Query the raid NPC", function() local v = M.raidCheck(); if M._ui then M._ui.notify("Raid check: " .. tostring(v)) end end)
+    -- raidHint() queries the RequestNextRaidHint RemoteFunction; it was implemented
+    -- but never exposed, so the next-raid hint was unreachable.
+    UI.button(page, "Next raid hint", "Ask the server for the next raid's hint", function()
+        local hint = M.raidHint()
+        if not hint then if M._ui then M._ui.notify("No hint available") end return end
+        local label = hint.Element or hint.element or hint.Next or tostring(hint)
+        if M._ui then M._ui.notify("Next raid: " .. tostring(label)) end
+        if M._core then M._core.info("raid hint", label) end
+    end)
     local statFrame = UI.section(page, "Raid: idle")
     M._statusLbl = statFrame and statFrame:FindFirstChildWhichIsA("TextLabel")
     function M._status(t) if M._statusLbl then M._statusLbl.Text = t end end

@@ -20,8 +20,17 @@ M.config = {
     noclip = false, walkWater = false, speedOn = false, walkSpeed = 50, jumpOn = false, jumpPower = 120,
     ken = false, buso = false,
     antiAfk = true,
+    espRange = 0,       -- 0 = show every player; >0 hides players past this many studs
+    espName = true,     -- show the player name above the distance
 }
 M._platform, M._hakiRunning = nil, false
+-- The humanoid values a session started with, so a speed/jump feature can restore
+-- them instead of dropping everyone back to a hardcoded 16.
+M._baseSpeed, M._baseJump = nil, nil
+local function rememberBase()
+    local h = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+    if h then M._baseSpeed, M._baseJump = h.WalkSpeed, h.JumpPower end
+end
 
 local function hrp(ch) return ch and ch:FindFirstChild("HumanoidRootPart") end
 local function myHrp() return LP.Character and LP.Character:FindFirstChild("HumanoidRootPart") end
@@ -109,7 +118,8 @@ function M.stop()
     M.config.ken, M.config.buso = false, false
     if M._platform then M._platform:Destroy(); M._platform = nil end
     local h = myHum()
-    if h then h.WalkSpeed = 16 end
+    -- Restore what the session started with, not a hardcoded 16/50.
+    if h then h.WalkSpeed = M._baseSpeed or 16; h.JumpPower = M._baseJump or 50 end
 end
 
 function M.init(Core, UI)
@@ -124,16 +134,32 @@ function M.init(Core, UI)
         end)
     end))
 
+    -- Capture the humanoid's stock WalkSpeed/JumpPower whenever a character
+    -- spawns, so speed/jump features have something real to restore to.
+    Core.track(LP.CharacterAdded:Connect(function() task.wait(0.5); rememberBase() end))
+    rememberBase()
+
     local page = UI.page("Player")
 
     UI.toggle(page, "Player ESP", "Highlight players and show distance", false, function(s) M.setESP(s) end)
+    -- espRange gates what the ESP draws (0 = everyone); the distance was already
+    -- computed for the label, so this only decides whether to show it.
+    UI.slider(page, "ESP max distance", "Hide players past this many studs (0 = all)", 0, 5000, M.config.espRange, function(v) M.config.espRange = v end)
+    UI.toggle(page, "ESP show name", "Show the player name above the distance", true, function(s) M.config.espName = s end)
 
     UI.section(page, "MOBILITY")
     UI.toggle(page, "NoClip", "Walk through walls", false, function(s) M.config.noclip = s end)
     UI.toggle(page, "Walk on Water", "Invisible platform over water", false, function(s) M.config.walkWater = s end)
-    UI.toggle(page, "Speed boost", "Faster walk speed", false, function(s) M.config.speedOn = s end)
+    UI.toggle(page, "Speed boost", "Faster walk speed", false, function(s)
+        M.config.speedOn = s
+        -- Restore the value the humanoid had before the boost when turning off.
+        if not s then local h = myHum(); if h then h.WalkSpeed = M._baseSpeed or 16 end end
+    end)
     UI.slider(page, "Walk speed", "Speed value", 16, 300, M.config.walkSpeed, function(v) M.config.walkSpeed = v end)
-    UI.toggle(page, "Super jump", "Higher jump", false, function(s) M.config.jumpOn = s end)
+    UI.toggle(page, "Super jump", "Higher jump", false, function(s)
+        M.config.jumpOn = s
+        if not s then local h = myHum(); if h then h.JumpPower = M._baseJump or 50 end end
+    end)
     UI.slider(page, "Jump power", "Jump value", 50, 500, M.config.jumpPower, function(v) M.config.jumpPower = v end)
 
     UI.section(page, "HAKI")
@@ -146,6 +172,7 @@ function M.init(Core, UI)
     Core.track(RunService.Heartbeat:Connect(function()
         if not M._espOn then return end
         local mh = myHrp()
+        local maxR = tonumber(M.config.espRange) or 0
         for _, p in ipairs(M.others()) do
             local ch = p.Character
             if ch then
@@ -154,7 +181,10 @@ function M.init(Core, UI)
                 if not e then e = makeEsp(ch); M._esp[p] = e end
                 local h = hrp(ch)
                 local d = (h and mh) and math.floor((h.Position - mh.Position).Magnitude) or 0
-                e.lbl.Text = p.Name .. "\n" .. d .. "m"
+                local shown = (maxR <= 0) or (d <= maxR)
+                e.hl.Enabled = shown
+                e.bb.Enabled = shown
+                e.lbl.Text = M.config.espName and (p.Name .. "\n" .. d .. "m") or (d .. "m")
             end
         end
     end))
