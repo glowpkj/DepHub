@@ -127,3 +127,28 @@ do
     local snapped = CFrame.lookAt(camera.CFrame.Position, target)
     check(snapped.LookAt == target and smoothed.LookAt == snapped.LookAt, "smoothed and snapped share the same target, differ only in alpha")
 end
+
+do
+    local ctx = sandbox()
+    local Dashboard = ctx:Run("src/core/dashboard.lua")
+    local updates = 0
+    local dashboard = Dashboard.new({
+        Interval = 1,
+        ManifestInterval = 30,
+        ScriptVersion = "0.0.99",
+        OnUpdate = function() updates += 1 end
+    })
+
+    check(dashboard:Start(), "dashboard starts once")
+    check(dashboard.Started and dashboard:Get().PlaceId ~= nil, "dashboard publishes an initial snapshot immediately")
+    check(updates >= 1, "dashboard emits its initial update")
+    check(dashboard._refreshingUpdates == true, "release metadata refresh runs asynchronously")
+    check(dashboard:RefreshUpdates(true) == false, "dashboard prevents overlapping release checks")
+
+    local before = dashboard:GetSnapshot()
+    check(before.ScriptVersion == "0.0.99", "dashboard keeps its known version while release metadata is pending")
+    dashboard:Destroy()
+    check(dashboard.Destroyed and not dashboard.Started, "dashboard destroy stops its lifecycle")
+    check(next(dashboard.Connections) == nil, "dashboard destroy disconnects heartbeat listeners")
+end
+
