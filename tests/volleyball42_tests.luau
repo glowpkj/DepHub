@@ -147,7 +147,12 @@ do
     check(state.Destroyed and humanoid.JumpPower == 55, "destroy restores the jump power")
     check(ctx.State.__DEPHUB.Volleyball42 == nil, "destroy clears the published state")
 
-    -- The new controls are registered on the Ball Predict tab.
+    -- Controls are split into feature tabs instead of being nested in one game-named page.
+    local pages = ui.Library._STATE.ContentPages
+    for _, tabName in ipairs({"Previsão", "Posicionamento", "Pulo", "Colisão"}) do
+        check(pages[tabName] ~= nil, "Volleyball creates the " .. tabName .. " feature tab")
+    end
+    check(pages["Ball Predict"] == nil, "Volleyball does not use a generic all-in-one tab")
     local labels = {}
     for _, control in ipairs(ui.Library._Controls) do
         if control.Label then labels[control.Label] = true end
