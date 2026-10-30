@@ -40,6 +40,10 @@ vectorMeta.__mul = function(a, b)
 end
 vectorMeta.__div = function(a, b) return Vector3.new(a.X/b, a.Y/b, a.Z/b) end
 vectorMeta.__eq = function(a, b) return a.X == b.X and a.Y == b.Y and a.Z == b.Z end
+-- Real Vector3.Lerp: linear interpolation, used by velocity smoothing.
+function vectorMeta:Lerp(goal, alpha)
+    return Vector3.new(self.X + (goal.X - self.X) * alpha, self.Y + (goal.Y - self.Y) * alpha, self.Z + (goal.Z - self.Z) * alpha)
+end
 function Vector3.new(x, y, z)
     if type(x) == "table" then y, z = x.Y, x.Z; x = x.X end
     return setmetatable({X=x or 0, Y=y or 0, Z=z or 0, __vector=true, Magnitude=math.sqrt((x or 0)^2+(y or 0)^2+(z or 0)^2)}, vectorMeta)
@@ -271,6 +275,7 @@ local function sandbox(placeId, gameId)
     player.ChildAdded, player.ChildRemoved = signal(), signal()
     local players = {LocalPlayer=player, PlayerAdded=signal(), PlayerRemoving=signal()}
     function players:GetPlayers() return {player} end
+    function players:FindFirstChild(name) if player.Name == name then return player end end
     function players:GetPlayerFromCharacter(character)
         for _, candidate in ipairs(players:GetPlayers()) do if candidate.Character == character then return candidate end end
     end

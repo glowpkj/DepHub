@@ -31,14 +31,35 @@ local CONTACT_DEBOUNCE = 0.08
 local GREEN = Color3.fromRGB(0, 255, 100)
 local RED = Color3.fromRGB(255, 45, 45)
 
+-- All the gameplay knobs the panel can change. Defaults are what the script
+-- started with; the panel rewrites these live, so the module reads the table
+-- instead of a craveted constant everywhere it matters.
+local Config = {
+    autoPosition = false,     -- teleport the character to the predicted landing
+    instantMove = false,      -- true = snap CFrame every frame; false = smooth lerp
+    positionOffsetY = 3,      -- studs above the landing point to stand
+    moveThreshold = 2,        -- only move when further than this from the target (studs)
+    moveSmoothing = 0.35,     -- lerp factor per frame for the safe (non-instant) path
+    lookAtBall = false,       -- point the camera at the ball every frame
+    jumpBoost = false,        -- enable the jump-power override
+    jumpPower = 120,          -- JumpPower value used while jumpBoost is on
+    maxPredictDistance = 0,   -- 0 = predict at any distance; >0 ignores balls past it
+}
+
 local State = {
     Version = "0.1.0",
     Destroyed = false,
     Started = false,
     Mode = "Personal",
     Modes = {"Personal", "Match", "Future"},
-    Toggles = {BallPredict = true},
-    ToggleLabels = {BallPredict = "Ball Predict"},
+    Toggles = {BallPredict = true, AutoPosition = false, LookAtBall = false, JumpBoost = false},
+    ToggleLabels = {
+        BallPredict = "Ball Predict",
+        AutoPosition = "Auto Position",
+        LookAtBall = "Look at Ball",
+        JumpBoost = "Jump Boost",
+    },
+    Config = Config,
     Connections = {},
     TouchConnections = {},
     Courts = {},
@@ -52,6 +73,9 @@ local State = {
     PredictionElapsed = 0,
     SearchElapsed = 0,
     InvalidPredictionElapsed = 0,
+    LastPrediction = nil,
+    BaseJumpPower = nil,
+    BaseUseJumpPower = nil,
     LastNotification = nil
 }
 
@@ -120,6 +144,41 @@ end
 local function clearHistory()
     table.clear(State.History)
     State.CurrentVelocity = nil
+end
+
+-- Jump power override. The base values are captured the first time the loop
+-- runs, so turning the boost off (or Destroy) restores exactly what the game
+-- had instead of a hardcoded number.
+local function rememberBaseJump()
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if humanoid and State.BaseJumpPower == nil then
+        State.BaseJumpPower = humanoid.JumpPower
+        State.BaseUseJumpPower = humanoid.UseJumpPower
+    end
+end
+
+local function applyJumpOverride()
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    if Config.jumpBoost then
+        rememberBaseJump()
+        pcall(function()
+            humanoid.UseJumpPower = true
+            humanoid.JumpPower = Config.jumpPower
+        end)
+    end
+end
+
+local function restoreJump()
+    local character = LocalPlayer.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid or State.BaseJumpPower == nil then return end
+    pcall(function()
+        humanoid.JumpPower = State.BaseJumpPower
+        if State.BaseUseJumpPower ~= nil then humanoid.UseJumpPower = State.BaseUseJumpPower end
+    end)
 end
 
 local function isException(part)
@@ -431,6 +490,49 @@ local function predictLanding(part, velocity)
     return nil
 end
 
+-- Move the character toward the predicted landing point. Two paths:
+--   instant = true  -> set CFrame directly every frame (fast, may rubber-band)
+--   instant = false -> lerp the CFrame a fraction per frame and zero velocity,
+--                      which is the smooth/safe path the game is less likely to
+--                      fight. Never Anchor the character: anchoring makes the
+--                      physics engine reject contacts and the ball stops hitting.
+local function moveToLanding(target)
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local goal = target + Vector3.new(0, Config.positionOffsetY, 0)
+    if (root.CFrame.Position - goal).Magnitude <= Config.moveThreshold then return end
+
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid:GetState() == Enum.HumanoidStateType.Dead then return end
+
+    if Config.instantMove then
+        pcall(function()
+            root.CFrame = CFrame.new(goal)
+            root.AssemblyLinearVelocity = Vector3.zero
+        end)
+    else
+        local factor = math.clamp(tonumber(Config.moveSmoothing) or 0.35, 0.05, 1)
+        local nextCFrame = root.CFrame:Lerp(CFrame.new(goal), factor)
+        pcall(function()
+            root.CFrame = nextCFrame
+            root.AssemblyLinearVelocity = Vector3.zero
+        end)
+    end
+end
+
+-- Point the camera at the ball while keeping its current position. Only the
+-- rotation is rewritten, so the player's zoom/view distance is preserved.
+local function lookAtBall(ballRoot)
+    if not ballRoot then return end
+    local camera = Workspace.CurrentCamera
+    if not camera then return end
+    pcall(function()
+        camera.CFrame = CFrame.lookAt(camera.CFrame.Position, ballRoot.Position)
+    end)
+end
+
 local function disconnectTouches()
     disconnectAll(State.TouchConnections)
 end
@@ -566,6 +668,25 @@ function State:SetToggle(name, value)
         return self:SetBallPredictEnabled(value)
     end
 
+    if name == "AutoPosition" then
+        self.Toggles.AutoPosition = value == true
+        Config.autoPosition = self.Toggles.AutoPosition
+        return true
+    end
+
+    if name == "LookAtBall" then
+        self.Toggles.LookAtBall = value == true
+        Config.lookAtBall = self.Toggles.LookAtBall
+        return true
+    end
+
+    if name == "JumpBoost" then
+        self.Toggles.JumpBoost = value == true
+        Config.jumpBoost = self.Toggles.JumpBoost
+        if not self.Toggles.JumpBoost then restoreJump() end
+        return true
+    end
+
     return false
 end
 
@@ -609,7 +730,13 @@ function State:Start()
     end)
 
     connect(self.Connections, RunService.Heartbeat, function(dt)
-        if self.Destroyed or not self.Toggles.BallPredict or self.Mode == "Future" then
+        if self.Destroyed then return end
+
+        -- Jump boost is independent of the ball: apply it as soon as it is on,
+        -- and it re-applies each frame because the game can reset the humanoid.
+        if Config.jumpBoost then applyJumpOverride() end
+
+        if not self.Toggles.BallPredict or self.Mode == "Future" then
             marker.Transparency = 1
             tracer.Enabled = false
             return
@@ -645,6 +772,23 @@ function State:Start()
             updateBallAttachment(root)
         end
 
+        -- Optional distance gate: ignore balls further than the configured range
+        -- (0 = no limit). Uses the character's root when available.
+        local maxRange = tonumber(Config.maxPredictDistance) or 0
+        if maxRange > 0 then
+            local character = LocalPlayer.Character
+            local myRoot = character and character:FindFirstChild("HumanoidRootPart")
+            if myRoot and (root.Position - myRoot.CFrame.Position).Magnitude > maxRange then
+                marker.Transparency = 1
+                tracer.Enabled = false
+                return
+            end
+        end
+
+        -- Look-at-ball is a per-frame camera follow: it does not depend on a
+        -- fresh prediction, so the camera keeps tracking while the ball moves.
+        if Config.lookAtBall then lookAtBall(root) end
+
         local velocity = estimateVelocity(root.Position, os.clock())
         if not velocity then
             self.InvalidPredictionElapsed += dt
@@ -666,10 +810,14 @@ function State:Start()
 
         if predicted then
             self.InvalidPredictionElapsed = 0
+            self.LastPrediction = predicted
             marker.Position = predicted
             marker.Transparency = 0.15
             updateMarkerColor(predicted)
             updateTracerVisibility()
+
+            -- Auto Position walks the character to the predicted landing spot.
+            if Config.autoPosition then moveToLanding(predicted) end
         else
             self.InvalidPredictionElapsed += PREDICTION_INTERVAL
             if self.InvalidPredictionElapsed >= 0.25 then
@@ -700,6 +848,7 @@ function State:Destroy()
     disconnectAll(self.Connections)
     disconnectTouches()
     resetBall()
+    restoreJump()
 
     if folder.Parent then
         folder:Destroy()
@@ -742,7 +891,36 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
                 notify("Modo inválido.")
             end
         end)
+        -- Distance gate: 0 predicts at any range. Only the marker/tracer respect
+        -- it, so a far ball is ignored rather than shown with a bad prediction.
+        predict:CreateSlider("Alcance da previsão", 0, 2000, Config.maxPredictDistance, function(v)
+            Config.maxPredictDistance = tonumber(v) or 0
+        end)
         predict:CreateParagraph("Como funciona", "Personal prevê a bola do próprio jogador; Match cobre as equipes; Future ainda não está configurado.")
+    end
+
+    -- Assistance: walk the character to the predicted landing and keep the
+    -- camera on the ball. "Instantâneo" trades safety for snapping.
+    local assist = section("Ball Predict", "Assistência", "Right")
+    if assist then
+        assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
+        assist:CreateToggle("Instantâneo", Config.instantMove, function(v) Config.instantMove = v == true end)
+        assist:CreateSlider("Offset acima do chão", 0, 20, Config.positionOffsetY, function(v) Config.positionOffsetY = tonumber(v) or 0 end)
+        assist:CreateSlider("Distância mínima", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
+        assist:CreateSlider("Suavidade do movimento", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
+        assist:CreateToggle("Olhar pra bola", State.Toggles.LookAtBall, function(v) State:SetToggle("LookAtBall", v) end)
+        assist:CreateParagraph("Assistência", "Auto Position leva o personagem ao ponto de queda. Instantâneo teleporta direto; desligado usa movimento suave (mais seguro).")
+    end
+
+    -- Movement: a jump-power override with a real, restorable base value.
+    local movement = section("Ball Predict", "Movimento", "Right")
+    if movement then
+        movement:CreateToggle("Jump Boost", State.Toggles.JumpBoost, function(v) State:SetToggle("JumpBoost", v) end)
+        movement:CreateSlider("Jump Power", 50, 500, Config.jumpPower, function(v)
+            Config.jumpPower = tonumber(v) or 120
+            if State.Toggles.JumpBoost then applyJumpOverride() end
+        end)
+        movement:CreateParagraph("Jump Boost", "Força o JumpPower enquanto ligado e restaura o valor original ao desligar.")
     end
 end
 
@@ -783,6 +961,13 @@ do
             return v and string.format("(%.1f,%.1f,%.1f)",v.X,v.Y,v.Z) or "sem dado"
         end)
         Diag:Feature("Volleyball.Historico",function() return #State.History.." amostras" end)
+        Diag:Feature("Volleyball.AutoPosition",function() return State.Toggles.AutoPosition and "ON" or "off" end)
+        Diag:Feature("Volleyball.LookAtBall",function() return State.Toggles.LookAtBall and "ON" or "off" end)
+        Diag:Feature("Volleyball.JumpBoost",function() return State.Toggles.JumpBoost and ("ON "..tostring(Config.jumpPower)) or "off" end)
+        Diag:Feature("Volleyball.Ponto previsto",function()
+            local p=State.LastPrediction
+            return p and string.format("(%.1f,%.1f,%.1f)",p.X,p.Y,p.Z) or "sem previsão"
+        end)
         if type(Diag.Watch)=="function" then
             Diag:Watch("Volleyball bola",function() return State.CurrentBall and State.CurrentBall.Name or "nenhuma" end)
             Diag:Watch("Volleyball quadras",function() return #State.Courts end)
@@ -795,11 +980,28 @@ do
                     .." bola="..tostring(State.CurrentBall and State.CurrentBall.Name or "nenhuma")
                     .." quadras="..#State.Courts.." tetos="..#State.Ceilings
                     .." amostras="..#State.History
+                    .." autoPos="..tostring(State.Toggles.AutoPosition)
+                    .." look="..tostring(State.Toggles.LookAtBall)
+                    .." jump="..tostring(State.Toggles.JumpBoost)
             end)
             Diag:Command("vb-predict",function(argument)
                 local on=argument~="off"
                 State:SetToggle("BallPredict",on)
                 return "BallPredict="..tostring(on)
+            end)
+            Diag:Command("vb-assist",function(argument)
+                local on=argument~="off"
+                State:SetToggle("AutoPosition",on)
+                State:SetToggle("LookAtBall",on)
+                return "AutoPosition="..tostring(on).." LookAtBall="..tostring(on)
+            end)
+            Diag:Command("vb-jump",function(argument)
+                if argument and argument~="" then
+                    local value=tonumber(argument)
+                    if value then Config.jumpPower=value end
+                end
+                State:SetToggle("JumpBoost",true)
+                return "JumpBoost=on power="..tostring(Config.jumpPower)
             end)
         end
     end
