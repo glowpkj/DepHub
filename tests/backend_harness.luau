@@ -232,6 +232,7 @@ local function NewWindow()
         end
         self:CreateCategory(name, icon)
         state.CategoryButtons[name].isStandalone = true
+        state.StandaloneTabs = state.StandaloneTabs or {}
         state.StandaloneTabs[name] = true
         library.StandaloneTabs = library.StandaloneTabs or {}
         library.StandaloneTabs[name] = true
