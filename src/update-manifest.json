@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-30T16:46:10.987Z",
-  "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+  "generatedAt": "2026-10-30T16:46:32.025210+00:00",
+  "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
   "version": "0.0.98",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "36364c628fd13225d97e931719102edf876bc048a6686d97213f36611bfc9d50",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -25,10 +25,40 @@
         "src/games/updates/66654135.txt"
       ]
     },
+    "114234929420007": {
+      "name": "Blood Strike",
+      "version": "632f4f2ebb741b866c4be473c67c4f908676b06ef7c000bf6cea1ef7948d990b",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/demon-ui.lua",
+        "src/core/ui/demon-theme.luau",
+        "src/core/updater.lua",
+        "src/core/diagnostics.lua",
+        "src/games/bloodstrike.lua",
+        "src/games/updates/114234929420007.txt"
+      ]
+    },
+    "107778070777162": {
+      "name": "Steal An Egg",
+      "version": "f9c93ab1ac114162aea5ecd5e17934124c0c48dee6114882fb1a7e8d2c0249d7",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/demon-ui.lua",
+        "src/core/ui/demon-theme.luau",
+        "src/core/updater.lua",
+        "src/core/diagnostics.lua",
+        "src/games/steal-a-egg.lua",
+        "src/games/updates/107778070777162.txt"
+      ]
+    },
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "b6b09380df452b439d3412be587574baaf8a641f8e05194747d86ad2930b4081",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -55,7 +85,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "1d1895776196f204cdc258152d77653f82076d912a1577f2106e43717e4bd9f3",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -70,7 +100,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "60261b3da48b0c992a95f884bf6f7a41393e5104ae700208729f5ef1a6be51bc",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -86,40 +116,10 @@
         "src/games/updates/3808081382.txt"
       ]
     },
-    "114234929420007": {
-      "name": "Blood Strike",
-      "version": "632f4f2ebb741b866c4be473c67c4f908676b06ef7c000bf6cea1ef7948d990b",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
-      "files": [
-        "DepHub.lua",
-        "src/version.txt",
-        "src/core/demon-ui.lua",
-        "src/core/ui/demon-theme.luau",
-        "src/core/updater.lua",
-        "src/core/diagnostics.lua",
-        "src/games/bloodstrike.lua",
-        "src/games/updates/114234929420007.txt"
-      ]
-    },
-    "107778070777162": {
-      "name": "Steal An Egg",
-      "version": "f9c93ab1ac114162aea5ecd5e17934124c0c48dee6114882fb1a7e8d2c0249d7",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
-      "files": [
-        "DepHub.lua",
-        "src/version.txt",
-        "src/core/demon-ui.lua",
-        "src/core/ui/demon-theme.luau",
-        "src/core/updater.lua",
-        "src/core/diagnostics.lua",
-        "src/games/steal-a-egg.lua",
-        "src/games/updates/107778070777162.txt"
-      ]
-    },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "77a13d6efcb33dcac735ddb0465667a81e0bdee9b39d70fff6540234f7a34b6e",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -143,7 +143,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "941c3025fcd8ef4509dbb1c610f3032ae3a9ddfa4a63c8fddee0471d46a36107",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -170,7 +170,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "c4d64d01ad234292cf6f36347a00a4034f77b42a595a007074db8c9e2e724265",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -197,7 +197,7 @@
     "93978595733734": {
       "name": "Violence District",
       "version": "80671dd040dac93dd43e75d4c02afbcfa52da417c8c802a251934410b317dfbf",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -212,7 +212,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "f41006ab5a1c9d078ab7943cb0d19041561db8d59ba95f8fcebdb75ea855cafb",
-      "commit": "e209eb9015a69cabf7be03b0599fb637be73712f",
+      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -232,6 +232,20 @@
   },
   "recentUpdates": [
     {
+      "Version": "ec07a42",
+      "Date": "2026-10-30T13:46:11-03:00",
+      "Changes": [
+        "v0.0.98: shared UI - backends' tabs actually show their controls"
+      ]
+    },
+    {
+      "Version": "cc8df64",
+      "Date": "2026-10-30T13:42:32-03:00",
+      "Changes": [
+        "v0.0.97: shared UI - stop re-locking the mouse on close"
+      ]
+    },
+    {
       "Version": "a0ab55e",
       "Date": "2026-10-30T13:38:14-03:00",
       "Changes": [
@@ -250,20 +264,6 @@
       "Date": "2026-10-30T12:52:50-03:00",
       "Changes": [
         "v0.0.94: shared UI - fix the mouse getting stuck when the panel closes"
-      ]
-    },
-    {
-      "Version": "e247cc9",
-      "Date": "2026-10-30T12:49:32-03:00",
-      "Changes": [
-        "v0.0.93: Volleyball 4.2 - merge the jump controls into one toggle and one slider"
-      ]
-    },
-    {
-      "Version": "c2fc10b",
-      "Date": "2026-10-30T12:43:09-03:00",
-      "Changes": [
-        "v0.0.92: Volleyball 4.2 - trim back to prediction, auto position, jump and collision"
       ]
     }
   ]
