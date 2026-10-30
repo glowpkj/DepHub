@@ -39,7 +39,9 @@ do
     local window=ctx.State.__DEPHUB.UI
     check(type(window)=="table" and type(window.Library)=="table","loader publishes the UI window")
     local dashboard=window.Library.Dashboard
-    check(type(dashboard)=="table","loader built the fixed Dashboard tab")
+    check(type(dashboard)=="table","loader built the standalone Dashboard tab")
+    check(window.Library.StandaloneTabs and window.Library.StandaloneTabs.Dashboard==true,"Dashboard is a standalone navigation destination")
+    check(ctx.State.__DEPHUB.UI.Library._STATE.ActiveCategory=="Dashboard","Dashboard opens as the active top-level destination")
     check(dashboard.Banner=="Dashboard","dashboard banner built against the Dashboard tab")
     check(type(dashboard.Performance)=="table" and dashboard.Performance.TabName=="Dashboard","dashboard performance metrics built against the Dashboard tab")
 end
