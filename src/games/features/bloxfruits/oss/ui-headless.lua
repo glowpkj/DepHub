@@ -150,13 +150,20 @@ end
 
 function UI.slider(page, title, desc, minimum, maximum, default, callback)
     local min, max = tonumber(minimum) or 0, tonumber(maximum) or 100
+    -- Only round to whole numbers when the slider itself is whole-numbered. A
+    -- fractional range (e.g. an attack interval of 0.05..2s) must keep its
+    -- precision, otherwise every value rounds to an integer and the control can
+    -- never express the low end of its own range.
+    local integral = (min == math.floor(min)) and (max == math.floor(max))
     local value = math.clamp(tonumber(default) or min, min, max)
     local api = {}
     function api.Get()
         return value
     end
     function api.Set(nextValue)
-        value = math.clamp(math.floor((tonumber(nextValue) or value) + 0.5), min, max)
+        local next = tonumber(nextValue) or value
+        if integral then next = math.floor(next + 0.5) end
+        value = math.clamp(next, min, max)
         if callback then callback(value) end
     end
     register(page, title, api, "slider", {min = min, max = max, default = value})

@@ -63,6 +63,30 @@ do
     check(state:SetSea("Sea3") and state.Sea == "Sea3", "sea is published for the sea-gated tabs")
     check(state:SetSea(nil) == false, "sea rejects a non-string")
 
+    -- Farm tuning controls must drive real behaviour, not just sit in the panel.
+    -- "Approach distance" (hoverRange) and "Attack interval" both feed the farm
+    -- loops; the farm module reads them back through the same config table.
+    local approach = controlFor("Approach distance")
+    check(approach ~= nil and approach.kind == "slider", "farm approach distance is a slider")
+    approach.set(600)
+    check(approach.get() == 600, "approach distance reads back after set")
+    approach.set(1)
+    check(approach.get() == 30, "approach distance clamps below its minimum")
+
+    local farm = state.Modules and state.Modules.farm
+    check(farm ~= nil and type(farm.config) == "table", "the farm module exposes its config")
+    approach.set(333)
+    check(farm.config.hoverRange == 333, "approach distance writes through to farm config")
+
+    local atk = controlFor("Attack interval")
+    check(atk ~= nil and atk.kind == "slider", "farm attack interval is a slider")
+    atk.set(0.05)
+    check(farm.config.attackInterval == 0.05, "attack interval writes through to farm config")
+    -- A fractional slider must keep its precision: rounding every value to an
+    -- integer would make the low end of the range unreachable.
+    atk.set(0.35)
+    check(atk.get() == 0.35, "a fractional slider keeps sub-integer precision")
+
     local status = state:GetStatus()
     check(status.Controls == #controls and status.Sea == "Sea3", "status reports the live control count and sea")
     check(type(status.Errors) == "table" and #status.Errors == 0, "no module reported an init error")

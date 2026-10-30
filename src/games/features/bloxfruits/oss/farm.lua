@@ -666,6 +666,10 @@ function M.init(Core, UI)
             M._curKey = nil
         end)
         UI.slider(page, "Height offset", "Studs above the mob", 0, 40, M.config.heightOffset, function(v) M.config.heightOffset = v end)
+        -- "Approach distance" is hoverRange: the loop only flies to the mob when it
+        -- is farther than this, otherwise it attacks in place. Larger = lazier
+        -- movement (fewer trips, wider leash); smaller = hugs the target.
+        UI.slider(page, "Approach distance", "Fly to the mob only when farther than this", 30, 600, M.config.hoverRange, function(v) M.config.hoverRange = v end)
         UI.toggle(page, "Bring mob", "Stack mobs on one spot under you", false, function(s) M.config.bring = s end)
 
         UI.toggle(page, "Auto attack (mobs)", "Attack the nearest mob (standalone)", false, function(s)
@@ -674,6 +678,8 @@ function M.init(Core, UI)
         UI.slider(page, "Attack range", "Mob detection radius", 1, 300, combat and combat.config.range or 120, function(v)
             if combat then combat.config.range = v end
         end)
+        -- attackInterval drives every wait between attacks in the farm loops.
+        UI.slider(page, "Attack interval", "Seconds between attacks (lower = faster)", 0.05, 2, M.config.attackInterval, function(v) M.config.attackInterval = v end)
 
         UI.dropdown(page, "Auto equip", "Weapon to equip while farming", { "Melee", "Sword", "Gun", "Fruit" }, function(s) M.config.equipType = s end)
         UI.toggle(page, "Auto equip on", "Equip the chosen weapon to farm with", false, function(s) M.config.equip = s end)
