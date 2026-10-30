@@ -356,7 +356,7 @@ local function dephubNotify(ui,title,message)
     if ui and type(ui.Notify)=="function" then ui:Notify(title,message) end
 end
 
-    local esp=dephubSection(UI,tabs,"Titan ESP","Visuals","Left")
+    local esp=dephubSection(UI,tabs,"ESP","Visuals","Left")
     if esp then
         esp:CreateToggle("Titan ESP",M.Toggles.TitanESP,function(v) M:SetToggle("TitanESP",v) end)
         esp:CreateToggle("Mostrar nuca",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
@@ -372,7 +372,7 @@ end
         assist:CreateToggle("Tentar novamente",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
         assist:CreateToggle("Anti-AFK",M.Toggles.AntiAFK,function(v) M:SetToggle("AntiAFK",v) end)
     end
-    local movement=dephubSection(UI,tabs,"Movement","Movimento","Left")
+    local movement=dephubSection(UI,tabs,"Movimento","Movimento","Left")
     if movement then
         movement:CreateToggle("Noclip do farm",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
         movement:CreateSlider("Travel speed",50,2000,M.Values.TravelSpeed,function(v) M:SetTravelSpeed(v) end)
@@ -388,7 +388,7 @@ end
         combat:CreateToggle("Skill autofarm",M.Toggles.SkillAutofarm,function(v) M:SetToggle("SkillAutofarm",v) end)
         combat:CreateToggle("Classic autofarm",M.Toggles.ClassicAutofarm,function(v) M:SetToggle("ClassicAutofarm",v) end)
     end
-    local status=dephubSection(UI,tabs,"Status","Diagnóstico","Left")
+    local status=dephubSection(UI,tabs,"Diagnóstico","Diagnóstico","Left")
     if status then
         status:CreateParagraph("Estado atual",M:GetStatus())
         status:CreateButton("Checar ShadowBan",function()
