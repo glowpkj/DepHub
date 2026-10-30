@@ -484,10 +484,15 @@ env.__DEPHUB.UI = window
 -- take the tab name, which the adapter returns on the tab record. Failures are
 -- non-fatal: a dashboard that cannot be built must never stop the hub loading.
 local function buildDashboardTab()
-    if type(window.CreateTab) ~= "function" or type(window.Library) ~= "table" then return false end
-    local ok, record = pcall(function() return window:CreateTab("Dashboard", "General") end)
+    if type(window.CreateCategory) ~= "function" or type(window.CreateTab) ~= "function" or type(window.Library) ~= "table" then return false end
+    local okCategory = pcall(function() window:CreateCategory("Dashboard", "house") end)
+    if not okCategory then
+        Diag:Note("Dashboard: categoria superior falhou")
+        return false
+    end
+    local ok, record = pcall(function() return window:CreateTab("Overview", "Dashboard") end)
     if not ok or type(record) ~= "table" or type(record.Name) ~= "string" then
-        Diag:Note("Dashboard: CreateTab falhou: " .. tostring(record))
+        Diag:Note("Dashboard: pagina principal falhou: " .. tostring(record))
         return false
     end
     local lib = window.Library
