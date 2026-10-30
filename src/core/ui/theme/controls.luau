@@ -286,7 +286,7 @@ function Library:AddToggle(page, text, default, callback)
 
         local function resizePanel(animate)
             if not settingsPanel or not settingsPanel.Parent then return end
-            local panelHeight = 29 + settingsLayout.AbsoluteContentSize.Y
+            local panelHeight = 38 + settingsLayout.AbsoluteContentSize.Y
             local targetPanel = UDim2.new(1, -16, 0, math.max(42, panelHeight))
             local targetHolder = UDim2.new(1, 0, 0, state and (_rowH + 7 + math.max(42, panelHeight) + 7) or _rowH)
             if animate and not SharedReduced.value then
@@ -341,6 +341,24 @@ function Library:AddToggle(page, text, default, callback)
         end
         function api:CreateParagraph(titleText, bodyText)
             return self.Library:AddParagraph(self.Page, tostring(titleText or ""), tostring(bodyText or ""))
+        end
+        function api:CreateKeybind(label, initial, callback)
+            return self.Library:AddKeybind(self.Page, label, initial, callback)
+        end
+        function api:CreateMultiDropdown(label, options, defaults, callback)
+            return self.Library:AddMultiDropdown(self.Page, label, options, defaults, callback)
+        end
+        function api:CreateColorPicker(label, initial, callback)
+            return self.Library:AddColorPicker(self.Page, label, initial, callback)
+        end
+        function api:CreateLabel(text)
+            return self.Library:AddLabel(self.Page, text)
+        end
+        function api:CreateSeparator(height)
+            return self.Library:AddSeparator(self.Page, height)
+        end
+        function api:CreateChipBar(label, options, initialIndex, callback)
+            return self.Library:AddChipBar(self.Page, label, options, initialIndex, callback)
         end
         _h.Settings = api
         refreshSettings(false)
