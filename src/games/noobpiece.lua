@@ -421,7 +421,7 @@ end
         visuals:CreateToggle("ESP de ilhas",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
         visuals:CreateToggle("ESP de NPCs",backend.Toggles.GachaESP,function(v) backend:SetGachaESP(v) end)
     end
-    local travel=dephubSection(UI,tabs,"Travel","Teleporte","Left")
+    local travel=dephubSection(UI,tabs,"Teleporte","Teleporte","Left")
     if travel then
         local islands=backend:GetIslandNames()
         if type(islands)=="table" and #islands>0 then
