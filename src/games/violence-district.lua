@@ -319,9 +319,11 @@ end
 local function isGeneratorContainer(instance)
     local name = normalizeObjectName(instance.Name)
     return name == "generators"
+        or name == "generator"
         or name == "generatorfolder"
         or name == "generatorcontainer"
         or name == "generatorobjects"
+        or (instance:IsA("Folder") and name:find("generator", 1, true) ~= nil)
 end
 
 local function hasGeneratorGeometry(instance)
