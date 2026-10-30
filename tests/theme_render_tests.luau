@@ -550,6 +550,10 @@ do
     for _, method in ipairs({"CreateToggle", "CreateSlider", "CreateDropdown", "CreateButton", "CreateInput", "CreateParagraph", "CreateKeybind", "CreateMultiDropdown", "CreateColorPicker", "CreateLabel", "CreateSeparator", "CreateChipBar"}) do
         check(type(toggleSettings[method]) == "function", "toggle settings expose " .. method)
     end
+    local invalidImport = library:ImportConfig("invalid")
+    check(invalidImport == false, "ImportConfig rejects non-table payloads")
+    local validImport, appliedImport, totalImport = library:ImportConfig({_controls = "invalid"}, true)
+    check(validImport == true and appliedImport == 0 and totalImport == 0, "ImportConfig safely ignores malformed control maps")
     check(pcall(function() library:CreateDashboardBanner("Dashboard") end), "CreateDashboardBanner builds the dashboard banner")
     check(pcall(function() library:CreatePerformanceDashboard("Dashboard", "Right") end), "CreatePerformanceDashboard builds the dashboard metrics")
     -- The banner reads _STATE.TabTopContainers[tabName], so its presence proves
