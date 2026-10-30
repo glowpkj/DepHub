@@ -120,6 +120,38 @@ do
     ignore.set("")
     check(next(combat.bounty.ignore) == nil, "clearing the ignore list empties it")
 
+    -- Fruits: ESP range, collect range/skip and store keep-list all gate real
+    -- behaviour, and the name-list parser drives the skip/keep matchers.
+    local fruits = state.Modules and state.Modules.fruits
+    check(fruits ~= nil and type(fruits.config) == "table", "the fruits module exposes its config")
+
+    local espRange = controlFor("ESP max distance")
+    check(espRange ~= nil and espRange.kind == "slider", "fruit ESP max distance is a slider")
+    espRange.set(400)
+    check(fruits.config.espRange == 400, "ESP max distance writes through to fruits config")
+
+    local collectRange = controlFor("Collect max distance")
+    check(collectRange ~= nil and collectRange.kind == "slider", "collect max distance is a slider")
+    collectRange.set(150)
+    check(fruits.config.collectRange == 150, "collect max distance writes through to fruits config")
+
+    local skip = controlFor("Collect skip list")
+    check(skip ~= nil and skip.kind == "textbox", "collect skip list is a textbox")
+    skip.set("Dragon, Rocket")
+    check(fruits.config.collectSkip.dragon == true and fruits.config.collectSkip.rocket == true, "collect skip list parses names")
+    skip.set("")
+    check(next(fruits.config.collectSkip) == nil, "clearing the collect skip list empties it")
+
+    local keep = controlFor("Store keep list")
+    check(keep ~= nil and keep.kind == "textbox", "store keep list is a textbox")
+    keep.set("Leopard")
+    check(fruits.config.storeKeep.leopard == true, "store keep list parses names")
+
+    local chestCd = controlFor("Chest cooldown")
+    check(chestCd ~= nil and chestCd.kind == "slider", "chest cooldown is a slider")
+    chestCd.set(2)
+    check(fruits.config.chestCooldown == 2, "chest cooldown writes through to fruits config")
+
     local status = state:GetStatus()
     check(status.Controls == #controls and status.Sea == "Sea3", "status reports the live control count and sea")
     check(type(status.Errors) == "table" and #status.Errors == 0, "no module reported an init error")

@@ -13,7 +13,13 @@ local RS = game:GetService("ReplicatedStorage")
 local LP = Players.LocalPlayer
 
 local M = {}
-M.config = { chestCooldown = 3.5, randomCooldown = 90, storePoll = 3, storeHandPoll = 2 }
+M.config = {
+    chestCooldown = 3.5, randomCooldown = 90, storePoll = 3, storeHandPoll = 2,
+    espRange = 0,           -- 0 = show every fruit; >0 hides fruits past this many studs
+    collectRange = 0,       -- 0 = collect from any distance
+    collectSkip = {},       -- fruit names never collected (matched by name prefix)
+    storeKeep = {},         -- fruit names never auto-stored
+}
 function M._setStatus(_) end
 M.FRUITS = {
     "Barrier", "Blade", "Blizzard", "Bomb", "Buddha", "Chop", "Control", "Creation", "Dark",
@@ -32,6 +38,26 @@ local fireprompt = fireproximityprompt or function() end
 local function hrp() local ch = LP.Character; return ch and ch:FindFirstChild("HumanoidRootPart") end
 local function teleport() return M._core and M._core.modules.teleport end
 local function commF() local r = RS:FindFirstChild("Remotes"); return r and r:FindFirstChild("CommF_") end
+
+-- A ground fruit Tool carries its real name in the "OriginalName" attribute
+-- ("Dragon-Dragon Fruit"); its .Name is the localised one. Match a name set
+-- against both, case-insensitively and by prefix, so a user can type "Dragon".
+local function fruitNameKeys(f)
+    local keys = {}
+    local orig = f:GetAttribute("OriginalName")
+    if orig then keys[#keys + 1] = tostring(orig):lower() end
+    if f.Name then keys[#keys + 1] = tostring(f.Name):lower() end
+    return keys
+end
+local function nameInSet(set, f)
+    if not set or not next(set) then return false end
+    for _, key in ipairs(fruitNameKeys(f)) do
+        for name in pairs(set) do
+            if key:find(name, 1, true) == 1 then return true end
+        end
+    end
+    return false
+end
 
 function M.getStock()
     local c = commF()
@@ -83,7 +109,7 @@ function M.storeHeld()
         for _, t in ipairs(pool:GetChildren()) do
             if t:IsA("Tool") then
                 local orig = t:GetAttribute("OriginalName")
-                if orig and tostring(orig):find("-") then
+                if orig and tostring(orig):find("-") and not nameInSet(M.config.storeKeep, t) then
                     pcall(function() c:InvokeServer("StoreFruit", orig, t) end)
                     if M._core then M._core.info("StoreFruit", orig) end
                 end
@@ -220,6 +246,10 @@ function M.setFruitESP(on)
                         M._fruitEspMap[f] = e
                     end
                     local d = h and math.floor((part.Position - h.Position).Magnitude) or 0
+                    local maxR = tonumber(M.config.espRange) or 0
+                    local shown = (maxR <= 0) or (d <= maxR)
+                    e.hl.Enabled = shown
+                    e.bb.Enabled = shown
                     e.lbl.Text = ("%s  %dm"):format(f.Name, d)
                 end
             end
@@ -234,11 +264,12 @@ end
 function M.nearestGroundFruit(skip)
     local h = hrp()
     local best, bestPart, bestD
+    local maxR = tonumber(M.config.collectRange) or 0
     for _, f in ipairs(M.groundFruits()) do
         local p = fruitPart(f)
-        if p and not (skip and skip[f]) then
+        if p and not (skip and skip[f]) and not nameInSet(M.config.collectSkip, f) then
             local d = h and (p.Position - h.Position).Magnitude or 0
-            if not bestD or d < bestD then best, bestPart, bestD = f, p, d end
+            if (maxR <= 0 or d <= maxR) and (not bestD or d < bestD) then best, bestPart, bestD = f, p, d end
         end
     end
     return best, bestPart
@@ -337,6 +368,17 @@ function M.setChestESP(on)
     end)
 end
 
+-- "Dragon Rocket" -> {dragon=true, rocket=true}. Names are matched by prefix and
+-- case-insensitively, so either the short name or the full "X-Y Fruit" works.
+function M.parseFruitList(text)
+    local set = {}
+    for token in tostring(text or ""):gmatch("[^,%s]+") do
+        local name = token:lower()
+        if name ~= "" then set[name] = true end
+    end
+    return set
+end
+
 function M.stop()
     M._fruitEsp, M._collect, M._snipe, M._store, M._random, M._chestOn = false, false, false, false, false, false
     M.setFruitESP(false); M.setChestESP(false)
@@ -347,8 +389,14 @@ function M.init(Core, UI)
 
     local fp = UI.page("Fruit")
     UI.toggle(fp, "Fruit ESP", "Highlight fruits on the ground", false, function(s) M.setFruitESP(s) end)
+    -- espRange hides far fruits: 0 keeps every fruit visible. The distance is
+    -- already computed for the label, so this only gates what is drawn.
+    UI.slider(fp, "ESP max distance", "Hide fruits past this many studs (0 = all)", 0, 2000, M.config.espRange, function(v) M.config.espRange = v end)
     UI.toggle(fp, "Grab Fruit", "Pick up the nearest ground fruit", false, function(s) M.setCollect(s) end)
+    UI.slider(fp, "Collect max distance", "Only grab fruits within this many studs (0 = any)", 0, 2000, M.config.collectRange, function(v) M.config.collectRange = v end)
+    UI.textbox(fp, "Collect skip list (names, comma-separated)", function(t) M.config.collectSkip = M.parseFruitList(t) end)
     UI.toggle(fp, "Fruit Store", "Auto-store fruits in your bar", false, function(s) M.setStore(s) end)
+    UI.textbox(fp, "Store keep list (never store these)", function(t) M.config.storeKeep = M.parseFruitList(t) end)
 
     UI.section(fp, "DEALER")
     local names = M.fruitNames()
@@ -371,6 +419,10 @@ function M.init(Core, UI)
     if UI._controls["Farm / Chest ESP"] then UI._controls["Farm / Chest ESP"].sea = "All" end
     UI.toggle(mp, "Auto collect chests", "Teleport chest to chest (nearest first)", false, function(s) M.setChestFarm(s) end)
     if UI._controls["Farm / Auto collect chests"] then UI._controls["Farm / Auto collect chests"].sea = "All" end
+    -- chestCooldown paces the chest-to-chest wait; it had a config field but no
+    -- control, so it was unreachable.
+    UI.slider(mp, "Chest cooldown", "Seconds to wait after each chest", 0.5, 10, M.config.chestCooldown, function(v) M.config.chestCooldown = v end)
+    if UI._controls["Farm / Chest cooldown"] then UI._controls["Farm / Chest cooldown"].sea = "All" end
 
     Core.register("fruits", M)
     return M

@@ -130,21 +130,37 @@ não existe no módulo; fica pendente até haver mecanismo.
 
 ## 4. FRUITS
 
-Arquivo: `fruits.lua`. Config atual: `chestCooldown`, `randomCooldown`,
-`storePoll`, `storeHandPoll`; lista `FRUITS`.
+Arquivo: `fruits.lua`. Config: `chestCooldown`, `randomCooldown`, `storePoll`,
+`storeHandPoll`, além das novas `espRange`, `collectRange`, `collectSkip`,
+`storeKeep`; lista `FRUITS`.
 
 | Pedido | Estado | Nota |
 |---|---|---|
-| Fruit ESP (nome/dist/filtros) | **Parcial** | há finder/teleport; falta ESP com filtros |
-| Coleta automática (dist/frutas/ignorar) | **Parcial** | coleta existe (via farm); sem seleção de frutas |
-| Fruit Store (auto armazenar/exceções) | **Gap** | há poll (`storePoll`) mas sem config de quais |
-| Fruit Snipe | **Gap** | não existe |
-| Auto Random Fruit (intervalo/limite) | **Impl** | `randomCooldown`; sem limite de dinheiro |
-| Chest ESP / Chest Farm | **Gap** | não existe |
+| Fruit ESP (nome/dist) | **Impl** | `setFruitESP` com nome + distância |
+| Fruit ESP: distância máxima | **Impl** Auto | slider "ESP max distance" → `espRange` (0 = todas) |
+| Fruit ESP: filtros por fruta/raridade | **Gap** | raridade não é exposta pelo jogo de forma simples |
+| Coleta automática | **Impl** | `setCollect` via `nearestGroundFruit` |
+| Coleta: distância máxima | **Impl** Auto | slider "Collect max distance" → `collectRange` |
+| Coleta: lista de ignoradas | **Impl** Auto | textbox "Collect skip list" → `collectSkip` (prefixo, case-insensitive) |
+| Coleta: seleção de frutas desejadas | **Parcial** | skip cobre "ignorar"; "só estas" não existe |
+| Coleta: interromper com inventário cheio | **Gap** | sem leitura confiável de capacidade |
+| Fruit Store (auto armazenar) | **Impl** | `setStore` |
+| Fruit Store: lista de exceções | **Impl** Auto | textbox "Store keep list" → `storeKeep` |
+| Fruit Store: condições/evitar importantes | **Parcial** | keep-list cobre "importantes" |
+| Fruit Snipe | **Impl** | `setSnipe` + dropdown de fruta |
+| Fruit Snipe: filtros de estoque / verificação | **Parcial** | usa `storePoll`; sem filtro por raridade |
+| Auto Random Fruit | **Impl** | `setRandom` (gacha Zioles) |
+| Auto Random Fruit: intervalo configurável | **Impl** | `randomCooldown` (sem controle dedicado) |
+| Chest ESP | **Impl** | `setChestESP` |
+| Chest ESP: filtro por tipo | **Gap** | casa `^Chest%d*$` e `SilverChest` |
+| Chest Farm | **Impl** | `setChestFarm` (mais próximo primeiro, sem repetir) |
+| Chest Farm: cooldown | **Impl** Auto | slider "Chest cooldown" → `chestCooldown` |
 
-**Resumo Fruits:** aqui há os maiores gaps reais. ESP/Store/Snipe/Chest são
-features inteiras, não só config — tratar como trabalho de sistema, não inventar
-controle sem mecanismo.
+**Resumo Fruits:** a rodada deu configuração real a ESP/coleta/store/chest
+(distância máxima, skip-list, keep-list, cooldown). O que resta são **features
+que dependem de dado que o jogo não expõe de forma confiável** (raridade, capacidade
+de inventário) ou variantes ("só coletar estas"), então ficam pendentes até haver
+mecanismo — em vez de criar um controle que não muda nada.
 
 ---
 
