@@ -47,6 +47,7 @@ local State = {
         ESPNames = true,
         ESPDistance = true,
         Chams = true,
+        GeneratorESP = false,
         AutoRepair = false,
         AutoSkillCheck = false,
         AutoParry = false,
@@ -59,6 +60,7 @@ local State = {
         ESPNames = "Mostrar nome e funcao",
         ESPDistance = "Mostrar distancia",
         Chams = "Chams (contorno)",
+        GeneratorESP = "ESP de geradores",
         AutoRepair = "Reparar gerador sozinho",
         AutoSkillCheck = "Acertar o skill check sozinho",
         AutoParry = "Auto Parry",
@@ -69,11 +71,15 @@ local State = {
         KillerColor = Color3.fromRGB(255, 74, 74),
         SurvivorColor = Color3.fromRGB(76, 188, 255),
         TextSize = 13,
+        GeneratorRange = 2000,
+        GeneratorColor = Color3.fromRGB(255, 190, 70),
         RepairRange = 14,
         ParryRange = 18,
         ParryCooldown = 1.0,
     },
     ESPObjects = {},
+    GeneratorESPObjects = {},
+    LastGeneratorScan = 0,
     RepairActive = false,
     RepairPoint = nil,
     RepairGenerator = nil,
@@ -145,11 +151,26 @@ local function localRoot()
     return character and (character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Head"))
 end
 
+local function normalizeObjectName(value)
+    return tostring(value or ""):lower():gsub("[^%w]", "")
+end
+
+local function isMapContainer(instance)
+    if not (instance:IsA("Folder") or instance:IsA("Model")) then return false end
+    local name = normalizeObjectName(instance.Name)
+    return name == "map"
+        or name == "currentmap"
+        or name == "activemap"
+        or name == "gamemap"
+        or name == "mapcontainer"
+        or name:match("^map%d+$") ~= nil
+end
+
 local function mapRoot()
-    local map = Workspace:FindFirstChild("Map")
-    if map then return map end
-    for _, child in ipairs(Workspace:GetChildren()) do
-        if child.Name == "Map" then return child end
+    local direct = Workspace:FindFirstChild("Map")
+    if direct then return direct end
+    for _, descendant in ipairs(Workspace:GetDescendants()) do
+        if isMapContainer(descendant) then return descendant end
     end
     return nil
 end
@@ -282,6 +303,223 @@ function State:SetESP(enabled)
         return true
     end
     self:Refresh()
+    return true
+end
+
+-- ---------------------------------------------------------------------------
+-- Generator ESP. Resolve the active map semantically instead of relying on a
+-- fixed Workspace.Map.Generators path. Maps often wrap this folder in extra
+-- Models/Folders or rename the map root between rounds.
+local function isGeneratorPointName(name)
+    return name:find("generatorpoint", 1, true) ~= nil
+        or name:find("repairpoint", 1, true) ~= nil
+        or name:find("skillcheck", 1, true) ~= nil
+end
+
+local function isGeneratorContainer(instance)
+    local name = normalizeObjectName(instance.Name)
+    return name == "generators"
+        or name == "generatorfolder"
+        or name == "generatorcontainer"
+        or name == "generatorobjects"
+end
+
+local function hasGeneratorGeometry(instance)
+    if instance:IsA("BasePart") then return true end
+    return (instance:IsA("Model") or instance:IsA("Folder"))
+        and instance:FindFirstChildWhichIsA("BasePart", true) ~= nil
+end
+
+local function addGeneratorTarget(targets, instance)
+    if not instance or not instance.Parent or not hasGeneratorGeometry(instance) then return end
+    if not (instance:IsA("Model") or instance:IsA("BasePart")) then return end
+    local name = normalizeObjectName(instance.Name)
+    if isGeneratorPointName(name) or isGeneratorContainer(instance) then return end
+    targets[instance] = true
+end
+
+local function collectGeneratorTargets(root)
+    local targets = {}
+    if not root then return targets end
+    local descendants = root:GetDescendants()
+    local containers = {}
+
+    for _, descendant in ipairs(descendants) do
+        if isGeneratorContainer(descendant) then
+            containers[#containers + 1] = descendant
+        end
+
+        local name = normalizeObjectName(descendant.Name)
+        if name:find("generator", 1, true) and not isGeneratorPointName(name) then
+            addGeneratorTarget(targets, descendant)
+        end
+    end
+
+    for _, container in ipairs(containers) do
+        local foundModels = false
+        for _, descendant in ipairs(container:GetDescendants()) do
+            if descendant:IsA("Model") and hasGeneratorGeometry(descendant) then
+                local ancestor = descendant.Parent
+                local nestedInModel = false
+                while ancestor and ancestor ~= container do
+                    if ancestor:IsA("Model") then
+                        nestedInModel = true
+                        break
+                    end
+                    ancestor = ancestor.Parent
+                end
+                if not nestedInModel then
+                    addGeneratorTarget(targets, descendant)
+                    foundModels = true
+                end
+            end
+        end
+
+        if not foundModels then
+            for _, descendant in ipairs(container:GetDescendants()) do
+                if descendant:IsA("BasePart") and descendant.Parent == container then
+                    addGeneratorTarget(targets, descendant)
+                end
+            end
+        end
+    end
+
+    for target in pairs(targets) do
+        local ancestor = target.Parent
+        while ancestor and ancestor ~= root do
+            if targets[ancestor] then
+                targets[target] = nil
+                break
+            end
+            ancestor = ancestor.Parent
+        end
+    end
+
+    return targets
+end
+
+local function findGeneratorTargets()
+    local map = mapRoot()
+    local targets = collectGeneratorTargets(map or Workspace)
+    if next(targets) == nil and map and map ~= Workspace then
+        targets = collectGeneratorTargets(Workspace)
+    end
+    return targets
+end
+
+local function generatorAdornee(target)
+    if not target or not target.Parent then return nil end
+    if target:IsA("BasePart") then return target end
+    if target:IsA("Model") then
+        return target.PrimaryPart
+            or target:FindFirstChild("HumanoidRootPart", true)
+            or target:FindFirstChildWhichIsA("BasePart", true)
+    end
+    return nil
+end
+
+function State:RemoveGeneratorESP(target)
+    local record = self.GeneratorESPObjects[target]
+    if not record then return end
+    self.GeneratorESPObjects[target] = nil
+    if record.Highlight then pcall(record.Highlight.Destroy, record.Highlight) end
+    if record.Billboard then pcall(record.Billboard.Destroy, record.Billboard) end
+end
+
+function State:ClearGeneratorESP()
+    for target in pairs(self.GeneratorESPObjects) do
+        self:RemoveGeneratorESP(target)
+    end
+end
+
+function State:CreateGeneratorESP(target, adornee)
+    self:RemoveGeneratorESP(target)
+    if self.Destroyed or not self.Toggles.GeneratorESP or not adornee then return end
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "DepHubGeneratorHighlight"
+    highlight.Adornee = target
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.FillColor = self.Values.GeneratorColor
+    highlight.FillTransparency = 0.58
+    highlight.OutlineColor = self.Values.GeneratorColor
+    highlight.OutlineTransparency = 0.08
+    highlight.Parent = target
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "DepHubGeneratorLabel"
+    billboard.Adornee = adornee
+    billboard.AlwaysOnTop = true
+    billboard.LightInfluence = 0
+    billboard.Size = UDim2.fromOffset(150, 28)
+    billboard.StudsOffsetWorldSpace = Vector3.new(0, 2.6, 0)
+    billboard.Parent = adornee
+
+    local label = Instance.new("TextLabel")
+    label.BackgroundTransparency = 1
+    label.BorderSizePixel = 0
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamBold
+    label.TextColor3 = self.Values.GeneratorColor
+    label.TextStrokeTransparency = 0.45
+    label.TextSize = self.Values.TextSize
+    label.Text = "GERADOR"
+    label.Parent = billboard
+
+    self.GeneratorESPObjects[target] = {
+        Highlight = highlight,
+        Billboard = billboard,
+        Label = label,
+        Adornee = adornee,
+    }
+end
+
+function State:RefreshGeneratorESP()
+    if self.Destroyed or not self.Toggles.GeneratorESP then
+        self:ClearGeneratorESP()
+        return
+    end
+
+    local myRoot = localRoot()
+    local seen = {}
+    local targets = findGeneratorTargets()
+
+    for target in pairs(targets) do
+        local adornee = generatorAdornee(target)
+        if adornee then
+            local distance
+            if myRoot then distance = (adornee.Position - myRoot.Position).Magnitude end
+            if not distance or distance <= self.Values.GeneratorRange then
+                seen[target] = true
+                local record = self.GeneratorESPObjects[target]
+                if not record or record.Adornee ~= adornee or not record.Highlight.Parent then
+                    self:CreateGeneratorESP(target, adornee)
+                    record = self.GeneratorESPObjects[target]
+                end
+                if record and record.Label then
+                    local distanceText = distance and (" | " .. tostring(math.floor(distance)) .. "m") or ""
+                    record.Label.Text = "GERADOR" .. distanceText
+                    record.Label.TextSize = self.Values.TextSize
+                end
+            end
+        end
+    end
+
+    for target in pairs(self.GeneratorESPObjects) do
+        if not seen[target] then self:RemoveGeneratorESP(target) end
+    end
+
+    self.LastGeneratorScan = os.clock()
+end
+
+function State:SetGeneratorESP(enabled)
+    self.Toggles.GeneratorESP = enabled == true
+    if not self.Toggles.GeneratorESP then
+        self:ClearGeneratorESP()
+        return true
+    end
+    self.LastGeneratorScan = 0
+    self:RefreshGeneratorESP()
     return true
 end
 
@@ -461,6 +699,8 @@ function State:SetToggle(name, enabled)
     self.Toggles[name] = enabled == true
     if name == "ESP" then
         return self:SetESP(enabled)
+    elseif name == "GeneratorESP" then
+        return self:SetGeneratorESP(enabled)
     elseif name == "ESPKiller" or name == "ESPSurvivor" or name == "Chams"
         or name == "ESPNames" or name == "ESPDistance" then
         if self.Toggles.ESP then self:Refresh() end
@@ -505,6 +745,9 @@ function State:Start()
         if self.Destroyed then return end
         stepRepair()
         submitSkillCheck()
+        if self.Toggles.GeneratorESP and os.clock() - self.LastGeneratorScan >= 1 then
+            self:RefreshGeneratorESP()
+        end
     end))
     return true
 end
@@ -514,6 +757,7 @@ function State:Destroy()
     self:StopRepair()
     self.Destroyed = true
     self:ClearESP()
+    self:ClearGeneratorESP()
     for _, connection in ipairs(self.Connections) do
         pcall(function() connection:Disconnect() end)
     end
@@ -541,26 +785,45 @@ end
 do
     local UI = env.__DEPHUB and env.__DEPHUB.UI
     if type(UI) == "table" and type(UI.CreateTab) == "function" then
-        local okTab, tab = pcall(function() return UI:CreateTab("Violence District", "All") end)
-        if okTab and tab then
-            local esp = sectionFor(tab, "ESP", "Left")
-            if esp then
-                esp:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
-                esp:CreateToggle(State.ToggleLabels.ESPKiller, State.Toggles.ESPKiller, function(v) State:SetToggle("ESPKiller", v) end)
-                esp:CreateToggle(State.ToggleLabels.ESPSurvivor, State.Toggles.ESPSurvivor, function(v) State:SetToggle("ESPSurvivor", v) end)
-                esp:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
-                esp:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State:SetToggle("ESPNames", v) end)
-                esp:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State:SetToggle("ESPDistance", v) end)
-                esp:CreateSlider("Distancia maxima", 50, 5000, State.Values.Range, function(v) State:SetValue("Range", v) end)
-                esp:CreateSlider("Tamanho do texto", 8, 30, State.Values.TextSize, function(v) State:SetValue("TextSize", v) end)
+        local function createTab(name)
+            local ok, tab = pcall(function() return UI:CreateTab(name, "All") end)
+            return ok and tab or nil
+        end
+
+        local espTab = createTab("ESP")
+        if espTab then
+            local players = sectionFor(espTab, "Jogadores", "Left")
+            if players then
+                players:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
+                players:CreateToggle(State.ToggleLabels.ESPKiller, State.Toggles.ESPKiller, function(v) State:SetToggle("ESPKiller", v) end)
+                players:CreateToggle(State.ToggleLabels.ESPSurvivor, State.Toggles.ESPSurvivor, function(v) State:SetToggle("ESPSurvivor", v) end)
+                players:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
+                players:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State:SetToggle("ESPNames", v) end)
+                players:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State:SetToggle("ESPDistance", v) end)
+                players:CreateSlider("Distância máxima", 50, 5000, State.Values.Range, function(v) State:SetValue("Range", v) end)
+                players:CreateSlider("Tamanho do texto", 8, 30, State.Values.TextSize, function(v) State:SetValue("TextSize", v) end)
             end
-            local gen = sectionFor(tab, "Gerador", "Right")
-            if gen then
-                gen:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
-                gen:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
-                gen:CreateSlider("Alcance do reparo", 4, 40, State.Values.RepairRange, function(v) State:SetValue("RepairRange", v) end)
+
+            local generators = sectionFor(espTab, "Geradores", "Right")
+            if generators then
+                generators:CreateToggle(State.ToggleLabels.GeneratorESP, State.Toggles.GeneratorESP, function(v) State:SetToggle("GeneratorESP", v) end)
+                generators:CreateSlider("Distância máxima", 50, 5000, State.Values.GeneratorRange, function(v) State:SetValue("GeneratorRange", v) end)
             end
-            local combat = sectionFor(tab, "Combate", "Right")
+        end
+
+        local generatorTab = createTab("Geradores")
+        if generatorTab then
+            local automation = sectionFor(generatorTab, "Automação", "Left")
+            if automation then
+                automation:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
+                automation:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
+                automation:CreateSlider("Alcance do reparo", 4, 40, State.Values.RepairRange, function(v) State:SetValue("RepairRange", v) end)
+            end
+        end
+
+        local combatTab = createTab("Combate")
+        if combatTab then
+            local combat = sectionFor(combatTab, "Auto Parry", "Left")
             if combat then
                 combat:CreateToggle(State.ToggleLabels.AutoParry, State.Toggles.AutoParry, function(v) State:SetToggle("AutoParry", v) end)
                 combat:CreateToggle(State.ToggleLabels.AutoEquip, State.Toggles.AutoEquip, function(v) State:SetToggle("AutoEquip", v) end)
