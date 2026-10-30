@@ -352,6 +352,15 @@ local function collectGeneratorTargets(root)
         local name = normalizeObjectName(descendant.Name)
         if name:find("generator", 1, true) and not isGeneratorPointName(name) then
             addGeneratorTarget(targets, descendant)
+        elseif name:match("^generatorpoint%d*$") then
+            local ancestor = descendant.Parent
+            while ancestor and ancestor ~= root do
+                if ancestor:IsA("Model") then
+                    addGeneratorTarget(targets, ancestor)
+                    break
+                end
+                ancestor = ancestor.Parent
+            end
         end
     end
 
@@ -841,6 +850,12 @@ do
     if Diag and type(Diag.RegisterModule) == "function" then
         Diag:RegisterModule("src/games/violence-district.lua")
         Diag:Feature("ViolenceDistrict.ESP", function() return State.Toggles.ESP and "ON" or "off" end)
+        Diag:Feature("ViolenceDistrict.GeneratorESP", function() return State.Toggles.GeneratorESP and "ON" or "off" end)
+        Diag:Watch("ViolenceDistrict geradores ESP", function()
+            local count = 0
+            for _ in pairs(State.GeneratorESPObjects) do count = count + 1 end
+            return count
+        end)
         Diag:Feature("ViolenceDistrict.AutoRepair", function() return State.Toggles.AutoRepair and "ON" or "off" end)
         Diag:Feature("ViolenceDistrict.AutoParry", function() return State.Toggles.AutoParry and "ON" or "off" end)
         Diag:Watch("ViolenceDistrict alvos", function()
