@@ -21,8 +21,8 @@ M.config = {
     targetPlayers = false, playerRange = 60,
     fast = false,
     auraRange = 60, losCheck = false,
-    aimSmooth = 0.15,
-    clickInterval = 0.25,
+    aimSmooth = 0.15, aimRange = 300, aimPart = "HumanoidRootPart",
+    clickInterval = 0.25, skillOrder = "Z X C V F",
     keys = { Z = false, X = false, C = false, V = false, F = false },
     followDist = 6, attack1v1 = false,
     spectate = false, aim = false,
@@ -40,6 +40,7 @@ M.bounty = {
     maxTime = 20,
     team = "Both",
     method = "Nearest",
+    ignore = {},
 }
 M._bountyOn, M._noStunOn = false, false
 M._bountySkip = {}
@@ -51,6 +52,29 @@ local function net()
     return n:FindFirstChild("RE/RegisterAttack"), n:FindFirstChild("RE/RegisterHit")
 end
 local function effDelay() return M.config.fast and 0.08 or M.config.delay end
+
+-- "Z X C V F" -> {"Z","X","C","V","F"}. Any key token is accepted so a user can
+-- reorder the rotation; unknown tokens are ignored by pressKey (Enum.KeyCode nil).
+local function parseSkillOrder(text)
+    local list = {}
+    for token in tostring(text or ""):gmatch("%S+") do
+        local key = token:upper()
+        if M.config.keys[key] ~= nil then list[#list + 1] = key end
+    end
+    if #list == 0 then list = { "Z", "X", "C", "V", "F" } end
+    return list
+end
+
+-- "Aurora, bob123" -> {aurora=true, bob123=true}. Comma or whitespace separated,
+-- lowercased; used by the bounty ignore list (matches name or display name).
+local function parseIgnoreList(text)
+    local set = {}
+    for token in tostring(text or ""):gmatch("[^,%s]+") do
+        local name = token:lower()
+        if name ~= "" then set[name] = true end
+    end
+    return set
+end
 
 function M.hrp() local ch = LP and LP.Character; return ch and ch:FindFirstChild("HumanoidRootPart") end
 
@@ -289,9 +313,12 @@ function M.setAutoClick(on)
     if M._autoClick and M._core then
         M._core.spawn(function()
             while M._autoClick do
-                for k, enabled in pairs(M.config.keys) do
+                -- Fire keys in the configured order, not pairs() order: a hash
+                -- table has no order, so the rotation used to come out different
+                -- every session (and a combo needs a stable sequence).
+                for _, k in ipairs(M._skillOrder or { "Z", "X", "C", "V", "F" }) do
                     if not M._autoClick then break end
-                    if enabled then M.pressKey(k) end
+                    if M.config.keys[k] then M.pressKey(k) end
                 end
                 task.wait(M.config.clickInterval)
             end
@@ -325,12 +352,22 @@ local function holdingCup(ch)
     for _, t in ipairs(ch:GetChildren()) do if t:IsA("Tool") and t.Name == "Cup" then return true end end
     return false
 end
+-- A player on the ignore list is never targeted, matched on display name or
+-- username (lowercased), so a user can paste either one.
+local function isIgnored(p)
+    local list = M.bounty.ignore
+    if not list or not next(list) then return false end
+    local name = p.Name:lower()
+    local dname = (p.DisplayName or ""):lower()
+    return list[name] == true or list[dname] == true
+end
 local function bountyValid(p)
     if p == LP then return false end
     local ch = p.Character
     local hum = ch and ch:FindFirstChildOfClass("Humanoid")
     local ph = ch and ch:FindFirstChild("HumanoidRootPart")
     if not (hum and ph and hum.Health > 0) then return false end
+    if isIgnored(p) then return false end
     if M.bounty.noFriends then
         local ok, f = pcall(function() return LP:IsFriendsWith(p.UserId) end)
         if ok and f then return false end
@@ -431,13 +468,14 @@ end
 function M.init(Core, UI)
     M._core = Core
     M.installCapture()
+    M._skillOrder = parseSkillOrder(M.config.skillOrder)
 
     Core.track(RunService.RenderStepped:Connect(function()
         local cam = workspace.CurrentCamera
         if not cam then return end
         if M.config.aim then
-            local ch = M.nearestPlayer()
-            local ph = ch and ch:FindFirstChild("HumanoidRootPart")
+            local ch = M.nearestPlayer(M.config.aimRange)
+            local ph = ch and (ch:FindFirstChild(M.config.aimPart) or ch:FindFirstChild("HumanoidRootPart"))
             if ph then
                 cam.CFrame = cam.CFrame:Lerp(CFrame.lookAt(cam.CFrame.Position, ph.Position), M.config.aimSmooth)
             end
@@ -467,12 +505,18 @@ function M.init(Core, UI)
     UI.section(page, "AIMBOT")
     UI.toggle(page, "Aimbot", "Lock camera on the nearest player", false, function(s) M.config.aim = s end)
     UI.slider(page, "Smoothness", "Lower = smoother", 3, 100, math.floor(M.config.aimSmooth * 100), function(v) M.config.aimSmooth = v / 100 end)
+    UI.slider(page, "Aimbot range", "Only lock onto players within this radius", 20, 1000, M.config.aimRange, function(v) M.config.aimRange = v end)
+    UI.dropdown(page, "Aim part", "Body part to aim at", { "HumanoidRootPart", "Head", "UpperTorso", "LowerTorso" }, function(s) M.config.aimPart = s end)
 
     UI.section(page, "AUTO SKILLS")
     UI.toggle(page, "Auto skills", "Auto-press the skill keys", false, function(s) M.setAutoClick(s) end)
     for _, k in ipairs({ "Z", "X", "C", "V", "F" }) do
         UI.toggle(page, "Key " .. k, "Include " .. k .. " in the rotation", M.config.keys[k], function(s) M.config.keys[k] = s end)
     end
+    UI.textbox(page, "Skill order (default: Z X C V F)", function(t)
+        M.config.skillOrder = (t ~= "" and t) or "Z X C V F"
+        M._skillOrder = parseSkillOrder(M.config.skillOrder)
+    end)
     UI.slider(page, "Skill interval (ms)", "Delay between key series", 100, 1000, math.floor(M.config.clickInterval * 1000), function(v) M.config.clickInterval = v / 1000 end)
 
     UI.section(page, "PLAYERS")
@@ -489,6 +533,7 @@ function M.init(Core, UI)
     UI.dropdown(page, "Farm method", "How to pick the target", { "Nearest", "Lowest HP" }, function(s) M.bounty.method = s end)
     UI.toggle(page, "Don't attack friends", "Skip your Roblox friends", M.bounty.noFriends, function(s) M.bounty.noFriends = s end)
     UI.toggle(page, "Don't attack Cup holders", "Skip players holding a Cup (truce)", M.bounty.noCup, function(s) M.bounty.noCup = s end)
+    UI.textbox(page, "Ignore players (names, comma-separated)", function(t) M.bounty.ignore = parseIgnoreList(t) end)
     UI.toggle(page, "No stun", "Counter stun (PlatformStand / stun attributes)", false, function(s) M.setNoStun(s) end)
     UI.toggle(page, "Invisible from Ken", "Best-effort: strike from behind/above", M.bounty.invisKen, function(s) M.bounty.invisKen = s end)
     UI.toggle(page, "Chat after kill", "Send a message when a target dies", M.bounty.chatKill, function(s) M.bounty.chatKill = s end)

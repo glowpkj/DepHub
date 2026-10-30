@@ -108,18 +108,23 @@ Arquivo: `combat.lua`. Já existe base ampla: `range`, `delay`,
 | Auto Attack: atacar durante o farm | **Impl** | `combat.attackOnce` usado pelo farm |
 | Kill Aura: alcance / LOS / intervalo | **Impl** | `auraRange`,`losCheck`,`delay` |
 | Kill Aura: seleção/prioridade de alvos | **Parcial** | `targetPlayers` mas sem filtros |
-| Aimbot: suavidade / alcance / parte do corpo | **Parcial** | `aimSmooth`; sem escolha de parte |
-| Aimbot: ativação por tecla | **Gap** | sempre ativo com o toggle |
-| Auto Skills: teclas / intervalo / ordem | **Parcial** | `keys` + `clickInterval`; sem ordem |
+| Aimbot: suavidade | **Impl** | `aimSmooth` (slider) |
+| Aimbot: alcance máximo | **Impl** Auto | slider "Aimbot range" → `aimRange` (20–1000) |
+| Aimbot: parte do corpo | **Impl** Auto | dropdown "Aim part" → `aimPart` (Root/Head/Upper/LowerTorso) |
+| Aimbot: ativação por tecla | **Gap** | ainda só toggle (`aim`); sem bind de tecla |
+| Auto Skills: teclas / intervalo | **Impl** | `keys` + `clickInterval` |
+| Auto Skills: ordem de execução | **Impl** Auto | textbox "Skill order" → `skillOrder`; **bug corrigido**: era `pairs()` (ordem aleatória), agora segue a sequência |
 | Auto Bounty: equipes / método / ignorar amigos | **Impl** | `bounty.noFriends`,`bounty.safePct`,`bounty.method`,`bounty.team` |
 | Auto Bounty: mensagem / tempo máx / retirada | **Impl** | `bounty.chatKill`,`chatMsg`,`maxTime` |
-| Auto Bounty: lista personalizada de ignorados | **Gap** | só amigos/nome |
+| Auto Bounty: lista personalizada de ignorados | **Impl** Auto | textbox "Ignore players" → `bounty.ignore` (nome ou display, vírgula/espaço) |
 | Follow Nearest / Spectate / No Stun / 1v1 | **Impl** | `followDist`, `attack1v1`, etc. |
 | Invisible from Ken | **Impl** | `bounty.invisKen`|
 
-**Resumo PVP:** a base é sólida. Gaps reais: lista de ignorados, prioridade/parte
-do corpo no aimbot, tecla do aimbot, ordem de skills. Nenhum é simulação — todos
-existem como mecanismo parcial e podem ganhar controle real.
+**Resumo PVP:** a rodada fechou lista de ignorados (bounty), alcance e parte do
+corpo do aimbot e a ordem de skills — e corrigiu um bug real (a rotação de skills
+saía em ordem aleatória por usar `pairs()`). Único gap de PVP restante: **bind de
+tecla do aimbot** (hoje só toggle) — exige hook de `UserInputService` que ainda
+não existe no módulo; fica pendente até haver mecanismo.
 
 ---
 

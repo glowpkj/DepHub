@@ -87,6 +87,39 @@ do
     atk.set(0.35)
     check(atk.get() == 0.35, "a fractional slider keeps sub-integer precision")
 
+    -- PVP: the aimbot range/part, the skill rotation order and the bounty ignore
+    -- list are all real mechanisms the module reads at runtime.
+    local combat = state.Modules and state.Modules.combat
+    check(combat ~= nil and type(combat.config) == "table", "the combat module exposes its config")
+
+    local aimRange = controlFor("Aimbot range")
+    check(aimRange ~= nil and aimRange.kind == "slider", "aimbot range is a slider")
+    aimRange.set(500)
+    check(combat.config.aimRange == 500, "aimbot range writes through to combat config")
+
+    local aimPart = controlFor("Aim part")
+    check(aimPart ~= nil and aimPart.kind == "dropdown", "aim part is a dropdown")
+    aimPart.set("Head")
+    check(combat.config.aimPart == "Head", "aim part writes through to combat config")
+
+    -- The skill rotation must be deterministic. It used to iterate a hash table
+    -- with pairs(), so the order changed between sessions; now it follows the
+    -- configured sequence.
+    local skillOrder = controlFor("Skill order")
+    check(skillOrder ~= nil and skillOrder.kind == "textbox", "skill order is a textbox")
+    skillOrder.set("F V Z")
+    check(combat._skillOrder ~= nil and #combat._skillOrder == 3, "skill order parses into a key list")
+    check(combat._skillOrder[1] == "F" and combat._skillOrder[2] == "V" and combat._skillOrder[3] == "Z", "skill order keeps the configured sequence")
+    skillOrder.set("")
+    check(#combat._skillOrder == 5, "an empty skill order falls back to the default rotation")
+
+    local ignore = controlFor("Ignore players")
+    check(ignore ~= nil and ignore.kind == "textbox", "bounty ignore list is a textbox")
+    ignore.set("Aurora, bob123")
+    check(combat.bounty.ignore.aurora == true and combat.bounty.ignore.bob123 == true, "ignore list lowercases and splits on commas")
+    ignore.set("")
+    check(next(combat.bounty.ignore) == nil, "clearing the ignore list empties it")
+
     local status = state:GetStatus()
     check(status.Controls == #controls and status.Sea == "Sea3", "status reports the live control count and sea")
     check(type(status.Errors) == "table" and #status.Errors == 0, "no module reported an init error")
