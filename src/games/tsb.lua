@@ -179,7 +179,7 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
         if type(UI.Notify) == "function" then UI:Notify(title, message) end
     end
 
-    local autoblock = section("Autoblock", "Bloqueio", "Left")
+    local autoblock = section("Combate", "Bloqueio", "Left")
     if autoblock then
         autoblock:CreateToggle("Auto block", State.Toggles.AutoBlock, function(v) State:SetAutoBlock(v) end)
         autoblock:CreateToggle("M1 após bloquear", State.Toggles.M1AfterBlock, function(v) State:SetM1AfterBlock(v) end)
@@ -190,7 +190,7 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
         autoblock:CreateToggle("Previsão", State.Toggles.Prediction, function(v) State:SetPrediction(v) end)
     end
 
-    local ranges = section("Ranges", "Alcance e tempo", "Left")
+    local ranges = section("Alcance", "Alcance e tempo", "Left")
     if ranges then
         ranges:CreateSlider("Alcance normal", 0, 60, State.Values.NormalRange, function(v) State:SetNormalRange(v) end)
         ranges:CreateSlider("Alcance especial", 0, 120, State.Values.SpecialRange, function(v) State:SetSpecialRange(v) end)
@@ -199,7 +199,7 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
         ranges:CreateSlider("Atraso do counter", 0, 1, State.Values.CounterDelay, function(v) State:SetCounterDelay(v) end)
     end
 
-    local detection = section("Detection", "Detecção", "Left")
+    local detection = section("Detecção", "Detecção", "Left")
     if detection then
         detection:CreateSlider("Tamanho da caixa", 0, 40, State.Values.DetectionBoxSize, function(v) State:SetDetectionBoxSize(v) end)
         detection:CreateSlider("Scan (Hz)", 1, 120, State.Values.ScanHz, function(v) State:SetScanHz(v) end)
@@ -208,13 +208,13 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
         detection:CreateToggle("Log de desconhecidos", State.Toggles.UnknownLogger, function(v) State:SetUnknownLogger(v) end)
     end
 
-    local prediction = section("Prediction", "Previsão", "Left")
+    local prediction = section("Previsão", "Previsão", "Left")
     if prediction then
         prediction:CreateSlider("Tempo de previsão", 0, 1, State.Values.PredictionTime, function(v) State:SetPredictionTime(v) end)
         prediction:CreateSlider("Extra de previsão", 0, 12, State.Values.PredictionExtra, function(v) State:SetPredictionExtra(v) end)
     end
 
-    local debug = section("Debug", "Diagnóstico", "Left")
+    local debug = section("Diagnóstico", "Diagnóstico", "Left")
     if debug then
         local function statusText()
             local info = State:GetDebugInfo()
