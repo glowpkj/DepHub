@@ -41,11 +41,9 @@ local Config = {
     moveThreshold = 2,        -- only move when further than this from the target (studs)
     moveSmoothing = 0.35,     -- lerp factor per frame for the safe (non-instant) path
     ceilingNoClip = true,     -- remove collision from Ceiling parts
-    jumpBoost = false,        -- enable the jump-power override
-    jumpPower = 120,          -- JumpPower value used while jumpBoost is on
-    jumpBypass = false,       -- force jumping on, overriding zones that lock it
-    bypassJumpPower = 120,    -- JumpPower used while jumpBypass is on
-    autoJump = false,         -- keep making the humanoid jump while bypass is on
+    jumpEnabled = false,      -- force the jump on: set JumpPower and keep it usable
+    jumpPower = 120,          -- JumpPower applied while jumpEnabled is on
+    autoJump = false,         -- also make the humanoid jump on its own
     maxPredictDistance = 0,   -- 0 = predict at any distance; >0 ignores balls past it
 }
 
@@ -55,12 +53,11 @@ local State = {
     Started = false,
     Mode = "Personal",
     Modes = {"Personal", "Match", "Future"},
-    Toggles = {BallPredict = true, AutoPosition = false, JumpBoost = false, JumpBypass = false, CeilingNoClip = true},
+    Toggles = {BallPredict = true, AutoPosition = false, JumpForce = false, CeilingNoClip = true},
     ToggleLabels = {
         BallPredict = "Ball Predict",
         AutoPosition = "Auto Position",
-        JumpBoost = "Jump Boost",
-        JumpBypass = "Jump Bypass",
+        JumpForce = "Pulo forçado",
         CeilingNoClip = "Ceiling NoClip",
     },
     Config = Config,
@@ -167,16 +164,41 @@ local function rememberBaseJump()
     end
 end
 
-local function applyJumpOverride()
+-- Forcing the jump: some maps stage a no-jump zone by zeroing JumpPower and
+-- JumpHeight and disabling the Jumping state on the client humanoid. Re-asserting
+-- both the values and the state flags every frame keeps the jump usable, and the
+-- base values are captured on first use so turning it off (or unloading) restores
+-- exactly what the game had.
+local BYPASS_STATES = {Enum.HumanoidStateType.Jumping, Enum.HumanoidStateType.Climbing}
+
+local function rememberBaseJumpStates(humanoid)
+    if State.BaseJumpStates then return end
+    local states = {}
+    for _, state in ipairs(BYPASS_STATES) do
+        local ok, enabled = pcall(function() return humanoid:GetStateEnabled(state) end)
+        states[state] = ok and enabled or true
+    end
+    State.BaseJumpStates = states
+end
+
+local function applyJump()
     local character = LocalPlayer.Character
     local humanoid = character and character:FindFirstChildOfClass("Humanoid")
     if not humanoid then return end
-    if Config.jumpBoost then
-        rememberBaseJump()
-        pcall(function()
-            humanoid.UseJumpPower = true
-            humanoid.JumpPower = Config.jumpPower
-        end)
+
+    rememberBaseJump()
+    rememberBaseJumpStates(humanoid)
+    pcall(function()
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = Config.jumpPower
+        humanoid.JumpHeight = math.max(tonumber(humanoid.JumpHeight) or 0, 7.2)
+    end)
+    for _, state in ipairs(BYPASS_STATES) do
+        pcall(function() humanoid:SetStateEnabled(state, true) end)
+    end
+
+    if Config.autoJump and humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
+        pcall(function() humanoid.Jump = true end)
     end
 end
 
@@ -194,45 +216,6 @@ local function restoreJump()
         for state, enabled in pairs(State.BaseJumpStates) do
             pcall(function() humanoid:SetStateEnabled(state, enabled) end)
         end
-    end
-end
-
--- Jump Bypass: some maps stage a no-jump zone by zeroing JumpPower/JumpHeight
--- and disabling the Jumping state on the client humanoid. Everything the client
--- owns here is re-asserted every frame, so the moment the zone trips it the loop
--- writes the boosted values straight back. The base values (power, height, the
--- jumping/climbing state flags) are captured on first use so turning it off or
--- unloading restores exactly what the game had.
-local BYPASS_STATES = {Enum.HumanoidStateType.Jumping, Enum.HumanoidStateType.Climbing}
-
-local function rememberBaseJumpStates(humanoid)
-    if State.BaseJumpStates then return end
-    local states = {}
-    for _, state in ipairs(BYPASS_STATES) do
-        local ok, enabled = pcall(function() return humanoid:GetStateEnabled(state) end)
-        states[state] = ok and enabled or true
-    end
-    State.BaseJumpStates = states
-end
-
-local function applyJumpBypass()
-    local character = LocalPlayer.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-
-    rememberBaseJump()
-    rememberBaseJumpStates(humanoid)
-    pcall(function()
-        humanoid.UseJumpPower = true
-        humanoid.JumpPower = Config.bypassJumpPower
-        humanoid.JumpHeight = math.max(tonumber(humanoid.JumpHeight) or 0, 7.2)
-    end)
-    for _, state in ipairs(BYPASS_STATES) do
-        pcall(function() humanoid:SetStateEnabled(state, true) end)
-    end
-
-    if Config.autoJump and humanoid:GetState() ~= Enum.HumanoidStateType.Dead then
-        pcall(function() humanoid.Jump = true end)
     end
 end
 
@@ -748,17 +731,10 @@ function State:SetToggle(name, value)
         return true
     end
 
-    if name == "JumpBoost" then
-        self.Toggles.JumpBoost = value == true
-        Config.jumpBoost = self.Toggles.JumpBoost
-        if not self.Toggles.JumpBoost then restoreJump() end
-        return true
-    end
-
-    if name == "JumpBypass" then
-        self.Toggles.JumpBypass = value == true
-        Config.jumpBypass = self.Toggles.JumpBypass
-        if not self.Toggles.JumpBypass then restoreJump() end
+    if name == "JumpForce" then
+        self.Toggles.JumpForce = value == true
+        Config.jumpEnabled = self.Toggles.JumpForce
+        if not self.Toggles.JumpForce then restoreJump() end
         return true
     end
 
@@ -807,12 +783,9 @@ function State:Start()
     connect(self.Connections, RunService.Heartbeat, function(dt)
         if self.Destroyed then return end
 
-        -- Jump boost is independent of the ball: apply it as soon as it is on,
-        -- and it re-applies each frame because the game can reset the humanoid.
-        if Config.jumpBoost then applyJumpOverride() end
-        -- Jump bypass re-asserts the jump values/states every frame so a no-jump
-        -- zone never gets a foothold.
-        if Config.jumpBypass then applyJumpBypass() end
+        -- Forcing the jump is independent of the ball: apply it as soon as it is
+        -- on, and re-apply each frame because the game can reset the humanoid.
+        if Config.jumpEnabled then applyJump() end
         -- Ceiling parts stay non-colliding for the player while this is on; a
         -- re-assert each frame covers ceilings that stream in later.
         if Config.ceilingNoClip then setCeilingNoClip(true) end
@@ -991,22 +964,18 @@ if type(UI) == "table" and type(UI.CreateTab) == "function" then
     -- Right column: movement (jump) and collision.
     local movement = section("Ball Predict", "Pulo", "Right")
     if movement then
-        movement:CreateToggle("Jump Boost", State.Toggles.JumpBoost, function(v) State:SetToggle("JumpBoost", v) end)
+        movement:CreateToggle("Pulo forçado", State.Toggles.JumpForce, function(v)
+            State:SetToggle("JumpForce", v)
+            notify(v and "Pulo forçado LIGADO" or "Pulo forçado desligado")
+        end)
         movement:CreateSlider("Jump Power", 50, 500, Config.jumpPower, function(v)
             Config.jumpPower = tonumber(v) or 120
-            if State.Toggles.JumpBoost then applyJumpOverride() end
-        end)
-        movement:CreateToggle("Jump Bypass", State.Toggles.JumpBypass, function(v)
-            State:SetToggle("JumpBypass", v)
-            notify(v and "Jump Bypass LIGADO: pular liberado" or "Jump Bypass desligado")
-        end)
-        movement:CreateSlider("Jump Bypass Power", 50, 500, Config.bypassJumpPower, function(v)
-            Config.bypassJumpPower = tonumber(v) or 120
+            if State.Toggles.JumpForce then applyJump() end
         end)
         movement:CreateToggle("Auto Jump", Config.autoJump, function(v)
             Config.autoJump = v == true
         end)
-        movement:CreateParagraph("Pulo", "Jump Boost força o JumpPower enquanto ligado e restaura o original ao desligar. Jump Bypass reaplica JumpPower, JumpHeight e o estado de pulo todo frame, então zonas que bloqueiam pular deixam de valer; Auto Jump pula sozinho enquanto ele está ligado.")
+        movement:CreateParagraph("Pulo", "Pulo forçado liga o pulo mesmo em zonas que o bloqueiam: aplica o Jump Power todo frame e mantém o estado de pulo habilitado. Ao desligar, restaura o que o jogo tinha. Auto Jump pula sozinho enquanto ele está ligado.")
     end
 
     -- Ceiling parts are what the ball bounces off; clearing their collision
@@ -1056,8 +1025,7 @@ do
         end)
         Diag:Feature("Volleyball.Historico",function() return #State.History.." amostras" end)
         Diag:Feature("Volleyball.AutoPosition",function() return State.Toggles.AutoPosition and "ON" or "off" end)
-        Diag:Feature("Volleyball.JumpBoost",function() return State.Toggles.JumpBoost and ("ON "..tostring(Config.jumpPower)) or "off" end)
-        Diag:Feature("Volleyball.JumpBypass",function() return State.Toggles.JumpBypass and ("ON "..tostring(Config.bypassJumpPower)) or "off" end)
+        Diag:Feature("Volleyball.JumpForce",function() return State.Toggles.JumpForce and ("ON "..tostring(Config.jumpPower)) or "off" end)
         Diag:Feature("Volleyball.InstantMove",function() return Config.instantMove and "ON" or "off" end)
         Diag:Feature("Volleyball.CeilingNoClip",function() return State.Toggles.CeilingNoClip and "ON" or "off" end)
         Diag:Feature("Volleyball.PodePular",function()
@@ -1086,7 +1054,7 @@ do
                     .." amostras="..#State.History
                     .." autoPos="..tostring(State.Toggles.AutoPosition)
                     .." instant="..tostring(Config.instantMove)
-                    .." jump="..tostring(State.Toggles.JumpBoost)
+                    .." jump="..tostring(State.Toggles.JumpForce)
             end)
             Diag:Command("vb-predict",function(argument)
                 local on=argument~="off"
@@ -1103,21 +1071,16 @@ do
                 return "InstantMove="..tostring(Config.instantMove)
             end)
             Diag:Command("vb-jump",function(argument)
+                if argument=="off" then
+                    State:SetToggle("JumpForce",false)
+                    return "JumpForce=off"
+                end
                 if argument and argument~="" then
                     local value=tonumber(argument)
                     if value then Config.jumpPower=value end
                 end
-                State:SetToggle("JumpBoost",true)
-                return "JumpBoost=on power="..tostring(Config.jumpPower)
-            end)
-            Diag:Command("vb-bypass",function(argument)
-                local on=argument~="off"
-                if argument and argument~="" and argument~="off" then
-                    local value=tonumber(argument)
-                    if value then Config.bypassJumpPower=value end
-                end
-                State:SetToggle("JumpBypass",on)
-                return "JumpBypass="..tostring(on).." power="..tostring(Config.bypassJumpPower)
+                State:SetToggle("JumpForce",true)
+                return "JumpForce=on power="..tostring(Config.jumpPower)
             end)
         end
     end

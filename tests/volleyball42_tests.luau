@@ -1,6 +1,6 @@
 -- Volleyball 4.2: the assistance features must drive real state, not just
 -- register controls. Auto Position moves the character's root toward the
--- predicted landing, Jump Boost/Bypass apply and then restore the humanoid's
+-- predicted landing, Pulo forcado applies and then restores the humanoid's
 -- jump values, and Ceiling noclip clears and restores collision.
 do
     local ctx = sandbox(1316421563, 1316421563)
@@ -70,41 +70,36 @@ do
     end
     check(state.CurrentBall == ball and state.CurrentVelocity ~= nil, "the loop locks onto the ball and estimates a velocity")
 
-    -- Jump Boost: applied while on, and restored to the game's original values.
-    state:SetToggle("JumpBoost", true)
+    -- Pulo forcado (JumpForce): one toggle that applies the jump power and keeps
+    -- the jump itself usable. It is the old boost and bypass in a single
+    -- operation, so it must both set the power and survive a no-jump zone.
+    state:SetToggle("JumpForce", true)
     tick()
-    check(humanoid.JumpPower == state.Config.jumpPower and humanoid.UseJumpPower == true, "jump boost applies the configured power")
+    check(humanoid.JumpPower == state.Config.jumpPower and humanoid.UseJumpPower == true, "jump force applies the configured power")
 
     state.Config.jumpPower = 200
     tick()
-    check(humanoid.JumpPower == 200, "changing the jump power slider sticks while boosted")
+    check(humanoid.JumpPower == 200, "changing the jump power slider sticks while jump force is on")
 
-    state:SetToggle("JumpBoost", false)
-    check(humanoid.JumpPower == 55 and humanoid.UseJumpPower == false, "disabling jump boost restores the original values")
-
-    -- Jump Bypass: the game trips a no-jump zone (power zeroed, state disabled),
-    -- and the bypass must undo it on the next frame.
-    state:SetToggle("JumpBypass", true)
+    -- A no-jump zone zeroes the power and disables the jumping state; the next
+    -- frame must write both back.
     humanoid.JumpPower, humanoid.JumpHeight = 0, 0
     humanoid:SetStateEnabled(Enum.HumanoidStateType.Jumping, false)
     tick()
-    check(humanoid.JumpPower == state.Config.bypassJumpPower, "jump bypass restores the jump power the zone zeroed")
-    check(humanoid.JumpHeight >= 7.2, "jump bypass restores a usable jump height")
-    check(humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) == true, "jump bypass re-enables the jumping state")
+    check(humanoid.JumpPower == state.Config.jumpPower, "jump force restores the power a no-jump zone zeroed")
+    check(humanoid.JumpHeight >= 7.2, "jump force restores a usable jump height")
+    check(humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) == true, "jump force re-enables the jumping state")
 
-    state.Config.bypassJumpPower = 300
-    tick()
-    check(humanoid.JumpPower == 300, "changing the bypass power slider sticks")
-
-    -- Auto Jump makes the humanoid jump each frame while the bypass is on.
+    -- Auto Jump makes the humanoid jump each frame while jump force is on.
     state.Config.autoJump = true
     humanoid.Jump = false
     tick()
     check(humanoid.Jump == true, "auto jump triggers the humanoid jump")
+    state.Config.autoJump = false
 
-    state:SetToggle("JumpBypass", false)
-    check(humanoid.JumpPower == 55 and humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) == true,
-        "disabling jump bypass restores the game's values")
+    state:SetToggle("JumpForce", false)
+    check(humanoid.JumpPower == 55 and humanoid.UseJumpPower == false and humanoid:GetStateEnabled(Enum.HumanoidStateType.Jumping) == true,
+        "disabling jump force restores the game's values")
 
     -- Auto Position: the root moves toward the predicted landing point. The ball
     -- keeps moving so the prediction stays valid (a static ball reads as a zero
@@ -145,9 +140,9 @@ do
     state:SetToggle("CeilingNoClip", true)
 
     -- Destroying restores the jump values and clears published state.
-    state:SetToggle("JumpBoost", true)
+    state:SetToggle("JumpForce", true)
     tick()
-    check(humanoid.JumpPower == state.Config.jumpPower, "jump boost is re-applied while live")
+    check(humanoid.JumpPower == state.Config.jumpPower, "jump force is re-applied while live")
     state:Destroy()
     check(state.Destroyed and humanoid.JumpPower == 55, "destroy restores the jump power")
     check(ctx.State.__DEPHUB.Volleyball42 == nil, "destroy clears the published state")
@@ -157,7 +152,7 @@ do
     for _, control in ipairs(ui.Library._Controls) do
         if control.Label then labels[control.Label] = true end
     end
-    for _, expected in ipairs({"Auto Position", "Instantâneo", "Suavidade do movimento", "Offset acima do chão", "Distância mínima", "Jump Boost", "Jump Power", "Alcance da previsão", "Jump Bypass", "Jump Bypass Power", "Auto Jump", "Ceiling sem colisão"}) do
+    for _, expected in ipairs({"Auto Position", "Instantâneo", "Suavidade do movimento", "Offset acima do chão", "Distância mínima", "Pulo forçado", "Jump Power", "Alcance da previsão", "Auto Jump", "Ceiling sem colisão"}) do
         check(labels[expected] == true, "Volleyball registers its control: " .. expected)
     end
 end
