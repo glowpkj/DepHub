@@ -684,11 +684,28 @@ function Library:CreateTab(categoryName, tabName)
     local function updateColumnsSize()
         local leftSize = leftLayout.AbsoluteContentSize.Y
         local rightSize = rightLayout.AbsoluteContentSize.Y
-        local maxH = math.max(leftSize, rightSize)
-        columnsContainer.Size = UDim2.new(1, 0, 0, maxH)
+        local availableWidth = UI.ContentArea and UI.ContentArea.AbsoluteSize.X or self.WindowSize.X.Offset
+        local stacked = availableWidth < 680
+        if stacked then
+            leftCol.Size = UDim2.new(1, 0, 0, leftSize)
+            leftCol.Position = UDim2.new(0, 0, 0, 0)
+            rightCol.Size = UDim2.new(1, 0, 0, rightSize)
+            rightCol.Position = UDim2.new(0, 0, 0, leftSize + self:_densityPadding(10))
+            columnsContainer.Size = UDim2.new(1, 0, 0, leftSize + rightSize + self:_densityPadding(10))
+        else
+            leftCol.Size = UDim2.new(0.5, -5, 0, leftSize)
+            leftCol.Position = UDim2.new(0, 0, 0, 0)
+            rightCol.Size = UDim2.new(0.5, -5, 0, rightSize)
+            rightCol.Position = UDim2.new(0.5, 5, 0, 0)
+            columnsContainer.Size = UDim2.new(1, 0, 0, math.max(leftSize, rightSize))
+        end
     end
     leftLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateColumnsSize)
     rightLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateColumnsSize)
+    if UI.ContentArea then
+        Fn.track(UI.ContentArea:GetPropertyChangedSignal("AbsoluteSize"), updateColumnsSize, self)
+    end
+    task.defer(updateColumnsSize)
 
     -- Save references
     STATE.ContentPages[tabName] = page
