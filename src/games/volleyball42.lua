@@ -501,6 +501,12 @@ local function getRaycastParams(ball)
         exclusions[#exclusions + 1] = LocalPlayer.Character
     end
 
+    for _, courtPart in ipairs(State.Courts) do
+        if courtPart.Parent then
+            exclusions[#exclusions + 1] = courtPart
+        end
+    end
+
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
     params.FilterDescendantsInstances = exclusions
