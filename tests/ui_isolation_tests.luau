@@ -29,7 +29,18 @@ do
     -- MM2
     do
         local ctx = sandbox(66654135, 66654135)
-        ctx:MountUI()
+        local window = ctx:MountUI()
+        -- Keyboard-independent open/close: the shell discards the toggle key when
+        -- the executor reports gameProcessed=true, so a global must exist to open
+        -- the panel regardless. It drives the library's own Toggle.
+        check(type(ctx.State.__DEPHUB_TOGGLE) == "function", "the UI exposes a keyboard-independent toggle global")
+        local first = window.Library._STATE.GuiVisible and true or false
+        ctx.State.__DEPHUB_TOGGLE()
+        local second = window.Library._STATE.GuiVisible and true or false
+        check(second ~= first, "the toggle global flips the panel visibility")
+        ctx.State.__DEPHUB_TOGGLE()
+        local third = window.Library._STATE.GuiVisible and true or false
+        check(third == first, "the toggle global flips it back")
         for _, name in ipairs({"roletracker", "roundtracker", "esp", "coinfarm", "playerteleport", "gundrop"}) do
             ctx.Responses["src/games/features/mm2/" .. name .. ".lua"] = sources["src/games/features/mm2/" .. name .. ".lua"]
         end

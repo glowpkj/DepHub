@@ -233,6 +233,10 @@ local DOD_LIBRARY_STUB = [==[
 local function NewWindow()
     local state = {ContentPages = {}, CategoryButtons = {}, CategoryTabs = {}, ActiveCategory = "General", ActiveTab = nil}
     local library = {_STATE = state, _Categories = {}, _Tabs = {}, _Controls = {}}
+    function library:Toggle()
+        state.GuiVisible = not state.GuiVisible
+        return state.GuiVisible
+    end
     function library:CreateCategory(name, icon)
         self._Categories[name] = true
         -- Mirror the real library: each category owns a "TabList" frame that holds

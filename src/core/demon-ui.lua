@@ -133,6 +133,18 @@ function DemonUI.new(options)
         Destroyed = false
     }, DemonUI)
     self:CreateCategory(DEFAULT_CATEGORY, "layers")
+
+    -- Fallback de abertura/fechamento sem teclado: alguns executores entregam o
+    -- InputBegan com gameProcessed=true (o shell descarta a tecla de proposito,
+    -- para nao conflitar com o chat), entao o painel fica impossivel de abrir
+    -- pelo teclado. Este global chama o Toggle direto. Tambem serve de sonda:
+    -- se __DEPHUB_TOGGLE() funciona mas a tecla nao, o problema e o executor.
+    local env = type(getgenv) == "function" and getgenv() or _G
+    env.__DEPHUB_TOGGLE = function()
+        if self.Destroyed or not self.Library then return false end
+        pcall(function() self.Library:Toggle() end)
+        return true
+    end
     return self
 end
 

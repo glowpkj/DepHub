@@ -270,6 +270,14 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
     Com 3+ controles o label do toggle trunca ate sumir. Agrupe pares (toggle +
     o slider dele, ou os switches da mesma funcionalidade).
 
+(i) Tecla de abrir/fechar nao funciona no executor -> painel nao abre.
+    O shell descarta o InputBegan quando gameProcessed=true (de proposito, para
+    nao conflitar com o chat). Alguns executores (ex. Madium) marcam QUALQUER
+    tecla como gameProcessed, entao a tecla nunca abre o painel. Fallback:
+    o global __DEPHUB_TOGGLE() abre/fecha o painel direto do console, sem
+    depender do teclado. Serve de sonda: se __DEPHUB_TOGGLE() funciona mas a
+    tecla nao, o problema e o executor entregando a tecla processada.
+
 (h) Wait() bloqueante no inicio do loader -> "rodei e nao aparece nada".
     O loader declarava `Players.LocalPlayer or Players.PlayerAdded:Wait()` e
     nunca usava a variavel, e mais adiante gateava o inicio com
@@ -334,14 +342,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.06)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.07)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
 HStack:
 
-FEITO / FUNCIONANDO (verificado offline, 798 checks):
+FEITO / FUNCIONANDO (verificado offline, 801 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
