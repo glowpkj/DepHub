@@ -511,6 +511,15 @@ local function sandbox(placeId, gameId)
             :gsub("^https://github%.com/glowpkj/DepHub/raw/[^/]+/", "")
             :gsub("^https://cdn%.jsdelivr%.net/gh/glowpkj/DepHub@[^/]+/", "")
             :gsub("%?.*$", "")
+        -- Host-specific overrides let a test make one mirror serve a different
+        -- body (e.g. a stale version.txt) while the others stay current, which is
+        -- how the host-resolution rule is exercised.
+        local byHost = context.HostResponses or {}
+        for _, entry in ipairs(byHost) do
+            if url:find(entry.Match, 1, true) or entry.Match:find(url, 1, true) then
+                if entry.Responses[path] ~= nil then return entry.Responses[path] end
+            end
+        end
         return assert(context.Responses[path], "Unexpected HTTP: " .. path)
     end
     local env = setmetatable({game=game, workspace=services.Workspace, Color3=Color3, Vector3=Vector3, CFrame=CFrame, typeof=typeof, Instance=Instance, Enum=Enum,

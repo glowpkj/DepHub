@@ -88,43 +88,45 @@ do
 end
 
 do
-    -- Source-host resolution: the loader probes its candidate hosts and keeps the
-    -- first one that serves the current build, publishing that base so every
-    -- module fetches from the same live mirror instead of the stale raw branch
-    -- cache. The harness answers every host by path, so the primary (jsDelivr)
-    -- wins and is used for all module URLs.
+    -- Source-host resolution: the loader probes its candidate hosts and accepts
+    -- only the one whose src/version.txt is EXACTLY this loader's version -- the
+    -- host that also serves the current modules. raw is first in the order, so it
+    -- wins, and every module fetch reuses that base.
     local ctx = sandbox(1, 2)
-    ctx.Responses["src/version.txt"] = "0.0.3"
+    local localVersion = ctx.Sources["DepHub.lua"]:match('local VERSION = "([^"]+)"')
+    ctx.Responses["src/version.txt"] = localVersion
     ctx:Provide("src/games/universal.lua", {})
     check(ctx:Run("DepHub.lua") == true, "loader succeeds and resolves a source host")
-    check(ctx.State.__DEPHUB.SourceBaseURL == "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@main/",
-        "loader prefers the first candidate host for the current build")
-    check(ctx.State.__DEPHUB.BaseVersion == "0.0.3", "loader records the version the chosen host served")
+    check(ctx.State.__DEPHUB.SourceBaseURL == "https://raw.githubusercontent.com/glowpkj/DepHub/main/",
+        "loader prefers raw, the first candidate serving this exact build")
+    check(ctx.State.__DEPHUB.BaseVersion == localVersion, "loader records the version the chosen host served")
 
     -- Every module fetch goes through the resolved base, so no module URL (as
-    -- opposed to the host probes) still targets the stale raw branch host.
+    -- opposed to the host probes) targets a mirror other than the winner.
     for _, url in ipairs(ctx.Requests) do
         if not url:find("src/version.txt", 1, true) then
-            check(url:find("glowpkj/DepHub/main/", 1, true) == nil, "no module fetch uses the stale raw host: " .. url)
+            check(url:find("cdn.jsdelivr.net", 1, true) == nil, "no module fetch uses a losing mirror: " .. url)
         end
     end
 end
 
 do
-    -- A current primary host stops the probe immediately: the preferred mirror is
-    -- used, and no other host (in particular the stale raw branch) is contacted
-    -- for the version.
-    local ctx = sandbox(1, 2)
+    -- The exact-version rule is what stops a stale mirror from being chosen. raw
+    -- here reports an OLD version (a stale edge cache); the loader must keep
+    -- probing and pick the mirror that serves the current build, even though it
+    -- comes later in the order -- never the host that answered first.
+    local ctx = sandbox()
     local localVersion = ctx.Sources["DepHub.lua"]:match('local VERSION = "([^"]+)"')
     ctx.Responses["src/version.txt"] = localVersion
     ctx:Provide("src/games/universal.lua", {})
-    check(ctx:Run("DepHub.lua") == true, "loader runs with a current primary host")
-    check(ctx.State.__DEPHUB.SourceBaseURL == "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@main/",
-        "a current primary host is chosen without falling back")
-    for _, url in ipairs(ctx.Requests) do
-        check(url:find("raw.githubusercontent.com/glowpkj/DepHub", 1, true) == nil,
-            "a current primary host keeps the stale raw host out of every request: " .. url)
-    end
+    ctx.HostResponses = {
+        {Match = "raw.githubusercontent.com/glowpkj/DepHub", Responses = {["src/version.txt"] = "0.0.1"}},
+    }
+    check(ctx:Run("DepHub.lua") == true, "loader runs when the first host is stale")
+    check(ctx.State.__DEPHUB.SourceBaseURL == "https://github.com/glowpkj/DepHub/raw/main/",
+        "a stale first host is rejected in favour of the next host serving this exact build")
+    check(ctx.State.__DEPHUB.BaseVersion == localVersion,
+        "loader records the version of the host it actually chose")
 end
 
 do

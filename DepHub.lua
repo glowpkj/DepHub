@@ -15,19 +15,21 @@ local env = type(getgenv) == "function" and getgenv() or _G
 pcall(print, "[DepHub] loader starting...")
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
--- Source hosts in fallback order. raw.githubusercontent.com serves a branch ref
--- through an edge cache whose TTL can keep a whole revision behind, so a "bump
--- main" can go unseen by the loader (and by every module) for minutes. jsDelivr
--- re-resolves from git per request, and github.com/<ref>/raw/ is a third origin;
--- the first host that answers the version probe wins for the whole session, and
--- its base is published so every module fetches from the same live mirror.
+-- Source hosts in fallback order. raw.githubusercontent.com is FIRST on purpose:
+-- its edge cache is short-lived and it is the origin the project actually pushes
+-- to, so it serves the current revision. jsDelivr re-resolves per request but its
+-- per-file branch cache has repeatedly been caught serving an OLD revision (a
+-- stale version.txt next to a fresh file, or vice-versa) -- exactly the failure
+-- that made a run pick an old mirror and load a build missing every new feature.
+-- It stays last as a fallback for when raw is unreachable. github.com/<ref>/raw/
+-- is a third origin between them.
 local HOST_TEMPLATES = {
-    "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
-    "https://github.com/glowpkj/DepHub/raw/" .. sourceRef .. "/",
     "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/",
+    "https://github.com/glowpkj/DepHub/raw/" .. sourceRef .. "/",
+    "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.1.07"
+local VERSION = "0.1.08"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -244,12 +246,12 @@ local function performRequest(url)
     return false, lastError
 end
 
--- Pick the source host that actually serves the current version. Probing with
--- src/version.txt is enough: a host may be reachable yet still hand back a stale
--- cached tree, so the probe reads the version and only accepts a host whose
--- content parses, preferring the one that reports the newest version seen. The
--- winner is stored in env so later sessions and every module reuse the same
--- mirror instead of each re-probing.
+-- Pick the source host that serves the current build. A host is accepted only
+-- when its src/version.txt is EXACTLY this loader's version: a host that answers
+-- version.txt but serves a stale tree is the failure that loaded a build missing
+-- every new feature (jsDelivr kept a cached tree around the old version while
+-- reporting it). Hosts are tried in HOST_TEMPLATES order -- raw first -- and the
+-- winner is stored in env so later sessions and every module reuse one mirror.
 resolveBase = function()
     if type(env.__DEPHUB) == "table" and type(env.__DEPHUB.SourceBaseURL) == "string"
         and env.__DEPHUB.SourceBaseRef == sourceRef then
@@ -257,6 +259,7 @@ resolveBase = function()
     end
 
     local bestBase, bestVersion
+    local exactBase
     local function segments(v)
         local out = {}
         for part in tostring(v):gmatch("%d+") do out[#out + 1] = tonumber(part) or 0 end
@@ -278,22 +281,28 @@ resolveBase = function()
         local ok, body = performRequest(base .. "src/version.txt?cb=" .. token)
         if ok and type(body) == "string" then
             local version = tostring(body):match("[%d%.]+")
-            if version and newer(version, bestVersion) then
-                bestBase, bestVersion = base, version
+            if version then
+                -- Prefer a host serving EXACTLY this build: a host whose
+                -- version.txt matches the loader is the one that also serves the
+                -- current modules. A host ahead or behind is stale somewhere.
+                if version == VERSION and not exactBase then
+                    exactBase = base
+                    break
+                end
+                if newer(version, bestVersion) then
+                    bestBase, bestVersion = base, version
+                end
             end
-            -- A host serving the local version or newer is good enough: stop at
-            -- the earliest one, so the preferred mirror wins as soon as it is
-            -- current. Probing continues only while hosts come back older
-            -- (stale cache) or unreachable.
-            if version and not newer(VERSION, version) then break end
         end
     end
 
-    local base = bestBase or BASE_URL
+    local base = exactBase or bestBase or BASE_URL
     env.__DEPHUB = env.__DEPHUB or {}
     env.__DEPHUB.SourceBaseURL = base
     env.__DEPHUB.SourceBaseRef = sourceRef
-    env.__DEPHUB.BaseVersion = bestVersion
+    -- Report the version of the chosen host, not of whichever host happened to
+    -- answer first: the log must match the mirror the modules are fetched from.
+    env.__DEPHUB.BaseVersion = exactBase and VERSION or bestVersion
     return base
 end
 

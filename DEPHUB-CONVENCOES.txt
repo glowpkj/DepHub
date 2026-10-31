@@ -244,15 +244,19 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
     aberto e devolve o mouse ao jogo ao fechar. Backend nao mexe em mouse.
 
 (d) CDN velho -> "nao carregou".
-    O executor busca de raw.githubusercontent.com, que serve versao defasada por
-    minutos apos o push. Se a versao no log for antiga, espere ou use ?v=<versao>
-    na URL. Nao e bug do codigo. O jsDelivr (cdn.jsdelivr.net/gh/...@main/) tem o
-    mesmo problema e cacheia POR ARQUIVO, entao pode servir version.txt velho com
-    DepHub.lua novo -- o log mostra "remote 0.0.99" enquanto o main ja e 0.1.x.
-    Para forcar: POST/GET em https://purge.jsdelivr.net/gh/glowpkj/DepHub@main/
-    <arquivo> (ex. src/version.txt) que purga e propaga em segundos. No executor,
-    o cache tambem pode prender a URL fixa do bootstrap: adicione ?cb=<os.time()>
-    na linha que o usuario cola.
+    O jsDelivr (cdn.jsdelivr.net/gh/...@main/) e raw.githubusercontent.com servem
+    versao defasada por minutos/horas apos o push, e o jsDelivr cacheia POR ARQUIVO:
+    pode servir um version.txt velho ao lado de um arquivo novo (ou o contrario).
+    Isso NAO e bug do codigo -- mas ja causou um bug serio: o loader escolhia o host
+    pelo primeiro version.txt que parseava, entao um espelho preso no cache ganhava
+    e o jogo carregava uma arvore velha SEM as features novas (parts, Auto Set,
+    global do painel simplesmente nao existiam). A correcao (v0.1.08): o loader
+    proba raw PRIMEIRO (e a origem do push, cache curto) e so aceita um host cujo
+    src/version.txt seja EXATAMENTE a versao do loader; um espelho atrasado e
+    pulado em vez de escolhido em silencio. Para forcar o CDN: POST/GET em
+    https://purge.jsdelivr.net/gh/glowpkj/DepHub@main/<arquivo> (ex. src/version.txt).
+    No executor, o cache tambem pode prender a URL fixa do bootstrap: adicione
+    ?cb=<os.time()> na linha que o usuario cola.
 
 (e) GUI crua no backend.
     Instance.new("ScreenGui"/"Frame"/"TextButton") no backend e proibido. O
@@ -342,14 +346,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.07)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.08)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
 HStack:
 
-FEITO / FUNCIONANDO (verificado offline, 801 checks):
+FEITO / FUNCIONANDO (verificado offline, 795 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -366,6 +370,13 @@ FEITO / FUNCIONANDO (verificado offline, 801 checks):
 - Volleyball 4.2 Auto Set Aim: toggle que, no instante do set, gira o corpo
   (yaw-only) para a part fixa de set mais proxima; envelopa o FireServer e
   restaura no disable/Destroy (v0.1.04).
+- Loader: escolhe o host de origem que serve ESTE build. Proba raw primeiro e so
+  aceita um host cujo src/version.txt seja exatamente a versao do loader; um
+  espelho preso no cache (jsDelivr) e pulado em vez de escolhido em silencio
+  (v0.1.08) -- antes, um host velho ganhava e o jogo carregava uma arvore sem as
+  features novas.
+- Painel abre/fecha sem teclado pelo global __DEPHUB_TOGGLE() (v0.1.07), fallback
+  para executores que entregam o InputBegan com gameProcessed=true.
 
 UI EM INGLES (regra permanente):
 - TODA string visivel ao jogador e em ingles: nomes de aba/secao, labels de
