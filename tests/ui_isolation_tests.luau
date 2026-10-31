@@ -120,25 +120,23 @@ do
         check(#ui.Library._Controls > 0, "TSB builds controls")
     end
 
-    -- Volleyball 4.2 (newly gained a UI)
+    -- Volleyball 4.2 is a skeleton now: the features (and their tabs) were removed
+    -- to restart from scratch, so it registers no UI at all. When new features are
+    -- added back, this block is where their tabs get asserted.
     do
         local ctx = sandbox(1316421563, 1316421563)
         ctx:MountUI()
         local ui = ctx.State.__DEPHUB.UI
+        local before = #ui.Library._Controls
         ctx:Run("src/games/volleyball42.lua")
         assertNoSeaCategories(ui.Library, "Volleyball42")
         assertNoBloxTabs(ui.Library, "Volleyball42")
+        check(#ui.Library._Controls == before, "the lean Volleyball backend registers no controls")
         local names = tabNames(ui.Library)
         local found = {}
         for _, name in ipairs(names) do found[name] = true end
-        check(found["Ball Predict"], "Volleyball 4.2 registers its Ball Predict tab")
-        check(found["Jump"], "Volleyball 4.2 registers its Jump tab")
-        check(found["Collision"], "Volleyball 4.2 registers its Collision tab")
-        local cats = {}
-        for category in pairs(ui.Library._STATE.CategoryButtons or {}) do cats[category] = true end
-        check(cats["Visual"] == true and cats["Movement"] == true and cats["World"] == true,
-            "Volleyball 4.2 groups its tabs into Visual / Movement / World")
-        check(#ui.Library._Controls > 0, "Volleyball 4.2 builds controls")
+        check(not found["Ball Predict"] and not found["Jump"] and not found["Collision"],
+            "the removed Volleyball tabs are gone")
     end
 
     -- Universal

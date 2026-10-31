@@ -156,9 +156,9 @@ do
     check(diag:RunCommand("rt3"):find("features=", 1, true) ~= nil, "RT3 registers a console command")
 end
 
--- Volleyball 4.2: the prediction loop depends on the ball object, the court
--- parts and the teams. With none seeded each probe reports a failure and the
--- live ball/mode features still read.
+-- Volleyball 4.2 is a skeleton: it registers no diagnostics of its own (the old
+-- ball/court/team probes were part of the removed features), and the shared
+-- Debug tab still builds without them.
 do
     local ctx = sandbox(1316421563, 1316421563)
     ctx:MountUI()
@@ -166,16 +166,9 @@ do
     ctx:Run("src/games/volleyball42.lua")
 
     local report = diag:Report()
-    check(report:find("Volleyball mode", 1, true) ~= nil, "Volleyball reports its mode into Debug")
-    check(report:find("Workspace.Gravity", 1, true) ~= nil, "Volleyball probes gravity")
-    check(report:find("[FAIL] Workspace.Ball", 1, true) ~= nil, "Volleyball reports the missing ball as a failure")
-    check(report:find("Volleyball.BallPredict", 1, true) ~= nil, "Volleyball exposes its toggle as a live feature")
-    check(report:find("Volleyball.Mode", 1, true) ~= nil, "Volleyball exposes its mode as a live feature")
-    check(diag:RunCommand("vb"):find("mode=", 1, true) ~= nil, "Volleyball registers a console command")
-
-    -- Seed a ball: the watch value changes and the command reflects it.
-    local ball = Instance.new("Model"); ball.Name = "Ball"; ball.Parent = ctx.Services.Workspace
-    check(diag:RunCommand("vb"):find("ball=", 1, true) ~= nil, "Volleyball command reflects the seeded ball")
+    check(report:find("Volleyball mode", 1, true) == nil, "the removed Volleyball probes are gone")
+    check(report:find("Volleyball.BallPredict", 1, true) == nil, "the removed Volleyball features are gone")
+    check(diag:RunCommand("vb") == nil or diag:RunCommand("vb"):find("mode=", 1, true) == nil, "the removed Volleyball command is gone")
 end
 
 -- Every backend must build the shared Debug tab without a real client: assert

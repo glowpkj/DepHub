@@ -321,6 +321,17 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
     CreateSection do double devolve um handle de secao com AddHStack/AddVStack,
     igual ao tema.
 
+(l) Feature removida deixando o teste apontando para ela -> "o gate quebra num
+    teste que espera uma aba que nao existe mais". Ao REMOVER features de um
+    backend (o recomeco do Volleyball 4.2 tirou previsao da bola, auto position,
+    pulo, ceiling noclip, Auto Set Aim, parts fixas, UI e diagnostics), os testes
+    que afirmavam essas abas/probes/comandos viram falso-negativo. Regra: a
+    remocao e uma mudanca de CONTRATO, entao atualize os testes no mesmo passo --
+    `volleyball42_tests`, `debug_backend_tests` (bloco de probes) e
+    `ui_isolation_tests` (bloco de abas) passam a afirmar o novo contrato magro
+    (backend sem abas, sem probes, so State:Act). Nunca remova a feature e deixe o
+    teste apontando para ela "para consertar depois".
+
 
 --------------------------------------------------------------------------------
 9. CHECKLIST ANTES DE DAR COMO PRONTO
@@ -372,30 +383,31 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.10)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.11)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
-concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
-HStack:
+concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
+HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 781 checks):
+FEITO / FUNCIONANDO (verificado offline, 728 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
+- Console limpo: um load saudavel imprime SO "DepHub vX"; o resto vai para o
+  Debug via Diagnostics.Log; falha de verdade sai por warn (v0.1.10).
 - 11 jogos roteados: Violence District, Blood Strike, Steal An Egg, MM2,
   Noob Piece, TSB, Restaurant Tycoon 3, AOTR, Volleyball 4.2, Blox Fruits
   (Sea 1/2), Universal.
 - Abas montam controles (bug do CreateSection corrigido em v0.0.98).
 - Fix do mouse do shell (v0.0.97).
-- Volleyball 4.2 auto SET: duas Parts 1x1x1 fixas criadas no load
-  (DepHubAutoSet), sem controle, removidas no Destroy (v0.1.02).
-- Volleyball 4.2 acoes do jogo: remotes PlayerAction + animacoes mapeados em
-  features/volleyball/actions.lua (set/spike/block/bump/dive/spawn/serve),
-  expostos como State:Act para as automacoes (v0.1.03).
-- Volleyball 4.2 Auto Set Aim: toggle que, no instante do set, gira o corpo
-  (yaw-only) para a part fixa de set mais proxima; envelopa o FireServer e
-  restaura no disable/Destroy (v0.1.04).
+- Volleyball 4.2 ESQUELETO (v0.1.11): todas as features foram removidas para
+  recomecar -- previsao da bola, auto position, pulo forcado, ceiling noclip,
+  Auto Set Aim, as parts fixas do set, a UI inteira e os diagnostics do backend.
+  O que FICA e a automacao das acoes do jogo: o modulo
+  features/volleyball/actions.lua (set frontal/back, spike, block, bump, dive,
+  spawn da bola, serve) exposto como State:Act(nome, ...) para as features
+  novas usarem.
 - Loader: escolhe o host de origem que serve ESTE build. Proba raw primeiro e so
   aceita um host cujo src/version.txt seja exatamente a versao do loader; um
   espelho preso no cache (jsDelivr) e pulado em vez de escolhido em silencio
