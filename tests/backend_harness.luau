@@ -69,7 +69,21 @@ local vectors = Vector3
 -- LookAt target so Lerp can be verified to move partway, never in one jump.
 local CFrame = {}
 local cframeMeta = {}
-cframeMeta.__index = cframeMeta
+local cframeMetaMethods = {}
+cframeMeta.__index = function(self, key)
+    -- LookVector is the unit facing direction. The double has no matrix, so it is
+    -- derived from the LookAt target: (target - position) normalised, or (1,0,0)
+    -- when there is no target. Enough for "did the body turn this way" checks.
+    if key == "LookVector" then
+        local target = self.LookAt
+        if target then
+            local delta = target - self.Position
+            if delta.Magnitude > 0 then return delta.Unit end
+        end
+        return Vector3.new(1, 0, 0)
+    end
+    return cframeMetaMethods[key]
+end
 function CFrame.new(x, y, z)
     local position = type(x) == "table" and x or Vector3.new(x or 0, y or 0, z or 0)
     return setmetatable({Position = position, LookAt = nil, __cframe = true}, cframeMeta)
@@ -78,7 +92,7 @@ function CFrame.lookAt(from, to)
     local position = type(from) == "table" and from or Vector3.new(from, 0, 0)
     return setmetatable({Position = position, LookAt = to, __cframe = true}, cframeMeta)
 end
-function cframeMeta:Lerp(goal, alpha)
+function cframeMetaMethods:Lerp(goal, alpha)
     local position = self.Position + (goal.Position - self.Position) * alpha
     local look
     if goal.LookAt then look = goal.LookAt end
@@ -86,7 +100,7 @@ function cframeMeta:Lerp(goal, alpha)
 end
 -- The double carries no rotation, so object space is just world space rebased on
 -- the frame's position. Court-inside tests rely on this.
-function cframeMeta:PointToObjectSpace(point)
+function cframeMetaMethods:PointToObjectSpace(point)
     return point - self.Position
 end
 -- Enough for offset math (target.CFrame * CFrame.new(dx, dy, dz)): positions add.
@@ -110,6 +124,12 @@ function instanceMeta:__index(key)
     -- the shared method table, so per-instance overrides are observable.
     local own = self._props[key]
     if own ~= nil then return own end
+    -- Position mirrors CFrame on a real BasePart; deriving it here keeps code
+    -- that reads one after setting the other from seeing nil in the double.
+    if key == "Position" then
+        local frame = self._props.CFrame
+        if frame then return frame.Position end
+    end
     return methods[key]
 end
 function instanceMeta:__newindex(key, value)

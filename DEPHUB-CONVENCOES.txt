@@ -315,14 +315,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.03)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.04)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
 HStack:
 
-FEITO / FUNCIONANDO (verificado offline, 775 checks):
+FEITO / FUNCIONANDO (verificado offline, 789 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -336,6 +336,9 @@ FEITO / FUNCIONANDO (verificado offline, 775 checks):
 - Volleyball 4.2 acoes do jogo: remotes PlayerAction + animacoes mapeados em
   features/volleyball/actions.lua (set/spike/block/bump/dive/spawn/serve),
   expostos como State:Act para as automacoes (v0.1.03).
+- Volleyball 4.2 Auto Set Aim: toggle que, no instante do set, gira o corpo
+  (yaw-only) para a part fixa de set mais proxima; envelopa o FireServer e
+  restaura no disable/Destroy (v0.1.04).
 
 UI EM INGLES (regra permanente):
 - TODA string visivel ao jogador e em ingles: nomes de aba/secao, labels de
@@ -417,6 +420,19 @@ ACOES DO JOGO (remotes + animacoes) - Volleyball 4.2, v0.1.03:
   guardada no State para o Destroy cancelar (sem disparar depois do unload).
 - Todo diretorio src/games/features/<jogo>/ tem que constar em
   tests/validate_repo.js (validateFeatureDirectory) e no manifest.
+
+GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
+- Para reagir no frame em que uma acao do jogo sai, NAO ha hook no remote: o
+  caminho e envelopar FireServer. Guarde o metodo original, troque por um
+  wrapper que olha os argumentos, chame o original normalmente e restaure o
+  original no disable E no Destroy (senao fica residuo).
+- Olhar/girar o personagem e yaw-only: use CFrame.lookAt na posicao atual com o
+  alvo achatado no plano (Y zerado) -- o corpo nunca inclina, e a posicao NAO
+  muda (so o facing). Nao mexer na camera sem pedido explicito.
+- O gatilho e especifico: so "Setting"/"Backsetting" giram o corpo; spike,
+  block, spawn e serve nao. Nao generalizar para "qualquer FireServer".
+- O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
+  CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
 EXCECAO DELIBERADA - Blox Fruits:
 - As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,

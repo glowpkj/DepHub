@@ -76,12 +76,13 @@ local State = {
     Started = false,
     Mode = "Personal",
     Modes = {"Personal", "Match", "Future"},
-    Toggles = {BallPredict = true, AutoPosition = false, JumpForce = false, CeilingNoClip = true},
+    Toggles = {BallPredict = true, AutoPosition = false, JumpForce = false, CeilingNoClip = true, AutoSetAim = false},
     ToggleLabels = {
         BallPredict = "Ball Predict",
         AutoPosition = "Auto Position",
         JumpForce = "Forced jump",
         CeilingNoClip = "Ceiling NoClip",
+        AutoSetAim = "Auto Set Aim",
     },
     Config = Config,
     Connections = {},
@@ -111,6 +112,12 @@ local State = {
     ServeTask = nil,
     LastAnimation = nil,
     LastError = nil,
+    -- Auto Set Aim: wraps PlayerAction.FireServer while on, so a set turns the
+    -- body toward the nearest fixed set position on that frame.
+    OriginalFireServer = nil,
+    AimWrapped = false,
+    AimCount = 0,
+    LastSetAim = nil,
 }
 
 -- The actions module counts fires through actor.Log; point it at the log table.
@@ -207,6 +214,90 @@ for index, position in ipairs(SET_POSITIONS) do
     setPart.CastShadow = false
     setPart.Transparency = 1
     setPart.Parent = setFolder
+end
+
+-- Auto Set Aim: quando ligado, no exato instante em que o set sai (o remote
+-- PlayerAction recebe "Setting" ou "Backsetting"), o CORPO vira para a part fixa
+-- de set mais proxima do personagem. So o instante do set gira -- nada de ficar
+-- virado o tempo todo -- e so o corpo (HumanoidRootPart) gira, a camera nao.
+-- O remote real nao tem hook, entao envelopamos o FireServer: guardamos o
+-- original, olhamos os argumentos e devolvemos o controle depois. Restaurado no
+-- disable e no Destroy.
+
+-- Direcao horizontal (yaw) do personagem ate um ponto, mantendo o corpo nivelado
+-- (nunca inclina pra cima/baixo). Yaw-only era o comportamento das features de
+-- "olhar" removidas em 0.0.92, e continua sendo o certo aqui.
+local function faceYaw(root, fromPosition, toPosition)
+    local delta = toPosition - fromPosition
+    local flat = Vector3.new(delta.X, 0, delta.Z)
+    if flat.Magnitude < 0.001 then return false end
+    -- Keep the character exactly where it is (same X/Y/Z) and only change the
+    -- facing; lookAt keeps the position but we build it from the current vector
+    -- so a streamed-in part cannot shift the character.
+    root.CFrame = CFrame.lookAt(fromPosition, fromPosition + flat)
+    return true
+end
+
+-- Encontra a part de set mais proxima do ponto dado (a que o corpo deve encarar).
+local function nearestSetPosition(fromPosition)
+    local nearest, nearestDistance = nil, math.huge
+    for _, part in ipairs(setFolder:GetChildren()) do
+        if part:IsA("BasePart") and part.Parent then
+            local distance = (part.Position - fromPosition).Magnitude
+            if distance < nearestDistance then
+                nearest, nearestDistance = part, distance
+            end
+        end
+    end
+    return nearest
+end
+
+-- Gira o personagem para a part de set mais proxima. Devolve true se girou.
+local function aimAtNearestSet()
+    local character = LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+    local target = nearestSetPosition(root.Position)
+    if not target then return false end
+    return faceYaw(root, root.Position, target.Position)
+end
+
+-- Envelopa PlayerAction.FireServer para girar o corpo no frame do set. O metodo
+-- original e guardado e chamado normalmente (o jogo recebe a acao igual), so
+-- olhamos os argumentos antes. Desligar restaura o metodo original.
+local function enableAim()
+    if State.AimWrapped then return true end
+    local remote = Actions and type(Actions.GetRemote) == "function" and Actions.GetRemote() or nil
+    if not remote then return false, "PlayerAction remote ausente" end
+
+    local original = remote.FireServer
+    if type(original) ~= "function" then return false, "FireServer ausente" end
+    State.OriginalFireServer = original
+
+    remote.FireServer = function(self, action, ...)
+        local result = original(self, action, ...)
+        -- "Setting"/"Backsetting" e o que o set dispara; ignora todo o resto
+        -- (spike, block, spawn, serve nao devem virar o corpo).
+        if action == "Setting" or action == "Backsetting" then
+            if aimAtNearestSet() then
+                State.AimCount += 1
+                State.LastSetAim = action
+            end
+        end
+        return result
+    end
+
+    State.AimWrapped = true
+    return true
+end
+
+local function disableAim()
+    local remote = Actions and type(Actions.GetRemote) == "function" and Actions.GetRemote() or nil
+    if remote and State.OriginalFireServer then
+        pcall(function() remote.FireServer = State.OriginalFireServer end)
+    end
+    State.OriginalFireServer = nil
+    State.AimWrapped = false
 end
 
 local function connect(list, signal, callback)
@@ -819,6 +910,22 @@ function State:SetToggle(name, value)
         return true
     end
 
+    if name == "AutoSetAim" then
+        self.Toggles.AutoSetAim = value == true
+        if self.Toggles.AutoSetAim then
+            local ok, err = enableAim()
+            if not ok then
+                -- Sem remote nao ha o que mirar: nao deixa o toggle ligado mentindo.
+                self.Toggles.AutoSetAim = false
+                self.LastError = tostring(err)
+                return false, err
+            end
+        else
+            disableAim()
+        end
+        return true
+    end
+
     return false
 end
 
@@ -988,6 +1095,9 @@ function State:Destroy()
         pcall(Actions.Cancel, self)
     end
 
+    -- Restaura o FireServer original se o Auto Set Aim ainda estiver envelopado.
+    disableAim()
+
     if folder.Parent then
         folder:Destroy()
     end
@@ -1063,6 +1173,19 @@ do
             assist:CreateSlider("Minimum distance", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
             assist:CreateSlider("Movement smoothing", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
             assist:CreateParagraph("Auto Position", "Walks the character to the predicted landing spot. Instant teleports directly; off uses smooth movement, whose speed is the smoothing slider.")
+        end
+
+        -- Set Assist: no instante em que o set sai (F -> "Setting"/"Backsetting"),
+        -- o corpo vira para a part fixa de set mais proxima. Um unico toggle.
+        local setAssist = Kit.Section(predictTab, "Set Assist", "Left")
+        if setAssist then
+            setAssist:CreateToggle("Auto Set Aim", State.Toggles.AutoSetAim, function(v)
+                local ok = State:SetToggle("AutoSetAim", v)
+                if type(UI.Notify) == "function" then
+                    UI:Notify("Volleyball 4.2", ok and (v and "Auto Set Aim ON" or "Auto Set Aim off") or "Auto Set Aim unavailable")
+                end
+            end)
+            setAssist:CreateParagraph("Set Assist", "When you set (F), the character turns to face the nearest fixed set position at that instant. Only the body turns, only while setting -- it does not stay facing there. Turning it off restores the original remote.")
         end
 
         -- Jump helpers are movement.
@@ -1164,6 +1287,10 @@ do
         Diag:Feature("Volleyball.Actions",function()
             if not Actions then return "unavailable" end
             return tostring(State.ActionLog.Actions).." fired"
+        end)
+        Diag:Feature("Volleyball.AutoSetAim",function()
+            if not State.Toggles.AutoSetAim then return "off" end
+            return "ON wrapped="..tostring(State.AimWrapped).." aimed="..tostring(State.AimCount).." last="..tostring(State.LastSetAim)
         end)
         Diag:Feature("Volleyball.CanJump",function()
             local ch=LocalPlayer.Character

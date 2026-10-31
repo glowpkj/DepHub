@@ -305,3 +305,75 @@ do
     check(ok == false, "an action with no PlayerAction remote reports failure instead of erroring")
     state:Destroy()
 end
+
+-- Auto Set Aim: while on, the exact instant a set fires ("Setting"/"Backsetting")
+-- the character's body turns to face the nearest fixed set position -- and only
+-- then. Other actions never turn it, and disabling/Destroy restores the original
+-- FireServer so nothing stays wrapped.
+do
+    local ctx = sandbox(1316421563, 1316421563)
+    ctx:MountUI()
+
+    -- The PlayerAction remote, with a plain FireServer (as the game has). The
+    -- wrapper replaces this attribute and must put it back.
+    local remotes = Instance.new("Folder"); remotes.Name, remotes.Parent = "Remotes", ctx.Services.ReplicatedStorage
+    local actions = Instance.new("RemoteEvent"); actions.Name, actions.Parent = "PlayerAction", remotes
+    local firedCalls = {}
+    local originalFireServer = function(_, ...) firedCalls[#firedCalls + 1] = {...} end
+    actions.FireServer = originalFireServer
+
+    -- Character with a root at the origin: the two set parts are (-22,15,0) and
+    -- (22,15,0), so the origin is between them -- we place the root nearer one
+    -- side to prove the NEAREST one is chosen.
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    local root = Instance.new("Part"); root.Name, root.Parent = "HumanoidRootPart", character
+    root.CFrame = CFrame.new(-20, 5, 3)
+    ctx.Player.Character = character
+
+    local state = ctx:Run("src/games/volleyball42.lua")
+
+    -- Off by default and nothing is wrapped until it is turned on.
+    check(state.Toggles.AutoSetAim == false, "auto set aim is off by default")
+    check(state.AimWrapped == false, "the remote is not wrapped while off")
+
+    local enabled = state:SetToggle("AutoSetAim", true)
+    check(enabled == true and state.AimWrapped == true, "enabling auto set aim wraps the remote")
+
+    -- Firing a set turns the body toward the NEAREST part: the root sits at
+    -- x=-20, so SetPosition1 (-22,15,0) is the nearest -- the character must end
+    -- up facing -X (towards it), not +X.
+    local beforeCalls = #firedCalls
+    state:Act("Set", true)
+    check(#firedCalls == beforeCalls + 1 and firedCalls[#firedCalls][1] == "Setting", "the set still fires through the wrapper")
+    check(state.AimCount == 1, "the set counted one aim")
+    check(state.LastSetAim == "Setting", "the aim recorded the set it came from")
+    -- The look
+    local look = root.CFrame.LookVector
+    check(look.X < 0, "the body turned toward the nearest set position (-X side)")
+
+    -- The root must not have moved: only the facing changes.
+    check(root.CFrame.Position.X == -20 and root.CFrame.Position.Z == 3, "aiming turns the body without moving it")
+
+    -- A backset also aims (it is the same set action, other variant).
+    state:Act("Set", false)
+    check(state.AimCount == 2 and state.LastSetAim == "Backsetting", "a backset aims too")
+
+    -- Other actions never turn the body: spike/block/spawn/serve leave it alone.
+    local aimedBefore = state.AimCount
+    state:Act("Spike")
+    state:Act("Block")
+    state:Act("SpawnBall")
+    check(state.AimCount == aimedBefore, "spike/block/spawn do not trigger the aim")
+
+    -- Disabling restores the original FireServer exactly.
+    state:SetToggle("AutoSetAim", false)
+    check(actions.FireServer == originalFireServer, "disabling restores the original FireServer")
+    check(state.AimWrapped == false, "the remote is no longer wrapped after disabling")
+
+    -- Re-enable and prove Destroy unwraps too.
+    state:SetToggle("AutoSetAim", true)
+    check(state.AimWrapped == true, "re-enabling wraps again")
+    state:Destroy()
+    check(actions.FireServer == originalFireServer, "destroy restores the original FireServer")
+end
+
