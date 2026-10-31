@@ -345,6 +345,16 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
     debug MODELADO (setregistry declara os slots) e o `Signal:Wait` devolve na
     hora, entao o teste prova o mecanismo sem um cliente real.
 
+(n) Slider (ou controle de layout fixo) espremido num HStack -> "o slider sumiu".
+    Um slider do shell nao pode entrar numa linha dividida: os internos dele sao
+    ancorados a DIREITA com offsets FIXOS (label em 1,-142; botoes -/+ em 1,-114 e
+    1,-18; value box 56px), entao em meia largura o label colapsa e os botoes vazam
+    pra fora da borda -- o controle existe, mas aparece quebrado/invisivel. Regra:
+    slider (e qualquer holder ALTO/ancorado a direita) vai em linha propria,
+    full-width, NUNCA dentro de um HStack. O reflow do HStack agora detecta o
+    holder alto e recusa a dividir a linha (mantem full width). Um toggle sozinho
+    num HStack continua ok (holder curto).
+
 
 --------------------------------------------------------------------------------
 9. CHECKLIST ANTES DE DAR COMO PRONTO
@@ -396,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.12)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.13)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 749 checks):
+FEITO / FUNCIONANDO (verificado offline, 755 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.

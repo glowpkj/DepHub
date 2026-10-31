@@ -183,8 +183,10 @@ State:Start()
 
 -- ---------------------------------------------------------------------------
 -- Apresentacao: uma aba Movement com uma secao e UM recurso. O toggle "Jump
--- Anywhere" liga o bypass + impulso juntos; o slider ao lado define a
--- intensidade do impulso. Um toggle + um slider, na mesma linha.
+-- Anywhere" liga o bypass + impulso juntos; o slider define a intensidade do
+-- impulso. Cada um na sua linha: um SLIDER nao pode entrar num HStack estreito
+-- (os internos dele sao ancorados a direita com offsets fixos, entao em meia
+-- largura o label colapsa e os botoes -/+ vazam pra fora da borda).
 -- ---------------------------------------------------------------------------
 do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
@@ -192,15 +194,14 @@ do
         local tab = Kit.Tab("Movement")
         local section = Kit.Section(tab, "Jump", "Left")
         if section then
-            local row = Kit.Row(section) or section
-            row:CreateToggle("Jump Anywhere", State.JumpEnabled, function(value)
+            section:CreateToggle("Jump Anywhere", State.JumpEnabled, function(value)
                 local ok, err = State:SetJumpEnabled(value)
                 if not ok then
                     State.LastError = tostring(err)
                     warn("[DepHub] Jump Anywhere unavailable: " .. tostring(err))
                 end
             end)
-            row:CreateSlider("Impulse", 0, 150, State.JumpImpulse, function(value)
+            section:CreateSlider("Impulse", 0, 150, State.JumpImpulse, function(value)
                 State:SetJumpImpulse(value)
             end)
         end

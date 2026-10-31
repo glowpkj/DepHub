@@ -569,6 +569,31 @@ local function _makeRowHandle(lib, target, horizontal)
         end
         local n = #kids
         if n == 0 then return end
+        -- A slider (or any control with fixed right-anchored internals and a tall
+        -- fixed holder) cannot survive a narrow share: at 1/N width its label
+        -- collapses and its buttons overflow. Detect those and refuse to squeeze
+        -- them -- they keep full width and the row simply wraps around them.
+        local function isFixedLayoutControl(child)
+            -- The slider/paragraph holders are height >= 50 with fixed internals;
+            -- a toggle/keybind holder is short. A tall holder means "full width
+            -- only" here.
+            local height = child.Size and child.Size.Y and child.Size.Y.Offset or 0
+            return height >= 50
+        end
+        local fixedCount = 0
+        for _, child in ipairs(kids) do
+            if isFixedLayoutControl(child) then fixedCount += 1 end
+        end
+        if fixedCount > 0 then
+            -- Any fixed-layout control present: give every child its own full
+            -- width. The row becomes a plain vertical stack visually (the
+            -- UIListLayout still runs horizontal, but nothing shares a line), which
+            -- is the only safe layout for a slider.
+            for _, child in ipairs(kids) do
+                child.Size = UDim2.new(1, 0, 0, child.Size.Y.Offset)
+            end
+            return
+        end
         -- Share the row width: each child takes an equal share of (100% - gaps).
         local perChildScale = 1 / n
         for _, child in ipairs(kids) do

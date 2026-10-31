@@ -561,6 +561,32 @@ do
     check(#rowKids == 2, "the HStack holds its two controls")
     check(rowKids[1].Size.X.Scale == 0.5 and rowKids[2].Size.X.Scale == 0.5, "an HStack shares its width evenly across both controls")
 
+    -- A slider in a half-width HStack used to break: its internals are
+    -- right-anchored with fixed offsets (label 1,-142; -/+ buttons at 1,-114 /
+    -- 1,-18), so at half width the label collapsed and the buttons overflowed off
+    -- the right edge -- the slider looked missing. The reflow now refuses to
+    -- squeeze a fixed-layout (tall holder) control: it keeps full width.
+    do
+        local probe = section:AddHStack()
+        local sliderHandle = probe:CreateSlider("Impulse", 0, 150, 25, 0, function() end)
+        local sliderHolder
+        for _, child in ipairs(probe.Raw:GetChildren()) do
+            if child._props.ClassName == "Frame" then sliderHolder = child end
+        end
+        check(sliderHolder ~= nil, "the slider builds its holder")
+        check(sliderHolder.Size.X.Scale == 1, "a slider in a row keeps full width instead of being squeezed")
+        check(sliderHolder.Size.Y.Offset == 58, "the slider holder keeps its full height")
+        -- A toggle added after must also stay full width (the row is now vertical
+        -- in effect), never sharing a line with the slider.
+        local t = probe:CreateToggle("Jump Anywhere", false, function() end)
+        check(t ~= nil, "the row still accepts a toggle next to a slider")
+        local widths = {}
+        for _, child in ipairs(probe.Raw:GetChildren()) do
+            if child._props.ClassName == "Frame" then widths[#widths + 1] = child.Size.X.Scale end
+        end
+        for _, w in ipairs(widths) do check(w == 1, "every control next to a slider keeps full width") end
+    end
+
     -- VStack: a named vertical group, same stacked layout as the section body.
     local stack = section:AddVStack()
     check(type(stack) == "table" and stack.__tag == "VStack", "AddVStack returns a VStack handle")

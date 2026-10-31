@@ -24,7 +24,7 @@ local HOST_TEMPLATES = {
     "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.1.12"
+local VERSION = "0.1.13"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
