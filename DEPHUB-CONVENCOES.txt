@@ -105,9 +105,16 @@ harness rejeita e em jogo briga com o tema). O backend so USA a API abaixo.
     sec:CreateParagraph(titulo, texto)
 
 Regras da API:
-- Todos os labels em portugues, curtos e claros (o usuario e brasileiro).
+- Todos os labels visiveis ao jogador em INGLES, curtos e claros (nomes de
+  aba/secao, labels de controle, paragrafos, notificacoes e textos do tab
+  Debug). Docs e comentarios continuam em portugues. Nao traduzir nomes reais
+  de instancias/pastas do jogo.
 - CreateSection exige "Left" ou "Right". Nao passe resumo/descricao no lugar.
 - Nada de UI criada fora do shell.
+
+Tecla de abrir/fechar: o padrao global e N (Enum.KeyCode.N), definido em
+src/core/demon-ui.lua (WINDOW_OPTIONS.ToggleKey) e no default do construtor do
+tema. Onde o loader/backend nao passam ToggleKey, vale N.
 
 Ponte de compatibilidade: hoje varios backends usam um helper local
 `sectionFor(tab, name, column)` que so chama tab:CreateSection(name, column).
@@ -122,16 +129,16 @@ coluna) - e SOMENTE isso.
 Um recurso com estado ativo tem que ter configuracao propria. Um botao
 ligar/desligar sozinho nao basta quando existem parametros que importam.
 
-    ESP ativado        [toggle]
-      Alcance          [slider]  50 .. 5000
-      Mostrar nome     [toggle]
-      Mostrar distancia[toggle]
+    ESP enabled        [toggle]
+      Range            [slider]  50 .. 5000
+      Show name        [toggle]
+      Show distance    [toggle]
       Chams            [toggle]
 
     Auto Parry         [toggle]
-      Alcance do parry [slider]
-      Recarga          [slider]
-      Equipar sozinho  [toggle]
+      Parry range      [slider]
+      Cooldown         [slider]
+      Auto equip       [toggle]
 
 Regras:
 - Toggle para ligar/desligar. Slider para numeros. Dropdown para modo.
@@ -281,11 +288,11 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.0.99)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.00)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
-concluida:
+concluida e o passe de UI em ingles:
 
 FEITO / FUNCIONANDO (verificado offline, 735 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
@@ -297,26 +304,51 @@ FEITO / FUNCIONANDO (verificado offline, 735 checks):
 - Abas montam controles (bug do CreateSection corrigido em v0.0.98).
 - Fix do mouse do shell (v0.0.97).
 
-MIGRACAO PARA CATEGORIAS (concluida nesta versao):
-- Todos os backends agora organizam por CATEGORIA de finalidade
+UI EM INGLES (regra permanente):
+- TODA string visivel ao jogador e em ingles: nomes de aba/secao, labels de
+  toggle/slider/dropdown/input, paragrafos, notificacoes, o texto do tab Debug
+  (vocabulario de modulo/probe em ingles: "[FAIL]", "loaded"/"absent",
+  "pending", "no detail") e as respostas dos comandos do console de debug.
+- O vocabulario do loader (logs de inicializacao, notas, aba "Unsupported") e
+  do updater tambem e em ingles, pois aparece no Debug.
+- Docs (este arquivo) e comentarios de codigo continuam em portugues, por
+  decisao do projeto. Nao traduzir: nomes de pastas/locais reais do jogo
+  (ex.: "Ilhas", "MysteriousIsland", "Cafe", "RegularLobby") nem chaves de
+  evento internas.
+
+TECLA DE ABRIR/FECHAR = N:
+- Padrao global do shell em src/core/demon-ui.lua (WINDOW_OPTIONS.ToggleKey =
+  Enum.KeyCode.N) e default do construtor do tema (constructor.luau:
+  opts.ToggleKey or Enum.KeyCode.N). Onde loader/backend nao passam ToggleKey,
+  o default e N. O usuario pode trocar em runtime pela overlay de keybinds.
+
+MIGRACAO PARA CATEGORIAS (concluida):
+- Todos os backends organizam por CATEGORIA de finalidade
   (Visual / Combat / Farm / Movement / Player / World / Misc), nunca por nome
   de jogo, e criam so as categorias que usam.
 - Um kit compartilhado (src/core/ui-kit.lua, publicado em
   env.__DEPHUB.UIKit) centraliza categoria -> aba -> secao e clampa a coluna
   para Left/Right num unico lugar; o helper `sectionFor`/`dephubSection`
   copiado em cada jogo foi removido.
-- Violence District: Visual (ESP) / World (Geradores) / Combat (Parry).
+- Violence District: Visual (ESP) / World (Generators) / Combat (Parry).
 - Blood Strike: Visual (ESP, secoes unificadas).
 - Steal An Egg: Movement (Speed, Teleport).
-- MM2: Visual (Roles) / Farm (Coin Farm, Gun Drop) / Movement (Jogadores).
-- AOTR: Visual (Titan ESP) / Combat (Farm) / Movement / Misc (Assistencia,
+- MM2: Visual (Roles) / Farm (Coin Farm, Gun Drop) / Movement (Players).
+- AOTR: Visual (Titan ESP) / Combat (Farm) / Movement / Misc (Assistance,
   Status).
 - Noob Piece: Farm / Visual (ESP) / Movement (Travel) / Player (Team).
 - RT3: Farm (Restaurant Farm, Kitchen) / Misc (Status).
 - TSB: Combat (Autoblock, Ranges, Detection, Prediction) / Misc (Debug).
-- Volleyball 4.2: Visual (Ball Predict) / Movement (Pulo) / World (Colisao).
-- Universal: Movement / Visual / Combat / Player (Social) / Misc (Servidor,
+- Volleyball 4.2: Visual (Ball Predict) / Movement (Jump) / World (Collision).
+- Universal: Movement / Visual / Combat / Player (Social) / Misc (Server,
   Status).
+
+PENDENTE - VStack/HStack:
+- O usuario quer o conteudo das abas reorganizado com VStack/HStack (empilhar
+  vertical + linhas horizontais para agrupar controles lado a lado, menos
+  poluido). Hoje o shell so tem empilhamento vertical dentro da secao
+  (UIListLayout + AutomaticCanvasSize.Y). Nao construir antes de receber a
+  foto de referencia do usuario mostrando o estado atual das abas.
 
 EXCECAO DELIBERADA - Blox Fruits:
 - As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,

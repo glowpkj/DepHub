@@ -188,7 +188,7 @@ function Updater:GetServer()
     end
 
     if #candidates == 0 then
-        return false, "Nenhum servidor disponivel"
+        return false, "No server available"
     end
 
     return true, candidates[math_random(1, #candidates)]

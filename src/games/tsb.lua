@@ -172,52 +172,52 @@ local UI = (env.__DEPHUB or {}).UI
 do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
-        local autoblock = Kit.Section(Kit.Tab("Autoblock", "Combat"), "Bloqueio", "Left")
+        local autoblock = Kit.Section(Kit.Tab("Autoblock", "Combat"), "Blocking", "Left")
         if autoblock then
             autoblock:CreateToggle("Auto block", State.Toggles.AutoBlock, function(v) State:SetAutoBlock(v) end)
-            autoblock:CreateToggle("M1 após bloquear", State.Toggles.M1AfterBlock, function(v) State:SetM1AfterBlock(v) end)
-            autoblock:CreateToggle("Encarar atacante", State.Toggles.FaceAttacker, function(v) State:SetFaceAttacker(v) end)
-            autoblock:CreateToggle("Bloquear dash", State.Toggles.DashBlock, function(v) State:SetDashBlock(v) end)
-            autoblock:CreateToggle("Bloquear skills", State.Toggles.SkillBlock, function(v) State:SetSkillBlock(v) end)
-            autoblock:CreateToggle("Checar direção (facing)", State.Toggles.FacingCheck, function(v) State:SetFacingCheck(v) end)
-            autoblock:CreateToggle("Previsão", State.Toggles.Prediction, function(v) State:SetPrediction(v) end)
+            autoblock:CreateToggle("M1 after block", State.Toggles.M1AfterBlock, function(v) State:SetM1AfterBlock(v) end)
+            autoblock:CreateToggle("Face attacker", State.Toggles.FaceAttacker, function(v) State:SetFaceAttacker(v) end)
+            autoblock:CreateToggle("Block dash", State.Toggles.DashBlock, function(v) State:SetDashBlock(v) end)
+            autoblock:CreateToggle("Block skills", State.Toggles.SkillBlock, function(v) State:SetSkillBlock(v) end)
+            autoblock:CreateToggle("Check facing", State.Toggles.FacingCheck, function(v) State:SetFacingCheck(v) end)
+            autoblock:CreateToggle("Prediction", State.Toggles.Prediction, function(v) State:SetPrediction(v) end)
         end
 
-        local ranges = Kit.Section(Kit.Tab("Ranges", "Combat"), "Alcance e tempo", "Left")
+        local ranges = Kit.Section(Kit.Tab("Ranges", "Combat"), "Range and timing", "Left")
         if ranges then
-            ranges:CreateSlider("Alcance normal", 0, 60, State.Values.NormalRange, function(v) State:SetNormalRange(v) end)
-            ranges:CreateSlider("Alcance especial", 0, 120, State.Values.SpecialRange, function(v) State:SetSpecialRange(v) end)
-            ranges:CreateSlider("Alcance de skill", 0, 120, State.Values.SkillRange, function(v) State:SetSkillRange(v) end)
-            ranges:CreateSlider("Tempo de skill", 0, 5, State.Values.SkillHold, function(v) State:SetSkillHold(v) end)
-            ranges:CreateSlider("Atraso do counter", 0, 1, State.Values.CounterDelay, function(v) State:SetCounterDelay(v) end)
+            ranges:CreateSlider("Normal range", 0, 60, State.Values.NormalRange, function(v) State:SetNormalRange(v) end)
+            ranges:CreateSlider("Special range", 0, 120, State.Values.SpecialRange, function(v) State:SetSpecialRange(v) end)
+            ranges:CreateSlider("Skill range", 0, 120, State.Values.SkillRange, function(v) State:SetSkillRange(v) end)
+            ranges:CreateSlider("Skill hold", 0, 5, State.Values.SkillHold, function(v) State:SetSkillHold(v) end)
+            ranges:CreateSlider("Counter delay", 0, 1, State.Values.CounterDelay, function(v) State:SetCounterDelay(v) end)
         end
 
-        local detection = Kit.Section(Kit.Tab("Detection", "Combat"), "Detecção", "Left")
+        local detection = Kit.Section(Kit.Tab("Detection", "Combat"), "Detection", "Left")
         if detection then
-            detection:CreateSlider("Tamanho da caixa", 0, 40, State.Values.DetectionBoxSize, function(v) State:SetDetectionBoxSize(v) end)
+            detection:CreateSlider("Box size", 0, 40, State.Values.DetectionBoxSize, function(v) State:SetDetectionBoxSize(v) end)
             detection:CreateSlider("Scan (Hz)", 1, 120, State.Values.ScanHz, function(v) State:SetScanHz(v) end)
             detection:CreateSlider("Facing dot", -1, 1, State.Values.FacingDot, function(v) State:SetFacingDot(v) end)
-            detection:CreateToggle("Mostrar caixa de detecção", State.Toggles.ShowDetectionBox, function(v) State:SetShowDetectionBox(v) end)
-            detection:CreateToggle("Log de desconhecidos", State.Toggles.UnknownLogger, function(v) State:SetUnknownLogger(v) end)
+            detection:CreateToggle("Show detection box", State.Toggles.ShowDetectionBox, function(v) State:SetShowDetectionBox(v) end)
+            detection:CreateToggle("Unknown logger", State.Toggles.UnknownLogger, function(v) State:SetUnknownLogger(v) end)
         end
 
-        local prediction = Kit.Section(Kit.Tab("Prediction", "Combat"), "Previsão", "Left")
+        local prediction = Kit.Section(Kit.Tab("Prediction", "Combat"), "Prediction", "Left")
         if prediction then
-            prediction:CreateSlider("Tempo de previsão", 0, 1, State.Values.PredictionTime, function(v) State:SetPredictionTime(v) end)
-            prediction:CreateSlider("Extra de previsão", 0, 12, State.Values.PredictionExtra, function(v) State:SetPredictionExtra(v) end)
+            prediction:CreateSlider("Prediction time", 0, 1, State.Values.PredictionTime, function(v) State:SetPredictionTime(v) end)
+            prediction:CreateSlider("Prediction extra", 0, 12, State.Values.PredictionExtra, function(v) State:SetPredictionExtra(v) end)
         end
 
-        local debug = Kit.Section(Kit.Tab("Debug", "Misc"), "Diagnóstico", "Left")
+        local debug = Kit.Section(Kit.Tab("Debug", "Misc"), "Diagnostics", "Left")
         if debug then
             local function statusText()
                 local info = State:GetDebugInfo()
-                return type(info) == "table" and tostring(info) or "Sem dados de debug."
+                return type(info) == "table" and tostring(info) or "No debug data."
             end
-            debug:CreateParagraph("Estado", statusText())
+            debug:CreateParagraph("State", statusText())
             debug:CreateToggle("Debug", State.Toggles.Debug, function(v) State:SetDebug(v) end)
-            debug:CreateButton("Resetar combate", function()
+            debug:CreateButton("Reset combat", function()
                 local ok = State:ResetCombatState()
-                if type(UI.Notify) == "function" then UI:Notify("TSB", ok and "Estado de combate resetado." or "Não foi possível resetar.") end
+                if type(UI.Notify) == "function" then UI:Notify("TSB", ok and "Combat state reset." or "Could not reset.") end
             end)
         end
     end
@@ -229,60 +229,60 @@ end
 do
     local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
     if Diag and type(Diag.Probe)=="function" then
-        Diag:SetEnvironment({["TSB versao"]=VERSION})
+        Diag:SetEnvironment({["TSB version"]=VERSION})
         Diag:RegisterModule("features/tsb/animations.lua")
         Diag:RegisterModule("features/tsb/autoblock-v3.lua")
-        Diag:Module("features/tsb/animations.lua",type(AnimationData)=="table",type(AnimationData)=="table" and "carregado" or "ausente")
-        Diag:Module("features/tsb/autoblock-v3.lua",State.Features.AutoBlock~=nil,State.Features.AutoBlock and "carregado" or "ausente")
-        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "ausente")
+        Diag:Module("features/tsb/animations.lua",type(AnimationData)=="table",type(AnimationData)=="table" and "loaded" or "absent")
+        Diag:Module("features/tsb/autoblock-v3.lua",State.Features.AutoBlock~=nil,State.Features.AutoBlock and "loaded" or "absent")
+        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "absent")
         local character=LocalPlayer and LocalPlayer.Character
         local communicate=character and character:FindFirstChild("Communicate")
         local root=character and character:FindFirstChild("HumanoidRootPart")
         local humanoid=character and character:FindFirstChildWhichIsA("Humanoid")
         Diag:Probe("Character.Communicate",communicate and communicate:IsA("RemoteEvent") or false,
-            communicate and communicate.ClassName or "ausente (bloqueio/counters falham)")
-        Diag:Probe("Character.HumanoidRootPart",root~=nil,root and root.ClassName or "ausente")
-        Diag:Probe("Character.Humanoid",humanoid~=nil,humanoid and humanoid.ClassName or "ausente")
+            communicate and communicate.ClassName or "absent (block/counters fail)")
+        Diag:Probe("Character.HumanoidRootPart",root~=nil,root and root.ClassName or "absent")
+        Diag:Probe("Character.Humanoid",humanoid~=nil,humanoid and humanoid.ClassName or "absent")
         Diag:Probe("Workspace.Live",Workspace:FindFirstChild("Live")~=nil,
-            Workspace:FindFirstChild("Live") and Workspace.Live.ClassName or "ausente (sem pasta Live, nenhum alvo fica pronto)")
-        Diag:Probe("AnimationData.Groups",type(AnimationData.Groups)=="table","grupos de animacao")
-        Diag:Probe("AnimationData.SkillIds",type(AnimationData.SkillIds)=="table","ids de skill")
+            Workspace:FindFirstChild("Live") and Workspace.Live.ClassName or "absent (no Live folder, no target becomes ready)")
+        Diag:Probe("AnimationData.Groups",type(AnimationData.Groups)=="table","animation groups")
+        Diag:Probe("AnimationData.SkillIds",type(AnimationData.SkillIds)=="table","skill ids")
         Diag:Feature("TSB.AutoBlock",function() return State.Toggles.AutoBlock and "ON" or "off" end)
         Diag:Feature("TSB.M1AfterBlock",function() return State.Toggles.M1AfterBlock and "ON" or "off" end)
         Diag:Feature("TSB.DashBlock",function() return State.Toggles.DashBlock and "ON" or "off" end)
         Diag:Feature("TSB.SkillBlock",function() return State.Toggles.SkillBlock and "ON" or "off" end)
-        Diag:Feature("TSB.Estado",function()
+        Diag:Feature("TSB.State",function()
             local info=State:GetDebugInfo()
-            if type(info)~="table" then return "sem dados" end
-            return "bloqueio="..tostring(info.BlockActive).." fonte="..tostring(info.BlockSource)
-                .." alvos="..tostring(info.TrackedPlayers).." blocos="..tostring(info.Blocks)
+            if type(info)~="table" then return "no data" end
+            return "block="..tostring(info.BlockActive).." source="..tostring(info.BlockSource)
+                .." targets="..tostring(info.TrackedPlayers).." blocks="..tostring(info.Blocks)
         end)
         Diag:Feature("TSB.Remote",function()
             local info=State:GetDebugInfo()
-            return type(info)=="table" and tostring(info.Remote) or "sem dados"
+            return type(info)=="table" and tostring(info.Remote) or "no data"
         end)
-        Diag:Feature("TSB.Desconhecidos",function()
+        Diag:Feature("TSB.Unknown",function()
             local info=State:GetDebugInfo()
             if type(info)~="table" then return "0" end
-            return tostring(info.UnknownAnimations).." animacoes nao mapeadas"
+            return tostring(info.UnknownAnimations).." unmapped animations"
         end)
         Diag:Feature("TSB.LastError",function()
             local info=State:GetDebugInfo()
-            return type(info)=="table" and tostring(info.LastError or "none") or "sem dados"
+            return type(info)=="table" and tostring(info.LastError or "none") or "no data"
         end)
         if type(Diag.Watch)=="function" then
-            Diag:Watch("TSB bloqueio ativo",function() local info=State:GetDebugInfo() return type(info)=="table" and tostring(info.BlockActive) or "?" end)
-            Diag:Watch("TSB alvos",function() local info=State:GetDebugInfo() return type(info)=="table" and tostring(info.TrackedPlayers) or "?" end)
+            Diag:Watch("TSB block active",function() local info=State:GetDebugInfo() return type(info)=="table" and tostring(info.BlockActive) or "?" end)
+            Diag:Watch("TSB targets",function() local info=State:GetDebugInfo() return type(info)=="table" and tostring(info.TrackedPlayers) or "?" end)
             Diag:Watch("TSB remote",function() local info=State:GetDebugInfo() return type(info)=="table" and tostring(info.Remote) or "?" end)
         end
         if type(Diag.Command)=="function" then
             Diag:Command("tsb",function()
                 local info=State:GetDebugInfo()
-                if type(info)~="table" then return "sem dados de debug" end
-                return "bloqueio="..tostring(info.BlockActive).." fonte="..tostring(info.BlockSource)
-                    .." alvos="..tostring(info.TrackedPlayers).." blocos="..tostring(info.Blocks)
+                if type(info)~="table" then return "no debug data" end
+                return "block="..tostring(info.BlockActive).." source="..tostring(info.BlockSource)
+                    .." targets="..tostring(info.TrackedPlayers).." blocks="..tostring(info.Blocks)
                     .." releases="..tostring(info.Releases).." remote="..tostring(info.Remote)
-                    .." desconhecidos="..tostring(info.UnknownAnimations)
+                    .." unknown="..tostring(info.UnknownAnimations)
             end)
             Diag:Command("tsb-autoblock",function(argument)
                 local on=argument~="off"

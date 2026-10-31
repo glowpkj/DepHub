@@ -60,7 +60,7 @@ end
 
 local LocalPlayer = game:GetService("Players").LocalPlayer
 if not LocalPlayer then
-    report("BloxFruits: LocalPlayer ausente")
+    report("BloxFruits: LocalPlayer absent")
     return false
 end
 
@@ -258,7 +258,7 @@ local function ensureTab(name, sea)
         -- Remember the failure so the next control in this group does not try
         -- again: without this the same tab is retried for every control.
         renderedTabs[key] = false
-        report("BloxFruits: não foi possível criar a aba " .. name .. " (" .. category .. ")")
+        report("BloxFruits: could not create the tab " .. name .. " (" .. category .. ")")
         return nil
     end
     local record = {Tab = tab, Sea = scope, Name = name, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
@@ -322,7 +322,7 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                 local record = ensureTab(logicalName, page.sea)
                 if pageName == "Info" then
                     local section = sectionFor(record, "Overview")
-                    if section then section:CreateParagraph("DepHub", "Controles organizados por categoria. Apenas Anti-AFK fica ligado por padrão.") end
+                    if section then section:CreateParagraph("DepHub", "Controls organized by category. Only Anti-AFK is on by default.") end
                     -- Feature search: filters the tab buttons by name so a feature
                     -- can be found without knowing which sea holds it. Clearing the
                     -- box shows everything again.
@@ -350,10 +350,10 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                         end
                         local snapshot = activeList()
                         statusSection:CreateParagraph("Automations ON",
-                            #snapshot > 0 and table.concat(snapshot, ", ") or "Nenhuma automação ligada.")
+                            #snapshot > 0 and table.concat(snapshot, ", ") or "No automation on.")
                         statusSection:CreateButton("Refresh status", function()
                             local parts = activeList()
-                            visual:Notify("Status", #parts > 0 and table.concat(parts, ", ") or "Nenhuma automação ligada.", 6)
+                            visual:Notify("Status", #parts > 0 and table.concat(parts, ", ") or "No automation on.", 6)
                         end)
                     end
                     local seaSection = sectionFor(record, "Sea")
@@ -367,7 +367,7 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                         local currentLabel = seaLabels[State.Sea] or "Sea 1"
                         seaSection:CreateDropdown("Sea", {"Sea 1", "Sea 2", "Sea 3"}, currentLabel, function(value)
                             State:SetSea(seaValues[tostring(value)] or "Sea1")
-                            visual:Notify("Sea", "Conteúdo filtrado para " .. tostring(value))
+                            visual:Notify("Sea", "Content filtered to " .. tostring(value))
                         end)
                     end
                 elseif pageName == "Config" then
@@ -375,47 +375,47 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                     if section then
                         local configName = "default"
                         local renameTo = ""
-                        section:CreateInput("Nome da configuração", "Nome da configuração", configName, function(value) configName = tostring(value or "default") end)
-                        section:CreateButton("Salvar configuração", function()
+                        section:CreateInput("Config name", "Config name", configName, function(value) configName = tostring(value or "default") end)
+                        section:CreateButton("Save config", function()
                             local name = tostring(configName ~= "" and configName or "default")
-                            if State:SaveConfig(name) then visual:Notify("Config", "Configuração salva: " .. name) else visual:Notify("Config", "Não foi possível salvar.") end
+                            if State:SaveConfig(name) then visual:Notify("Config", "Config saved: " .. name) else visual:Notify("Config", "Could not save.") end
                         end)
-                        section:CreateButton("Carregar configuração", function()
+                        section:CreateButton("Load config", function()
                             local name = tostring(configName ~= "" and configName or "default")
-                            if State:LoadConfig(name) then visual:Notify("Config", "Configuração carregada: " .. name) else visual:Notify("Config", "Não foi possível carregar.") end
+                            if State:LoadConfig(name) then visual:Notify("Config", "Config loaded: " .. name) else visual:Notify("Config", "Could not load.") end
                         end)
-                        section:CreateButton("Excluir configuração", function()
+                        section:CreateButton("Delete config", function()
                             local name = tostring(configName ~= "" and configName or "default")
-                            if State:DeleteConfig(name) then visual:Notify("Config", "Configuração excluída: " .. name) else visual:Notify("Config", "Não foi possível excluir (inexistente?).") end
+                            if State:DeleteConfig(name) then visual:Notify("Config", "Config deleted: " .. name) else visual:Notify("Config", "Could not delete (does not exist?).") end
                         end)
-                        section:CreateButton("Listar configurações", function()
+                        section:CreateButton("List configs", function()
                             local names = State:ListConfigs()
-                            if #names == 0 then visual:Notify("Config", "Nenhuma configuração salva.") else visual:Notify("Config", table.concat(names, ", "), 6) end
+                            if #names == 0 then visual:Notify("Config", "No saved config.") else visual:Notify("Config", table.concat(names, ", "), 6) end
                         end)
                         -- Rename reads the "Nome" box as the source and a second box
                         -- as the target, so no extra state is needed beyond the two.
-                        section:CreateInput("Renomear para", "Novo nome", renameTo, function(value) renameTo = tostring(value or "") end)
-                        section:CreateButton("Renomear configuração", function()
+                        section:CreateInput("Rename to", "New name", renameTo, function(value) renameTo = tostring(value or "") end)
+                        section:CreateButton("Rename config", function()
                             local from = tostring(configName ~= "" and configName or "default")
                             local to = tostring(renameTo ~= "" and renameTo or "")
-                            if to == "" then visual:Notify("Config", "Informe o novo nome no campo acima.") return end
-                            if State:RenameConfig(from, to) then visual:Notify("Config", "Renomeada: " .. from .. " -> " .. to) else visual:Notify("Config", "Não foi possível renomear (origem inexistente ou destino já existe).") end
+                            if to == "" then visual:Notify("Config", "Enter the new name in the field above.") return end
+                            if State:RenameConfig(from, to) then visual:Notify("Config", "Renamed: " .. from .. " -> " .. to) else visual:Notify("Config", "Could not rename (source missing or target already exists).") end
                         end)
                     end
                     local reset = sectionFor(record, "Reset")
                     if reset then
-                        reset:CreateButton("Restaurar padrões (tudo)", function()
+                        reset:CreateButton("Restore defaults (all)", function()
                             State:ResetDefaults()
-                            visual:Notify("Config", "Todos os controles voltaram ao padrão.")
+                            visual:Notify("Config", "All controls are back to default.")
                         end)
                         -- Reset a single module without touching the others. The
                         -- page names map to modules in the core module registry.
                         local modules = {"combat", "farm", "player", "fruits", "shop", "events", "extras", "teleport"}
                         local chosen = "combat"
-                        reset:CreateDropdown("Módulo", modules, chosen, function(value) chosen = tostring(value or "combat") end)
-                        reset:CreateButton("Restaurar módulo", function()
+                        reset:CreateDropdown("Module", modules, chosen, function(value) chosen = tostring(value or "combat") end)
+                        reset:CreateButton("Restore module", function()
                             local n = State:ResetModule(chosen)
-                            if n > 0 then visual:Notify("Config", "Módulo " .. chosen .. " restaurado (" .. n .. " controles).") else visual:Notify("Config", "Nenhum controle restaurável em " .. chosen .. ".") end
+                            if n > 0 then visual:Notify("Config", "Module " .. chosen .. " restored (" .. n .. " controls).") else visual:Notify("Config", "No restorable control in " .. chosen .. ".") end
                         end)
                     end
                 end
@@ -449,7 +449,7 @@ do
         for _, name in ipairs({"core", "teleport", "combat", "farm", "player", "fruits", "shop", "events", "extras", "info"}) do
             Diag:RegisterModule("features/bloxfruits/oss/" .. name .. ".lua")
             local loaded = type(modules[name]) == "table"
-            local detail = loaded and "carregado" or "ausente"
+            local detail = loaded and "loaded" or "absent"
             if not loaded and type(State.Errors) == "table" and State.Errors[name] ~= nil then detail = tostring(State.Errors[name]) end
             Diag:Module("features/bloxfruits/oss/" .. name .. ".lua", loaded, detail)
         end
@@ -458,20 +458,20 @@ do
             toggleCount = toggleCount + 1
             if value then onCount = onCount + 1 end
         end
-        Diag:Note("BloxFruits toggles: " .. tostring(onCount) .. " ligados de " .. tostring(toggleCount))
+        Diag:Note("BloxFruits toggles: " .. tostring(onCount) .. " on of " .. tostring(toggleCount))
         Diag:Feature("BloxFruits.Sea", function() return tostring(State.Sea or "?") end)
-        Diag:Feature("BloxFruits.Toggles ligados", function()
+        Diag:Feature("BloxFruits.Toggles on", function()
             local parts = {}
             for key, value in pairs(State.Toggles or {}) do
                 if value then parts[#parts + 1] = key end
             end
             table.sort(parts)
-            return #parts > 0 and table.concat(parts, ", ") or "nenhum"
+            return #parts > 0 and table.concat(parts, ", ") or "none"
         end)
         Diag:Feature("BloxFruits.LastError", function() return tostring(State.LastError or "none") end)
         if type(Diag.Watch) == "function" then
             Diag:Watch("BloxFruits sea", function() return tostring(State.Sea or "?") end)
-            Diag:Watch("BloxFruits modulos", function()
+            Diag:Watch("BloxFruits modules", function()
                 local loaded = 0
                 for _, module in pairs(State.Modules or {}) do if type(module) == "table" then loaded = loaded + 1 end end
                 return loaded
@@ -479,7 +479,7 @@ do
         end
         if type(Diag.Command) == "function" then
             Diag:Command("bf", function()
-                return "sea=" .. tostring(State.Sea or "?") .. " modulos=" .. tostring((function()
+                return "sea=" .. tostring(State.Sea or "?") .. " modules=" .. tostring((function()
                     local n = 0
                     for _, module in pairs(State.Modules or {}) do if type(module) == "table" then n = n + 1 end end
                     return n

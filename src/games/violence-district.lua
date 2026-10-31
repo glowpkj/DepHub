@@ -53,16 +53,16 @@ local State = {
         AutoEquip = true,
     },
     ToggleLabels = {
-        ESP = "ESP ativado",
-        ESPKiller = "Mostrar Killer",
-        ESPSurvivor = "Mostrar Survivors",
-        ESPNames = "Mostrar nome e funcao",
-        ESPDistance = "Mostrar distancia",
-        Chams = "Chams (contorno)",
-        AutoRepair = "Reparar gerador sozinho",
-        AutoSkillCheck = "Acertar o skill check sozinho",
+        ESP = "ESP enabled",
+        ESPKiller = "Show Killer",
+        ESPSurvivor = "Show Survivors",
+        ESPNames = "Show name and role",
+        ESPDistance = "Show distance",
+        Chams = "Chams (outline)",
+        AutoRepair = "Auto repair generator",
+        AutoSkillCheck = "Auto skill check",
         AutoParry = "Auto Parry",
-        AutoEquip = "Equipar adaga sozinho",
+        AutoEquip = "Auto equip dagger",
     },
     Values = {
         Range = 2000,
@@ -542,23 +542,23 @@ do
             visual:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
             visual:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State:SetToggle("ESPNames", v) end)
             visual:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State:SetToggle("ESPDistance", v) end)
-            visual:CreateSlider("Distancia maxima", 50, 5000, State.Values.Range, function(v) State:SetValue("Range", v) end)
-            visual:CreateSlider("Tamanho do texto", 8, 30, State.Values.TextSize, function(v) State:SetValue("TextSize", v) end)
+            visual:CreateSlider("Max distance", 50, 5000, State.Values.Range, function(v) State:SetValue("Range", v) end)
+            visual:CreateSlider("Text size", 8, 30, State.Values.TextSize, function(v) State:SetValue("TextSize", v) end)
         end
 
-        local world = Kit.Section(Kit.Tab("Geradores", "World"), "Reparo e skill check", "Left")
+        local world = Kit.Section(Kit.Tab("Generators", "World"), "Repair and skill check", "Left")
         if world then
             world:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
             world:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
-            world:CreateSlider("Alcance do reparo", 4, 40, State.Values.RepairRange, function(v) State:SetValue("RepairRange", v) end)
+            world:CreateSlider("Repair range", 4, 40, State.Values.RepairRange, function(v) State:SetValue("RepairRange", v) end)
         end
 
         local combat = Kit.Section(Kit.Tab("Parry", "Combat"), "Auto parry", "Left")
         if combat then
             combat:CreateToggle(State.ToggleLabels.AutoParry, State.Toggles.AutoParry, function(v) State:SetToggle("AutoParry", v) end)
             combat:CreateToggle(State.ToggleLabels.AutoEquip, State.Toggles.AutoEquip, function(v) State:SetToggle("AutoEquip", v) end)
-            combat:CreateSlider("Alcance do parry", 5, 40, State.Values.ParryRange, function(v) State:SetValue("ParryRange", v) end)
-            combat:CreateSlider("Recarga do parry", 0.5, 5, State.Values.ParryCooldown, function(v) State:SetValue("ParryCooldown", v) end)
+            combat:CreateSlider("Parry range", 5, 40, State.Values.ParryRange, function(v) State:SetValue("ParryRange", v) end)
+            combat:CreateSlider("Parry cooldown", 0.5, 5, State.Values.ParryCooldown, function(v) State:SetValue("ParryCooldown", v) end)
         end
     end
 end

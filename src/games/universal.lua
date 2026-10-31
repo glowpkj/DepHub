@@ -163,7 +163,7 @@ end
 function State:CreateTeleportTool()
     if self.TeleportTool then pcall(self.TeleportTool.Destroy, self.TeleportTool) end
     local tool = Instance.new("Tool")
-    tool.Name, tool.RequiresHandle, tool.CanBeDropped, tool.ToolTip = "DepHub Click TP", false, false, "Equipe e clique para teleportar"
+    tool.Name, tool.RequiresHandle, tool.CanBeDropped, tool.ToolTip = "DepHub Click TP", false, false, "Equip and click to teleport"
     local backpack = LocalPlayer:FindFirstChildOfClass("Backpack") or LocalPlayer:WaitForChild("Backpack",8)
     if self.Destroyed or not backpack then tool:Destroy(); return false end
     tool.Parent = backpack
@@ -173,7 +173,7 @@ function State:CreateTeleportTool()
         local mouse = LocalPlayer:GetMouse()
         if root and mouse.Hit then root.CFrame = mouse.Hit + Vector3.new(0, 3, 0) end
     end)
-    self:Notify("Tool de teleporte adicionada à mochila.", "Success")
+    self:Notify("Teleport tool added to the backpack.", "Success")
 end
 
 function State:RemoveESP(player)
@@ -270,7 +270,7 @@ function State:SendChat()
             remote:FireServer(message, "All")
         end
     end)
-    if not ok then self:Notify("O chat deste jogo não aceitou a mensagem.", "Error") end
+    if not ok then self:Notify("This game's chat did not accept the message.", "Error") end
     return ok
 end
 
@@ -451,10 +451,10 @@ end
 
 function State:ServerHop()
     local ok, body = pcall(function() return game:HttpGet("https://games.roblox.com/v1/games/" .. tostring(game.PlaceId) .. "/servers/Public?sortOrder=Asc&limit=100") end)
-    if not ok then return self:Notify("Não foi possível consultar os servidores.", "Error") end
+    if not ok then return self:Notify("Could not query the servers.", "Error") end
     local decoded, data = pcall(HttpService.JSONDecode, HttpService, body)
     if decoded then for _, server in ipairs(data.data or {}) do local playing,maxPlayers=tonumber(server.playing),tonumber(server.maxPlayers); if server.id ~= game.JobId and playing and maxPlayers and playing < maxPlayers then TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer); return end end end
-    self:Notify("Nenhum servidor disponível foi encontrado.", "Error")
+    self:Notify("No available server was found.", "Error")
 end
 
 function State:RunExternal(url, name)
@@ -583,7 +583,7 @@ function State:GetStatus()
     for _, name in ipairs(names) do
         if self.Toggles[name] then on[#on + 1] = name end
     end
-    return #on > 0 and ("ON: " .. table.concat(on, ", ")) or "tudo desligado"
+    return #on > 0 and ("ON: " .. table.concat(on, ", ")) or "all off"
 end
 
 -- The shared shell is identical for every game; this backend fills it with its
@@ -601,17 +601,17 @@ do
         --   Player   - chat loop
         --   Misc     - server actions and diagnostics
         -- ---------------------------------------------------------------------
-        local movement = Kit.Section(Kit.Tab("Movement", "Movement"), "Movimento")
+        local movement = Kit.Section(Kit.Tab("Movement", "Movement"), "Movement")
         if movement then
             movement:CreateToggle("WalkSpeed", State.Toggles.WalkSpeed, function(v)
                 State:SetWalkSpeedEnabled(v)
             end)
-            movement:CreateSlider("WalkSpeed (valor)", 16, 500, State.Values.WalkSpeed, function(v)
+            movement:CreateSlider("WalkSpeed (value)", 16, 500, State.Values.WalkSpeed, function(v)
                 State.Values.WalkSpeed = tonumber(v) or State.Values.WalkSpeed
                 State:ApplyMovement()
             end)
             movement:CreateToggle("JumpPower", State.Toggles.Jump, function(v) State:SetJumpEnabled(v) end)
-            movement:CreateSlider("JumpPower (valor)", 50, 500, State.Values.JumpPower, function(v)
+            movement:CreateSlider("JumpPower (value)", 50, 500, State.Values.JumpPower, function(v)
                 State.Values.JumpPower = tonumber(v) or State.Values.JumpPower
                 State:ApplyMovement()
             end)
@@ -630,36 +630,36 @@ do
         local visuals = Kit.Section(Kit.Tab("Visual", "Visual"), "Visual")
         if visuals then
             visuals:CreateToggle("ESP", State.Toggles.ESP, function(v) State:SetESP(v) end)
-            visuals:CreateToggle("Nomes", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
-            visuals:CreateToggle("Distância", State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
-            visuals:CreateToggle("Vida", State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
+            visuals:CreateToggle("Names", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
+            visuals:CreateToggle("Distance", State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
+            visuals:CreateToggle("Health", State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
             visuals:CreateToggle("Team check", State.Toggles.TeamCheck, function(v) State.Toggles.TeamCheck = v == true end)
-            visuals:CreateToggle("Cores de time", State.Toggles.TeamColors, function(v) State.Toggles.TeamColors = v == true end)
+            visuals:CreateToggle("Team colors", State.Toggles.TeamColors, function(v) State.Toggles.TeamColors = v == true end)
             visuals:CreateToggle("Chams", State.Toggles.Chams, function(v) State.Toggles.Chams = v == true end)
-            visuals:CreateSlider("Alcance do ESP", 100, 10000, State.Values.ESPRange, function(v)
+            visuals:CreateSlider("ESP range", 100, 10000, State.Values.ESPRange, function(v)
                 State.Values.ESPRange = tonumber(v) or State.Values.ESPRange
             end)
             visuals:CreateToggle("Tracers", State.Toggles.Tracers, function(v) State:SetTracers(v) end)
             visuals:CreateToggle("Fullbright", State.Toggles.Fullbright, function(v) State:SetFullbright(v) end)
-            visuals:CreateToggle("Zoom infinito", State.Toggles.InfiniteZoom, function(v) State:SetInfiniteZoom(v) end)
+            visuals:CreateToggle("Infinite zoom", State.Toggles.InfiniteZoom, function(v) State:SetInfiniteZoom(v) end)
         end
 
-        local combat = Kit.Section(Kit.Tab("Combate", "Combat"), "Combate")
+        local combat = Kit.Section(Kit.Tab("Combat", "Combat"), "Combat")
         if combat then
-            combat:CreateToggle("Aimbot (botão direito)", State.Toggles.Aimbot, function(v) State.Toggles.Aimbot = v == true end)
-            combat:CreateSlider("FOV do aimbot", 10, 360, State.Values.AimbotFOV, function(v)
+            combat:CreateToggle("Aimbot (right button)", State.Toggles.Aimbot, function(v) State.Toggles.Aimbot = v == true end)
+            combat:CreateSlider("Aimbot FOV", 10, 360, State.Values.AimbotFOV, function(v)
                 State.Values.AimbotFOV = tonumber(v) or State.Values.AimbotFOV
             end)
-            combat:CreateDropdown("Parte mirada", {"Head", "HumanoidRootPart", "UpperTorso", "Torso"}, State.Values.AimPart, function(v)
+            combat:CreateDropdown("Aim part", {"Head", "HumanoidRootPart", "UpperTorso", "Torso"}, State.Values.AimPart, function(v)
                 State.Values.AimPart = tostring(v)
             end)
             combat:CreateToggle("Silent aim", State.Toggles.SilentAim, function(v) State:SetSilentAim(v) end)
-            combat:CreateSlider("Alcance do silent aim", 50, 2000, State.Values.SilentAimRange, function(v)
+            combat:CreateSlider("Silent aim range", 50, 2000, State.Values.SilentAimRange, function(v)
                 State.Values.SilentAimRange = tonumber(v) or State.Values.SilentAimRange
             end)
             combat:CreateToggle("Anti-fling", State.Toggles.AntiFling, function(v) State:SetAntiFling(v) end)
             combat:CreateToggle("Anti-void", State.Toggles.AntiVoid, function(v) State:SetAntiVoid(v) end)
-            combat:CreateSlider("Altura do void", -500, 0, State.Values.VoidHeight, function(v)
+            combat:CreateSlider("Void height", -500, 0, State.Values.VoidHeight, function(v)
                 State.Values.VoidHeight = tonumber(v) or State.Values.VoidHeight
             end)
         end
@@ -667,36 +667,36 @@ do
         local social = Kit.Section(Kit.Tab("Social", "Player"), "Social")
         if social then
             social:CreateToggle("Chat loop", State.Toggles.ChatLoop, function(v) State:SetChatLoop(v) end)
-            social:CreateInput("Mensagem do chat", State.Values.ChatMessage, State.Values.ChatMessage, function(v)
+            social:CreateInput("Chat message", State.Values.ChatMessage, State.Values.ChatMessage, function(v)
                 State.Values.ChatMessage = tostring(v)
             end)
-            social:CreateSlider("Intervalo do chat", 1, 60, State.Values.ChatInterval, function(v)
+            social:CreateSlider("Chat interval", 1, 60, State.Values.ChatInterval, function(v)
                 State.Values.ChatInterval = tonumber(v) or State.Values.ChatInterval
             end)
-            social:CreateButton("Enviar mensagem uma vez", function() State:SendChat() end)
+            social:CreateButton("Send message once", function() State:SendChat() end)
         end
 
-        local server = Kit.Section(Kit.Tab("Servidor", "Misc"), "Servidor")
+        local server = Kit.Section(Kit.Tab("Server", "Misc"), "Server")
         if server then
             server:CreateButton("Server hop", function()
                 State:ServerHop()
-                if type(UI.Notify) == "function" then UI:Notify("Universal", "Procurando servidor.") end
+                if type(UI.Notify) == "function" then UI:Notify("Universal", "Searching for a server.") end
             end)
             server:CreateButton("Rejoin", function() State:Rejoin() end)
             server:CreateButton("Teleport tool", function()
                 State:CreateTeleportTool()
-                if type(UI.Notify) == "function" then UI:Notify("Universal", "Tool de teleporte criada.") end
+                if type(UI.Notify) == "function" then UI:Notify("Universal", "Teleport tool created.") end
             end)
             server:CreateButton("Dex Explorer", function()
                 State:RunDex()
-                if type(UI.Notify) == "function" then UI:Notify("Universal", "Dex solicitado.") end
+                if type(UI.Notify) == "function" then UI:Notify("Universal", "Dex requested.") end
             end)
         end
 
-        local status = Kit.Section(Kit.Tab("Status", "Misc"), "Diagnóstico")
+        local status = Kit.Section(Kit.Tab("Status", "Misc"), "Diagnostics")
         if status then
-            status:CreateParagraph("Estado atual", State:GetStatus())
-            status:CreateButton("Atualizar status", function()
+            status:CreateParagraph("Current state", State:GetStatus())
+            status:CreateButton("Refresh status", function()
                 if type(UI.Notify) == "function" then UI:Notify("Universal", State:GetStatus()) end
             end)
         end
@@ -710,17 +710,17 @@ do
         local character = LocalPlayer.Character
         local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         local root = character and character:FindFirstChild("HumanoidRootPart")
-        Diag:Probe("Workspace.Character", character ~= nil, character and character.Name or "sem personagem")
-        Diag:Probe("Humanoid", humanoid ~= nil, humanoid and (math.floor(humanoid.Health) .. " HP") or "ausente")
-        Diag:Probe("HumanoidRootPart", root ~= nil, root and "resolvivel" or "ausente")
-        Diag:Probe("Workspace.CurrentCamera", Workspace.CurrentCamera ~= nil, Workspace.CurrentCamera and "presente" or "ausente")
+        Diag:Probe("Workspace.Character", character ~= nil, character and character.Name or "no character")
+        Diag:Probe("Humanoid", humanoid ~= nil, humanoid and (math.floor(humanoid.Health) .. " HP") or "absent")
+        Diag:Probe("HumanoidRootPart", root ~= nil, root and "resolvable" or "absent")
+        Diag:Probe("Workspace.CurrentCamera", Workspace.CurrentCamera ~= nil, Workspace.CurrentCamera and "present" or "absent")
         Diag:Probe("Lighting", Lighting ~= nil, tostring(Lighting.Brightness))
         Diag:Feature("Universal.Status", function() return State:GetStatus() end)
         Diag:Feature("Universal.WalkSpeed", function() return State.Toggles.WalkSpeed and (tostring(State.Values.WalkSpeed) .. " studs/s") or "off" end)
         Diag:Feature("Universal.Fly", function() return State.Toggles.Fly and ("ON " .. tostring(State.Values.FlySpeed) .. " studs/s") or "off" end)
         Diag:Feature("Universal.ESP", function() return State.Toggles.ESP and "ON" or "off" end)
-        Diag:Watch("Personagem", function() local c = LocalPlayer.Character; return c and c.Name or "nil" end)
-        Diag:Watch("Toggles ativos", function()
+        Diag:Watch("Character", function() local c = LocalPlayer.Character; return c and c.Name or "nil" end)
+        Diag:Watch("Active toggles", function()
             local count = 0
             for _, value in pairs(State.Toggles) do if value then count += 1 end end
             return count
@@ -731,7 +731,7 @@ do
             end)
             Diag:Command("universal-chat", function(argument)
                 if argument and argument ~= "" then State.Values.ChatMessage = argument end
-                return "mensagem=" .. tostring(State.Values.ChatMessage)
+                return "message=" .. tostring(State.Values.ChatMessage)
             end)
         end
     end

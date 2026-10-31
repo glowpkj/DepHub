@@ -61,11 +61,11 @@ local function loadModule(path)
 
     local okRun, result = pcall(chunk)
     if not okRun then
-        logWarn("Erro executando " .. path .. ": " .. tostring(result))
+        logWarn("Error running " .. path .. ": " .. tostring(result))
         return nil
     end
 
-    log("Modulo carregado: " .. path)
+    log("Module loaded: " .. path)
     return result
 end
 
@@ -213,13 +213,13 @@ local RegisteredFeatures = 0
 
 local function registerFeature(name, module)
     if not module then
-        logWarn("Feature indisponivel: " .. name)
+        logWarn("Feature unavailable: " .. name)
         return false
     end
 
     local handler = module.Toggle or module.Set
     if type(handler) ~= "function" then
-        logWarn("Feature sem Toggle/Set: " .. name)
+        logWarn("Feature without Toggle/Set: " .. name)
         return false
     end
 
@@ -240,23 +240,23 @@ do
             farm:CreateToggle("Auto farm",runtime.Features.AutoFarm and runtime.Features.AutoFarm.Enabled==true,function(v)
                 if runtime.Features.AutoFarm then runtime.Features.AutoFarm.Toggle(v) end
             end)
-            farm:CreateToggle("Farm de amigos",runtime.Features.AutoFarmFriends and runtime.Features.AutoFarmFriends.Enabled==true,function(v)
+            farm:CreateToggle("Friends farm",runtime.Features.AutoFarmFriends and runtime.Features.AutoFarmFriends.Enabled==true,function(v)
                 if runtime.Features.AutoFarmFriends then runtime.Features.AutoFarmFriends.Toggle(v) end
             end)
         end
 
-        local kitchen=Kit.Section(Kit.Tab("Kitchen","Farm"),"Cozinha","Left")
+        local kitchen=Kit.Section(Kit.Tab("Kitchen","Farm"),"Kitchen","Left")
         if kitchen then
-            kitchen:CreateToggle("Cozinhar instantaneamente",runtime.Features.InstantCook and runtime.Features.InstantCook.Enabled==true,function(v)
+            kitchen:CreateToggle("Instant cook",runtime.Features.InstantCook and runtime.Features.InstantCook.Enabled==true,function(v)
                 if runtime.Features.InstantCook then runtime.Features.InstantCook.Toggle(v) end
             end)
-            kitchen:CreateToggle("Coletar drops",runtime.Features.AutoDrop and runtime.Features.AutoDrop.Enabled==true,function(v)
+            kitchen:CreateToggle("Collect drops",runtime.Features.AutoDrop and runtime.Features.AutoDrop.Enabled==true,function(v)
                 if runtime.Features.AutoDrop then runtime.Features.AutoDrop.Toggle(v) end
             end)
         end
 
         local status=Kit.Section(Kit.Tab("Status","Misc"),"Runtime","Left")
-        if status then status:CreateParagraph("DepHub","Restaurant Tycoon 3 carregado. Os controles acionam as funções registradas no runtime.") end
+        if status then status:CreateParagraph("DepHub","Restaurant Tycoon 3 loaded. The controls drive the functions registered in the runtime.") end
     end
 end
 return true
@@ -268,7 +268,7 @@ registerFeature("AutoDrop", AutoDrop)
 registerFeature("AutoFarmFriends", AutoFarmFriends)
 
 if RegisteredFeatures == 0 then
-    logWarn("Nenhuma feature foi registrada.")
+    logWarn("No feature was registered.")
     AntiAFK.Stop()
     runtime:Destroy()
     return false
@@ -293,21 +293,21 @@ do
             Diag:RegisterModule(path)
             local loaded=modules[path]
             local hasHandler=type(loaded)=="table" and type(loaded.Toggle or loaded.Set)=="function"
-            Diag:Module(path,loaded~=nil,loaded and (hasHandler and "carregado" or "sem Toggle/Set") or "ausente")
+            Diag:Module(path,loaded~=nil,loaded and (hasHandler and "loaded" or "no Toggle/Set") or "absent")
         end
-        Diag:Probe("runtime.Start",runtime~=nil,runtime and "ok" or "ausente")
-        Diag:Probe("Runtime.Dashboard",runtime.Dashboard~=nil,runtime.Dashboard and "ligado" or "ausente")
-        Diag:Probe("Runtime.HealthMonitor",runtime.HealthMonitor~=nil,runtime.HealthMonitor and "ligado" or "ausente")
-        Diag:Probe("Runtime.Scheduler",runtime.Scheduler~=nil,runtime.Scheduler and "ligado" or "ausente")
-        Diag:Probe("AntiAFK",env.__DEPHUB and env.__DEPHUB.AntiAFK~=nil,env.__DEPHUB and env.__DEPHUB.AntiAFK and "ligado" or "ausente")
-        Diag:Probe("Features registradas",RegisteredFeatures>0,RegisteredFeatures.." de "..#featurePaths)
-        Diag:Feature("RT3.AutoFarm",function() return runtime.Features.AutoFarm and tostring(runtime.Features.AutoFarm.Enabled) or "ausente" end)
-        Diag:Feature("RT3.AutoFarmFriends",function() return runtime.Features.AutoFarmFriends and tostring(runtime.Features.AutoFarmFriends.Enabled) or "ausente" end)
-        Diag:Feature("RT3.InstantCook",function() return runtime.Features.InstantCook and tostring(runtime.Features.InstantCook.Enabled) or "ausente" end)
-        Diag:Feature("RT3.AutoDrop",function() return runtime.Features.AutoDrop and tostring(runtime.Features.AutoDrop.Enabled) or "ausente" end)
+        Diag:Probe("runtime.Start",runtime~=nil,runtime and "ok" or "absent")
+        Diag:Probe("Runtime.Dashboard",runtime.Dashboard~=nil,runtime.Dashboard and "on" or "absent")
+        Diag:Probe("Runtime.HealthMonitor",runtime.HealthMonitor~=nil,runtime.HealthMonitor and "on" or "absent")
+        Diag:Probe("Runtime.Scheduler",runtime.Scheduler~=nil,runtime.Scheduler and "on" or "absent")
+        Diag:Probe("AntiAFK",env.__DEPHUB and env.__DEPHUB.AntiAFK~=nil,env.__DEPHUB and env.__DEPHUB.AntiAFK and "on" or "absent")
+        Diag:Probe("Registered features",RegisteredFeatures>0,RegisteredFeatures.." of "..#featurePaths)
+        Diag:Feature("RT3.AutoFarm",function() return runtime.Features.AutoFarm and tostring(runtime.Features.AutoFarm.Enabled) or "absent" end)
+        Diag:Feature("RT3.AutoFarmFriends",function() return runtime.Features.AutoFarmFriends and tostring(runtime.Features.AutoFarmFriends.Enabled) or "absent" end)
+        Diag:Feature("RT3.InstantCook",function() return runtime.Features.InstantCook and tostring(runtime.Features.InstantCook.Enabled) or "absent" end)
+        Diag:Feature("RT3.AutoDrop",function() return runtime.Features.AutoDrop and tostring(runtime.Features.AutoDrop.Enabled) or "absent" end)
         Diag:Feature("RT3.Health",function()
             local snap=runtime:GetSnapshot()
-            return snap and tostring(snap.Health) or "sem snapshot"
+            return snap and tostring(snap.Health) or "no snapshot"
         end)
         if type(Diag.Watch)=="function" then
             Diag:Watch("RT3 health",function() local snap=runtime:GetSnapshot() return snap and tostring(snap.Health) or "?" end)
@@ -316,7 +316,7 @@ do
                 for _ in pairs(runtime.Features) do n=n+1 end
                 return n
             end)
-            Diag:Watch("RT3 destruido",function() return tostring(runtime.Destroyed) end)
+            Diag:Watch("RT3 destroyed",function() return tostring(runtime.Destroyed) end)
         end
         if type(Diag.Command)=="function" then
             Diag:Command("rt3",function()
@@ -328,7 +328,7 @@ do
                 return "features="..table.concat(names,",")
                     .." health="..tostring(snap.Health)
                     .." executor="..tostring(data.Executor)
-                    .." destruido="..tostring(runtime.Destroyed)
+                    .." destroyed="..tostring(runtime.Destroyed)
             end)
         end
     end

@@ -259,35 +259,35 @@ do
     local UI = env.__DEPHUB and env.__DEPHUB.UI
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
-        local speed = Kit.Section(Kit.Tab("Speed", "Movement"), "Movimento", "Left")
+        local speed = Kit.Section(Kit.Tab("Speed", "Movement"), "Movement", "Left")
         if speed then
             speed:CreateToggle("Speed boost", State.Toggles.Speed, function(v) State:SetToggle("Speed", v) end)
             speed:CreateSlider("Walk speed", 16, 300, State.Values.WalkSpeed, function(v) State:SetSpeed(v) end)
         end
 
         local tpTab = Kit.Tab("Teleport", "Movement")
-        local fly = Kit.Section(tpTab, "Voo", "Left")
+        local fly = Kit.Section(tpTab, "Flight", "Left")
         if fly then
-            fly:CreateSlider("Velocidade do voo", 50, 1000, State.Values.FlySpeed, function(v) State:SetFlySpeed(v) end)
-            fly:CreateButton("Notificar posicao atual", function()
+            fly:CreateSlider("Flight speed", 50, 1000, State.Values.FlySpeed, function(v) State:SetFlySpeed(v) end)
+            fly:CreateButton("Report current position", function()
                 local p = State:FlyToPosition()
-                if not p then UI:Notify("Teleport", "Sem personagem") return end
-                UI:Notify("Posicao", string.format("X %.1f  Y %.1f  Z %.1f", p.X, p.Y, p.Z))
+                if not p then UI:Notify("Teleport", "No character") return end
+                UI:Notify("Position", string.format("X %.1f  Y %.1f  Z %.1f", p.X, p.Y, p.Z))
             end)
-            fly:CreateButton("Salvar waypoint aqui", function()
+            fly:CreateButton("Save waypoint here", function()
                 local p = State:FlyToPosition()
-                if not p then UI:Notify("Teleport", "Sem personagem") return end
+                if not p then UI:Notify("Teleport", "No character") return end
                 State:AddWaypoint(nil, p)
-                UI:Notify("Waypoint", "Salvo (total " .. tostring(#State.Waypoints) .. ")")
+                UI:Notify("Waypoint", "Saved (total " .. tostring(#State.Waypoints) .. ")")
             end)
         end
 
         local wp = Kit.Section(tpTab, "Waypoints", "Right")
         if wp then
             for _, waypoint in ipairs(State.Waypoints) do
-                wp:CreateButton("Ir: " .. waypoint.name, function() State:Go(waypoint.pos) end)
+                wp:CreateButton("Go: " .. waypoint.name, function() State:Go(waypoint.pos) end)
             end
-            wp:CreateParagraph("Waypoints", "Nenhum salvo ainda. Use 'Salvar waypoint aqui' na coluna da esquerda enquanto estiver no lugar desejado.")
+            wp:CreateParagraph("Waypoints", "None saved yet. Use 'Save waypoint here' in the left column while standing where you want it.")
         end
     end
 end

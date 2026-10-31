@@ -152,7 +152,7 @@ do
     for _, control in ipairs(ui.Library._Controls) do
         if control.Label then labels[control.Label] = true end
     end
-    for _, expected in ipairs({"Auto Position", "Instantâneo", "Suavidade do movimento", "Offset acima do chão", "Distância mínima", "Pulo forçado", "Jump Power", "Alcance da previsão", "Auto Jump", "Ceiling sem colisão"}) do
+    for _, expected in ipairs({"Auto Position", "Instant", "Movement smoothing", "Offset above ground", "Minimum distance", "Forced jump", "Jump Power", "Prediction range", "Auto Jump", "Ceiling no collision"}) do
         check(labels[expected] == true, "Volleyball registers its control: " .. expected)
     end
 end

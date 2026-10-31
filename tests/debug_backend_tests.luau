@@ -25,11 +25,11 @@ do
     ctx:Run("src/games/mm2.lua")
 
     local report = diag:Report()
-    check(report:find("MM2 versao", 1, true) ~= nil, "MM2 reports its version into Debug")
+    check(report:find("MM2 version", 1, true) ~= nil, "MM2 reports its version into Debug")
     check(report:find("Players.LocalPlayer: ", 1, true) ~= nil, "MM2 probes LocalPlayer")
     check(report:find("Workspace.RegularLobby", 1, true) ~= nil, "MM2 probes the round lobby")
     check(report:find("Tool.Knife", 1, true) ~= nil, "MM2 probes the murder knife")
-    check(report:find("MM2.Rodada", 1, true) ~= nil, "MM2 exposes its round state as a live feature")
+    check(report:find("MM2.Round", 1, true) ~= nil, "MM2 exposes its round state as a live feature")
     check(report:find("MM2.CoinFarm", 1, true) ~= nil, "MM2 exposes coin farm state as a live feature")
 
     -- The backend added its own console command.
@@ -56,7 +56,7 @@ do
     end
     local diag = attachDiagnostics(ctx)
     ctx:Run("src/games/mm2.lua")
-    check(diag:Report():find("[FALHA] Workspace.RegularLobby", 1, true) ~= nil, "a missing lobby probe reports a failure")
+    check(diag:Report():find("[FAIL] Workspace.RegularLobby", 1, true) ~= nil, "a missing lobby probe reports a failure")
 end
 
 -- TSB: the block remote and the Live folder are the block/counter failure
@@ -77,13 +77,13 @@ do
     ctx:Run("src/games/tsb.lua")
 
     local report = diag:Report()
-    check(report:find("TSB versao", 1, true) ~= nil, "TSB reports its version into Debug")
+    check(report:find("TSB version", 1, true) ~= nil, "TSB reports its version into Debug")
     check(report:find("Character.Communicate", 1, true) ~= nil, "TSB probes the block remote")
     check(report:find("Workspace.Live", 1, true) ~= nil, "TSB probes the Live folder")
     check(report:find("AnimationData.Groups", 1, true) ~= nil, "TSB probes the animation groups")
     check(report:find("TSB.AutoBlock", 1, true) ~= nil, "TSB exposes its block state as a live feature")
-    check(report:find("[FALHA] Workspace.Live", 1, true) ~= nil, "TSB reports the missing Live folder as a failure")
-    check(diag:RunCommand("tsb"):find("bloqueio=", 1, true) ~= nil, "TSB registers a console command")
+    check(report:find("[FAIL] Workspace.Live", 1, true) ~= nil, "TSB reports the missing Live folder as a failure")
+    check(diag:RunCommand("tsb"):find("block=", 1, true) ~= nil, "TSB registers a console command")
 end
 
 -- Noob Piece: the island systems key off one Workspace folder. Its absence must
@@ -111,11 +111,11 @@ do
     ctx:Run("src/games/noobpiece.lua")
 
     local report = diag:Report()
-    check(report:find("NoobPiece versao", 1, true) ~= nil, "Noob Piece reports its version into Debug")
+    check(report:find("NoobPiece version", 1, true) ~= nil, "Noob Piece reports its version into Debug")
     check(report:find("Workspace.MysteriousIsland", 1, true) ~= nil, "Noob Piece probes the mysterious island")
-    check(report:find("[FALHA] Workspace.MysteriousIsland", 1, true) ~= nil, "Noob Piece reports the missing island as a failure")
+    check(report:find("[FAIL] Workspace.MysteriousIsland", 1, true) ~= nil, "Noob Piece reports the missing island as a failure")
     check(report:find("NoobPiece.AutoFarm", 1, true) ~= nil, "Noob Piece exposes its toggles as live features")
-    check(diag:RunCommand("np"):find("ilha=", 1, true) ~= nil, "Noob Piece registers a console command")
+    check(diag:RunCommand("np"):find("island=", 1, true) ~= nil, "Noob Piece registers a console command")
 
     -- Seed the island: the watch value flips and the command reflects it.
     local island = Instance.new("Model"); island.Name = "MysteriousIsland"; island.Parent = ctx.Services.Workspace
@@ -151,7 +151,7 @@ do
     local report = diag:Report()
     check(report:find("RT3 features", 1, true) ~= nil, "RT3 reports its feature count into Debug")
     check(report:find("Runtime.Dashboard", 1, true) ~= nil, "RT3 probes the runtime dashboard")
-    check(report:find("Features registradas", 1, true) ~= nil, "RT3 probes the registered feature count")
+    check(report:find("Registered features", 1, true) ~= nil, "RT3 probes the registered feature count")
     check(report:find("RT3.Health", 1, true) ~= nil, "RT3 exposes runtime health as a live feature")
     check(diag:RunCommand("rt3"):find("features=", 1, true) ~= nil, "RT3 registers a console command")
 end
@@ -166,16 +166,16 @@ do
     ctx:Run("src/games/volleyball42.lua")
 
     local report = diag:Report()
-    check(report:find("Volleyball modo", 1, true) ~= nil, "Volleyball reports its mode into Debug")
+    check(report:find("Volleyball mode", 1, true) ~= nil, "Volleyball reports its mode into Debug")
     check(report:find("Workspace.Gravity", 1, true) ~= nil, "Volleyball probes gravity")
-    check(report:find("[FALHA] Workspace.Ball", 1, true) ~= nil, "Volleyball reports the missing ball as a failure")
+    check(report:find("[FAIL] Workspace.Ball", 1, true) ~= nil, "Volleyball reports the missing ball as a failure")
     check(report:find("Volleyball.BallPredict", 1, true) ~= nil, "Volleyball exposes its toggle as a live feature")
-    check(report:find("Volleyball.Modo", 1, true) ~= nil, "Volleyball exposes its mode as a live feature")
-    check(diag:RunCommand("vb"):find("modo=", 1, true) ~= nil, "Volleyball registers a console command")
+    check(report:find("Volleyball.Mode", 1, true) ~= nil, "Volleyball exposes its mode as a live feature")
+    check(diag:RunCommand("vb"):find("mode=", 1, true) ~= nil, "Volleyball registers a console command")
 
     -- Seed a ball: the watch value changes and the command reflects it.
     local ball = Instance.new("Model"); ball.Name = "Ball"; ball.Parent = ctx.Services.Workspace
-    check(diag:RunCommand("vb"):find("bola=", 1, true) ~= nil, "Volleyball command reflects the seeded ball")
+    check(diag:RunCommand("vb"):find("ball=", 1, true) ~= nil, "Volleyball command reflects the seeded ball")
 end
 
 -- Every backend must build the shared Debug tab without a real client: assert
@@ -189,9 +189,9 @@ do
     local diag = attachDiagnostics(ctx)
     ctx:Run("src/games/mm2.lua")
     local report = diag:Report()
-    check(report:find("Ambiente", 1, true) ~= nil, "backend Debug report keeps the environment section")
-    check(report:find("Modulos", 1, true) ~= nil, "backend Debug report keeps the modules section")
-    check(report:find("Estrutura do jogo", 1, true) ~= nil, "backend Debug report keeps the structure section")
+    check(report:find("Environment", 1, true) ~= nil, "backend Debug report keeps the environment section")
+    check(report:find("Modules", 1, true) ~= nil, "backend Debug report keeps the modules section")
+    check(report:find("Game structure", 1, true) ~= nil, "backend Debug report keeps the structure section")
 end
 
 -- Universal: the backend every unmapped game now loads. It must instrument the
@@ -210,7 +210,7 @@ do
     check(report:find("Workspace.CurrentCamera", 1, true) ~= nil, "Universal probes the current camera")
     check(report:find("Workspace.Character", 1, true) ~= nil, "Universal probes the local character")
 
-    check(diag:RunCommand("universal"):find("desligado", 1, true) ~= nil, "Universal registers a console command")
+    check(diag:RunCommand("universal"):find("all off", 1, true) ~= nil, "Universal registers a console command")
 
     -- Flipping a toggle is reflected in the feature read, proving the probe
     -- tracks live state rather than a canned value.

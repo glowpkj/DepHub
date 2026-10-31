@@ -40,12 +40,12 @@ local State = {
         Chams = true,
     },
     ToggleLabels = {
-        ESP = "ESP ativado",
-        TeamCheck = "Ignorar time aliado",
-        ESPNames = "Mostrar nome",
-        ESPDistance = "Mostrar distancia",
-        ESPHealth = "Mostrar vida",
-        Chams = "Chams (contorno)",
+        ESP = "ESP enabled",
+        TeamCheck = "Ignore teammates",
+        ESPNames = "Show name",
+        ESPDistance = "Show distance",
+        ESPHealth = "Show health",
+        Chams = "Chams (outline)",
     },
     Values = {
         Range = 1000,
@@ -297,16 +297,16 @@ end
 do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
-        local visual = Kit.Section(Kit.Tab("ESP", "Visual"), "Jogadores", "Left")
+        local visual = Kit.Section(Kit.Tab("ESP", "Visual"), "Players", "Left")
         if visual then
-            visual:CreateToggle("ESP ativado", State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
-            visual:CreateToggle("Ignorar time aliado", State.Toggles.TeamCheck, function(v) State:SetToggle("TeamCheck", v) end)
-            visual:CreateToggle("Chams (contorno)", State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
-            visual:CreateToggle("Mostrar nome", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
-            visual:CreateToggle("Mostrar distancia", State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
-            visual:CreateToggle("Mostrar vida", State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
-            visual:CreateSlider("Distancia maxima", 50, 5000, State.Values.Range, function(v) State:SetRange(v) end)
-            visual:CreateSlider("Tamanho do texto", 8, 30, State.Values.TextSize, function(v) State:SetTextSize(v) end)
+            visual:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
+            visual:CreateToggle(State.ToggleLabels.TeamCheck, State.Toggles.TeamCheck, function(v) State:SetToggle("TeamCheck", v) end)
+            visual:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
+            visual:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
+            visual:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
+            visual:CreateToggle(State.ToggleLabels.ESPHealth, State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
+            visual:CreateSlider("Max distance", 50, 5000, State.Values.Range, function(v) State:SetRange(v) end)
+            visual:CreateSlider("Text size", 8, 30, State.Values.TextSize, function(v) State:SetTextSize(v) end)
         end
     end
 end

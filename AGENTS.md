@@ -52,6 +52,25 @@ Follow the existing module layout (`src/core`, `src/games`, loader `DepHub.lua`,
 `tools/`, `tests/`). Do not duplicate logic across files; extend or reuse the
 existing piece. Do not touch other games when the task names one game.
 
+## 4a. Player-visible UI is in English
+
+Every string the player can see is English: tab and section titles, toggle /
+slider / dropdown / input labels, paragraph text, notifications, and the Debug
+tab vocabulary (module/probe detail such as `[FAIL]`, `loaded`/`absent`,
+`pending`; the loader's startup logs, notes and the "Unsupported" tab; the
+updater's messages; and the debug console's command replies). Docs
+(`DEPHUB-CONVENCOES.txt`) and code comments stay in Portuguese. Do NOT translate
+real in-game instance/folder names (`Ilhas`, `MysteriousIsland`, `Cafe`,
+`RegularLobby`) or the strings that drive a feature.
+
+## 4b. Default open/close key is N
+
+The shell's global default toggle key is `Enum.KeyCode.N`, set in
+`src/core/demon-ui.lua` (`WINDOW_OPTIONS.ToggleKey`) and as the theme
+constructor default (`src/core/ui/theme/constructor.luau`). Where the loader or a
+backend does not pass a `ToggleKey`, the default is N. The player can rebind at
+runtime through the keybind overlay.
+
 ## 5. Version in place
 
 Version bumps touch **both** `src/version.txt` and the `VERSION` line in

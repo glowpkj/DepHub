@@ -81,7 +81,7 @@ function Library.new(opts)
     end
     self.TabPosition = opts.TabPosition or "Top"
     self.TabWidth    = opts.TabWidth or 130
-    self.ToggleKey   = opts.ToggleKey or Enum.KeyCode.RightShift
+    self.ToggleKey   = opts.ToggleKey or Enum.KeyCode.N
     self._TitleIconName = (type(opts.TitleIcon) == "string" and opts.TitleIcon ~= "")
         and opts.TitleIcon or "hexagon"
         

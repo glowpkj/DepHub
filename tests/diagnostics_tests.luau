@@ -10,25 +10,25 @@ do
     diag:Module("um", true, "ok")
     diag:Module("dois", false, "explodiu")
     diag:Probe("Workspace.Titans", true, "3 titans")
-    diag:Probe("Assets.Remotes.GET", false, "ausente")
-    diag:Feature("Feature.A", function() return "rodando" end)
-    diag:Feature("Feature.B", function() error("leitura falhou") end)
-    diag:Note("linha livre")
-    diag:Log("loader", "iniciando")
+    diag:Probe("Assets.Remotes.GET", false, "absent")
+    diag:Feature("Feature.A", function() return "running" end)
+    diag:Feature("Feature.B", function() error("read failed") end)
+    diag:Note("free line")
+    diag:Log("loader", "starting")
 
     local report = diag:Report()
     check(report:find("Executor: Tester", 1, true) ~= nil, "diagnostics report includes environment")
     check(report:find("[OK] um: ok", 1, true) ~= nil, "diagnostics report marks a healthy module")
-    check(report:find("[FALHA] dois: explodiu", 1, true) ~= nil, "diagnostics report marks a failed module")
+    check(report:find("[FAIL] dois: explodiu", 1, true) ~= nil, "diagnostics report marks a failed module")
     check(report:find("[OK] Workspace.Titans: 3 titans", 1, true) ~= nil, "diagnostics report includes a passing probe")
-    check(report:find("[FALHA] Assets.Remotes.GET: ausente", 1, true) ~= nil, "diagnostics report includes a failing probe")
-    check(report:find("Feature.A: rodando", 1, true) ~= nil, "diagnostics report reads a live feature")
-    check(report:find("Feature.B: ERRO DE LEITURA", 1, true) ~= nil, "diagnostics report contains a throwing feature instead of failing")
-    check(report:find("linha livre", 1, true) ~= nil and report:find("iniciando", 1, true) ~= nil, "diagnostics report includes notes and log lines")
-    check(report:find("Metricas", 1, true) ~= nil or report:find("FPS", 1, true) ~= nil, "diagnostics report includes live metrics")
+    check(report:find("[FAIL] Assets.Remotes.GET: absent", 1, true) ~= nil, "diagnostics report includes a failing probe")
+    check(report:find("Feature.A: running", 1, true) ~= nil, "diagnostics report reads a live feature")
+    check(report:find("Feature.B: READ ERROR", 1, true) ~= nil, "diagnostics report contains a throwing feature instead of failing")
+    check(report:find("free line", 1, true) ~= nil and report:find("starting", 1, true) ~= nil, "diagnostics report includes notes and log lines")
+    check(report:find("Metrics", 1, true) ~= nil or report:find("FPS", 1, true) ~= nil, "diagnostics report includes live metrics")
 
     local summary = diag:Summary()
-    check(summary:find("1 falha", 1, true) ~= nil, "diagnostics summary counts failures")
+    check(summary:find("1 fail", 1, true) ~= nil, "diagnostics summary counts failures")
 
     -- A throw inside a deferred feature reader must never take the report down.
     diag:Feature("Feature.C", function() return nil + 1 end)
@@ -36,11 +36,11 @@ do
 
     -- Console commands: built-ins and a backend-added one, unknown names reported.
     check(diag:RunCommand("metrics"):find("fps=", 1, true) ~= nil, "console runs the metrics command")
-    check(diag:RunCommand("sniff off") == "sniff de remotes desligado" and diag.SniffEnabled == false, "console toggles remote sniffing")
-    check(diag:RunCommand("naoExiste"):find("desconhecido", 1, true) ~= nil, "console reports an unknown command")
+    check(diag:RunCommand("sniff off") == "remote sniffing off" and diag.SniffEnabled == false, "console toggles remote sniffing")
+    check(diag:RunCommand("naoExiste"):find("unknown", 1, true) ~= nil, "console reports an unknown command")
     local ran = false
-    diag:Command("custom", function(argument) ran = argument; return "feito:" .. tostring(argument) end)
-    check(diag:RunCommand("custom 42") == "feito:42" and ran == "42", "console dispatches a registered command with its argument")
+    diag:Command("custom", function(argument) ran = argument; return "done:" .. tostring(argument) end)
+    check(diag:RunCommand("custom 42") == "done:42" and ran == "42", "console dispatches a registered command with its argument")
 
     -- Watch: a change is turned into a timestamped log line.
     local watched = 1
@@ -219,7 +219,7 @@ do
     check(found, "shared Debug tab is registered when enabled")
 
     local report = ctx.State.__DEPHUB.Diagnostics:Report()
-    check(report:find("Ambiente", 1, true) ~= nil, "Debug report has an environment section")
+    check(report:find("Environment", 1, true) ~= nil, "Debug report has an environment section")
     check(report:find("AOTR.TitanRipper", 1, true) ~= nil, "AOT:R backend reports its combat features into Debug")
     check(report:find("Workspace.Titans", 1, true) ~= nil, "AOT:R backend reports its structure probes into Debug")
 

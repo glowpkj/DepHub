@@ -99,12 +99,12 @@ if Diag and type(Diag.Probe)=="function" then
  Diag:Module("features/aotr/targets.lua",targets~=nil,tostring(targetsError or "ok"))
  Diag:Module("features/aotr/movement.lua",movement~=nil,tostring(movementError or "ok"))
  Diag:Module("features/aotr/combat.lua",combat~=nil,tostring(combatError or "ok"))
- Diag:Probe("Workspace.Titans",titanFolder()~=nil,titanFolder() and (#titans().." titans") or "ausente")
+ Diag:Probe("Workspace.Titans",titanFolder()~=nil,titanFolder() and (#titans().." titans") or "absent")
  local napeFound=false
  for _,model in ipairs(titans()) do if nape(model) then napeFound=true break end end
- Diag:Probe("Hitboxes.Hit.Nape",napeFound,napeFound and "resolvivel em titan vivo" or "nao encontrado")
- Diag:Probe("Assets.Remotes.GET",getRemote and getRemote:IsA("RemoteFunction") or false,getRemote and getRemote.ClassName or "ausente")
- Diag:Probe("Assets.Remotes.POST",postRemote and postRemote:IsA("RemoteEvent") or false,postRemote and postRemote.ClassName or "ausente")
+ Diag:Probe("Hitboxes.Hit.Nape",napeFound,napeFound and "resolvable on a live titan" or "not found")
+ Diag:Probe("Assets.Remotes.GET",getRemote and getRemote:IsA("RemoteFunction") or false,getRemote and getRemote.ClassName or "absent")
+ Diag:Probe("Assets.Remotes.POST",postRemote and postRemote:IsA("RemoteEvent") or false,postRemote and postRemote.ClassName or "absent")
  Diag:Probe("HUD Hotbar",child(child(child(child(player,"PlayerGui"),"Interface"),"HUD"),"Main")~=nil,"HUD/Main")
  local refillFound=false
  for _,rootName in ipairs({"Unclimbable","Climbable"}) do
@@ -122,21 +122,21 @@ if Diag and type(Diag.Probe)=="function" then
    end
   end
  end
- Diag:Probe("GasTanks.Refill",refillFound,refillFound and "encontrado" or "ausente")
+ Diag:Probe("GasTanks.Refill",refillFound,refillFound and "found" or "absent")
  Diag:Feature("AOTR.TitanESP",function() return M.Toggles.TitanESP and "ON" or "off" end)
- Diag:Feature("AOTR.TitanRipper",function() return M.Combat and tostring(M.Combat.States.Ripper or "Disabled") or "sem modulo" end)
- Diag:Feature("AOTR.SkillAutofarm",function() return M.Combat and tostring(M.Combat.States.SkillAutofarm or "Disabled") or "sem modulo" end)
- Diag:Feature("AOTR.ClassicAutofarm",function() return M.Combat and tostring(M.Combat.States.ClassicAutofarm or "Disabled") or "sem modulo" end)
- Diag:Feature("AOTR.Assistencia",function()
-  if not M.Assistance then return "sem modulo" end
+ Diag:Feature("AOTR.TitanRipper",function() return M.Combat and tostring(M.Combat.States.Ripper or "Disabled") or "no module" end)
+ Diag:Feature("AOTR.SkillAutofarm",function() return M.Combat and tostring(M.Combat.States.SkillAutofarm or "Disabled") or "no module" end)
+ Diag:Feature("AOTR.ClassicAutofarm",function() return M.Combat and tostring(M.Combat.States.ClassicAutofarm or "Disabled") or "no module" end)
+ Diag:Feature("AOTR.Assistance",function()
+  if not M.Assistance then return "no module" end
   local parts={}
   for _,name in ipairs({"AutoBladeRefill","AutoGrabEscape","AntiInjury","AutoRetry","AntiAFK"}) do
    if M.Toggles[name] then parts[#parts+1]=name.."="..tostring(M.Assistance.States[name] or "?") end
   end
-  return #parts>0 and table.concat(parts,"; ") or "todas off"
+  return #parts>0 and table.concat(parts,"; ") or "all off"
  end)
  Diag:Feature("AOTR.TravelSpeed",function() return tostring(M.Values.TravelSpeed).." studs/s" end)
- Diag:Feature("AOTR.ShadowBan",function() return M.Combat and M.Combat.CheckResult or "sem modulo" end)
+ Diag:Feature("AOTR.ShadowBan",function() return M.Combat and M.Combat.CheckResult or "no module" end)
  Diag:Feature("AOTR.LastError",function() return M.LastError end)
  -- Structure watch: entity/part changes become timestamped console events.
  Diag:Watch("Titans",function() return #titans() end)
@@ -357,10 +357,10 @@ do
         local esp=Kit.Section(Kit.Tab("Titan ESP","Visual"),"Visuals","Left")
         if esp then
             esp:CreateToggle("Titan ESP",M.Toggles.TitanESP,function(v) M:SetToggle("TitanESP",v) end)
-            esp:CreateToggle("Mostrar nuca",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
-            esp:CreateToggle("Expandir nuca",M.Toggles.NapeExtend,function(v) M:SetToggle("NapeExtend",v) end)
-            esp:CreateSlider("Multiplicador da nuca",0,2,M.Values.NapeMultiplier,function(v) M:SetNapeMultiplier(v) end)
-            esp:CreateToggle("Expandir alvo do Attack Titan",M.Toggles.ErenExtend,function(v) M:SetToggle("ErenExtend",v) end)
+            esp:CreateToggle("Show nape",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
+            esp:CreateToggle("Expand nape",M.Toggles.NapeExtend,function(v) M:SetToggle("NapeExtend",v) end)
+            esp:CreateSlider("Nape multiplier",0,2,M.Values.NapeMultiplier,function(v) M:SetNapeMultiplier(v) end)
+            esp:CreateToggle("Expand Attack Titan target",M.Toggles.ErenExtend,function(v) M:SetToggle("ErenExtend",v) end)
         end
 
         local combat=Kit.Section(Kit.Tab("Farm","Combat"),"Autofarm","Left")
@@ -370,32 +370,32 @@ do
             combat:CreateToggle("Classic autofarm",M.Toggles.ClassicAutofarm,function(v) M:SetToggle("ClassicAutofarm",v) end)
         end
 
-        local movement=Kit.Section(Kit.Tab("Movement","Movement"),"Movimento","Left")
+        local movement=Kit.Section(Kit.Tab("Movement","Movement"),"Movement","Left")
         if movement then
-            movement:CreateToggle("Noclip do farm",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
+            movement:CreateToggle("Farm noclip",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
             movement:CreateSlider("Travel speed",50,2000,M.Values.TravelSpeed,function(v) M:SetTravelSpeed(v) end)
-            movement:CreateButton("Ir até o refill",function()
+            movement:CreateButton("Go to refill",function()
                 local ok=M:TeleportToRefill()
-                if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R",ok and "Indo até o refill." or "Refill não encontrado.") end
+                if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R",ok and "Heading to refill." or "Refill not found.") end
             end)
-            movement:CreateButton("Cancelar movimento",function() M:CancelTeleport() end)
+            movement:CreateButton("Cancel movement",function() M:CancelTeleport() end)
         end
 
-        local assist=Kit.Section(Kit.Tab("Assistência","Misc"),"Automação","Left")
+        local assist=Kit.Section(Kit.Tab("Assistance","Misc"),"Automation","Left")
         if assist then
-            assist:CreateToggle("Repor lâminas",M.Toggles.AutoBladeRefill,function(v) M:SetToggle("AutoBladeRefill",v) end)
-            assist:CreateToggle("Pegar escape automaticamente",M.Toggles.AutoGrabEscape,function(v) M:SetToggle("AutoGrabEscape",v) end)
+            assist:CreateToggle("Refill blades",M.Toggles.AutoBladeRefill,function(v) M:SetToggle("AutoBladeRefill",v) end)
+            assist:CreateToggle("Auto grab escape",M.Toggles.AutoGrabEscape,function(v) M:SetToggle("AutoGrabEscape",v) end)
             assist:CreateToggle("Anti-injury",M.Toggles.AntiInjury,function(v) M:SetToggle("AntiInjury",v) end)
-            assist:CreateToggle("Tentar novamente",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
+            assist:CreateToggle("Auto retry",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
             assist:CreateToggle("Anti-AFK",M.Toggles.AntiAFK,function(v) M:SetToggle("AntiAFK",v) end)
         end
 
-        local status=Kit.Section(Kit.Tab("Status","Misc"),"Diagnóstico","Left")
+        local status=Kit.Section(Kit.Tab("Status","Misc"),"Diagnostics","Left")
         if status then
-            status:CreateParagraph("Estado atual",M:GetStatus())
-            status:CreateButton("Checar ShadowBan",function()
+            status:CreateParagraph("Current state",M:GetStatus())
+            status:CreateButton("Check ShadowBan",function()
                 M:CheckShadowBan()
-                if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R","Diagnóstico solicitado.") end
+                if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R","Diagnostics requested.") end
             end)
         end
     end

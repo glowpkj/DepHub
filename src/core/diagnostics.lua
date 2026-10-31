@@ -105,21 +105,21 @@ end
 function Diagnostics:RegisterModule(name)
     name = tostring(name)
     pushUnique(self.ModuleOrder, name)
-    if self.Modules[name] == nil then self.Modules[name] = {Ok = nil, Detail = "pendente"} end
+    if self.Modules[name] == nil then self.Modules[name] = {Ok = nil, Detail = "pending"} end
     return name
 end
 
 function Diagnostics:Module(name, ok, detail)
     name = tostring(name)
     pushUnique(self.ModuleOrder, name)
-    self.Modules[name] = {Ok = ok == true, Detail = detail ~= nil and tostring(detail) or (ok and "ok" or "sem detalhe")}
-    self:_addLog("module", (ok and "[OK] " or "[FALHA] ") .. name .. ": " .. self.Modules[name].Detail)
+    self.Modules[name] = {Ok = ok == true, Detail = detail ~= nil and tostring(detail) or (ok and "ok" or "no detail")}
+    self:_addLog("module", (ok and "[OK] " or "[FAIL] ") .. name .. ": " .. self.Modules[name].Detail)
 end
 
 function Diagnostics:Probe(label, ok, detail)
     label = tostring(label)
     pushUnique(self.ProbeOrder, label)
-    self.Probes[label] = {Ok = ok == true, Detail = detail ~= nil and tostring(detail) or (ok and "ok" or "ausente")}
+    self.Probes[label] = {Ok = ok == true, Detail = detail ~= nil and tostring(detail) or (ok and "ok" or "absent")}
 end
 
 function Diagnostics:Feature(name, reader)
@@ -214,7 +214,7 @@ function Diagnostics:_installLogHooks()
     local ok, scriptContext = pcall(function() return game:GetService("ScriptContext") end)
     if ok and scriptContext and scriptContext.Error and not self.Hooks.ScriptContext then
         local connection = scriptContext.Error:Connect(function(message, stack)
-            self:_addLog("erro", tostring(message) .. (stack and ("\n" .. tostring(stack)) or ""))
+            self:_addLog("error", tostring(message) .. (stack and ("\n" .. tostring(stack)) or ""))
         end)
         self.Hooks.ScriptContext = connection
     end
@@ -283,7 +283,7 @@ function Diagnostics:SniffRemote(remote, label)
                 if ok and handle ~= nil then
                     record.Restores[#record.Restores + 1] = handle
                 else
-                    self:_addLog("remote", "nao foi possivel hookar " .. name .. " de " .. label)
+                    self:_addLog("remote", "could not hook " .. name .. " of " .. label)
                 end
             elseif rawget(remote, name) == method then
                 -- Plain-function double: patch the own field only, and only
@@ -397,16 +397,16 @@ end
 -- ---------------------------------------------------------------------------
 
 function Diagnostics:_registerBuiltins()
-    self:Command("help", function() return "comandos: " .. self:_commandList() end)
-    self:Command("clear", function() self.Logs = {}; return "log limpo" end)
-    self:Command("pause", function() self.LogPaused = true; return "log pausado" end)
-    self:Command("resume", function() self.LogPaused = false; return "log retomado" end)
-    self:Command("report", function() return "relatorio completo: use o botao Copiar relatorio" end)
+    self:Command("help", function() return "commands: " .. self:_commandList() end)
+    self:Command("clear", function() self.Logs = {}; return "log cleared" end)
+    self:Command("pause", function() self.LogPaused = true; return "log paused" end)
+    self:Command("resume", function() self.LogPaused = false; return "log resumed" end)
+    self:Command("report", function() return "full report: use the Copy report button" end)
     self:Command("modules", function()
         local parts = {}
         for _, name in ipairs(self.ModuleOrder) do
             local record = self.Modules[name]
-            parts[#parts + 1] = (record and (record.Ok == true and "ok " or record.Ok == false and "FALHA " or "? ") or "? ") .. name
+            parts[#parts + 1] = (record and (record.Ok == true and "ok " or record.Ok == false and "FAIL " or "? ") or "? ") .. name
         end
         return table.concat(parts, " | ")
     end)
@@ -414,7 +414,7 @@ function Diagnostics:_registerBuiltins()
         local parts = {}
         for _, label in ipairs(self.ProbeOrder) do
             local record = self.Probes[label]
-            if record then parts[#parts + 1] = label .. "=" .. tostring(record.Ok and "ok" or "ausente") end
+            if record then parts[#parts + 1] = label .. "=" .. tostring(record.Ok and "ok" or "absent") end
         end
         return table.concat(parts, " | ")
     end)
@@ -424,15 +424,15 @@ function Diagnostics:_registerBuiltins()
             local reader = self.Features[name]
             if type(reader) == "function" then
                 local ok, value = pcall(reader)
-                parts[#parts + 1] = name .. "=" .. (ok and tostring(value) or "ERRO")
+                parts[#parts + 1] = name .. "=" .. (ok and tostring(value) or "ERROR")
             end
         end
         return table.concat(parts, " | ")
     end)
     self:Command("sniff", function(argument)
-        if argument == "on" then self.SniffEnabled = true return "sniff de remotes ligado"
-        elseif argument == "off" then self.SniffEnabled = false return "sniff de remotes desligado" end
-        return "uso: sniff on|off (atual: " .. tostring(self.SniffEnabled) .. ")"
+        if argument == "on" then self.SniffEnabled = true return "remote sniffing on"
+        elseif argument == "off" then self.SniffEnabled = false return "remote sniffing off" end
+        return "usage: sniff on|off (current: " .. tostring(self.SniffEnabled) .. ")"
     end)
     self:Command("env", function()
         local parts = {}
@@ -442,7 +442,7 @@ function Diagnostics:_registerBuiltins()
     end)
     self:Command("metrics", function()
         local metrics = self:_collectMetrics()
-        return string.format("fps=%.0f ping=%.0fms memoria=%.1fMB uptime=%s titans=%d",
+        return string.format("fps=%.0f ping=%.0fms memory=%.1fMB uptime=%s titans=%d",
             metrics.FPS, metrics.Ping, metrics.Memory, clockString(metrics.Uptime), metrics.Titans)
     end)
 end
@@ -461,12 +461,12 @@ function Diagnostics:RunCommand(text)
     self:_addLog("cmd", "> " .. text)
     local handler = self.Commands[name]
     if not handler then
-        local message = "comando desconhecido: " .. name .. " (" .. self:_commandList() .. ")"
+        local message = "unknown command: " .. name .. " (" .. self:_commandList() .. ")"
         self:_addLog("console", message)
         return message
     end
     local ok, result = pcall(handler, argument ~= "" and argument or nil)
-    local message = ok and tostring(result or "ok") or ("erro: " .. tostring(result))
+    local message = ok and tostring(result or "ok") or ("error: " .. tostring(result))
     self:_addLog("console", message)
     return message
 end
@@ -477,7 +477,7 @@ end
 
 local function statusMark(ok)
     if ok == true then return "[OK]" end
-    if ok == false then return "[FALHA]" end
+    if ok == false then return "[FAIL]" end
     return "[?]"
 end
 
@@ -488,62 +488,62 @@ function Diagnostics:MetricsLine()
 end
 
 function Diagnostics:Report()
-    if self.Destroyed then return "diagnostico encerrado" end
+    if self.Destroyed then return "diagnostics stopped" end
     local ok, text = pcall(function() return self:_render() end)
-    return ok and text or ("DepHub diagnostico: falha ao montar o relatorio: " .. tostring(text))
+    return ok and text or ("DepHub diagnostics: failed to build the report: " .. tostring(text))
 end
 
 function Diagnostics:_render()
     local lines = {}
     lines[#lines + 1] = "===== DepHub console ====="
-    lines[#lines + 1] = "modulo ativo: " .. tostring((envTable().__DEPHUB or {}).Mode or "?")
+    lines[#lines + 1] = "active module: " .. tostring((envTable().__DEPHUB or {}).Mode or "?")
     lines[#lines + 1] = self:MetricsLine()
     lines[#lines + 1] = ""
 
-    lines[#lines + 1] = "-- Ambiente --"
+    lines[#lines + 1] = "-- Environment --"
     local envKeys = {}
     for key in pairs(self.Environment) do envKeys[#envKeys + 1] = key end
     table.sort(envKeys)
     for _, key in ipairs(envKeys) do lines[#lines + 1] = key .. ": " .. self.Environment[key] end
     lines[#lines + 1] = ""
 
-    lines[#lines + 1] = "-- Modulos --"
+    lines[#lines + 1] = "-- Modules --"
     for _, name in ipairs(self.ModuleOrder) do
         local record = self.Modules[name]
         if record then lines[#lines + 1] = statusMark(record.Ok) .. " " .. name .. ": " .. tostring(record.Detail) end
     end
     lines[#lines + 1] = ""
 
-    lines[#lines + 1] = "-- Estrutura do jogo --"
+    lines[#lines + 1] = "-- Game structure --"
     for _, label in ipairs(self.ProbeOrder) do
         local record = self.Probes[label]
         if record then lines[#lines + 1] = statusMark(record.Ok) .. " " .. label .. ": " .. tostring(record.Detail) end
     end
     lines[#lines + 1] = ""
 
-    lines[#lines + 1] = "-- Estado das features (ao vivo) --"
+    lines[#lines + 1] = "-- Feature state (live) --"
     for _, name in ipairs(self.FeatureOrder) do
         local reader = self.Features[name]
         if type(reader) == "function" then
             local ok, value = pcall(reader)
-            lines[#lines + 1] = name .. ": " .. (ok and tostring(value) or ("ERRO DE LEITURA: " .. tostring(value)))
+            lines[#lines + 1] = name .. ": " .. (ok and tostring(value) or ("READ ERROR: " .. tostring(value)))
         end
     end
     lines[#lines + 1] = ""
 
     if #self.WatchOrder > 0 then
-        lines[#lines + 1] = "-- Observados --"
+        lines[#lines + 1] = "-- Watches --"
         for _, label in ipairs(self.WatchOrder) do lines[#lines + 1] = label .. ": " .. tostring(self.WatchValues[label] or "?") end
         lines[#lines + 1] = ""
     end
 
     if #self.Notes > 0 then
-        lines[#lines + 1] = "-- Notas --"
+        lines[#lines + 1] = "-- Notes --"
         for _, note in ipairs(self.Notes) do lines[#lines + 1] = note end
         lines[#lines + 1] = ""
     end
 
-    lines[#lines + 1] = "-- Log (" .. tostring(#self.Logs) .. " de " .. tostring(MAX_LOG) .. ") --"
+    lines[#lines + 1] = "-- Log (" .. tostring(#self.Logs) .. " of " .. tostring(MAX_LOG) .. ") --"
     for _, entry in ipairs(self.Logs) do lines[#lines + 1] = "[" .. entry.T .. "][" .. entry.Kind .. "] " .. entry.Text end
     return table.concat(lines, "\n")
 end
@@ -571,7 +571,7 @@ function Diagnostics:Summary()
             if record.Ok == true then okP = okP + 1 else failP = failP + 1 end
         end
     end
-    return string.format("modulos %d ok / %d falha / %d pendente | estrutura %d ok / %d ausente | features %d | log %d",
+    return string.format("modules %d ok / %d fail / %d pending | structure %d ok / %d absent | features %d | log %d",
         okM, failM, pendM, okP, failP, #self.FeatureOrder, #self.Logs)
 end
 
@@ -608,25 +608,25 @@ function Diagnostics:Install(ui)
     self.Tab = tab
     self.UI = ui
 
-    local live = tab:CreateSection("Ao vivo", "Left")
+    local live = tab:CreateSection("Live", "Left")
     if live then
-        self.MetricsParagraph = live:CreateParagraph("Metricas", self:MetricsLine())
+        self.MetricsParagraph = live:CreateParagraph("Metrics", self:MetricsLine())
         if type(self.MetricsParagraph.Set) ~= "function" then self.MetricsParagraph = nil end
-        self.ReportParagraph = live:CreateParagraph("Estado", self:Report())
+        self.ReportParagraph = live:CreateParagraph("State", self:Report())
         if type(self.ReportParagraph.Set) ~= "function" then self.ReportParagraph = nil end
     end
 
-    local controls = tab:CreateSection("Controles", "Left")
+    local controls = tab:CreateSection("Controls", "Left")
     if controls then
         self.LogParagraph = controls:CreateParagraph("Log", self:LogText())
         if type(self.LogParagraph.Set) ~= "function" then self.LogParagraph = nil end
-        controls:CreateToggle("Sniff de remotes", self.SniffEnabled, function(value) self.SniffEnabled = value == true end)
-        controls:CreateToggle("Pausar log", false, function(value) self.LogPaused = value == true end)
-        controls:CreateButton("Limpar log", function() self.Logs = {}; self:_refreshViews() end)
-        controls:CreateButton("Copiar relatorio (clipboard + console)", function()
+        controls:CreateToggle("Remote sniff", self.SniffEnabled, function(value) self.SniffEnabled = value == true end)
+        controls:CreateToggle("Pause log", false, function(value) self.LogPaused = value == true end)
+        controls:CreateButton("Clear log", function() self.Logs = {}; self:_refreshViews() end)
+        controls:CreateButton("Copy report (clipboard + console)", function()
             local copied = self:Copy()
             if type(ui.Notify) == "function" then
-                ui:Notify("Debug", copied and "Relatorio copiado." or "Relatorio enviado ao console (clipboard indisponivel).")
+                ui:Notify("Debug", copied and "Report copied." or "Report sent to the console (clipboard unavailable).")
             end
             self:_refreshViews()
         end)
@@ -634,14 +634,14 @@ function Diagnostics:Install(ui)
 
     local terminal = tab:CreateSection("Terminal", "Right")
     if terminal then
-        self.CommandInput = terminal:CreateInput("Comando", "digite e clique Executar (help)", "", function() end)
-        terminal:CreateButton("Executar", function()
+        self.CommandInput = terminal:CreateInput("Command", "type and click Run (help)", "", function() end)
+        terminal:CreateButton("Run", function()
             local value = self.CommandInput and self.CommandInput.Value or ""
             self:RunCommand(value)
             if self.CommandInput then pcall(function() self.CommandInput.Control:Set("") end) end
             self:_refreshViews()
         end)
-        terminal:CreateParagraph("Comandos", self:_commandList())
+        terminal:CreateParagraph("Commands", self:_commandList())
     end
 
     self.Installed = true
@@ -658,7 +658,7 @@ function Diagnostics:Install(ui)
             if not ok then self:_addLog("console", "loop: " .. tostring(err)) end
         end
     end)
-    self:_addLog("console", "console de debug iniciado")
+    self:_addLog("console", "debug console started")
     return true
 end
 

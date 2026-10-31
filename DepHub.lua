@@ -23,7 +23,7 @@ local HOST_TEMPLATES = {
     "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.0.99"
+local VERSION = "0.1.00"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -120,7 +120,7 @@ end
 
 local previousState = env[STATE_KEY]
 if type(previousState) == "table" and previousState.status == "running" then
-    log("Inicializacao em andamento. Aguarde antes de executar novamente.")
+    log("Initialization in progress. Wait before running again.")
     return false
 end
 if env[EXECUTED_KEY]
@@ -175,9 +175,9 @@ env.__DEPHUB.Debug = function()
 end
 
 local function fail(reason)
-    local message = tostring(reason or "Falha desconhecida")
-    log("Falha: " .. message)
-    if Diag then Diag:Note("FALHA DO LOADER: " .. message) end
+    local message = tostring(reason or "Unknown failure")
+    log("Failure: " .. message)
+    if Diag then Diag:Note("LOADER FAILURE: " .. message) end
     if env[STATE_KEY] ~= session then return false end
     cleanupRuntime()
     if env[STATE_KEY] == session then
@@ -340,7 +340,7 @@ do
     env.__DEPHUB.Diagnostics = Diag
 end
 Diag:RegisterModule("src/core/diagnostics.lua")
-Diag:Module("src/core/diagnostics.lua", not Diag.__stub, Diag.__stub and "nao carregou" or "carregado")
+Diag:Module("src/core/diagnostics.lua", not Diag.__stub, Diag.__stub and "did not load" or "loaded")
 Diag:SetEnvironment({
     Executor = detectExecutor(),
     Version = VERSION,
@@ -348,20 +348,20 @@ Diag:SetEnvironment({
     GameId = gameId,
     GameName = tostring(game.Name or "?"),
     SourceRef = sourceRef,
-    HttpGet = type(game.HttpGet) == "function" and "game:HttpGet" or "ausente",
-    request = type(request) == "function" and "presente" or "ausente",
-    loadstring = type(loadstring) == "function" and "presente" or "ausente"
+    HttpGet = type(game.HttpGet) == "function" and "game:HttpGet" or "absent",
+    request = type(request) == "function" and "present" or "absent",
+    loadstring = type(loadstring) == "function" and "present" or "absent"
 })
 
 local executorName = detectExecutor()
-log("Iniciando loader v" .. VERSION)
-log("Executor detectado: " .. tostring(executorName))
+log("Starting loader v" .. VERSION)
+log("Executor detected: " .. tostring(executorName))
 log("PlaceId: " .. placeId)
 log("GameId: " .. gameId)
 
 local okVersion, remoteVersion = httpGet("src/version.txt", false)
 if okVersion then env.__DEPHUB.RemoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION end
-log("Fonte: " .. tostring(env.__DEPHUB.SourceBaseURL) .. " (remoto " .. tostring(env.__DEPHUB.RemoteVersion or "?") .. ")")
+log("Source: " .. tostring(env.__DEPHUB.SourceBaseURL) .. " (remote " .. tostring(env.__DEPHUB.RemoteVersion or "?") .. ")")
 
 -- Compare two dotted version strings numerically, segment by segment. Returns
 -- true only when "a" is strictly newer than "b", so an older remote (a test
@@ -462,7 +462,7 @@ if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "func
     Diag:Module("src/core/demon-ui.lua", false, tostring(demonModule))
     return fail("DemonOfDarknessUI nao carregou: " .. tostring(demonModule))
 end
-Diag:Module("src/core/demon-ui.lua", true, "carregado")
+Diag:Module("src/core/demon-ui.lua", true, "loaded")
 
 local okWindow, window = pcall(demonModule.new, {
     Name = "DepHub",
@@ -470,7 +470,7 @@ local okWindow, window = pcall(demonModule.new, {
 })
 if not okWindow or type(window) ~= "table" then
     Diag:Module("demon-ui window", false, tostring(window))
-    return fail("Nao foi possivel iniciar DemonOfDarknessUI: " .. tostring(window))
+    return fail("Could not start DemonOfDarknessUI: " .. tostring(window))
 end
 Diag:Module("demon-ui window", true, "janela criada")
 
@@ -485,7 +485,7 @@ do
     local okKit, kitModule = loadModule("src/core/ui-kit.lua", false)
     if okKit and type(kitModule) == "table" then
         env.__DEPHUB.UIKit = kitModule
-        Diag:Module("src/core/ui-kit.lua", true, "carregado")
+        Diag:Module("src/core/ui-kit.lua", true, "loaded")
     else
         Diag:Module("src/core/ui-kit.lua", false, tostring(kitModule))
     end
@@ -514,7 +514,7 @@ local function buildDashboardTab()
     return okBanner and okPerf
 end
 local dashboardBuilt = buildDashboardTab()
-Diag:Module("dashboard tab", dashboardBuilt, dashboardBuilt and "aba Dashboard criada" or "nao foi possivel montar a aba Dashboard")
+Diag:Module("dashboard tab", dashboardBuilt, dashboardBuilt and "Dashboard tab created" or "could not build the Dashboard tab")
 
 -- The Debug tab and the print/warn log hooks are opt-in. They are useful for
 -- development but add a tab to every game and intercept every print, so by
@@ -549,26 +549,26 @@ end)
 env.__DEPHUB_DEBUG = function()
     env.__DEPHUB_ENABLE_DEBUG = true
     local ok = Diag:Install(window)
-    return ok and "aba Debug ativa" or "nao foi possivel ativar a aba Debug"
+    return ok and "Debug tab active" or "could not activate the Debug tab"
 end
 env.__DEPHUB_DEBUG_OFF = function()
     env.__DEPHUB_ENABLE_DEBUG = false
     Diag:Uninstall()
-    return "aba Debug removida"
+    return "Debug tab removed"
 end
 
 -- Unknown game with universal disabled: keep the window, tell the player the
 -- place is unsupported and stop. No incompatible backend is forced on them.
 if not knownTarget then
-    Diag:Note("Jogo nao reconhecido: nenhum backend carregado (universal desativado).")
+    Diag:Note("Unknown game: no backend loaded (universal disabled).")
     pcall(function()
-        local tab = window:CreateTab("Incompativel")
+        local tab = window:CreateTab("Unsupported")
         if tab then
-            local section = tab:CreateSection("Estado", "Left")
+            local section = tab:CreateSection("State", "Left")
             if section then
-                section:CreateParagraph("Jogo nao reconhecido",
-                    "O DepHub nao tem suporte especifico para este lugar e o backend universal foi desativado.\nPlaceId: " .. placeId ..
-                    "\nGameId: " .. gameId .. "\nPara usar o backend universal, defina env.__DEPHUB_DISABLE_UNIVERSAL = false (ou nil) e recarregue.")
+                section:CreateParagraph("Unrecognized game",
+                    "DepHub has no specific support for this place and the universal backend is disabled.\nPlaceId: " .. placeId ..
+                    "\nGameId: " .. gameId .. "\nTo use the universal backend, set env.__DEPHUB_DISABLE_UNIVERSAL = false (or nil) and reload.")
             end
         end
     end)
@@ -577,7 +577,7 @@ if not knownTarget then
     env[EXECUTED_KEY] = true
     env[STATE_KEY].status = "unsupported"
     env[STATE_KEY].finishedAt = os.clock()
-    log("Jogo nao reconhecido - PlaceId " .. placeId .. " / GameId " .. gameId)
+    log("Unknown game - PlaceId " .. placeId .. " / GameId " .. gameId)
     return true
 end
 
@@ -586,7 +586,7 @@ Diag:RegisterModule(target.Core)
 local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then
     Diag:Module(target.Core, false, tostring(coreResult))
-    return fail("Core " .. tostring(target.Core) .. " falhou: " .. tostring(coreResult))
+    return fail("Core " .. tostring(target.Core) .. " failed: " .. tostring(coreResult))
 end
 local isRT3 = target.Core == "src/games/rt3.lua"
 local isTSB = target.TSB == true
@@ -603,12 +603,12 @@ if isRT3 then
         Diag:Module(target.Core, false, "retornou " .. tostring(coreResult))
         return fail("Modulo RT3 nao inicializou")
     end
-    Diag:Module(target.Core, true, "carregado")
+    Diag:Module(target.Core, true, "loaded")
 elseif type(coreResult) ~= "table" then
     Diag:Module(target.Core, false, "retornou " .. typeof(coreResult) .. " (" .. tostring(coreResult) .. ")")
     return fail("Core " .. tostring(target.Core) .. " retornou " .. typeof(coreResult) .. " (" .. tostring(coreResult) .. ")")
 else
-    Diag:Module(target.Core, true, "carregado")
+    Diag:Module(target.Core, true, "loaded")
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil

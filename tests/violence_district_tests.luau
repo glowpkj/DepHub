@@ -101,8 +101,8 @@ do
         local UI = ctx.State.__DEPHUB.UI
         local lib = UI and UI.Library
         local pages = lib and lib._STATE and lib._STATE.ContentPages or {}
-        check(lib ~= nil and pages["Visual"] ~= nil and pages["Geradores"] ~= nil and pages["Parry"] ~= nil,
-            "Violence District builds its tabs (Visual / Geradores / Parry)")
+        check(lib ~= nil and pages["Visual"] ~= nil and pages["Generators"] ~= nil and pages["Parry"] ~= nil,
+            "Violence District builds its tabs (Visual / Generators / Parry)")
         check(pages["Violence District"] == nil, "no tab is named after the game")
         local labels = {}
         for _, control in ipairs(lib and lib._Controls or {}) do

@@ -399,49 +399,49 @@ local UI=(env.__DEPHUB or {}).UI
 do
     local Kit=env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
-        local farming=Kit.Section(Kit.Tab("Farm","Farm"),"Automação","Left")
+        local farming=Kit.Section(Kit.Tab("Farm","Farm"),"Automation","Left")
         if farming then
             farming:CreateToggle("Auto farm",backend.Toggles.AutoFarm,function(v) backend:SetAutoFarm(v) end)
             farming:CreateToggle("Auto attack",backend.Toggles.AutoAttack,function(v) backend:SetAutoAttack(v) end)
             farming:CreateToggle("Auto quest",backend.Toggles.AutoQuest,function(v) backend:SetAutoQuest(v) end)
             farming:CreateToggle("Auto chest",backend.Toggles.AutoChest,function(v) backend:SetAutoChest(v) end)
-            farming:CreateSlider("Intervalo do chest",0.1,2,backend.Values.AutoChestDelay,function(v) backend:SetAutoChestDelay(v) end)
-            farming:CreateDropdown("Tipo de arma",{"Fists","Sword"},backend.Values.WeaponCategory,function(v) backend:SetWeaponCategory(v) end)
+            farming:CreateSlider("Chest interval",0.1,2,backend.Values.AutoChestDelay,function(v) backend:SetAutoChestDelay(v) end)
+            farming:CreateDropdown("Weapon type",{"Fists","Sword"},backend.Values.WeaponCategory,function(v) backend:SetWeaponCategory(v) end)
             local enemies=backend:GetEnemyTypes()
             if type(enemies)=="table" and #enemies>0 then
-                farming:CreateDropdown("Inimigo",enemies,backend.Values.SelectedEnemy,function(v) backend:SetSelectedEnemy(v) end)
+                farming:CreateDropdown("Enemy",enemies,backend.Values.SelectedEnemy,function(v) backend:SetSelectedEnemy(v) end)
             end
         end
 
-        local visuals=Kit.Section(Kit.Tab("ESP","Visual"),"Exploração","Left")
+        local visuals=Kit.Section(Kit.Tab("ESP","Visual"),"Exploration","Left")
         if visuals then
-            visuals:CreateToggle("ESP de chests",backend.Toggles.ChestESP,function(v) backend:SetChestESP(v) end)
-            visuals:CreateToggle("ESP de ilhas",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
-            visuals:CreateToggle("ESP de NPCs",backend.Toggles.GachaESP,function(v) backend:SetGachaESP(v) end)
+            visuals:CreateToggle("Chest ESP",backend.Toggles.ChestESP,function(v) backend:SetChestESP(v) end)
+            visuals:CreateToggle("Island ESP",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
+            visuals:CreateToggle("NPC ESP",backend.Toggles.GachaESP,function(v) backend:SetGachaESP(v) end)
         end
 
-        local travel=Kit.Section(Kit.Tab("Travel","Movement"),"Teleporte","Left")
+        local travel=Kit.Section(Kit.Tab("Travel","Movement"),"Teleport","Left")
         if travel then
             local islands=backend:GetIslandNames()
             if type(islands)=="table" and #islands>0 then
-                travel:CreateDropdown("Ilha",islands,backend.Values.SelectedIsland,function(v) backend:SetSelectedIsland(v) end)
+                travel:CreateDropdown("Island",islands,backend.Values.SelectedIsland,function(v) backend:SetSelectedIsland(v) end)
             end
-            travel:CreateToggle("Teleporte automático para ilha",backend.Toggles.IslandTeleport,function(v) backend:SetIslandTeleport(v) end)
-            travel:CreateButton("Ir para ilha selecionada",function()
+            travel:CreateToggle("Auto teleport to island",backend.Toggles.IslandTeleport,function(v) backend:SetIslandTeleport(v) end)
+            travel:CreateButton("Go to selected island",function()
                 local ok=backend:TeleportIsland(backend.Values.SelectedIsland)
-                if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleporte iniciado." or "Não foi possível teleportar.") end
+                if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleport started." or "Could not teleport.") end
             end)
-            travel:CreateButton("Ir para Wandering Gacha",function()
+            travel:CreateButton("Go to Wandering Gacha",function()
                 local ok=backend:TeleportWanderingGacha()
-                if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleporte iniciado." or "Gacha não encontrado.") end
+                if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleport started." or "Gacha not found.") end
             end)
         end
 
-        local team=Kit.Section(Kit.Tab("Team","Player"),"Equipe","Left")
+        local team=Kit.Section(Kit.Tab("Team","Player"),"Team","Left")
         if team then
             local teams=backend:GetTeams()
             if type(teams)=="table" and #teams>0 then
-                team:CreateDropdown("Equipe",teams,backend.Values.SelectedTeam,function(v) backend:SetSelectedTeam(v) end)
+                team:CreateDropdown("Team",teams,backend.Values.SelectedTeam,function(v) backend:SetSelectedTeam(v) end)
             end
             team:CreateToggle("Auto team",backend.Toggles.AutoTeam,function(v) backend:SetAutoTeam(v) end)
         end
@@ -454,25 +454,25 @@ end
 do
     local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
     if Diag and type(Diag.Probe)=="function" then
-        Diag:SetEnvironment({["NoobPiece versao"]=backend.Version})
+        Diag:SetEnvironment({["NoobPiece version"]=backend.Version})
         for _,name in ipairs({"movementprofile","islanddata","chestesp","islandtracker","autochest","autoattack","autofarm","autoteam","wanderinggacha","npcesp","autoquest"}) do
             Diag:RegisterModule("features/noobpiece/"..name..".lua")
         end
-        Diag:Module("features/noobpiece/islanddata.lua",backend.IslandTracker~=nil,"carregado")
-        Diag:Module("features/noobpiece/chestesp.lua",backend.ChestESP~=nil,"carregado")
-        Diag:Module("features/noobpiece/islandtracker.lua",backend.IslandTracker~=nil,"carregado")
-        Diag:Module("features/noobpiece/autochest.lua",backend.AutoChest~=nil,"carregado")
-        Diag:Module("features/noobpiece/autoattack.lua",backend.AutoAttack~=nil,"carregado")
-        Diag:Module("features/noobpiece/autofarm.lua",backend.AutoFarm~=nil,"carregado")
-        Diag:Module("features/noobpiece/autoteam.lua",backend.AutoTeam~=nil,"carregado")
-        Diag:Module("features/noobpiece/wanderinggacha.lua",backend.WanderingGacha~=nil,"carregado")
-        Diag:Module("features/noobpiece/npcesp.lua",backend.NpcESP~=nil,"carregado")
-        Diag:Module("features/noobpiece/autoquest.lua",backend.AutoQuest~=nil,"carregado")
+        Diag:Module("features/noobpiece/islanddata.lua",backend.IslandTracker~=nil,"loaded")
+        Diag:Module("features/noobpiece/chestesp.lua",backend.ChestESP~=nil,"loaded")
+        Diag:Module("features/noobpiece/islandtracker.lua",backend.IslandTracker~=nil,"loaded")
+        Diag:Module("features/noobpiece/autochest.lua",backend.AutoChest~=nil,"loaded")
+        Diag:Module("features/noobpiece/autoattack.lua",backend.AutoAttack~=nil,"loaded")
+        Diag:Module("features/noobpiece/autofarm.lua",backend.AutoFarm~=nil,"loaded")
+        Diag:Module("features/noobpiece/autoteam.lua",backend.AutoTeam~=nil,"loaded")
+        Diag:Module("features/noobpiece/wanderinggacha.lua",backend.WanderingGacha~=nil,"loaded")
+        Diag:Module("features/noobpiece/npcesp.lua",backend.NpcESP~=nil,"loaded")
+        Diag:Module("features/noobpiece/autoquest.lua",backend.AutoQuest~=nil,"loaded")
         Diag:Probe("Workspace.MysteriousIsland",Workspace:FindFirstChild("MysteriousIsland")~=nil,
-            Workspace:FindFirstChild("MysteriousIsland") and Workspace.MysteriousIsland.ClassName or "ausente (ESP/teleporte da ilha desligam)")
-        Diag:Probe("Workspace.ChildAdded",backend.IslandWorkspaceConnection~=nil,backend.IslandWorkspaceConnection and "ligado" or "desligado")
-        Diag:Probe("Workspace.ChildRemoved",backend.IslandWorkspaceRemovingConnection~=nil,backend.IslandWorkspaceRemovingConnection and "ligado" or "desligado")
-        Diag:Probe("IslandAvailability",backend.IslandAvailability~=nil,backend.IslandAvailability and "BindableEvent" or "ausente")
+            Workspace:FindFirstChild("MysteriousIsland") and Workspace.MysteriousIsland.ClassName or "absent (island ESP/teleport turn off)")
+        Diag:Probe("Workspace.ChildAdded",backend.IslandWorkspaceConnection~=nil,backend.IslandWorkspaceConnection and "on" or "off")
+        Diag:Probe("Workspace.ChildRemoved",backend.IslandWorkspaceRemovingConnection~=nil,backend.IslandWorkspaceRemovingConnection and "on" or "off")
+        Diag:Probe("IslandAvailability",backend.IslandAvailability~=nil,backend.IslandAvailability and "BindableEvent" or "absent")
         Diag:Feature("NoobPiece.ChestESP",function() return backend.Toggles.ChestESP and "ON" or "off" end)
         Diag:Feature("NoobPiece.IslandESP",function() return backend.Toggles.IslandESP and "ON" or "off" end)
         Diag:Feature("NoobPiece.IslandTeleport",function() return backend.Toggles.IslandTeleport and "ON" or "off" end)
@@ -482,7 +482,7 @@ do
         Diag:Feature("NoobPiece.AutoAttack",function() return backend.Toggles.AutoAttack and "ON" or "off" end)
         Diag:Feature("NoobPiece.AutoFarm",function() return backend.Toggles.AutoFarm and "ON" or "off" end)
         Diag:Feature("NoobPiece.AutoTeam",function() return backend.Toggles.AutoTeam and "ON" or "off" end)
-        Diag:Feature("NoobPiece.Ilha selecionada",function() return tostring(backend.Values.SelectedIsland) end)
+        Diag:Feature("NoobPiece.SelectedIsland",function() return tostring(backend.Values.SelectedIsland) end)
         if type(Diag.Watch)=="function" then
             Diag:Watch("NoobPiece MysteriousIsland",function() return tostring(Workspace:FindFirstChild("MysteriousIsland")~=nil) end)
             Diag:Watch("NoobPiece ilha selecionada",function() return tostring(backend.Values.SelectedIsland) end)
@@ -491,7 +491,7 @@ do
                 for _,name in ipairs({"ChestESP","IslandESP","IslandTeleport","GachaESP","AutoQuest","AutoChest","AutoAttack","AutoFarm","AutoTeam"}) do
                     if backend.Toggles[name] then on[#on+1]=name end
                 end
-                return #on>0 and table.concat(on,",") or "nenhum"
+                return #on>0 and table.concat(on,",") or "none"
             end)
         end
         if type(Diag.Command)=="function" then
@@ -500,9 +500,9 @@ do
                 for _,name in ipairs({"ChestESP","IslandESP","IslandTeleport","GachaESP","AutoQuest","AutoChest","AutoAttack","AutoFarm","AutoTeam"}) do
                     if backend.Toggles[name] then on[#on+1]=name end
                 end
-                return "ilha="..tostring(backend.Values.SelectedIsland)
+                return "island="..tostring(backend.Values.SelectedIsland)
                     .." mystic="..tostring(Workspace:FindFirstChild("MysteriousIsland")~=nil)
-                    .." ligados="..(#on>0 and table.concat(on,",") or "nenhum")
+                    .." on="..(#on>0 and table.concat(on,",") or "none")
             end)
             Diag:Command("np-autofarm",function(argument)
                 local on=argument~="off"

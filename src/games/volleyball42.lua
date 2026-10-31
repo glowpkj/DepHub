@@ -57,7 +57,7 @@ local State = {
     ToggleLabels = {
         BallPredict = "Ball Predict",
         AutoPosition = "Auto Position",
-        JumpForce = "Pulo forçado",
+        JumpForce = "Forced jump",
         CeilingNoClip = "Ceiling NoClip",
     },
     Config = Config,
@@ -754,7 +754,7 @@ function State:SetMode(value)
     resetBall()
     self.SearchElapsed = 0
     self.LastNotification = {
-        Message = value == "Future" and "Future ainda não configurado" or ("Modo " .. value .. " selecionado"),
+        Message = value == "Future" and "Future not configured yet" or ("Mode " .. value .. " selected"),
         Kind = "Info"
     }
 
@@ -926,40 +926,40 @@ do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
         local predictTab = Kit.Tab("Ball Predict", "Visual")
-        local predict = Kit.Section(predictTab, "Previsão", "Left")
+        local predict = Kit.Section(predictTab, "Prediction", "Left")
         if predict then
             predict:CreateToggle("Ball Predict", State.Toggles.BallPredict, function(v) State:SetToggle("BallPredict", v) end)
-            predict:CreateDropdown("Modo", State.Modes, State.Mode, function(v)
+            predict:CreateDropdown("Mode", State.Modes, State.Mode, function(v)
                 if State:SetMode(v) then
-                    if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", "Modo " .. tostring(v) .. " selecionado.") end
+                    if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", "Mode " .. tostring(v) .. " selected.") end
                 else
-                    if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", "Modo inválido.") end
+                    if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", "Invalid mode.") end
                 end
             end)
             -- Distance gate: 0 predicts at any range. Only the marker/tracer respect
             -- it, so a far ball is ignored rather than shown with a bad prediction.
-            predict:CreateSlider("Alcance da previsão", 0, 2000, Config.maxPredictDistance, function(v)
+            predict:CreateSlider("Prediction range", 0, 2000, Config.maxPredictDistance, function(v)
                 Config.maxPredictDistance = tonumber(v) or 0
             end)
-            predict:CreateParagraph("Previsão", "Personal prevê a bola do próprio jogador; Match cobre as equipes; Future ainda não está configurado. O marcador fica verde dentro da quadra (onde a bola conta) e vermelho fora.")
+            predict:CreateParagraph("Prediction", "Personal predicts your own ball; Match covers both teams; Future is not configured yet. The marker is green inside the court (where the ball counts) and red outside.")
         end
 
         local assist = Kit.Section(predictTab, "Auto Position", "Left")
         if assist then
             assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
-            assist:CreateToggle("Instantâneo", Config.instantMove, function(v) Config.instantMove = v == true end)
-            assist:CreateSlider("Offset acima do chão", 0, 20, Config.positionOffsetY, function(v) Config.positionOffsetY = tonumber(v) or 0 end)
-            assist:CreateSlider("Distância mínima", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
-            assist:CreateSlider("Suavidade do movimento", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
-            assist:CreateParagraph("Auto Position", "Leva o personagem ao ponto de queda previsto. Instantâneo teleporta direto; desligado usa movimento suave, cuja velocidade é o slider de suavidade.")
+            assist:CreateToggle("Instant", Config.instantMove, function(v) Config.instantMove = v == true end)
+            assist:CreateSlider("Offset above ground", 0, 20, Config.positionOffsetY, function(v) Config.positionOffsetY = tonumber(v) or 0 end)
+            assist:CreateSlider("Minimum distance", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
+            assist:CreateSlider("Movement smoothing", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
+            assist:CreateParagraph("Auto Position", "Walks the character to the predicted landing spot. Instant teleports directly; off uses smooth movement, whose speed is the smoothing slider.")
         end
 
         -- Jump helpers are movement.
-        local movement = Kit.Section(Kit.Tab("Pulo", "Movement"), "Pulo", "Left")
+        local movement = Kit.Section(Kit.Tab("Jump", "Movement"), "Jump", "Left")
         if movement then
-            movement:CreateToggle("Pulo forçado", State.Toggles.JumpForce, function(v)
+            movement:CreateToggle("Forced jump", State.Toggles.JumpForce, function(v)
                 State:SetToggle("JumpForce", v)
-                if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", v and "Pulo forçado LIGADO" or "Pulo forçado desligado") end
+                if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", v and "Forced jump ON" or "Forced jump off") end
             end)
             movement:CreateSlider("Jump Power", 50, 500, Config.jumpPower, function(v)
                 Config.jumpPower = tonumber(v) or 120
@@ -968,15 +968,15 @@ do
             movement:CreateToggle("Auto Jump", Config.autoJump, function(v)
                 Config.autoJump = v == true
             end)
-            movement:CreateParagraph("Pulo", "Pulo forçado liga o pulo mesmo em zonas que o bloqueiam: aplica o Jump Power todo frame e mantém o estado de pulo habilitado. Ao desligar, restaura o que o jogo tinha. Auto Jump pula sozinho enquanto ele está ligado.")
+            movement:CreateParagraph("Jump", "Forced jump enables jumping in zones that block it: applies the Jump Power every frame and keeps the jump state enabled. Disabling restores what the game had. Auto Jump jumps on its own while it is on.")
         end
 
         -- Ceiling parts are what the ball bounces off; clearing their collision
         -- removes them as an obstacle for the player. On by default.
-        local collision = Kit.Section(Kit.Tab("Colisão", "World"), "Colisão", "Left")
+        local collision = Kit.Section(Kit.Tab("Collision", "World"), "Collision", "Left")
         if collision then
-            collision:CreateToggle("Ceiling sem colisão", State.Toggles.CeilingNoClip, function(v) State:SetToggle("CeilingNoClip", v) end)
-            collision:CreateParagraph("Colisão", "Tira a colisão das parts Ceiling para você (padrão ligado). A bola continua batendo nelas. Ao desligar, a colisão volta ao original.")
+            collision:CreateToggle("Ceiling no collision", State.Toggles.CeilingNoClip, function(v) State:SetToggle("CeilingNoClip", v) end)
+            collision:CreateParagraph("Collision", "Removes collision from the Ceiling parts for you (on by default). The ball still bounces off them. Disabling restores the original collision.")
         end
     end
 end
@@ -988,16 +988,16 @@ end
 do
     local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
     if Diag and type(Diag.Probe)=="function" then
-        Diag:SetEnvironment({["Volleyball modo"]=tostring(State.Mode),["Volleyball versao"]=State.Version})
-        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "ausente")
+        Diag:SetEnvironment({["Volleyball mode"]=tostring(State.Mode),["Volleyball version"]=State.Version})
+        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "absent")
         Diag:Probe("Workspace.Gravity",Workspace.Gravity~=nil,tostring(Workspace.Gravity))
         local ball=nil
         for _,object in ipairs(Workspace:GetDescendants()) do
             if object.Name=="Ball" and (object:IsA("Model") or object:IsA("BasePart")) then ball=object break end
         end
-        Diag:Probe("Workspace.Ball",ball~=nil,ball and ball.ClassName or "ausente (predicao nao adquire a bola)")
-        Diag:Probe("Workspace.LockCourt",#State.Courts>0,#State.Courts.." quadras cacheadas")
-        Diag:Probe("Workspace.Ceiling",#State.Ceilings>0,#State.Ceilings.." tetos cacheados")
+        Diag:Probe("Workspace.Ball",ball~=nil,ball and ball.ClassName or "absent (prediction cannot acquire the ball)")
+        Diag:Probe("Workspace.LockCourt",#State.Courts>0,#State.Courts.." courts cached")
+        Diag:Probe("Workspace.Ceiling",#State.Ceilings>0,#State.Ceilings.." ceilings cached")
         local blue,red=false,false
         local okTeams,teams=pcall(function() return game:GetService("Teams") end)
         if okTeams and teams then
@@ -1008,44 +1008,44 @@ do
                 end
             end)
         end
-        Diag:Probe("Teams.Blue",blue,blue and "ok" or "ausente (modo Match sem equipe)")
-        Diag:Probe("Teams.Red",red,red and "ok" or "ausente (modo Match sem equipe)")
+        Diag:Probe("Teams.Blue",blue,blue and "ok" or "absent (Match mode without teams)")
+        Diag:Probe("Teams.Red",red,red and "ok" or "absent (Match mode without teams)")
         Diag:Feature("Volleyball.BallPredict",function() return State.Toggles.BallPredict and "ON" or "off" end)
-        Diag:Feature("Volleyball.Modo",function() return tostring(State.Mode) end)
-        Diag:Feature("Volleyball.Bola atual",function() return State.CurrentBall and State.CurrentBall.Name or "nenhuma" end)
-        Diag:Feature("Volleyball.Velocidade",function()
+        Diag:Feature("Volleyball.Mode",function() return tostring(State.Mode) end)
+        Diag:Feature("Volleyball.CurrentBall",function() return State.CurrentBall and State.CurrentBall.Name or "none" end)
+        Diag:Feature("Volleyball.Velocity",function()
             local v=State.CurrentVelocity
-            return v and string.format("(%.1f,%.1f,%.1f)",v.X,v.Y,v.Z) or "sem dado"
+            return v and string.format("(%.1f,%.1f,%.1f)",v.X,v.Y,v.Z) or "no data"
         end)
-        Diag:Feature("Volleyball.Historico",function() return #State.History.." amostras" end)
+        Diag:Feature("Volleyball.History",function() return #State.History.." samples" end)
         Diag:Feature("Volleyball.AutoPosition",function() return State.Toggles.AutoPosition and "ON" or "off" end)
         Diag:Feature("Volleyball.JumpForce",function() return State.Toggles.JumpForce and ("ON "..tostring(Config.jumpPower)) or "off" end)
         Diag:Feature("Volleyball.InstantMove",function() return Config.instantMove and "ON" or "off" end)
         Diag:Feature("Volleyball.CeilingNoClip",function() return State.Toggles.CeilingNoClip and "ON" or "off" end)
-        Diag:Feature("Volleyball.PodePular",function()
+        Diag:Feature("Volleyball.CanJump",function()
             local ch=LocalPlayer.Character
             local h=ch and ch:FindFirstChildOfClass("Humanoid")
-            if not h then return "sem humanoid" end
+            if not h then return "no humanoid" end
             local ok,enabled=pcall(function() return h:GetStateEnabled(Enum.HumanoidStateType.Jumping) end)
             return string.format("jumping=%s power=%s height=%s",
                 tostring(ok and enabled or "?"),tostring(h.JumpPower),tostring(h.JumpHeight))
         end)
-        Diag:Feature("Volleyball.Ponto previsto",function()
+        Diag:Feature("Volleyball.PredictedLanding",function()
             local p=State.LastPrediction
-            return p and string.format("(%.1f,%.1f,%.1f)",p.X,p.Y,p.Z) or "sem previsão"
+            return p and string.format("(%.1f,%.1f,%.1f)",p.X,p.Y,p.Z) or "no prediction"
         end)
         if type(Diag.Watch)=="function" then
-            Diag:Watch("Volleyball bola",function() return State.CurrentBall and State.CurrentBall.Name or "nenhuma" end)
-            Diag:Watch("Volleyball quadras",function() return #State.Courts end)
-            Diag:Watch("Volleyball tetos",function() return #State.Ceilings end)
-            Diag:Watch("Volleyball modo",function() return tostring(State.Mode) end)
+            Diag:Watch("Volleyball ball",function() return State.CurrentBall and State.CurrentBall.Name or "none" end)
+            Diag:Watch("Volleyball courts",function() return #State.Courts end)
+            Diag:Watch("Volleyball ceilings",function() return #State.Ceilings end)
+            Diag:Watch("Volleyball mode",function() return tostring(State.Mode) end)
         end
         if type(Diag.Command)=="function" then
             Diag:Command("vb",function()
-                return "modo="..tostring(State.Mode)
-                    .." bola="..tostring(State.CurrentBall and State.CurrentBall.Name or "nenhuma")
-                    .." quadras="..#State.Courts.." tetos="..#State.Ceilings
-                    .." amostras="..#State.History
+                return "mode="..tostring(State.Mode)
+                    .." ball="..tostring(State.CurrentBall and State.CurrentBall.Name or "none")
+                    .." courts="..#State.Courts.." ceilings="..#State.Ceilings
+                    .." samples="..#State.History
                     .." autoPos="..tostring(State.Toggles.AutoPosition)
                     .." instant="..tostring(Config.instantMove)
                     .." jump="..tostring(State.Toggles.JumpForce)

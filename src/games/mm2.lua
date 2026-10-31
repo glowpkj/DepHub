@@ -169,53 +169,53 @@ do
         -- Roles are pure information on screen -> Visual.
         local roles=Kit.Section(Kit.Tab("Roles","Visual"),"Role ESP","Left")
         if roles then
-            roles:CreateToggle("Mostrar Murder e Sheriff",false,function(value)
+            roles:CreateToggle("Show Murder and Sheriff",false,function(value)
                 State:SetRoleESP(value)
             end)
-            roles:CreateParagraph("Identificacao","Destaca o Murder em vermelho e o Sheriff em azul.")
+            roles:CreateParagraph("Identification","Highlights the Murder in red and the Sheriff in blue.")
         end
 
         -- Coin collection is a farm loop -> Farm.
-        local coins=Kit.Section(Kit.Tab("Coin Farm","Farm"),"Coletar moedas","Left")
+        local coins=Kit.Section(Kit.Tab("Coin Farm","Farm"),"Collect coins","Left")
         if coins then
-            coins:CreateToggle("Coleta automatica",false,function(value)
+            coins:CreateToggle("Auto collect",false,function(value)
                 State:SetAutoCoins(value)
             end)
-            coins:CreateSlider("Distancia de seguranca",0,80,State.Values.CoinSafeDistance,function(value)
+            coins:CreateSlider("Safe distance",0,80,State.Values.CoinSafeDistance,function(value)
                 State:SetCoinSafeDistance(value)
             end)
-            coins:CreateSlider("Intervalo (segundos)",0.02,0.3,State.Values.CoinDelay,function(value)
+            coins:CreateSlider("Interval (seconds)",0.02,0.3,State.Values.CoinDelay,function(value)
                 State:SetCoinDelay(value)
             end)
         end
 
         -- Gun drop is a farm action with a visual ESP bit -> Farm.
-        local gun=Kit.Section(Kit.Tab("Gun Drop","Farm"),"Pistola caida","Left")
+        local gun=Kit.Section(Kit.Tab("Gun Drop","Farm"),"Dropped gun","Left")
         if gun then
-            gun:CreateToggle("ESP da pistola",false,function(value)
+            gun:CreateToggle("Gun ESP",false,function(value)
                 State:SetGunDropESP(value)
             end)
-            gun:CreateToggle("Pegar pistola automaticamente",false,function(value)
+            gun:CreateToggle("Auto pickup gun",false,function(value)
                 State:SetAutoGetGun(value)
             end)
-            gun:CreateSlider("Distancia segura do Murder",5,80,State.Values.GunSafeDistance,function(value)
+            gun:CreateSlider("Safe distance from Murder",5,80,State.Values.GunSafeDistance,function(value)
                 State:SetGunSafeDistance(value)
             end)
-            gun:CreateSlider("Tempo de coleta",0.05,0.5,State.Values.GunPickupHold,function(value)
+            gun:CreateSlider("Pickup hold time",0.05,0.5,State.Values.GunPickupHold,function(value)
                 State:SetGunPickupHold(value)
             end)
         end
 
         -- Teleport-to-player is a movement/player action -> Movement.
-        local players=Kit.Section(Kit.Tab("Jogadores","Movement"),"Jogadores vivos","Left")
+        local players=Kit.Section(Kit.Tab("Players","Movement"),"Alive players","Left")
         if players then
-            players:CreateButton("Teleportar para proximo jogador vivo",function()
+            players:CreateButton("Teleport to next alive player",function()
                 local ok,name=State:TeleportNextAlivePlayer()
                 if type(UI.Notify)=="function" then
-                    UI:Notify("MM2",ok and ("Teleportado para "..tostring(name)) or tostring(name or "Nao foi possivel teleportar"),ok and "success" or "warning")
+                    UI:Notify("MM2",ok and ("Teleported to "..tostring(name)) or tostring(name or "Could not teleport"),ok and "success" or "warning")
                 end
             end)
-            players:CreateParagraph("Status","O teleporte percorre os jogadores vivos da rodada.")
+            players:CreateParagraph("Status","Teleport cycles through the round's alive players.")
         end
     end
 end
@@ -226,21 +226,21 @@ end
 do
     local Diag=env.__DEPHUB and env.__DEPHUB.Diagnostics
     if Diag and type(Diag.Probe)=="function" then
-        Diag:SetEnvironment({["MM2 versao"]=VERSION})
+        Diag:SetEnvironment({["MM2 version"]=VERSION})
         for _,name in ipairs({"roletracker","roundtracker","esp","coinfarm","playerteleport","gundrop"}) do
             Diag:RegisterModule("features/mm2/"..name..".lua")
         end
-        Diag:Module("features/mm2/roletracker.lua",RoleTracker~=nil,"carregado")
-        Diag:Module("features/mm2/roundtracker.lua",RoundTracker~=nil,"carregado")
-        Diag:Module("features/mm2/esp.lua",ESP~=nil,"carregado")
-        Diag:Module("features/mm2/coinfarm.lua",CoinFarm~=nil,"carregado")
-        Diag:Module("features/mm2/playerteleport.lua",PlayerTeleport~=nil,"carregado")
-        Diag:Module("features/mm2/gundrop.lua",GunDrop~=nil,"carregado")
+        Diag:Module("features/mm2/roletracker.lua",RoleTracker~=nil,"loaded")
+        Diag:Module("features/mm2/roundtracker.lua",RoundTracker~=nil,"loaded")
+        Diag:Module("features/mm2/esp.lua",ESP~=nil,"loaded")
+        Diag:Module("features/mm2/coinfarm.lua",CoinFarm~=nil,"loaded")
+        Diag:Module("features/mm2/playerteleport.lua",PlayerTeleport~=nil,"loaded")
+        Diag:Module("features/mm2/gundrop.lua",GunDrop~=nil,"loaded")
         -- Structure probes: the named objects the trackers resolve. A rename of
         -- any of these is exactly what silently kills a feature after an update.
-        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "ausente")
+        Diag:Probe("Players.LocalPlayer",LocalPlayer~=nil,LocalPlayer and LocalPlayer.Name or "absent")
         Diag:Probe("Workspace.RegularLobby",Workspace:FindFirstChild("RegularLobby")~=nil,
-            Workspace:FindFirstChild("RegularLobby") and Workspace.RegularLobby.ClassName or "ausente")
+            Workspace:FindFirstChild("RegularLobby") and Workspace.RegularLobby.ClassName or "absent")
         local hasKnife,hasGun,hasDrop,hasCoins=false,false,false,false
         for _,object in ipairs(Workspace:GetDescendants()) do
             if object.Name=="GunDrop" then hasDrop=true end
@@ -253,30 +253,30 @@ do
             if character and character:FindFirstChild("Gun",true) then hasGun=true end
             if backpack and backpack:FindFirstChild("Gun") then hasGun=true end
         end
-        Diag:Probe("Tool.Knife",hasKnife,hasKnife and "visto em algum jogador" or "nao visto (sem murder na rodada?)")
-        Diag:Probe("Tool.Gun",hasGun,hasGun and "visto em algum jogador" or "nao visto (sem sheriff na rodada?)")
-        Diag:Probe("Workspace.GunDrop",hasDrop,hasDrop and "encontrado" or "nenhum drop ativo")
-        Diag:Probe("Workspace.CoinContainer",hasCoins,hasCoins and "encontrado" or "nenhum container")
+        Diag:Probe("Tool.Knife",hasKnife,hasKnife and "seen on a player" or "not seen (no murder this round?)")
+        Diag:Probe("Tool.Gun",hasGun,hasGun and "seen on a player" or "not seen (no sheriff this round?)")
+        Diag:Probe("Workspace.GunDrop",hasDrop,hasDrop and "found" or "no active drop")
+        Diag:Probe("Workspace.CoinContainer",hasCoins,hasCoins and "found" or "no container")
         -- Live feature state, read from the tracker debug tables the backend keeps.
         Diag:Feature("MM2.RoleESP",function() return State.Toggles.RoleESP and "ON" or "off" end)
         Diag:Feature("MM2.AutoCoins",function() return State.Toggles.AutoCoins and "ON" or "off" end)
         Diag:Feature("MM2.GunDropESP",function() return State.Toggles.GunDropESP and "ON" or "off" end)
         Diag:Feature("MM2.AutoGetGun",function() return State.Toggles.AutoGetGun and "ON" or "off" end)
-        Diag:Feature("MM2.Papeis",function()
+        Diag:Feature("MM2.Roles",function()
             local info=RoleTracker:GetDebugInfo()
             return "murder="..tostring(info.Murder).." sheriff="..tostring(info.Sheriff).." scans="..tostring(info.Scans)
         end)
-        Diag:Feature("MM2.Rodada",function()
+        Diag:Feature("MM2.Round",function()
             local info=RoundTracker:GetDebugInfo()
-            return "ativa="..tostring(info.RoundActive).." vivos="..tostring(info.AliveRoundPlayers).." lobby="..tostring(info.PlayersInLobby)
+            return "active="..tostring(info.RoundActive).." alive="..tostring(info.AliveRoundPlayers).." lobby="..tostring(info.PlayersInLobby)
         end)
         Diag:Feature("MM2.CoinFarm",function()
             local info=CoinFarm:GetDebugInfo()
-            return "moedas="..tostring(info.Coins).." teleportes="..tostring(info.Teleports).." pausa="..tostring(info.Paused)
+            return "coins="..tostring(info.Coins).." teleports="..tostring(info.Teleports).." paused="..tostring(info.Paused)
         end)
         Diag:Feature("MM2.GunDrop",function()
             local info=GunDrop:GetDebugInfo()
-            return "drop="..tostring(info.GunDrop).." dist="..tostring(info.MurderDistance).." seguro="..tostring(info.Safe)
+            return "drop="..tostring(info.GunDrop).." dist="..tostring(info.MurderDistance).." safe="..tostring(info.Safe)
         end)
         Diag:Feature("MM2.LastError",function()
             local parts={}
@@ -287,8 +287,8 @@ do
         end)
         if type(Diag.Watch)=="function" then
             Diag:Watch("MM2 murder",function() local info=RoleTracker:GetDebugInfo() return tostring(info.Murder) end)
-            Diag:Watch("MM2 rodada ativa",function() return tostring(RoundTracker:GetDebugInfo().RoundActive) end)
-            Diag:Watch("MM2 moedas",function() return tostring(CoinFarm:GetDebugInfo().Coins) end)
+            Diag:Watch("MM2 round active",function() return tostring(RoundTracker:GetDebugInfo().RoundActive) end)
+            Diag:Watch("MM2 coins",function() return tostring(CoinFarm:GetDebugInfo().Coins) end)
             Diag:Watch("MM2 gun drop",function() return tostring(GunDrop:GetDebugInfo().GunDrop) end)
         end
         if type(Diag.Command)=="function" then
@@ -298,8 +298,8 @@ do
                 local coin=CoinFarm:GetDebugInfo()
                 local gun=GunDrop:GetDebugInfo()
                 return "murder="..tostring(role.Murder).." sheriff="..tostring(role.Sheriff)
-                    .." rodadaAtiva="..tostring(round.RoundActive).." vivos="..tostring(round.AliveRoundPlayers)
-                    .." moedas="..tostring(coin.Coins).." drop="..tostring(gun.GunDrop)
+                    .." roundActive="..tostring(round.RoundActive).." alive="..tostring(round.AliveRoundPlayers)
+                    .." coins="..tostring(coin.Coins).." drop="..tostring(gun.GunDrop)
             end)
             Diag:Command("mm2-roleesp",function(argument)
                 local on=argument~="off"

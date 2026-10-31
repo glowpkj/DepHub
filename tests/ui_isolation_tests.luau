@@ -2,7 +2,7 @@
 -- never publish Blox Fruits categories or tab names. The Demon UI wrapper is
 -- exercised through its real wrapper code with a library double.
 do
-    local BLOXFRUITS_TABS = {"Fruit", "Fruits", "PVP", "Combat", "Sea", "Farm 2", "Farm 3", "Shop 2", "Shop 3", "Raids/Events", "Raids"}
+    local BLOXFRUITS_TABS = {"Fruit", "Fruits", "PVP", "Sea", "Farm 2", "Farm 3", "Shop 2", "Shop 3", "Raids/Events", "Raids"}
     local function tabNames(library)
         local names = {}
         for _, tab in ipairs(library._Tabs) do names[#names + 1] = tab.Name end
@@ -39,7 +39,7 @@ do
         assertNoBloxTabs(ui.Library, "MM2")
         local names = tabNames(ui.Library)
         check(#names > 0, "MM2 registers its own tabs")
-        for _, expected in ipairs({"Roles", "Coin Farm", "Gun Drop", "Jogadores"}) do
+        for _, expected in ipairs({"Roles", "Coin Farm", "Gun Drop", "Players"}) do
             local found = false
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "MM2 registers its tab: " .. expected)
@@ -56,7 +56,7 @@ do
         assertNoSeaCategories(ui.Library, "AOTR")
         assertNoBloxTabs(ui.Library, "AOTR")
         local names = tabNames(ui.Library)
-        for _, expected in ipairs({"Titan ESP", "Farm", "Movement", "Assistência", "Status"}) do
+        for _, expected in ipairs({"Titan ESP", "Farm", "Movement", "Assistance", "Status"}) do
             local found = false
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "AOTR registers its tab: " .. expected)
@@ -121,8 +121,8 @@ do
         local found = {}
         for _, name in ipairs(names) do found[name] = true end
         check(found["Ball Predict"], "Volleyball 4.2 registers its Ball Predict tab")
-        check(found["Pulo"], "Volleyball 4.2 registers its Pulo tab")
-        check(found["Colisão"], "Volleyball 4.2 registers its Colisão tab")
+        check(found["Jump"], "Volleyball 4.2 registers its Jump tab")
+        check(found["Collision"], "Volleyball 4.2 registers its Collision tab")
         local cats = {}
         for category in pairs(ui.Library._STATE.CategoryButtons or {}) do cats[category] = true end
         check(cats["Visual"] == true and cats["Movement"] == true and cats["World"] == true,
@@ -142,7 +142,7 @@ do
         check(#names > 0, "Universal registers its own tabs")
         local found = {}
         for _, name in ipairs(names) do found[name] = true end
-        for _, expected in ipairs({"Movement", "Visual", "Combate", "Social", "Servidor", "Status"}) do
+        for _, expected in ipairs({"Movement", "Visual", "Combat", "Social", "Server", "Status"}) do
             check(found[expected], "Universal registers its tab: " .. expected)
         end
         local cats = {}

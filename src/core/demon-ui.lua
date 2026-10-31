@@ -25,7 +25,7 @@ local WINDOW_OPTIONS = {
     Theme = "Monochrome",
     TabPosition = "Side",
     CategoryAlign = "Center",
-    ToggleKey = Enum.KeyCode.RightControl,
+    ToggleKey = Enum.KeyCode.N,
     Acrylic = true,
     AcrylicBlur = 18,
     Size = UDim2.fromOffset(900, 580),
@@ -71,13 +71,13 @@ local function loadTheme()
     if cachedTheme then return cachedTheme end
     local source = fetchThemeSource()
     if type(source) ~= "string" or #source == 0 then
-        error("Falha ao carregar src/core/ui/demon-theme.luau: nenhuma copia disponivel")
+        error("Failed to load src/core/ui/demon-theme.luau: no copy available")
     end
     local chunk, compileError = loadstring(source)
-    if not chunk then error("Falha ao compilar demon-theme.luau: " .. tostring(compileError)) end
+    if not chunk then error("Failed to compile demon-theme.luau: " .. tostring(compileError)) end
     local okRun, export = pcall(chunk)
     if not okRun or type(export) ~= "table" or type(export.new) ~= "function" then
-        error("demon-theme.luau não retornou uma biblioteca válida: " .. tostring(export))
+        error("demon-theme.luau did not return a valid library: " .. tostring(export))
     end
     cachedTheme = export
     return export
@@ -171,7 +171,7 @@ function DemonUI:CreateTab(name, category, sea)
     state = self.Library._STATE
     local tabExists = state and state.ContentPages and state.ContentPages[uniqueName] ~= nil
     if not ok or not tabExists then
-        return nil, tostring(result or ("ContentPages[" .. uniqueName .. "] ausente"))
+        return nil, tostring(result or ("ContentPages[" .. uniqueName .. "] missing"))
     end
     -- `sea` scopes the tab to one or more seas ("Sea1", "Sea2,Sea3", "All").
     -- nil means the tab is not sea-scoped and is always shown.

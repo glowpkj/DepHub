@@ -22,9 +22,9 @@ do
         check(ctx.State.__DEPHUB_LOADER_STATE.status == "success", "successful loader records success state")
         check(ctx.State.__DEPHUB.Mode == case[3], "loader records the backend label")
         check(#ctx.Logs == 5, "loader emits its startup identity lines plus the source host")
-        check(ctx.Logs[1] and ctx.Logs[1]:match("^Iniciando loader v%d+%.%d+%.%d+$") ~= nil and ctx.Logs[2] == "Executor detectado: Test", "startup logs have no old prefix")
+        check(ctx.Logs[1] and ctx.Logs[1]:match("^Starting loader v%d+%.%d+%.%d+$") ~= nil and ctx.Logs[2] == "Executor detected: Test", "startup logs have no old prefix")
         check(ctx.Logs[3] == "PlaceId: " .. case[1] and ctx.Logs[4] == "GameId: " .. case[2], "game identity logs preserved")
-        check(ctx.Logs[5] and ctx.Logs[5]:match("^Fonte: https://") ~= nil, "loader logs the resolved source host")
+        check(ctx.Logs[5] and ctx.Logs[5]:match("^Source: https://") ~= nil, "loader logs the resolved source host")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
         check(ctx.State.__DEPHUB.Updater.Started, "updater still starts using fresh code")
