@@ -7,6 +7,9 @@ do
         {119048529960596, 2, "rt3", false},
         {1, 119048529960596, "rt3", false}
     }
+    local function localVersionOf(ctx)
+        return ctx.Sources["DepHub.lua"]:match('local VERSION = "([^"]+)"')
+    end
     for _, case in ipairs(cases) do
         local ctx = sandbox(case[1], case[2])
         ctx.Responses["src/version.txt"] = "0.0.3"
@@ -21,25 +24,11 @@ do
         check(ctx:Run("DepHub.lua") == true, "loader succeeds for route " .. case[3])
         check(ctx.State.__DEPHUB_LOADER_STATE.status == "success", "successful loader records success state")
         check(ctx.State.__DEPHUB.Mode == case[3], "loader records the backend label")
-        -- The loader proves liveness first (a raw print before any early return),
-        -- then emits its identity lines, the resolved source host, and progress
-        -- logs around the UI/backend load. Assert the meaningful lines appear in
-        -- order instead of pinning the exact log count, so extra progress lines
-        -- never break this test.
-        local function logIndexOf(pattern)
-            for i, line in ipairs(ctx.Logs) do if line:match(pattern) then return i end end
-            return nil
-        end
-        check(ctx.Logs[1] == "[DepHub] loader starting...", "the loader proves liveness before any early return")
-        local iStarting = logIndexOf("^Starting loader v%d+%.%d+%.%d+$")
-        local iExecutor = logIndexOf("^Executor detected: Test$")
-        local iPlace = logIndexOf("^PlaceId: " .. case[1] .. "$")
-        local iGame = logIndexOf("^GameId: " .. case[2] .. "$")
-        local iSource = logIndexOf("^Source: https://")
-        check(iStarting and iExecutor and iPlace and iGame and iSource, "loader emits its startup identity lines plus the source host")
-        check(iStarting < iExecutor and iExecutor < iPlace and iPlace < iGame and iGame < iSource, "startup identity lines are in order")
-        check(logIndexOf("^Backend loaded%. DepHub v") ~= nil, "loader logs a final ready line")
-        check(not table.find(ctx.Logs, "Starting loader v0.0.1"), "startup logs have no old prefix")
+        -- A healthy load is quiet on the console: exactly one line, the DepHub
+        -- version. The startup identity (executor, place, host) and progress are
+        -- recorded in the Debug tab via Diagnostics.Log, not printed.
+        check(ctx.Logs[1] == "DepHub v" .. localVersionOf(ctx), "the loader prints only the DepHub version on a healthy load")
+        check(#ctx.Logs == 1, "a healthy load prints nothing else to the console")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
         check(ctx.State.__DEPHUB.Updater.Started, "updater still starts using fresh code")
@@ -82,8 +71,26 @@ do
             "the loader has no blocking PlayerAdded:Wait() at startup")
         check(not loaderSource:find("game.Loaded:Wait()", 1, true),
             "the loader has no blocking game.Loaded:Wait() at startup")
-        check(loaderSource:find('pcall(print, "[DepHub] loader starting...")', 1, true) ~= nil,
-            "the loader proves liveness before any early return")
+    end
+
+    -- A healthy load is QUIET: the console sees exactly one line, the DepHub
+    -- version. The progress chatter (executor, place, host, module) lives only in
+    -- the Debug tab via Diagnostics.Log, never on the console.
+    do
+        local ctx = sandbox()
+        local localVersion = ctx.Sources["DepHub.lua"]:match('local VERSION = "([^"]+)"')
+        ctx.Responses["src/version.txt"] = localVersion
+        ctx:Provide("src/games/universal.lua", {})
+        check(ctx:Run("DepHub.lua") == true, "a healthy load completes")
+        local printed = {}
+        for _, line in ipairs(ctx.Logs) do printed[#printed + 1] = line end
+        -- The harness records warn() into Logs too; a healthy run logs no warn.
+        check(#printed == 1 and printed[1] == "DepHub v" .. localVersion,
+            "a healthy load prints exactly the DepHub version and nothing else")
+        check(not ctx.Logs[1] or not ctx.Logs[1]:find("Starting loader", 1, true),
+            "the loader does not announce its startup on the console")
+        check(not ctx.Logs[1] or not ctx.Logs[1]:find("Executor detected", 1, true),
+            "the loader does not print the executor on the console")
     end
 end
 

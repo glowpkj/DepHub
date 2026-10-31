@@ -289,11 +289,15 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
     disparou (LocalPlayer nil no run; jogo ja carregado): sem print, sem erro,
     sem painel -- parece que o script morreu, mas esta travado. NUNCA coloque
     Wait() bloqueante no corpo do loader; espere com um loop ativo limitado
-    (task.wait em for) ou dentro de task.spawn. O loader imprime uma linha de
-    vida ("[DepHub] loader starting...") ANTES de qualquer retorno cedo, loga
-    progresso ao redor do load da UI/backend e uma linha final
-    ("Backend loaded. DepHub vX ready"), e um run repetido de sessao saudavel
-    loga "Already running vX" em vez de retornar true em silencio.
+    (task.wait em for) ou dentro de task.spawn.
+
+    CONSOLE LIMPO (v0.1.10): um load saudavel imprime UMA linha, "DepHub vX".
+    Todo o resto -- identidade (executor, place, game), host resolvido, progresso
+    da UI/backend, "Already running" -- vai SO para o Debug tab via
+    Diagnostics.Log (a funcao log() nao imprime mais no console). Falha de
+    verdade (backend que deu erro, place desconhecido, recarga que nao pegou)
+    sai por warn(), via report(), para um run quebrado NUNCA ficar em silencio.
+    O bootstrap que o usuario cola e so um loadstring(game:HttpGet(url))():
 
 (j) Instancia do Roblox NAO aceita atribuicao de metodo -> "X is not a valid
     member of Y". Metodo de Instance (FireServer de um RemoteEvent, InvokeServer
@@ -368,14 +372,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.09)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.10)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
 HStack:
 
-FEITO / FUNCIONANDO (verificado offline, 796 checks):
+FEITO / FUNCIONANDO (verificado offline, 781 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.

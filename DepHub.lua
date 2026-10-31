@@ -9,11 +9,6 @@ local pcall = pcall
 local Players = game:GetService("Players")
 local env = type(getgenv) == "function" and getgenv() or _G
 
--- Prova de vida: imprime antes de qualquer logica que possa retornar cedo ou
--- travar, para que "nao aparece nada" signifique sempre "o corpo nao rodou" e
--- nunca "rodou e saiu em silencio".
-pcall(print, "[DepHub] loader starting...")
-
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 -- Source hosts in fallback order. raw.githubusercontent.com is FIRST on purpose:
 -- its edge cache is short-lived and it is the origin the project actually pushes
@@ -29,7 +24,7 @@ local HOST_TEMPLATES = {
     "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.1.09"
+local VERSION = "0.1.10"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -44,11 +39,23 @@ local CACHE_BUST = tostring(os.time()) .. "." .. tostring(math.floor((os.clock()
 local placeId = tostring(game.PlaceId)
 local gameId = tostring(game.GameId)
 
+-- Loader logging: the console only ever sees ONE line -- the DepHub version --
+-- so a normal load is quiet. Everything else (progress, host resolution, the
+-- exact failure) is still recorded for the Debug tab through Diagnostics.Log.
+-- Genuine failures (a backend that threw, an unknown place) go to warn, so a
+-- broken run is never silent.
 local function log(message)
     local text = tostring(message)
-    pcall(print, text)
     local diag = env and env.__DEPHUB and env.__DEPHUB.Diagnostics
     if diag and type(diag.Log) == "function" then pcall(diag.Log, diag, "loader", text) end
+end
+
+-- A genuine failure is the one thing the console should show besides the
+-- version: it goes to warn so a broken run is never silent.
+local function report(message)
+    local text = tostring(message)
+    log(text)
+    pcall(warn, "[DepHub] " .. text)
 end
 
 local function detectExecutor()
@@ -126,7 +133,7 @@ end
 
 local previousState = env[STATE_KEY]
 if type(previousState) == "table" and previousState.status == "running" then
-    log("Initialization in progress. Wait before running again.")
+    report("Initialization in progress. Wait before running again.")
     return false
 end
 if env[EXECUTED_KEY]
@@ -138,8 +145,11 @@ if env[EXECUTED_KEY]
     and previousState.SourceRef == sourceRef
     and sessionHealthy() then
     -- Já existe uma sessão viva desta mesma versão: nada a fazer. Logar deixa
-    -- explicito, em vez de parecer que o loader morreu em silencio.
+    -- explicito, em vez de parecer que o loader morreu em silencio. O console
+    -- recebe a mesma linha de versao de um load novo, para o run ser idempotente
+    -- do ponto de vista de quem cola o bootstrap.
     log("Already running v" .. VERSION .. " (session healthy); skipping reload.")
+    pcall(print, "DepHub v" .. VERSION)
     return true
 end
 
@@ -186,6 +196,7 @@ end
 local function fail(reason)
     local message = tostring(reason or "Unknown failure")
     log("Failure: " .. message)
+    pcall(warn, "[DepHub] Failure: " .. message)
     if Diag then Diag:Note("LOADER FAILURE: " .. message) end
     if env[STATE_KEY] ~= session then return false end
     cleanupRuntime()
@@ -421,12 +432,12 @@ if okVersion and type(remV) == "string" and versionIsNewer(remV, VERSION) and en
             env[STATE_KEY] = nil
             local okRun, runError = pcall(freshChunk, sourceRef)
             if okRun then return true end
-            log("Recarga do loader falhou ao executar: " .. tostring(runError))
+            report("Recarga do loader falhou ao executar: " .. tostring(runError))
         else
-            log("Recarga do loader nao compilou: " .. tostring(freshChunk))
+            report("Recarga do loader nao compilou: " .. tostring(freshChunk))
         end
     else
-        log("Recarga do loader nao baixou: " .. tostring(freshSource))
+        report("Recarga do loader nao baixou: " .. tostring(freshSource))
     end
     -- Fall through: if the reload did not take, run the cached build as before
     -- rather than leaving the player with nothing. Restore the session that was
@@ -602,7 +613,7 @@ if not knownTarget then
     env[EXECUTED_KEY] = true
     env[STATE_KEY].status = "unsupported"
     env[STATE_KEY].finishedAt = os.clock()
-    log("Unknown game - PlaceId " .. placeId .. " / GameId " .. gameId)
+    report("Unknown game - PlaceId " .. placeId .. " / GameId " .. gameId)
     return true
 end
 
@@ -671,7 +682,9 @@ if env[STATE_KEY] ~= session then return false end
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
-log("Backend loaded. DepHub v" .. VERSION .. " ready -- press N to open the panel.")
+-- The one line the console sees on a healthy load.
+log("Backend loaded. DepHub v" .. VERSION .. " ready.")
+pcall(print, "DepHub v" .. VERSION)
 
 task.defer(function()
     if env[STATE_KEY] ~= session or session.status ~= "success" then return end
