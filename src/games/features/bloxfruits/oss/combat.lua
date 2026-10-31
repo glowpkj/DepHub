@@ -114,8 +114,16 @@ function M.installCapture()
     old = hookmetamethod(game, "__namecall", newcclosure(function(self, ...)
         if M._capturing and not checkcaller() and getnamecallmethod() == "FireServer" and self == RegisterHit then
             local a = table.pack(...)
-            if a[4] ~= nil then M.lastHitId = a[4]
-            elseif a.n == 1 and type(a[1]) == "string" then M.lastHitId = a[1] end
+            local id
+            if a[4] ~= nil then id = a[4]
+            elseif a.n == 1 and type(a[1]) == "string" then id = a[1] end
+            if id ~= nil and id ~= M.lastHitId then
+                M.lastHitId = id
+                -- The hitId is per weapon swing: a neighbour that fires hits on
+                -- its own (bladhits) has to follow every change, not just the
+                -- first one, or its swings start sending a stale id.
+                if M._onHitId then pcall(M._onHitId, id) end
+            end
         end
         return old(self, ...)
     end))

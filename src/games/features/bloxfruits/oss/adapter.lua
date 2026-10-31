@@ -11,7 +11,7 @@
 
 local Factory = {}
 
-local ORDER = {"core", "teleport", "combat", "farm", "player", "fruits", "shop", "events", "extras", "info"}
+local ORDER = {"core", "teleport", "combat", "bladhits", "flashstep", "farm", "player", "fruits", "shop", "events", "extras", "info"}
 
 local function readSource(loader, path)
     local ok, source = pcall(loader, path)

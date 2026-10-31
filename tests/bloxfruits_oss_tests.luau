@@ -2,7 +2,7 @@
 -- bodies that drive the game are exercised through the adapter's control
 -- registry; remote-touching code paths are not re-tested here.
 local OSS_PREFIX = "src/games/features/bloxfruits/oss/"
-local OSS_MODULES = {"adapter", "ui-headless", "core", "teleport", "combat", "farm",
+local OSS_MODULES = {"adapter", "ui-headless", "core", "teleport", "combat", "bladhits", "flashstep", "farm",
     "player", "fruits", "shop", "events", "extras", "info"}
 
 -- The backend resolves its modules through the same game:HttpGet path a live
@@ -190,6 +190,71 @@ do
     check(espName ~= nil and espName.kind == "toggle", "ESP show name is a toggle")
     espName.set(false)
     check(player.config.espName == false, "ESP show name writes through to player config")
+
+    -- Blade Hits: the auto-swing loop's range, cadence and target folders are all
+    -- read back by the swing thread, so each control has to reach the module
+    -- config. The hitId is the value the game's own M1 supplied; a forged one is
+    -- ignored, so the module mirrors whatever combat captured.
+    local bladhits = state.Modules and state.Modules.bladhits
+    check(bladhits ~= nil and type(bladhits.config) == "table", "the bladhits module exposes its config")
+    check(type(bladhits.swing) == "function", "bladhits exposes the remote hit it fires")
+
+    local bladeHits = controlFor("Blade hits")
+    check(bladeHits ~= nil and bladeHits.kind == "toggle", "blade hits is a toggle")
+
+    local bladeRange = controlFor("Blade range")
+    check(bladeRange ~= nil and bladeRange.kind == "slider", "blade range is a slider")
+    bladeRange.set(250)
+    check(bladhits.config.range == 250, "blade range writes through to bladhits config")
+
+    -- The interval is edited in milliseconds but stored in seconds, so the write
+    -- has to be divided back before the loop uses it.
+    local bladeInterval = controlFor("Blade interval (ms)")
+    check(bladeInterval ~= nil and bladeInterval.kind == "slider", "blade interval is a slider in milliseconds")
+    bladeInterval.set(200)
+    check(bladhits.config.interval == 0.2, "blade interval converts milliseconds to seconds")
+
+    -- The two folders scanned for mobs are independent switches.
+    local enemiesFolder = controlFor("Enemies folder")
+    check(enemiesFolder ~= nil and enemiesFolder.kind == "toggle", "the enemies folder scan is a toggle")
+    enemiesFolder.set(false)
+    check(bladhits.config.enemiesFolder == false, "disabling the enemies folder scan reaches bladhits config")
+    enemiesFolder.set(true)
+    check(bladhits.config.enemiesFolder == true, "re-enabling the enemies folder scan reaches bladhits config")
+
+    local charactersFolder = controlFor("Characters folder")
+    check(charactersFolder ~= nil and charactersFolder.kind == "toggle", "the characters folder scan is a toggle")
+    charactersFolder.set(false)
+    check(bladhits.config.charactersFolder == false, "disabling the characters folder scan reaches bladhits config")
+
+    local bladePlayers = controlFor("Hit players too")
+    check(bladePlayers ~= nil and bladePlayers.kind == "toggle", "hitting players is a toggle")
+    bladePlayers.set(true)
+    check(bladhits.config.players == true, "hitting players reaches bladhits config")
+
+    -- The captured hitId is what makes the hit stick; a synced value is stored.
+    bladhits.syncHitId(4242)
+    check(bladhits.lastHitId == 4242, "a synced hitId is stored for the next swing")
+
+    -- combat owns the id (only it hooks the namecall), so it must hand every new
+    -- one to bladhits. Without this the loop keeps a stale id after the first M1.
+    check(combat._onHitId == bladhits.syncHitId, "combat broadcasts every captured hitId to bladhits")
+    combat._onHitId(9090)
+    check(bladhits.lastHitId == 9090, "a broadcast hitId reaches the blade hits loop")
+
+    -- Flashstep: one toggle that keeps the character attribute at zero.
+    local flashstep = state.Modules and state.Modules.flashstep
+    check(flashstep ~= nil, "the flashstep module is registered")
+    check(type(flashstep.set) == "function", "flashstep exposes its setter")
+
+    local flashToggle = controlFor("Flashstep")
+    check(flashToggle ~= nil and flashToggle.kind == "toggle", "flashstep cooldown is a toggle")
+    -- Arming it with no character mounted must not error and must report on.
+    flashToggle.set(true)
+    check(flashstep._on == true, "enabling flashstep arms the attribute watcher")
+    flashToggle.set(false)
+    check(flashstep._on == false, "disabling flashstep disarms it")
+    check(flashstep._character == nil, "disabling flashstep releases the character binding")
 
     -- Teleport: flight speed gates how fast every teleport flies.
     local teleport = state.Modules and state.Modules.teleport
