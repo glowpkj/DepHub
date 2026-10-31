@@ -144,3 +144,134 @@ do
     check(ok == false, "an action with no PlayerAction remote reports failure instead of erroring")
     state:Destroy()
 end
+
+-- Jump Anywhere: one toggle drives two things -- the jump bypass (patches the
+-- check upvalue inside CharacterActions.Jump so "NoJump" is cleared) and the
+-- extra impulse (raises vertical velocity on the jump frame). The bypass needs
+-- the executor's debug.getupvalue/setupvalue; the impulse does not, so the
+-- backend must stay usable when the patch cannot apply.
+do
+    local ctx = sandbox(1316421563, 1316421563)
+    ctx:MountUI()
+
+    -- Build the game's CharacterScript.CharacterActions ModuleScript with a Jump
+    -- function that carries a check upvalue at index 3 (the contract the feature
+    -- patches). The check returns "NoJump" until the patch clears it.
+    local checkCalls = 0
+    local function checkLinefault()
+        checkCalls += 1
+        return "NoJump"
+    end
+
+    local ca = {State = {Jumped = false}}
+    ca.Jump = function()
+        return checkLinefault()
+    end
+    ctx.Env.debug.setregistry(ca.Jump, {
+        [1] = {Name = "self", Value = ca},
+        [2] = {Name = "args", Value = {}},
+        [3] = {Name = "checkLinefault", Value = checkLinefault},
+    })
+
+    local root = Instance.new("Folder"); root.Name = "guilhermealone1"; root.Parent = ctx.Services.Workspace
+    local scriptFolder = Instance.new("Folder"); scriptFolder.Name = "CharacterScript"; scriptFolder.Parent = root
+    local actionsModule = Instance.new("ModuleScript")
+    actionsModule.Name = "CharacterActions"
+    actionsModule._props.Module = ca
+    actionsModule.Parent = scriptFolder
+
+    -- A character with a root the impulse can write to.
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    local hrp = Instance.new("Part"); hrp.Name, hrp.Parent = "HumanoidRootPart", character
+    hrp.AssemblyLinearVelocity = Vector3.new(3, 0, 4)
+    ctx.Player.Character = character
+
+    local state = ctx:Run("src/games/volleyball42.lua")
+    check(state.Jump ~= nil, "the jump feature is loaded")
+
+    -- Toggle off: the patch is NOT applied -- the game's check still vetoes.
+    check(state.JumpEnabled == false, "the feature starts disabled")
+    check(checkLinefault() == "NoJump", "with the feature off, the game check still vetoes")
+
+    -- Toggle on: the bypass applies (the original check is saved and swapped).
+    local ok = state:SetJumpEnabled(true)
+    check(ok == true, "enabling the feature reports success")
+    check(state.JumpEnabled == true, "the feature is on")
+    local _, patched = ctx.Env.debug.getupvalue(ca.Jump, 3)
+    check(type(patched) == "function" and patched ~= checkLinefault, "enabling patches the check upvalue")
+    check(patched() == nil, "the patched check clears the game's veto (returns nil)")
+    check(patched() ~= "NoJump", "the patched check no longer vetoes")
+
+    -- Impulse: the slider value drives the vertical velocity on the jump frame.
+    state:SetJumpImpulse(100)
+    check(state.JumpImpulse == 100, "the impulse percentage is stored")
+    ca.State.Jumped = true
+    ctx.Services.RunService.Heartbeat:Fire(0.05)   -- jump edge detected, spawns the apply
+    ctx:FlushSpawned()                             -- the spawned body runs one frame later
+    local velocity = hrp.AssemblyLinearVelocity
+    local base = math.sqrt(2 * 196.2 * ((50 * 50) / (2 * 196.2)))
+    check(math.abs(velocity.Y - base * 2) < 0.5, "100% impulse doubles the jump velocity")
+    check(velocity.X == 3 and velocity.Z == 4, "the horizontal velocity is untouched")
+
+    -- With the impulse at 0, only the bypass is active and the jump keeps its
+    -- original speed (the impulse must not fire at all).
+    hrp.AssemblyLinearVelocity = Vector3.new(0, 7, 0)
+    state:SetJumpImpulse(0)
+    ca.State.Jumped = false
+    ctx.Services.RunService.Heartbeat:Fire(0.05)
+    ca.State.Jumped = true
+    ctx.Services.RunService.Heartbeat:Fire(0.05)
+    ctx:FlushSpawned()
+    check(hrp.AssemblyLinearVelocity.Y == 7, "0% impulse leaves the jump velocity as the game set it")
+
+    -- Disable restores the original check.
+    state:SetJumpEnabled(false)
+    local _, restored = ctx.Env.debug.getupvalue(ca.Jump, 3)
+    check(restored == checkLinefault, "disabling restores the original check upvalue")
+    check(state.JumpEnabled == false, "the feature is off again")
+
+    -- Destroy is a clean teardown: re-enable, then Destroy must restore the patch.
+    state:SetJumpEnabled(true)
+    state:Destroy()
+    local _, afterDestroy = ctx.Env.debug.getupvalue(ca.Jump, 3)
+    check(afterDestroy == checkLinefault, "destroy restores the original check upvalue")
+    check(state.Destroyed == true, "destroy marks the backend destroyed")
+end
+
+-- No executor debug library (an executor without getupvalue/setupvalue): the
+-- bypass cannot apply, so the feature reports unavailable -- but it must NOT
+-- error, and the backend must keep running with everything else intact.
+do
+    local ctx = sandbox(1316421563, 1316421563)
+    ctx:MountUI()
+    ctx.Env.debug = {getupvalue = nil, setupvalue = nil}
+    ctx.State.debug = ctx.Env.debug
+
+    local ca = {State = {Jumped = false}, Jump = function() return "NoJump" end}
+    local root = Instance.new("Folder"); root.Name = "guilhermealone1"; root.Parent = ctx.Services.Workspace
+    local scriptFolder = Instance.new("Folder"); scriptFolder.Name = "CharacterScript"; scriptFolder.Parent = root
+    local actionsModule = Instance.new("ModuleScript")
+    actionsModule.Name = "CharacterActions"; actionsModule._props.Module = ca; actionsModule.Parent = scriptFolder
+
+    local state = ctx:Run("src/games/volleyball42.lua")
+    local ok, err = state:SetJumpEnabled(true)
+    check(ok == false, "without the debug library the bypass reports failure instead of erroring")
+    check(type(err) == "string" and err:find("debug", 1, true) ~= nil, "the failure names the missing primitive")
+    check(state.Destroyed == false, "the backend keeps running when the bypass cannot apply")
+    state:Destroy()
+end
+
+-- The UI registers exactly one toggle and one slider for this one feature.
+do
+    local ctx = sandbox(1316421563, 1316421563)
+    local ui = ctx:MountUI()
+    ctx:Run("src/games/volleyball42.lua")
+    local controls = ctx.State.__DEPHUB.UI.Library._Controls
+    local toggles, sliders = 0, 0
+    for _, control in ipairs(controls) do
+        if control.Kind == "toggle" then toggles += 1 end
+        if control.Kind == "slider" then sliders += 1 end
+    end
+    check(toggles == 1, "the jump feature is one toggle")
+    check(sliders == 1, "the jump feature has one impulse slider")
+end

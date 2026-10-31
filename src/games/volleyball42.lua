@@ -44,8 +44,31 @@ if not Actions then
     warn("[DepHub] Volleyball actions unavailable: " .. tostring(actionsError))
 end
 
+-- Carrega o modulo de Jump Anywhere + impulso (um unico recurso, um unico
+-- toggle). Nao bloquear o load se falhar: sem ele o backend sobe e o toggle
+-- reporta indisponivel.
+local function loadFeature(relativePath, validate)
+    local cacheBust = tostring((env.__DEPHUB or {}).SourceCacheBust or "")
+    local okGet, source = pcall(function()
+        return game:HttpGet(BASE_URL .. relativePath .. (cacheBust ~= "" and ("?cb=" .. cacheBust) or ""))
+    end)
+    if not okGet or type(source) ~= "string" or #source == 0 then return nil, tostring(source) end
+    local okCompile, chunk, compileError = pcall(loadstring, source)
+    if not okCompile or type(chunk) ~= "function" then return nil, tostring(compileError or chunk) end
+    local okRun, module = pcall(chunk)
+    if not okRun or type(module) ~= "table" or not validate(module) then return nil, tostring(module) end
+    return module
+end
+
+local JumpAnywhere, jumpError = loadFeature("src/games/features/volleyball/jump-anywhere.lua", function(module)
+    return type(module.new) == "function"
+end)
+if not JumpAnywhere then
+    warn("[DepHub] Volleyball jump feature unavailable: " .. tostring(jumpError))
+end
+
 local State = {
-    Version = "0.2.0",
+    Version = "0.3.0",
     Destroyed = false,
     Started = false,
     Actions = Actions,
@@ -54,6 +77,10 @@ local State = {
     ServeTask = nil,
     LastAnimation = nil,
     LastError = nil,
+    -- Um unico recurso ligado a um unico toggle: jump bypass + impulso.
+    Jump = nil,
+    JumpEnabled = false,
+    JumpImpulse = 25,
 }
 
 -- O modulo de acoes conta os disparos via actor.Log; aponta para o log do State.
@@ -84,9 +111,54 @@ function State:Start()
     return true
 end
 
+-- === JUMP ANYWHERE (bypass + impulso) ===
+
+-- Uma unica chave liga as duas partes: o bypass (pular em qualquer lugar) e o
+-- impulso (acelerar o pulo). O slider so muda a intensidade do impulso; com 0%
+-- fica so o bypass, com o pulo original.
+--
+-- Devolve true quando ligou. Se o bypass nao pode ser aplicado (executor sem
+-- debug.getupvalue/setupvalue, ou o modulo do jogo ausente), a feature ainda
+-- liga para o IMPULSO e devolve false, "unavailable:<motivo>" para a UI avisar
+-- -- nunca derruba o backend por causa disso.
+function State:SetJumpEnabled(enabled)
+    if self.Destroyed then return false end
+    local wanted = enabled == true
+
+    if wanted then
+        if not self.Jump then return false, "unavailable:feature" end
+        if not self.JumpEnabled then
+            self.Jump:SetImpulse(self.JumpImpulse)
+            local bypassOk, bypassErr = self.Jump:Start()
+            self.JumpEnabled = true
+            if bypassOk ~= true then return false, "unavailable:" .. tostring(bypassErr or "bypass") end
+        end
+    else
+        if self.Jump and self.JumpEnabled then self.Jump:Stop() end
+        self.JumpEnabled = false
+    end
+    return true
+end
+
+-- Impulso em % (0-150). Grava sempre; o efeito so vale com o toggle ligado.
+function State:SetJumpImpulse(percent)
+    if self.Destroyed then return false end
+    local value = math.clamp(math.floor((tonumber(percent) or 0) + 0.5), 0, 150)
+    self.JumpImpulse = value
+    if self.Jump and self.JumpEnabled then self.Jump:SetImpulse(value) end
+    return true
+end
+
 function State:Destroy()
     if self.Destroyed then return end
     self.Destroyed = true
+
+    -- Desliga o recurso de pulo (restaura o upvalue original do jogo e desconecta).
+    if self.Jump then
+        pcall(self.Jump.Stop, self.Jump)
+        self.Jump = nil
+    end
+    self.JumpEnabled = false
 
     -- Cancela um serve em andamento (ele tem um task.wait interno) para nao
     -- disparar "Serving" depois do unload.
@@ -102,6 +174,37 @@ function State:Destroy()
     end
 end
 
+-- Instancia o recurso de pulo (mecanismo pronto; so liga quando o toggle ligar).
+if JumpAnywhere then
+    State.Jump = JumpAnywhere.new()
+end
+
 State:Start()
+
+-- ---------------------------------------------------------------------------
+-- Apresentacao: uma aba Movement com uma secao e UM recurso. O toggle "Jump
+-- Anywhere" liga o bypass + impulso juntos; o slider ao lado define a
+-- intensidade do impulso. Um toggle + um slider, na mesma linha.
+-- ---------------------------------------------------------------------------
+do
+    local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+        local tab = Kit.Tab("Movement")
+        local section = Kit.Section(tab, "Jump", "Left")
+        if section then
+            local row = Kit.Row(section) or section
+            row:CreateToggle("Jump Anywhere", State.JumpEnabled, function(value)
+                local ok, err = State:SetJumpEnabled(value)
+                if not ok then
+                    State.LastError = tostring(err)
+                    warn("[DepHub] Jump Anywhere unavailable: " .. tostring(err))
+                end
+            end)
+            row:CreateSlider("Impulse", 0, 150, State.JumpImpulse, function(value)
+                State:SetJumpImpulse(value)
+            end)
+        end
+    end
+end
 
 return State

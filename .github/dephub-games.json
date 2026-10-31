@@ -57,6 +57,7 @@
       "src/core/diagnostics.lua",
       "src/games/volleyball42.lua",
       "src/games/features/volleyball/actions.lua",
+      "src/games/features/volleyball/jump-anywhere.lua",
       "src/games/updates/1316421563.txt"
     ]
   },

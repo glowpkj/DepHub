@@ -332,6 +332,19 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
     (backend sem abas, sem probes, so State:Act). Nunca remova a feature e deixe o
     teste apontando para ela "para consertar depois".
 
+(m) Patch por upvalue (debug.getupvalue/setupvalue) nao existe no Luau de
+    fabrica nem no harness -> a feature some em silencio ou o teste mente. O
+    Luau stock NAO tem debug.getupvalue/setupvalue (so o executor expoe). Uma
+    feature que patcheia o upvalue de uma funcao do jogo (ex.: Jump Anywhere
+    troca o check de pulo dentro de CharacterActions.Jump para nao vetar) DEVE:
+    (1) degradar sem derrubar -- getDebug() devolve nil quando as primitivas
+    faltam, a feature reporta "unavailable" e o resto do backend sobe; (2) tratar
+    as DUAS assinaturas de getupvalue que circulam (indice -> nome,valor  OU
+    indice -> valor); (3) no Destroy, so restaurar se o upvalue ainda for o NOSSO
+    patch (outro script pode ter patcheado depois). No harness, o `env.debug` e um
+    debug MODELADO (setregistry declara os slots) e o `Signal:Wait` devolve na
+    hora, entao o teste prova o mecanismo sem um cliente real.
+
 
 --------------------------------------------------------------------------------
 9. CHECKLIST ANTES DE DAR COMO PRONTO
@@ -383,14 +396,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.11)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.12)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 728 checks):
+FEITO / FUNCIONANDO (verificado offline, 749 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -401,13 +414,15 @@ FEITO / FUNCIONANDO (verificado offline, 728 checks):
   (Sea 1/2), Universal.
 - Abas montam controles (bug do CreateSection corrigido em v0.0.98).
 - Fix do mouse do shell (v0.0.97).
-- Volleyball 4.2 ESQUELETO (v0.1.11): todas as features foram removidas para
-  recomecar -- previsao da bola, auto position, pulo forcado, ceiling noclip,
-  Auto Set Aim, as parts fixas do set, a UI inteira e os diagnostics do backend.
-  O que FICA e a automacao das acoes do jogo: o modulo
-  features/volleyball/actions.lua (set frontal/back, spike, block, bump, dive,
-  spawn da bola, serve) exposto como State:Act(nome, ...) para as features
-  novas usarem.
+- Volleyball 4.2 ESQUELETO + 1 feature (v0.1.11/0.1.12): as features antigas
+  (previsao da bola, auto position, pulo forcado, ceiling noclip, Auto Set Aim,
+  parts fixas) foram removidas para recomecar. O que FICA: (a) a automacao das
+  acoes do jogo em features/volleyball/actions.lua exposta como State:Act; (b) a
+  feature Jump Anywhere em features/volleyball/jump-anywhere.lua -- UM toggle
+  (aba Movement) que liga o jump bypass (patch do upvalue de check dentro de
+  CharacterActions.Jump, via debug.getupvalue/setupvalue) + o impulso extra, e
+  UM slider de impulso (0-150%). Sem debug/upvalue no executor o bypass nao
+  aplica e o toggle reporta, mas o backend sobe igual.
 - Loader: escolhe o host de origem que serve ESTE build. Proba raw primeiro e so
   aceita um host cujo src/version.txt seja exatamente a versao do loader; um
   espelho preso no cache (jsDelivr) e pulado em vez de escolhido em silencio

@@ -120,9 +120,8 @@ do
         check(#ui.Library._Controls > 0, "TSB builds controls")
     end
 
-    -- Volleyball 4.2 is a skeleton now: the features (and their tabs) were removed
-    -- to restart from scratch, so it registers no UI at all. When new features are
-    -- added back, this block is where their tabs get asserted.
+    -- Volleyball 4.2 is a skeleton plus one feature: the jump bypass/impulse
+    -- toggle. It registers exactly that one control pair.
     do
         local ctx = sandbox(1316421563, 1316421563)
         ctx:MountUI()
@@ -131,7 +130,7 @@ do
         ctx:Run("src/games/volleyball42.lua")
         assertNoSeaCategories(ui.Library, "Volleyball42")
         assertNoBloxTabs(ui.Library, "Volleyball42")
-        check(#ui.Library._Controls == before, "the lean Volleyball backend registers no controls")
+        check(#ui.Library._Controls == before + 2, "the Volleyball backend registers its one toggle and one slider")
         local names = tabNames(ui.Library)
         local found = {}
         for _, name in ipairs(names) do found[name] = true end

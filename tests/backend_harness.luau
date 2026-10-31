@@ -22,6 +22,13 @@ local function signal()
         connection=self:Connect(function(...) connection:Disconnect(); fn(...) end)
         return connection
     end
+    -- Roblox signals have :Wait(); the harness cannot block, so it returns at once
+    -- (the deferred body runs on the same test step). Faithful enough for code
+    -- that waits one frame before acting -- the frame boundary is simulated by
+    -- the test firing Heartbeat or flushing spawned work.
+    function event:Wait()
+        return nil
+    end
     return event
 end
 local Color3 = {}
@@ -671,6 +678,40 @@ local function sandbox(placeId, gameId)
     -- primitives there too, matching how a real executor exposes them.
     context.State.hookfunction = env.hookfunction
     context.State.restorefunction = env.restorefunction
+    -- Executor debug library. Stock Luau has debug.getupvalue/setupvalue but no
+    -- setter for closures' upvalues at a distance, so the real primitive is
+    -- modelled here: a per-function list of upvalue slots the feature patches
+    -- (Jump Anywhere rewrites CharacterActions.Jump's check upvalue). This keeps
+    -- the offline path honest -- a feature that patches by index hits the same
+    -- slots it would in an executor.
+    local upvalueRegistry = {}
+    env.debug = {
+        getupvalue = function(fn, index)
+            local slots = upvalueRegistry[fn]
+            if not slots or not slots[index] then return nil end
+            local slot = slots[index]
+            return slot.Name, slot.Value
+        end,
+        setupvalue = function(fn, index, value)
+            local slots = upvalueRegistry[fn]
+            if not slots or not slots[index] then return nil end
+            slots[index].Value = value
+            return slots[index].Name
+        end,
+        -- Test-only: register the upvalue slots a function should expose. A real
+        -- executor reads the compiler-produced slots; the harness has no compiled
+        -- function for CA.Jump, so the test declares them.
+        setregistry = function(fn, slots) upvalueRegistry[fn] = slots end,
+    }
+    context.State.debug = env.debug
+    env.require = function(target)
+        local module = target
+        if type(module) == "table" and module._props then module = module._props.Module end
+        if type(module) == "function" then return module() end
+        if module ~= nil then return module end
+        error("harness require: no ModuleScript payload", 2)
+    end
+    context.State.require = env.require
     return context
 end
 local ossContext = sandbox()
