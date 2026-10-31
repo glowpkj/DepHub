@@ -315,14 +315,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.01)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.02)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
 HStack:
 
-FEITO / FUNCIONANDO (verificado offline, 751 checks):
+FEITO / FUNCIONANDO (verificado offline, 760 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -331,6 +331,8 @@ FEITO / FUNCIONANDO (verificado offline, 751 checks):
   (Sea 1/2), Universal.
 - Abas montam controles (bug do CreateSection corrigido em v0.0.98).
 - Fix do mouse do shell (v0.0.97).
+- Volleyball 4.2 auto SET: duas Parts 1x1x1 fixas criadas no load
+  (DepHubAutoSet), sem controle, removidas no Destroy (v0.1.02).
 
 UI EM INGLES (regra permanente):
 - TODA string visivel ao jogador e em ingles: nomes de aba/secao, labels de
@@ -384,6 +386,18 @@ ALTURA DAS SECOES + VSTACK/HSTACK (concluido em v0.1.01):
   encurta bastante as abas.
 - Cobertura: testes de tema (AddHStack reflow 50/50, VStack vertical, altura da
   secao = conteudo) e de backend (Volleyball usa linhas de par).
+
+AUTO SET / PARTS SEM CONTROLE (Volleyball 4.2, v0.1.02):
+- Quando a tarefa pede "criar automaticamente, sem controle": a Part e criada no
+  LOAD do backend (nao num toggle/botao) e nao existe UI que a ligue/desligue.
+- Parenteie as Parts num Folder proprio no Workspace (ex. "DepHubAutoSet"),
+  destruindo um homonimo antes de criar, e destrua o Folder no State:Destroy()
+  para nao deixar residuo (regra 3 do AGENTS.md).
+- Marque Anchored + CanCollide/CanTouch/CanQuery = false e Transparency = 1 para
+  nao interferir na fisica/raycast do jogo nem aparecer.
+- O harness de teste permite Instance.new("Part"), mas rejeita GUI - entao criar
+  Part no load e testavel: o teste afirma existencia, Size 1,1,1, posicao exata
+  e a limpeza no Destroy.
 
 EXCECAO DELIBERADA - Blox Fruits:
 - As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,

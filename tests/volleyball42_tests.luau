@@ -52,6 +52,21 @@ do
     check(type(state) == "table", "Volleyball 4.2 starts with a mounted window")
     check(type(state.Config) == "table", "Volleyball exposes its config table")
 
+    -- Auto SET: the two set positions must exist as soon as the backend loads,
+    -- with no control to create them and nothing that can switch them off.
+    local setFolder = ctx.Services.Workspace:FindFirstChild("DepHubAutoSet")
+    check(setFolder ~= nil, "the auto SET folder is created on load")
+    local setParts = setFolder and setFolder:GetChildren() or {}
+    check(#setParts == 2, "the auto SET folder holds exactly two set positions")
+    local positions = {}
+    for _, part in ipairs(setParts) do
+        positions[part.Name] = part.CFrame.Position
+        check(part.Size == Vector3.new(1, 1, 1), "each set position is a 1x1x1 part: " .. part.Name)
+        check(part.Anchored == true and part.CanCollide == false, "each set position is anchored and non-colliding: " .. part.Name)
+    end
+    check(positions.SetPosition1 == Vector3.new(-22, 15, 0), "set position 1 is at (-22, 15, 0)")
+    check(positions.SetPosition2 == Vector3.new(22, 15, 0), "set position 2 is at (22, 15, 0)")
+
     -- A ball owned by the local player, so isOwner/Personal mode accept it.
     local ball = Instance.new("Model"); ball.Name = "Ball"; ball.Parent = ctx.Services.Workspace
     local ballPart = Instance.new("Part"); ballPart.Name = "Ball"; ballPart.Parent = ball
@@ -146,6 +161,7 @@ do
     state:Destroy()
     check(state.Destroyed and humanoid.JumpPower == 55, "destroy restores the jump power")
     check(ctx.State.__DEPHUB.Volleyball42 == nil, "destroy clears the published state")
+    check(ctx.Services.Workspace:FindFirstChild("DepHubAutoSet") == nil, "destroy removes the auto SET folder")
 
     -- The new controls are registered on the Ball Predict tab.
     local labels = {}

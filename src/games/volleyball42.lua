@@ -128,6 +128,40 @@ tracer.Transparency = NumberSequence.new(0.05)
 tracer.Enabled = false
 tracer.Parent = folder
 
+-- Auto SET: as duas posicoes fixas de levantamento (set) do mapa. Sao criadas
+-- sempre no load, sem nenhum controle que as ligue/desligue -- so existem.
+-- Ancoradas e sem colisao/touch/query (nao interferem na fisica), invisiveis,
+-- dentro de um Folder proprio no Workspace para poderem ser limpas de uma vez.
+local SET_FOLDER_NAME = "DepHubAutoSet"
+local SET_POSITIONS = {
+    CFrame.new(-22, 15, 0),
+    CFrame.new(22, 15, 0),
+}
+
+local oldSetFolder = Workspace:FindFirstChild(SET_FOLDER_NAME)
+if oldSetFolder then
+    oldSetFolder:Destroy()
+end
+
+local setFolder = Instance.new("Folder")
+setFolder.Name = SET_FOLDER_NAME
+setFolder.Parent = Workspace
+
+for index, position in ipairs(SET_POSITIONS) do
+    local setPart = Instance.new("Part")
+    setPart.Name = "SetPosition" .. tostring(index)
+    setPart.Shape = Enum.PartType.Block
+    setPart.Size = Vector3.new(1, 1, 1)
+    setPart.CFrame = position
+    setPart.Anchored = true
+    setPart.CanCollide = false
+    setPart.CanTouch = false
+    setPart.CanQuery = false
+    setPart.CastShadow = false
+    setPart.Transparency = 1
+    setPart.Parent = setFolder
+end
+
 local function connect(list, signal, callback)
     local ok, connection = pcall(signal.Connect, signal, callback)
     if ok and connection then
@@ -905,6 +939,12 @@ function State:Destroy()
         folder:Destroy()
     end
 
+    -- The Auto SET folder holds the two set positions; without this it survives
+    -- the unload and leaves residue in the Workspace.
+    if setFolder.Parent then
+        setFolder:Destroy()
+    end
+
     if env[STATE_KEY] == self then
         env[STATE_KEY] = nil
     end
@@ -1029,6 +1069,8 @@ do
         Diag:Probe("Workspace.Ball",ball~=nil,ball and ball.ClassName or "absent (prediction cannot acquire the ball)")
         Diag:Probe("Workspace.LockCourt",#State.Courts>0,#State.Courts.." courts cached")
         Diag:Probe("Workspace.Ceiling",#State.Ceilings>0,#State.Ceilings.." ceilings cached")
+        local setFolderRef=Workspace:FindFirstChild(SET_FOLDER_NAME)
+        Diag:Probe("Workspace."..SET_FOLDER_NAME,setFolderRef~=nil,setFolderRef and (#setFolderRef:GetChildren().." set positions") or "absent (auto SET did not spawn)")
         local blue,red=false,false
         local okTeams,teams=pcall(function() return game:GetService("Teams") end)
         if okTeams and teams then
@@ -1053,6 +1095,16 @@ do
         Diag:Feature("Volleyball.JumpForce",function() return State.Toggles.JumpForce and ("ON "..tostring(Config.jumpPower)) or "off" end)
         Diag:Feature("Volleyball.InstantMove",function() return Config.instantMove and "ON" or "off" end)
         Diag:Feature("Volleyball.CeilingNoClip",function() return State.Toggles.CeilingNoClip and "ON" or "off" end)
+        Diag:Feature("Volleyball.AutoSet",function()
+            local set=Workspace:FindFirstChild(SET_FOLDER_NAME)
+            if not set then return "absent" end
+            local parts={}
+            for _,child in ipairs(set:GetChildren()) do
+                local p=child.Position
+                parts[#parts+1]=string.format("%s(%.0f,%.0f,%.0f)",child.Name,p.X,p.Y,p.Z)
+            end
+            return table.concat(parts," ")
+        end)
         Diag:Feature("Volleyball.CanJump",function()
             local ch=LocalPlayer.Character
             local h=ch and ch:FindFirstChildOfClass("Humanoid")
