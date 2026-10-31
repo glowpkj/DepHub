@@ -1,9 +1,10 @@
 -- Behaviour checks for o backend de Blox Fruits do usuario.
 --
 -- O backend carrega src/games/features/bloxfruits/<nome>.lua (uma feature por
--- arquivo, cada uma independente) e monta o painel. A arvore open-source antiga
--- (oss/) nao e carregada: as features dela vao sendo trazidas para o molde
--- proprio uma a uma, comecando pela blade hit.
+-- arquivo, cada uma independente) e monta o painel. As features que ainda nao
+-- foram portadas ficam guardadas em features/bloxfruits/parked/ -- fora da
+-- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
+-- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
 local FEATURES = {"bladhits"}
 
@@ -16,7 +17,13 @@ local function bfContext(placeId, gameId)
         local path = FEATURE_PREFIX .. name .. ".lua"
         ctx.Responses[path] = sources[path]
     end
-    return ctx
+    -- Os remotes que a blade hit resolve, para o Enable passar de verdade.
+    local rstorage = ctx.Services.ReplicatedStorage
+    local modules = Instance.new("Folder"); modules.Name = "Modules"; modules.Parent = rstorage
+    local netFolder = Instance.new("Folder"); netFolder.Name = "Net"; netFolder.Parent = modules
+    local attack = Instance.new("RemoteEvent"); attack.Name = "RE/RegisterAttack"; attack.Parent = netFolder
+    local hit = Instance.new("RemoteEvent"); hit.Name = "RE/RegisterHit"; hit.Parent = netFolder
+    return ctx, modules
 end
 
 -- A blade hit e auto-contida de proposito: nada de DepHub, nada de adapter.
@@ -48,44 +55,12 @@ do
     check(instance.LastHitId == 4242, "SetHitId ignora nil e nao apaga o id")
 end
 
+-- O caminho ativo: a blade hit carrega, instancia pelo toggle e sai no Destroy.
+-- Este e o contrato que importa para o script do usuario.
 do
     local ctx = bfContext(994732206, 994732206)
     local state = ctx:Run("src/games/bloxfruits.lua")
-    check(type(state) == "table" and state.Destroyed == false, "o backend de Blox Fruits sobe parado")
-    check(state.Disabled == true, "o backend reporta o estado desligado")
-
-    -- Parado: nenhuma feature carrega e o painel nao e construido.
-    check(next(state.Features) == nil, "nenhuma feature carrega enquanto parado")
-    check(next(state.Instances) == nil, "nenhuma feature instancia enquanto parado")
-    check(next(state.Toggles) == nil, "nenhum toggle e publicado enquanto parado")
-    check(state.UIFrontend == nil, "o frontend nao e construido enquanto parado")
-    check(type(state.Errors) == "table" and #state.Errors == 0, "parking nao gera erro")
-
-    check(state:SetToggle("bladhits", true) == false, "um toggle nao pode ser ligado enquanto parado")
-    check(state:GetToggle("bladhits") == false, "um toggle desconhecido le falso enquanto parado")
-
-    local status = state:GetStatus()
-    check(status.Disabled == true and status.TogglesOn == 0, "status reporta parado e zero toggles ligados")
-
-    state:Destroy()
-    check(state.Destroyed and ctx.State.__DEPHUB.BloxFruits == nil, "destroy limpa o estado publicado")
-    check(state:SetToggle("bladhits", true) == false, "backend destruido rejeita toggles")
-end
-
--- O caminho ativo: com a flag levantada, a blade hit carrega, instancia pelo
--- toggle e sai no Destroy. Este e o contrato que importa para o script do
--- usuario.
-do
-    local ctx = bfContext(994732206, 994732206)
-    -- Os remotes que a blade hit resolve, para o Enable passar de verdade.
-    local rstorage = ctx.Services.ReplicatedStorage
-    local modules = Instance.new("Folder"); modules.Name = "Modules"; modules.Parent = rstorage
-    local netFolder = Instance.new("Folder"); netFolder.Name = "Net"; netFolder.Parent = modules
-    local attack = Instance.new("RemoteEvent"); attack.Name = "RE/RegisterAttack"; attack.Parent = netFolder
-    local hit = Instance.new("RemoteEvent"); hit.Name = "RE/RegisterHit"; hit.Parent = netFolder
-
-    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
-    check(type(state) == "table" and state.Disabled == false, "o backend roda com a flag levantada")
+    check(type(state) == "table" and state.Destroyed == false, "o backend de Blox Fruits sobe")
 
     local factory = state.Features.bladhits
     check(type(factory) == "table" and type(factory.new) == "function", "a blade hit e carregada pelo backend")
@@ -119,22 +94,40 @@ do
     check(state:SetFeatureRange("nao-existe", 5) == false, "knob de feature desconhecida e rejeitado")
 
     local status = state:GetStatus()
-    check(status.Disabled == false and status.TogglesOn == 1, "status conta a feature ligada")
+    check(status.TogglesOn == 1, "status conta a feature ligada")
 
     state:Destroy()
     check(state.Destroyed and next(state.Instances) == nil, "destroy derruba as instancias")
     check(ctx.State.__DEPHUB.BloxFruits == nil, "destroy limpa o global do backend")
+    check(state:SetToggle("bladhits", true) == false, "backend destruido rejeita toggles")
 end
 
 -- Sem os remotes, ligar nao explode: o modulo instancia, o Enable devolve false
 -- e o toggle fica desligado. O jogador ve a notificacao, nao um erro.
 do
-    local ctx = bfContext(994732206, 994732206)
-    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
+    local ctx, modules = bfContext(994732206, 994732206)
+    modules.Parent = nil
+    local state = ctx:Run("src/games/bloxfruits.lua")
     check(state:SetToggle("bladhits", true) == false, "sem remotes ligar devolve false")
     check(state.Instances.bladhits ~= nil, "mesmo assim o modulo foi instanciado")
     check(state:GetToggle("bladhits") == false, "sem remotes o toggle fica desligado")
     check(state.Instances.bladhits:IsEnabled() == false, "sem remotes a feature nao liga")
+    state:Destroy()
+end
+
+-- As features parkeadas ficam fora da pasta ativa: o backend nao as resolve e
+-- o manifest nao as lista (nada apagado -- so nao carregam).
+do
+    local ctx = bfContext(994732206, 994732206)
+    ctx.Responses[FEATURE_PREFIX .. "parked/farm.lua"] = "error('parked feature must not be fetched')"
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
+    check(next(state.Features) ~= nil, "so as features ativas carregam")
+    for name in pairs(state.Features) do
+        check(name == "bladhits", "nenhuma feature parkeada e carregada")
+    end
+    check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
+    check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
     state:Destroy()
 end
 
@@ -143,7 +136,7 @@ end
 do
     local ctx = bfContext(994732206, 994732206)
     local ui = ctx:MountUI()
-    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
+    local state = ctx:Run("src/games/bloxfruits.lua")
     check(type(state) == "table", "o backend constroi contra uma janela montada")
     check(state.UIFrontend == ui, "o backend publica o frontend montado")
 
@@ -157,6 +150,7 @@ end
 do
     local ctx = bfContext(85211729168715, 85211729168715)
     local state = ctx:Run("src/games/bloxfruits.lua")
-    check(type(state) == "table" and state.Disabled == true, "Blox Fruits sobe parado tambem na rota do Sea 1")
+    check(type(state) == "table" and state.Destroyed == false, "Blox Fruits sobe tambem na rota do Sea 1")
+    check(state.Features.bladhits ~= nil, "a blade hit carrega na rota do Sea 1")
     check(ctx.State.__DEPHUB.BloxFruits == state, "o contrato do loader aponta pro backend")
 end

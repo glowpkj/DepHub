@@ -253,17 +253,17 @@ do
 end
 
 do
-    -- Blox Fruits runs its own per-feature modules again (one file per feature
-    -- under features/bloxfruits/), not the vendored open-source adapter. The
-    -- backend is parked by default, so this contract is exercised with the flag
-    -- lifted. The features are self-contained, so the sandbox only has to serve
-    -- their files -- no oss/ tree is resolved any more.
+    -- Blox Fruits runs its own per-feature modules (one file per feature under
+    -- features/bloxfruits/), not the vendored open-source adapter. The features
+    -- are self-contained, so the sandbox only has to serve their files -- no
+    -- oss/ tree is resolved any more, and there is no global on/off flag: what
+    -- is listed in the backend is what loads.
     local ctx = sandbox()
     for _, name in ipairs(BF_FEATURES) do
         local path = BF_FEATURE_PREFIX .. name .. ".lua"
         ctx.Responses[path] = sources[path]
     end
-    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
+    local state = ctx:Run("src/games/bloxfruits.lua")
     check(type(state) == "table" and state.Destroyed == false, "actual Blox Fruits entry starts the backend")
     check(state.Features.bladhits ~= nil, "Blox Fruits loads the blade hit feature")
     check(state.Instances.bladhits == nil, "no feature turns itself on at load")
@@ -282,18 +282,16 @@ do
 end
 
 do
-    -- Parked by default: the backend still resolves for the loader, but nothing
-    -- loads and no toggle is published -- what keeps Blox Fruits out of the
-    -- panel while every file stays on disk.
+    -- The features that were not ported yet live in features/bloxfruits/parked/
+    -- -- out of the active folder, not loaded, not in the manifest. Nothing was
+    -- deleted: the backend simply never resolves them, and no parked feature
+    -- can be toggled back on.
     local ctx = sandbox()
-    for _, name in ipairs(BF_FEATURES) do
-        local path = BF_FEATURE_PREFIX .. name .. ".lua"
-        ctx.Responses[path] = sources[path]
-    end
+    ctx.Responses[BF_FEATURE_PREFIX .. "parked/farm.lua"] = "error('parked feature must not be fetched')"
     local state = ctx:Run("src/games/bloxfruits.lua")
-    check(type(state) == "table" and state.Disabled == true, "the Blox Fruits entry loads parked by default")
-    check(next(state.Toggles or {}) == nil, "a parked Blox Fruits publishes no toggle")
-    check(next(state.Features or {}) == nil, "a parked Blox Fruits loads no feature")
+    check(type(state) == "table" and state.Destroyed == false, "the backend starts with parked/ beside it")
+    check(state.Instances["farm"] == nil, "a parked feature does not instantiate")
+    check(state:SetToggle("farm", true) == false, "a parked feature cannot be toggled on")
     state:Destroy()
 end
 

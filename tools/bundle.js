@@ -52,11 +52,17 @@ for (const core of routedCores) modulePaths.add(core);
 // Walk src/ recursively: any module under it is potentially loadable, so inline
 // the lot. This is the belt-and-braces guarantee that no route falls through to
 // the network, and it means new files need no manifest edit to ship.
+//
+// Exception: features/bloxfruits/parked/ holds features that were taken out of
+// the active folder on purpose (nothing deleted). They are not routed to, not
+// tracked, and must not ship -- skip the subtree so they never enter the bundle.
 function walk(dir) {
   for (const entry of fs.readdirSync(path.join(root, dir), {withFileTypes: true})) {
     const rel = dir + '/' + entry.name;
-    if (entry.isDirectory()) walk(rel);
-    else if (entry.name.endsWith('.lua') || entry.name.endsWith('.luau') || entry.name.endsWith('.txt')) modulePaths.add(rel);
+    if (entry.isDirectory()) {
+      if (rel === 'src/games/features/bloxfruits/parked') continue;
+      walk(rel);
+    } else if (entry.name.endsWith('.lua') || entry.name.endsWith('.luau') || entry.name.endsWith('.txt')) modulePaths.add(rel);
   }
 }
 walk('src');

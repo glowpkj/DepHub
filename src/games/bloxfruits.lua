@@ -13,9 +13,11 @@ local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env._
 -- Disable(). Este backend so faz tres coisas -- baixa a arvore, monta o painel
 -- e liga/desliga cada feature pelo toggle.
 --
--- A arvore open-source antiga (src/games/features/bloxfruits/oss/) continua no
--- repositorio, mas NAO e carregada aqui: as features dela vao sendo trazidas pro
--- molde proprio uma a uma. Por isso o backend so varre FEATURE_MODULES.
+-- As features que ainda nao foram portadas ficam guardadas em
+-- src/games/features/bloxfruits/parked/ (nada foi apagado): elas saem da pasta
+-- ativa, nao carregam e nao entram no manifest, mas seguem no disco prontas
+-- para serem trazidas pro molde proprio uma a uma. Por isso o backend so varre
+-- FEATURE_MODULES -- nao existe flag global que ligue/desligue tudo.
 
 local FEATURE_PATH = "src/games/features/bloxfruits/"
 local VERSION = "1.0.0"
@@ -26,16 +28,6 @@ local VERSION = "1.0.0"
 local FEATURE_MODULES = {
     {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
 }
-
--- MASTER SWITCH -- o backend inteiro fica parado.
---
--- Nada e apagado: os arquivos de feature, o backend, os testes e o manifest
--- seguem exatamente como estao, e voltar esta flag para `false` restaura o
--- comportamento com nenhuma outra mudanca. Enquanto `true`: nenhuma feature
--- inicializa e o frontend nao e construido.
--- __DEPHUB_BF_DISABLED e o override usado pelos testes offline.
-local DISABLED = true
-if type(env.__DEPHUB_BF_DISABLED) == "boolean" then DISABLED = env.__DEPHUB_BF_DISABLED end
 
 local previous = type(env.__DEPHUB_BLOXFRUITS) == "table" and env.__DEPHUB_BLOXFRUITS or nil
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
@@ -79,7 +71,6 @@ end
 
 local State = {
     Destroyed = false,
-    Disabled = DISABLED,
     Version = VERSION,
     Features = {},
     Instances = {},
@@ -91,15 +82,13 @@ local State = {
 
 -- Carrega cada feature e guarda a fabrica. Nenhum init ainda: o modulo so
 -- instancia quando o toggle liga, para o painel abrir sem ligar nada sozinho.
-if not DISABLED then
-    for _, entry in ipairs(FEATURE_MODULES) do
-        local ok, factory = loadFactory(FEATURE_PATH .. entry.name .. ".lua")
-        if ok then
-            State.Features[entry.name] = factory
-        else
-            State.Errors[#State.Errors + 1] = entry.name .. ": " .. tostring(factory)
-            report("BloxFruits: feature " .. entry.name .. " falhou: " .. tostring(factory))
-        end
+for _, entry in ipairs(FEATURE_MODULES) do
+    local ok, factory = loadFactory(FEATURE_PATH .. entry.name .. ".lua")
+    if ok then
+        State.Features[entry.name] = factory
+    else
+        State.Errors[#State.Errors + 1] = entry.name .. ": " .. tostring(factory)
+        report("BloxFruits: feature " .. entry.name .. " falhou: " .. tostring(factory))
     end
 end
 
@@ -169,7 +158,6 @@ function State:GetStatus()
     for _, value in pairs(self.Toggles) do if value then on = on + 1 end end
     return {
         Version = self.Version,
-        Disabled = self.Disabled == true,
         Features = self.Instances,
         Loaded = self.Features,
         TogglesOn = on,
@@ -196,7 +184,7 @@ env.__DEPHUB.BloxFruitsOwn = State
 
 -- Painel: a UI e construida pelo proprio backend, com a shell compartilhada,
 -- para o script nao depender do adapter nem de um frontend externo.
-local visual = (not DISABLED) and env.__DEPHUB and env.__DEPHUB.UI or nil
+local visual = env.__DEPHUB and env.__DEPHUB.UI or nil
 if type(visual) == "table" and type(visual.CreateTab) == "function" then
     local pages = {}
     for _, entry in ipairs(FEATURE_MODULES) do
@@ -232,7 +220,6 @@ end
 do
     local Diag = env.__DEPHUB and env.__DEPHUB.Diagnostics
     if Diag and type(Diag.RegisterModule) == "function" then
-        Diag:SetEnvironment({["BloxFruits state"] = DISABLED and "disabled" or "enabled"})
         for _, entry in ipairs(FEATURE_MODULES) do
             local path = "features/bloxfruits/" .. entry.name .. ".lua"
             Diag:RegisterModule(path)
@@ -245,7 +232,6 @@ do
             end
             Diag:Module(path, loaded, detail)
         end
-        Diag:Feature("BloxFruits.Enabled", function() return DISABLED and "no" or "yes" end)
         Diag:Feature("BloxFruits.Toggles on", function() return tostring(State:GetStatus().TogglesOn) end)
         Diag:Feature("BloxFruits.LastError", function() return tostring(State.LastError or "none") end)
     end
