@@ -22,12 +22,24 @@ do
         check(ctx.State.__DEPHUB_LOADER_STATE.status == "success", "successful loader records success state")
         check(ctx.State.__DEPHUB.Mode == case[3], "loader records the backend label")
         -- The loader proves liveness first (a raw print before any early return),
-        -- then emits the four identity lines and the resolved source host.
-        check(#ctx.Logs == 6, "loader emits its liveness line plus the startup identity lines")
+        -- then emits its identity lines, the resolved source host, and progress
+        -- logs around the UI/backend load. Assert the meaningful lines appear in
+        -- order instead of pinning the exact log count, so extra progress lines
+        -- never break this test.
+        local function logIndexOf(pattern)
+            for i, line in ipairs(ctx.Logs) do if line:match(pattern) then return i end end
+            return nil
+        end
         check(ctx.Logs[1] == "[DepHub] loader starting...", "the loader proves liveness before any early return")
-        check(ctx.Logs[2] and ctx.Logs[2]:match("^Starting loader v%d+%.%d+%.%d+$") ~= nil and ctx.Logs[3] == "Executor detected: Test", "startup logs have no old prefix")
-        check(ctx.Logs[4] == "PlaceId: " .. case[1] and ctx.Logs[5] == "GameId: " .. case[2], "game identity logs preserved")
-        check(ctx.Logs[6] and ctx.Logs[6]:match("^Source: https://") ~= nil, "loader logs the resolved source host")
+        local iStarting = logIndexOf("^Starting loader v%d+%.%d+%.%d+$")
+        local iExecutor = logIndexOf("^Executor detected: Test$")
+        local iPlace = logIndexOf("^PlaceId: " .. case[1] .. "$")
+        local iGame = logIndexOf("^GameId: " .. case[2] .. "$")
+        local iSource = logIndexOf("^Source: https://")
+        check(iStarting and iExecutor and iPlace and iGame and iSource, "loader emits its startup identity lines plus the source host")
+        check(iStarting < iExecutor and iExecutor < iPlace and iPlace < iGame and iGame < iSource, "startup identity lines are in order")
+        check(logIndexOf("^Backend loaded%. DepHub v") ~= nil, "loader logs a final ready line")
+        check(not table.find(ctx.Logs, "Starting loader v0.0.1"), "startup logs have no old prefix")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
         check(ctx.State.__DEPHUB.Updater.Started, "updater still starts using fresh code")
@@ -59,15 +71,17 @@ do
     end
 
     -- Regression: the loader used to declare `Players.LocalPlayer or
-    -- Players.PlayerAdded:Wait()` and never use it. When LocalPlayer is nil that
-    -- :Wait() blocks the whole thread -- no print, no error, no panel -- which is
-    -- exactly the "I ran it and nothing happens" symptom. The declaration is
-    -- dead code and must stay gone; a blocking wait must not reappear at load.
+    -- Players.PlayerAdded:Wait()` and never use it, and later used
+    -- `game.Loaded:Wait()` to gate startup. Both are blocking waits that, when
+    -- the signal has already fired, never return -- no print, no error, no panel,
+    -- the "I ran it and nothing happens" symptom. Neither may come back.
     do
         local ctx = sandbox()
         local loaderSource = ctx.Sources["DepHub.lua"]
         check(not loaderSource:find("PlayerAdded:Wait()", 1, true),
             "the loader has no blocking PlayerAdded:Wait() at startup")
+        check(not loaderSource:find("game.Loaded:Wait()", 1, true),
+            "the loader has no blocking game.Loaded:Wait() at startup")
         check(loaderSource:find('pcall(print, "[DepHub] loader starting...")', 1, true) ~= nil,
             "the loader proves liveness before any early return")
     end

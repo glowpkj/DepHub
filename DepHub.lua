@@ -27,7 +27,7 @@ local HOST_TEMPLATES = {
     "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.1.05"
+local VERSION = "0.1.06"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -457,7 +457,14 @@ local knownTarget = targets[placeId] or targets[gameId] or (isAOTRName and {Core
 if not knownTarget and env.__DEPHUB_DISABLE_UNIVERSAL ~= true then
     knownTarget = {Core = "src/games/universal.lua", Universal = true}
 end
-if not game:IsLoaded() then game.Loaded:Wait() end
+-- Nao usar um Wait() bloqueante no sinal de Loaded aqui: se o jogo ja carregou,
+-- ele nao dispara de novo e o Wait travaria a thread para sempre (mesmo sintoma
+-- do PlayerAdded removido). Se o jogo ainda estiver carregando, alguns frames de
+-- espera ativa cobrem o caso sem prender o script indefinidamente.
+for _ = 1, 30 do
+    if game:IsLoaded() then break end
+    task.wait(0.1)
+end
 task.wait()
 
 -- The shell is identical for every game, so the loader only hands it the name
@@ -470,6 +477,7 @@ if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "func
     return fail("DemonOfDarknessUI nao carregou: " .. tostring(demonModule))
 end
 Diag:Module("src/core/demon-ui.lua", true, "loaded")
+log("UI module loaded; building window...")
 
 local okWindow, window = pcall(demonModule.new, {
     Name = "DepHub",
@@ -480,6 +488,7 @@ if not okWindow or type(window) ~= "table" then
     return fail("Could not start DemonOfDarknessUI: " .. tostring(window))
 end
 Diag:Module("demon-ui window", true, "janela criada")
+log("Window built; loading backend...")
 
 env.__DEPHUB.DemonUI = window
 env.__DEPHUB.UI = window
@@ -590,6 +599,7 @@ end
 
 local target = knownTarget
 Diag:RegisterModule(target.Core)
+log("Loading backend " .. tostring(target.Core) .. "...")
 local okCore, coreResult = loadModule(target.Core, false)
 if not okCore then
     Diag:Module(target.Core, false, tostring(coreResult))
@@ -652,6 +662,7 @@ if env[STATE_KEY] ~= session then return false end
 env[EXECUTED_KEY] = true
 env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
+log("Backend loaded. DepHub v" .. VERSION .. " ready -- press N to open the panel.")
 
 task.defer(function()
     if env[STATE_KEY] ~= session or session.status ~= "success" then return end
