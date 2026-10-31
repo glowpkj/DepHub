@@ -315,14 +315,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.02)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.03)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
 HStack:
 
-FEITO / FUNCIONANDO (verificado offline, 760 checks):
+FEITO / FUNCIONANDO (verificado offline, 775 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -333,6 +333,9 @@ FEITO / FUNCIONANDO (verificado offline, 760 checks):
 - Fix do mouse do shell (v0.0.97).
 - Volleyball 4.2 auto SET: duas Parts 1x1x1 fixas criadas no load
   (DepHubAutoSet), sem controle, removidas no Destroy (v0.1.02).
+- Volleyball 4.2 acoes do jogo: remotes PlayerAction + animacoes mapeados em
+  features/volleyball/actions.lua (set/spike/block/bump/dive/spawn/serve),
+  expostos como State:Act para as automacoes (v0.1.03).
 
 UI EM INGLES (regra permanente):
 - TODA string visivel ao jogador e em ingles: nomes de aba/secao, labels de
@@ -398,6 +401,22 @@ AUTO SET / PARTS SEM CONTROLE (Volleyball 4.2, v0.1.02):
 - O harness de teste permite Instance.new("Part"), mas rejeita GUI - entao criar
   Part no load e testavel: o teste afirma existencia, Size 1,1,1, posicao exata
   e a limpeza no Destroy.
+
+ACOES DO JOGO (remotes + animacoes) - Volleyball 4.2, v0.1.03:
+- O que o jogo usa para agir fica num modulo de feature
+  (src/games/features/<jogo>/<nome>.lua), carregado pelo backend via
+  game:HttpGet + loadstring (mesmo padrao do TSB/MM2), e registrado no manifest.
+- O modulo NAO cria UI nem liga sozinho: ele publica as acoes (FireServer no
+  remote real + LoadAnimation no Animator) para as automacoes do backend.
+- Remote ausente/Animator ausente NAO derruba o backend: reporta falha
+  (State:Act devolve false, "unavailable"/erro) em vez de error(). O load nao
+  bloqueia se o modulo falhar (so avisa por warn).
+- Indices que o jogador equipa (ex. PlayerData.Animations.Set) sao lidos em
+  runtime, nunca fixados no codigo; sem PlayerData cai no indice 1.
+- Acoes com task.wait interno (ex. Serve 1.2s) rodam em task.spawn e a task e
+  guardada no State para o Destroy cancelar (sem disparar depois do unload).
+- Todo diretorio src/games/features/<jogo>/ tem que constar em
+  tests/validate_repo.js (validateFeatureDirectory) e no manifest.
 
 EXCECAO DELIBERADA - Blox Fruits:
 - As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,

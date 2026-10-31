@@ -512,6 +512,14 @@ local function sandbox(placeId, gameId)
         self.Deferred = {}
         for _, call in ipairs(pending) do call.Fn(unpack(call.Args)) end
     end
+    -- task.spawn bodies are recorded (not run) so tests decide when they execute.
+    -- Serve uses one for its delayed hit; running it here is how the test proves
+    -- the "Serving" fire happens.
+    function context:FlushSpawned()
+        local pending = self.Spawned
+        self.Spawned = {}
+        for _, call in ipairs(pending) do call.Fn(unpack(call.Args)) end
+    end
     function context:Provide(path, value)
         self.Responses[path] = 'return _provided[' .. string.format('%q', path) .. ']'
         env._provided[path] = value

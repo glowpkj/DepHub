@@ -56,6 +56,7 @@
       "src/core/updater.lua",
       "src/core/diagnostics.lua",
       "src/games/volleyball42.lua",
+      "src/games/features/volleyball/actions.lua",
       "src/games/updates/1316421563.txt"
     ]
   },
