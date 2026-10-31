@@ -82,7 +82,7 @@ const sources = 'local sources = {\n' + files.map(file =>
   `[ ${quote(file)} ] = ${quote(fs.readFileSync(path.join(root, file), 'utf8'))},`).join('\n') + '\n}';
 const harness = fs.readFileSync(path.join(__dirname, 'backend_harness.luau'), 'utf8')
   .replace('-- INSERT_SOURCES', () => sources)
-  .replace('-- INSERT_BLOXF_OSS_TESTS', () => fs.readFileSync(path.join(__dirname, 'bloxfruits_oss_tests.luau'), 'utf8'))
+  .replace('-- INSERT_BLOXF_OSS_TESTS', () => fs.readFileSync(path.join(__dirname, 'bloxfruits_tests.luau'), 'utf8'))
   .replace('-- INSERT_THEME_SOURCE', () => {
     const theme = fs.readFileSync(path.join(root, 'src/core/ui/demon-theme.luau'), 'utf8');
     const partsDir = path.join(root, 'src/core/ui/theme');

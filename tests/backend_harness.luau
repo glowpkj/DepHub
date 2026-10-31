@@ -734,6 +734,11 @@ local function sandbox(placeId, gameId)
 end
 local ossContext = sandbox()
 local player = ossContext.Player
+-- Blox Fruits: the backend loads its own per-feature modules from
+-- features/bloxfruits/ (one file per feature, each self-contained). These are
+-- the files the tests have to serve, and the ones they exercise directly.
+local BF_FEATURE_PREFIX = "src/games/features/bloxfruits/"
+local BF_FEATURES = {"bladhits"}
 -- INSERT_THEME_SOURCE
 -- INSERT_BLOXF_OSS_TESTS
 -- INSERT_LIFECYCLE_TESTS

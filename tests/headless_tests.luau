@@ -253,30 +253,29 @@ do
 end
 
 do
-    -- Blox Fruits now runs the vendored open-source script behind a headless
-    -- adapter, so the loader contract is the control registry it publishes
-    -- rather than the old per-feature mock modules. The backend is parked by
-    -- default now (DISABLED in the backend), so this contract is exercised with
-    -- the flag lifted, exactly as the repo runs it when Blox Fruits is on.
+    -- Blox Fruits runs its own per-feature modules again (one file per feature
+    -- under features/bloxfruits/), not the vendored open-source adapter. The
+    -- backend is parked by default, so this contract is exercised with the flag
+    -- lifted. The features are self-contained, so the sandbox only has to serve
+    -- their files -- no oss/ tree is resolved any more.
     local ctx = sandbox()
-    for _, name in ipairs(OSS_MODULES) do
-        local path = OSS_PREFIX .. name .. ".lua"
+    for _, name in ipairs(BF_FEATURES) do
+        local path = BF_FEATURE_PREFIX .. name .. ".lua"
         ctx.Responses[path] = sources[path]
     end
     local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
-    check(type(state) == "table" and state.Destroyed == false, "actual Blox Fruits entry starts the OSS backend with no UI")
-    check(state.UI ~= nil and state.UI.gui == nil, "Blox Fruits backend builds no window")
-    check(state.Toggles and next(state.Toggles) ~= nil, "Blox Fruits publishes its toggles for the frontend")
+    check(type(state) == "table" and state.Destroyed == false, "actual Blox Fruits entry starts the backend")
+    check(state.Features.bladhits ~= nil, "Blox Fruits loads the blade hit feature")
+    check(state.Instances.bladhits == nil, "no feature turns itself on at load")
 
-    local toggled = false
-    for key in pairs(state.Toggles) do toggled = key break end
-    check(state:SetToggle(toggled, true) and state:GetToggle(toggled), "Blox Fruits toggles route through the backend")
-    check(state:SetValue("does not exist", 1) == false, "unknown control is rejected")
+    check(state:SetToggle("bladhits", true) or state.Instances.bladhits ~= nil, "the blade hit toggle routes through the backend")
+    check(state:SetToggle("does not exist", true) == false, "an unknown feature is rejected")
+    check(state:SetFeatureRange("does not exist", 5) == false, "a knob on an unknown feature is rejected")
 
     local requests = #ctx.Requests
     ctx.Player.CharacterAdded:Fire({})
     ctx:FlushDeferred()
-    check(#ctx.Requests == requests, "Blox Fruits respawn does not reload modules")
+    check(#ctx.Requests == requests, "Blox Fruits respawn does not reload features")
 
     state:Destroy()
     check(state.Destroyed and ctx.State.__DEPHUB.BloxFruits == nil, "Blox Fruits cleanup releases state")
@@ -284,17 +283,17 @@ end
 
 do
     -- Parked by default: the backend still resolves for the loader, but nothing
-    -- initialises and no toggle is published -- what keeps Blox Fruits out of
-    -- the panel while every file stays on disk.
+    -- loads and no toggle is published -- what keeps Blox Fruits out of the
+    -- panel while every file stays on disk.
     local ctx = sandbox()
-    for _, name in ipairs(OSS_MODULES) do
-        local path = OSS_PREFIX .. name .. ".lua"
+    for _, name in ipairs(BF_FEATURES) do
+        local path = BF_FEATURE_PREFIX .. name .. ".lua"
         ctx.Responses[path] = sources[path]
     end
     local state = ctx:Run("src/games/bloxfruits.lua")
     check(type(state) == "table" and state.Disabled == true, "the Blox Fruits entry loads parked by default")
     check(next(state.Toggles or {}) == nil, "a parked Blox Fruits publishes no toggle")
-    check(#state:ListControls() == 0, "a parked Blox Fruits registers no control")
+    check(next(state.Features or {}) == nil, "a parked Blox Fruits loads no feature")
     state:Destroy()
 end
 
@@ -361,17 +360,15 @@ do
     check(validation.PendingUpdate == nil and validation.RejectedVersions.v3, "backend-change validation still rejects untracked updates")
 end
 
--- Vendored combat behaviour: the module must find the nearest Enemies folder
--- target and fire the real RegisterAttack/RegisterHit remotes with the
--- server-validated hit table. Exercised through the module's own public API.
+-- Blade hit behaviour: the feature must find a live target in the folders the
+-- game uses and fire the real RegisterAttack/RegisterHit remotes, carrying the
+-- hitId as the 4th argument. It is exercised through its own public API, with
+-- no backend and no adapter in the way -- it is self-contained.
 do
     local ctx = sandbox(2753915549, 994732206)
-    for _, name in ipairs(OSS_MODULES) do
-        local path = OSS_PREFIX .. name .. ".lua"
-        ctx.Responses[path] = sources[path]
-    end
+    ctx.Responses[BF_FEATURE_PREFIX .. "bladhits.lua"] = sources[BF_FEATURE_PREFIX .. "bladhits.lua"]
 
-    -- Remotes the combat module resolves through ReplicatedStorage.
+    -- Remotes the feature resolves through ReplicatedStorage.
     local rstorage = ctx.Services.ReplicatedStorage
     local modules = Instance.new("Folder"); modules.Name = "Modules"; modules.Parent = rstorage
     local netFolder = Instance.new("Folder"); netFolder.Name = "Net"; netFolder.Parent = modules
@@ -390,15 +387,42 @@ do
     local enemyHumanoid = Instance.new("Humanoid"); enemyHumanoid.Health, enemyHumanoid.Parent = 100, enemy
     local enemyRoot = Instance.new("Part"); enemyRoot.Name, enemyRoot.Position, enemyRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 4), enemy
 
-    local Combat = ctx.Env.loadstring(sources[OSS_PREFIX .. "combat.lua"])()
-    local found = Combat.nearest(100)
-    check(found == enemy, "combat finds the nearest enemy in range")
+    local BladeHit = ctx.Env.loadstring(sources[BF_FEATURE_PREFIX .. "bladhits.lua"])()
+    local blade = BladeHit.new()
+    check(blade:ResolveRemotes(), "a blade hit acha os remotes em Modules.Net")
+
+    local targets = blade:CollectEnemies(100)
+    check(#targets == 1 and targets[1].model == enemy, "a blade hit acha o inimigo vivo no alcance")
+    check(targets[1].distance == 4, "a blade hit calcula a distancia do alvo")
 
     charRoot.Position = Vector3.new(500, 0, 500)
-    check(Combat.nearest(10) == nil, "combat ignores enemies outside the range")
+    check(#blade:CollectEnemies(10) == 0, "a blade hit ignora alvo fora do alcance")
     charRoot.Position = Vector3.new(0, 0, 0)
 
-    check(type(Combat.hrp()) == "table", "combat resolves the local humanoid root part")
-    check(type(Combat.nearestAny(100)) == "table", "combat can scan descendants for a live humanoid")
-    Combat.stop()
+    -- Um modelo sem Humanoid vivo nao entra na lista.
+    local humanoidless = Instance.new("Model"); humanoidless.Name, humanoidless.Parent = "NoHumanoid", enemies
+    local ghost = Instance.new("Part"); ghost.Name, ghost.Position, ghost.Parent = "HumanoidRootPart", Vector3.new(0, 0, 2), humanoidless
+    check(#blade:CollectEnemies(100) == 1, "a blade hit ignora um alvo sem Humanoid")
+
+    -- Um inimigo morto tambem nao entra.
+    enemyHumanoid.Health = 0
+    check(#blade:CollectEnemies(100) == 0, "a blade hit ignora alvo morto")
+    enemyHumanoid.Health = 100
+
+    -- O golpe dispara os dois remotes e conta o hit.
+    check(blade:AttackNearest(), "a blade hit ataca o alvo no alcance")
+    check(blade.hits == 1, "a blade hit conta o golpe")
+
+    -- Desligar limpa a thread e nao explode.
+    blade:Disable()
+    check(blade:IsEnabled() == false, "depois de Disable a blade hit esta parada")
+    blade:Destroy()
+
+    -- Sem os remotes por perto, Enable recusa em vez de explodir.
+    modules.Parent = nil
+    local bare = BladeHit.new()
+    check(bare:AttackNearest() == false, "sem remotes resolvidos a blade hit nao ataca")
+    check(bare:Enable() == false, "Enable falha quando os remotes nao existem")
+    check(bare:IsEnabled() == false, "uma blade hit sem remotes fica desligada")
+    bare:Destroy()
 end

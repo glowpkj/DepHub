@@ -2,36 +2,42 @@ local game = game
 local type = type
 local tostring = tostring
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-
 local env = type(getgenv) == "function" and getgenv() or _G
 local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env.__DEPHUB.Log or function() end
--- Backend for the vendored open-source Blox Fruits script.
---
--- It owns no presentation: the DepHub frontend renders from this contract and
--- the feature state lives in the adapter's control registry. Every method is a
--- thin forwarder, so there is exactly one source of truth for a toggle.
 
-local OSS_PATH = "src/games/features/bloxfruits/oss/"
+-- Backend for o script de Blox Fruits do usuario.
+--
+-- As features ficam em src/games/features/bloxfruits/<nome>.lua, uma por
+-- arquivo, cada uma independente (sem DepHub, sem adapter OSS): elas fazem os
+-- proprios game:GetService e se publicam como um modulo com new()/Enable()/
+-- Disable(). Este backend so faz tres coisas -- baixa a arvore, monta o painel
+-- e liga/desliga cada feature pelo toggle.
+--
+-- A arvore open-source antiga (src/games/features/bloxfruits/oss/) continua no
+-- repositorio, mas NAO e carregada aqui: as features dela vao sendo trazidas pro
+-- molde proprio uma a uma. Por isso o backend so varre FEATURE_MODULES.
+
+local FEATURE_PATH = "src/games/features/bloxfruits/"
 local VERSION = "1.0.0"
 
--- MASTER SWITCH -- the whole Blox Fruits backend is parked.
+-- As features deste backend, na ordem em que carregam. Cada entrada: o arquivo,
+-- a aba/secao em que aparece e o rotulo do toggle. O resto (range, intervalo…)
+-- sai do proprio modulo, para o backend nao virar uma lista de knobs paralela.
+local FEATURE_MODULES = {
+    {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
+}
+
+-- MASTER SWITCH -- o backend inteiro fica parado.
 --
--- Nothing is deleted: every module file, the adapter, the tests and the manifest
--- stay exactly as they are, and flipping this one flag back to `false` restores
--- the previous behaviour with no other change. While it is `true`:
---   * no OSS module initialises (no feature registers anything), and
---   * the frontend is never built: no tab, section, category or sea category is
---     created, so nothing from Blox Fruits appears in the panel.
--- The backend still resolves and returns its State, so the loader routing and
--- the Debug tab keep working -- it is a parked backend, not a missing one.
---
--- __DEPHUB_BF_DISABLED (read below the literal) is the override the offline
--- tests use to start the backend running without editing the source under test.
+-- Nada e apagado: os arquivos de feature, o backend, os testes e o manifest
+-- seguem exatamente como estao, e voltar esta flag para `false` restaura o
+-- comportamento com nenhuma outra mudanca. Enquanto `true`: nenhuma feature
+-- inicializa e o frontend nao e construido.
+-- __DEPHUB_BF_DISABLED e o override usado pelos testes offline.
 local DISABLED = true
 if type(env.__DEPHUB_BF_DISABLED) == "boolean" then DISABLED = env.__DEPHUB_BF_DISABLED end
 
-local previous = type(env.__DEPHUB_BLOXFRUITS_OSS) == "table" and env.__DEPHUB_BLOXFRUITS_OSS or nil
+local previous = type(env.__DEPHUB_BLOXFRUITS) == "table" and env.__DEPHUB_BLOXFRUITS or nil
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
 
 local sourceBase = (env.__DEPHUB or {}).SourceBaseURL or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
@@ -65,495 +71,183 @@ local function loadFactory(path)
     return true, factory
 end
 
--- The adapter's LoadSource contract is "hand me the source string", while fetch
--- reports (ok, source). Wrap so a missing module surfaces the failing path.
-local function loadSource(path)
-    local ok, source = fetch(path)
-    if ok then return source end
-    return nil, tostring(source)
-end
-
 local LocalPlayer = game:GetService("Players").LocalPlayer
 if not LocalPlayer then
-    report("BloxFruits: LocalPlayer absent")
+    report("BloxFruits: LocalPlayer ausente")
     return false
 end
 
-local okFactory, Adapter = loadFactory(OSS_PATH .. "adapter.lua")
-if not okFactory then
-    report("BloxFruits: adapter falhou: " .. tostring(Adapter))
-    return false
-end
-
-local Context = {
-    Vendors = {game = game, task = task},
-    Env = env,
-    Sea = "Sea1",
-    Version = VERSION,
+local State = {
+    Destroyed = false,
     Disabled = DISABLED,
-    Warn = report,
-    PathPrefix = OSS_PATH,
-    LoadSource = loadSource
+    Version = VERSION,
+    Features = {},
+    Instances = {},
+    Errors = {},
+    Toggles = {},
+    ToggleLabels = {},
+    LastError = nil,
 }
 
-local okNew, State, reason = pcall(Adapter.new, Context)
-if not okNew or type(State) ~= "table" then
-    report("BloxFruits: OSS nao inicializou: " .. tostring(State) .. (reason and (" | " .. tostring(reason)) or ""))
-    return false
-end
-
-env.__DEPHUB_BLOXFRUITS_OSS = State
-env.__DEPHUB = env.__DEPHUB or {}
-env.__DEPHUB.BloxFruits = State
-env.__DEPHUB.BloxFruitsOSS = State
-
--- Public toggles: one per control the modules registered, so a frontend can
--- mirror them with the generic SetToggle/GetToggle path it already uses.
-State.Toggles = {}
-State.ToggleLabels = {}
-for _, definition in ipairs(State:ListControls()) do
-    if definition.kind == "toggle" then
-        State.Toggles[definition.key] = definition.get() == true
-        State.ToggleLabels[definition.key] = definition.page .. " / " .. definition.title
-    end
-end
-
-function State:SetToggle(name, enabled)
-    if self.Destroyed or type(name) ~= "string" then return false end
-    local control = self:GetControl(name)
-    if not control or control.kind ~= "toggle" then return false end
-    if not self:SetControl(name, enabled == true) then return false end
-    self.Toggles[name] = control.get() == true
-    return true
-end
-
-function State:GetToggle(name)
-    if self.Destroyed then return false end
-    local control = self:GetControl(name)
-    if not control then return self.Toggles[name] == true end
-    return control.get() == true
-end
-
-function State:GetValue(name, fallback)
-    local value = self:GetControlValue(name)
-    if value == nil then return fallback end
-    return value
-end
-
-function State:SetValue(name, value)
-    local ok = self:SetControl(name, value)
-    local control = self:GetControl(name)
-    if ok and control and control.kind == "toggle" then self.Toggles[name] = control.get() == true end
-    return ok
-end
-
--- Core.spawn hands every loop back so the frontend's Rejoin can restart the
--- work the game cancelled on teleport (resume.lua used to call this).
-local CoreThreads = (State.Core and State.Core._threads) or {}
-
-local function resumeAll()
-    local resumed = 0
-    for _, thread in ipairs(CoreThreads) do
-        if type(thread) == "thread" and coroutine.status(thread) == "suspended" then
-            local ok = pcall(task.spawn, thread)
-            if ok then resumed += 1 end
+-- Carrega cada feature e guarda a fabrica. Nenhum init ainda: o modulo so
+-- instancia quando o toggle liga, para o painel abrir sem ligar nada sozinho.
+if not DISABLED then
+    for _, entry in ipairs(FEATURE_MODULES) do
+        local ok, factory = loadFactory(FEATURE_PATH .. entry.name .. ".lua")
+        if ok then
+            State.Features[entry.name] = factory
+        else
+            State.Errors[#State.Errors + 1] = entry.name .. ": " .. tostring(factory)
+            report("BloxFruits: feature " .. entry.name .. " falhou: " .. tostring(factory))
         end
     end
-    return resumed
 end
 
-State.ResumeAll = resumeAll
+function State:GetFeature(name)
+    return self.Instances[name]
+end
 
-function State:Rejoin()
-    self:ResumeAll()
+function State:SetFeature(name, enabled)
+    if self.Destroyed then return false end
+    local entry
+    for _, candidate in ipairs(FEATURE_MODULES) do
+        if candidate.name == name then entry = candidate break end
+    end
+    local factory = self.Features[name]
+    if not entry or type(factory) ~= "table" then return false end
+    if enabled then
+        local instance = self.Instances[name]
+        if not instance then
+            local ok, created = pcall(factory.new, {})
+            if not ok or type(created) ~= "table" then
+                self.LastError = "new " .. name .. ": " .. tostring(created)
+                report("BloxFruits: " .. self.LastError)
+                return false
+            end
+            instance = created
+            self.Instances[name] = instance
+        end
+        local ok = pcall(instance.Enable, instance)
+        if not ok then self.LastError = "enable " .. name; return false end
+        self.Toggles[name] = instance:IsEnabled() == true
+        return self.Toggles[name]
+    end
+    local instance = self.Instances[name]
+    if instance then pcall(instance.Disable, instance) end
+    self.Toggles[name] = false
     return true
 end
 
-function State:ServerHop()
-    local ok, module = pcall(function() return self.Modules and self.Modules.events end)
-    if ok and type(module) == "table" and type(module.serverHop) == "function" then
-        pcall(module.serverHop, module)
-        return true
-    end
-    return false
+function State:SetToggle(key, enabled)
+    return self:SetFeature(key, enabled == true)
+end
+
+function State:GetToggle(key)
+    local instance = self.Instances[key]
+    if instance then return instance:IsEnabled() == true end
+    return self.Toggles[key] == true
+end
+
+-- A feature expoe os proprios knobs (range, intervalo…) por metodos, nao por
+-- um config paralelo aqui. O backend so encaminha.
+function State:SetFeatureRange(key, value)
+    local instance = self.Instances[key]
+    if not instance then return false end
+    if type(instance.SetRange) ~= "function" then return false end
+    return pcall(instance.SetRange, instance, value)
+end
+
+function State:SetFeatureInterval(key, value)
+    local instance = self.Instances[key]
+    if not instance then return false end
+    if type(instance.SetInterval) ~= "function" then return false end
+    return pcall(instance.SetInterval, instance, value)
+end
+
+function State:GetStatus()
+    local on = 0
+    for _, value in pairs(self.Toggles) do if value then on = on + 1 end end
+    return {
+        Version = self.Version,
+        Disabled = self.Disabled == true,
+        Features = self.Instances,
+        Loaded = self.Features,
+        TogglesOn = on,
+        Errors = self.Errors,
+    }
 end
 
 function State:Destroy()
     if self.Destroyed then return end
-    pcall(function() self:Unload() end)
     self.Destroyed = true
-    if env.__DEPHUB_BLOXFRUITS_OSS == self then env.__DEPHUB_BLOXFRUITS_OSS = nil end
+    for name, instance in pairs(self.Instances) do
+        if type(instance.Destroy) == "function" then pcall(instance.Destroy, instance) end
+        self.Instances[name] = nil
+    end
+    if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
-    if env.__DEPHUB and env.__DEPHUB.BloxFruitsOSS == self then env.__DEPHUB.BloxFruitsOSS = nil end
+    if env.__DEPHUB and env.__DEPHUB.BloxFruitsOwn == self then env.__DEPHUB.BloxFruitsOwn = nil end
 end
 
+env.__DEPHUB_BLOXFRUITS = State
+env.__DEPHUB = env.__DEPHUB or {}
+env.__DEPHUB.BloxFruits = State
+env.__DEPHUB.BloxFruitsOwn = State
 
-local Visual = env.__DEPHUB and env.__DEPHUB.UI
--- `DISABLED and nil or Visual` would always yield Visual: in Lua that idiom
--- cannot return a nil "then" branch, so the parked backend kept building the
--- frontend. An explicit branch is the only correct form here.
-local visual = nil
-if not DISABLED then visual = Visual end
-local uiModel = State.UI
-local pageAliases = {
-    ["Info"] = "Home",
-    ["Farm"] = "Farm",
-    ["Farm 2"] = "Farm",
-    ["Farm 3"] = "Farm",
-    ["PVP"] = "Combat",
-    ["Teleport"] = "Teleport",
-    ["Sea"] = "Travel",
-    ["Fruit"] = "Fruits",
-    ["Shop"] = "Shop",
-    ["Shop 2"] = "Shop",
-    ["Shop 3"] = "Shop",
-    ["Raids/Events"] = "Events",
-    ["Extras"] = "Extras",
-    ["Player"] = "Player",
-    ["Config"] = "Settings"
-}
-local tabOrder = {"Info", "Farm", "Farm 2", "Farm 3", "PVP", "Teleport", "Sea", "Fruit", "Shop", "Shop 2", "Shop 3", "Raids/Events", "Extras", "Player", "Config"}
-local renderedTabs = {}
-local renderedSections = {}
-local function splitSeas(value)
-    local result = {}
-    for sea in string.gmatch(tostring(value or ""), "[^,]+") do
-        result[string.gsub(sea, "%s+", "")] = true
-    end
-    return result
-end
-local function categoryForControl(sea)
-    local value = tostring(sea or "All")
-    if value == "All" or value == "" then return "General" end
-    local seas = splitSeas(value)
-    if seas.Sea1 and seas.Sea2 and seas.Sea3 then return "General" end
-    -- A control scoped to more than one sea belongs to whichever of those seas the
-    -- player is on right now: on Sea 2, "Sea2,Sea3" is a Sea 2 feature. The header
-    -- therefore only ever shows the current sea's category, never a combined one,
-    -- so a shared feature never drags another sea's category into view.
-    local current = tostring(State.Sea or "Sea1")
-    if seas[current] then
-        if current == "Sea1" then return "Sea 1" end
-        if current == "Sea2" then return "Sea 2" end
-        if current == "Sea3" then return "Sea 3" end
-    end
-    if seas.Sea1 and seas.Sea2 then return "Sea 1/2" end
-    if seas.Sea2 and seas.Sea3 then return "Sea 2/3" end
-    if seas.Sea1 then return "Sea 1" end
-    if seas.Sea2 then return "Sea 2" end
-    if seas.Sea3 then return "Sea 3" end
-    return "General"
-end
--- Tabs that must stay reachable no matter which sea the player is on. Teleport
--- is the way to travel between seas (it holds the Sea 1/2/3 waypoints), and the
--- Info/PVP/Player/Config pages are game-wide rather than belonging to a sea.
-local ALWAYS_VISIBLE = {
-    Home = true, Combat = true, Teleport = true, Player = true, Settings = true
-}
-
-local function ensureTab(name, sea)
-    -- The repository rule is "tabs by finalidade, never by game name". Here the
-    -- tab NAMES are already finalidades (Farm, Combat, Teleport, Player, Shop,
-    -- Events, Settings) -- no tab is named after the game. What varies is the
-    -- CATEGORY heading, and this is the one deliberate exception: Blox Fruits
-    -- spans three seas whose features must not show while the player is on
-    -- another sea, so the category is the sea (Sea 1/2/3) and the shell's sea
-    -- filter (_tabMatchesSea / _refileSeaTabs) shows only the current sea's
-    -- heading. Swapping those for finalidade categories would surface Sea 3
-    -- features on Sea 1, so the sea axis is kept by design.
-    local category = categoryForControl(sea)
-    -- A logical tab can be shared by more than one sea (Farm, Shop). The sea
-    -- scope stored on the shell tab is what decides whether it is shown, so a
-    -- tab that carries a sea keeps it; the always-visible pages drop their scope.
-    local scope = ALWAYS_VISIBLE[name] and nil or sea
-    local key = category .. "|" .. name
-    if renderedTabs[key] ~= nil then return renderedTabs[key] or nil end
-    -- The Blox Fruits backend owns its sea categories: the shared shell only
-    -- creates "General", so this backend registers the seas it uses. Each sea
-    -- category gets its own icon so the header reads as designed rather than a
-    -- row of identical "layers" glyphs.
-    local CATEGORY_ICONS = {["General"] = "layers", ["Sea 1"] = "waves", ["Sea 2"] = "sailboat", ["Sea 3"] = "skull", ["Sea 1/2"] = "waves", ["Sea 2/3"] = "waves"}
-    if type(visual.CreateCategory) == "function" then visual:CreateCategory(category, CATEGORY_ICONS[category]) end
-    local tab = visual:CreateTab(name, category, scope)
-    if not tab then
-        -- Remember the failure so the next control in this group does not try
-        -- again: without this the same tab is retried for every control.
-        renderedTabs[key] = false
-        report("BloxFruits: could not create the tab " .. name .. " (" .. category .. ")")
-        return nil
-    end
-    local record = {Tab = tab, Sea = scope, Name = name, Category = category, Key = key, Columns = {Left = 0, Right = 0}}
-    renderedTabs[key] = record
-    return record
-end
-local function groupFor(definition)
-    local key = tostring(definition.key or ""):lower()
-    local title = tostring(definition.title or ""):lower()
-    local value = key .. " " .. title
-    if value:find("config") or value:find("save") or value:find("load") then return "Configuration" end
-    if value:find("quest") or value:find("level") or value:find("farm") or value:find("mastery") or value:find("stat") or value:find("bring") or value:find("collect") then return "Farming" end
-    if value:find("fruit") or value:find("dealer") or value:find("spin") or value:find("storage") then return "Fruits" end
-    if value:find("raid") or value:find("event") or value:find("leviathan") or value:find("mirage") or value:find("sea beast") or value:find("bones") then return "Events" end
-    if value:find("island") or value:find("teleport") or value:find("waypoint") or value:find("travel") or value:find("sea travel") or value:find("boss") then return "Travel" end
-    if value:find("player") or value:find("walk") or value:find("speed") or value:find("jump") or value:find("esp") or value:find("afk") or value:find("ken") or value:find("buso") then return "Player" end
-    if value:find("shop") or value:find("buy") or value:find("weapon") or value:find("style") or value:find("accessory") or value:find("race") then return "Shop & Upgrades" end
-    if value:find("aim") or value:find("attack") or value:find("combat") or value:find("aura") or value:find("bounty") or value:find("pvp") or value:find("skill") or value:find("stun") or value:find("target") or value:find("sword") or value:find("gun") then return "Combat" end
-    if value:find("info") or value:find("status") or value:find("version") then return "Overview" end
-    return "Other"
-end
-local function sectionFor(tabRecord, group)
-    if not tabRecord or not tabRecord.Tab then return nil end
-    local key = tabRecord.Key .. "|" .. group
-    if renderedSections[key] then return renderedSections[key] end
-    local column = tabRecord.Columns.Left <= tabRecord.Columns.Right and "Left" or "Right"
-    tabRecord.Columns[column] += 1
-    local section = tabRecord.Tab:CreateSection(group, column)
-    renderedSections[key] = section
-    return section
-end
-local function renderDefinition(definition, section)
-    local title = tostring(definition.title or definition.key or "Control")
-    -- Show the control's own description as a caption when the modules provided
-    -- one that adds information beyond the title. This is the §11 "descrições"
-    -- pass: the text already flowed into the control registry, it was just never
-    -- rendered.
-    local description = tostring(definition.description or "")
-    if description ~= "" and description:lower() ~= title:lower() and section.CreateParagraph then
-        section:CreateParagraph(title, description)
-    end
-    local function set(value) State:SetControl(definition.key, value) end
-    if definition.kind == "toggle" then
-        section:CreateToggle(title, definition.get and definition.get() == true, set)
-    elseif definition.kind == "slider" then
-        section:CreateSlider(title, definition.min, definition.max, definition.get and definition.get() or definition.default, set)
-    elseif definition.kind == "dropdown" then
-        section:CreateDropdown(title, definition.options or {}, definition.get and definition.get() or definition.default, set)
-    elseif definition.kind == "button" then
-        section:CreateButton(title, function() set(true) end)
-    elseif definition.kind == "textbox" then
-        section:CreateInput(title, title, definition.get and definition.get() or "", set)
-    end
-end
+-- Painel: a UI e construida pelo proprio backend, com a shell compartilhada,
+-- para o script nao depender do adapter nem de um frontend externo.
+local visual = (not DISABLED) and env.__DEPHUB and env.__DEPHUB.UI or nil
 if type(visual) == "table" and type(visual.CreateTab) == "function" then
-    for _, pageName in ipairs(tabOrder) do
-        local page = uiModel.tabs[pageName]
-        if page then
-            local logicalName = pageAliases[pageName] or pageName
-            if #page.controls == 0 then
-                local record = ensureTab(logicalName, page.sea)
-                if pageName == "Info" then
-                    local section = sectionFor(record, "Overview")
-                    if section then section:CreateParagraph("DepHub", "Controls organized by category. Only Anti-AFK is on by default.") end
-                    -- Feature search: filters the tab buttons by name so a feature
-                    -- can be found without knowing which sea holds it. Clearing the
-                    -- box shows everything again.
-                    local searchSection = sectionFor(record, "Find")
-                    if searchSection then
-                        searchSection:CreateInput("Search features", "Type to filter tabs...", "", function(value)
-                            if type(visual.Search) == "function" then visual:Search(tostring(value or "")) end
-                        end)
-                        searchSection:CreateButton("Clear search", function()
-                            if type(visual.Search) == "function" then visual:Search("") end
-                        end)
-                    end
-                    -- Automation status: a live read of which toggles are on. The
-                    -- paragraph is a snapshot taken at load; the button reports the
-                    -- current state so the player can confirm at any time.
-                    local statusSection = sectionFor(record, "Status")
-                    if statusSection then
-                        local function activeList()
-                            local parts = {}
-                            for key, value in pairs(State.Toggles or {}) do
-                                if value then parts[#parts + 1] = tostring(key) end
-                            end
-                            table.sort(parts)
-                            return parts
+    local pages = {}
+    for _, entry in ipairs(FEATURE_MODULES) do
+        if State.Features[entry.name] then
+            local category = entry.page == "Combat" and "Combat" or "General"
+            visual:CreateCategory(category, category == "Combat" and "swords" or "layers")
+            local tab = pages[category .. "|" .. entry.page]
+            if tab == nil then tab = visual:CreateTab(entry.page, category, nil) or false; pages[category .. "|" .. entry.page] = tab end
+            if tab then
+                local section = tab:CreateSection(entry.section)
+                if section then
+                    section:CreateToggle(entry.toggle, false, function(value)
+                        if value and not State:SetFeature(entry.name, true) then
+                            visual:Notify("Blade hits", "Remotes nao encontrados (Modules.Net).")
                         end
-                        local snapshot = activeList()
-                        statusSection:CreateParagraph("Automations ON",
-                            #snapshot > 0 and table.concat(snapshot, ", ") or "No automation on.")
-                        statusSection:CreateButton("Refresh status", function()
-                            local parts = activeList()
-                            visual:Notify("Status", #parts > 0 and table.concat(parts, ", ") or "No automation on.", 6)
+                        if not value then State:SetFeature(entry.name, false) end
+                    end)
+                    if entry.name == "bladhits" then
+                        section:CreateSlider("Blade range", 10, 300, 100, function(value)
+                            State:SetFeatureRange(entry.name, value)
+                        end)
+                        section:CreateSlider("Blade interval (ms)", 30, 500, 100, function(value)
+                            State:SetFeatureInterval(entry.name, value / 1000)
                         end)
                     end
-                    local seaSection = sectionFor(record, "Sea")
-                    if seaSection then
-                        -- Single sea selector. The game reports the current sea
-                        -- automatically (info.lua polls Realm) and this lets the
-                        -- player override it; both paths end in applySea, which
-                        -- filters the tabs down to the chosen sea.
-                        local seaLabels = {Sea1 = "Sea 1", Sea2 = "Sea 2", Sea3 = "Sea 3"}
-                        local seaValues = {["Sea 1"] = "Sea1", ["Sea 2"] = "Sea2", ["Sea 3"] = "Sea3"}
-                        local currentLabel = seaLabels[State.Sea] or "Sea 1"
-                        seaSection:CreateDropdown("Sea", {"Sea 1", "Sea 2", "Sea 3"}, currentLabel, function(value)
-                            State:SetSea(seaValues[tostring(value)] or "Sea1")
-                            visual:Notify("Sea", "Content filtered to " .. tostring(value))
-                        end)
-                    end
-                elseif pageName == "Config" then
-                    local section = sectionFor(record, "Configuration")
-                    if section then
-                        local configName = "default"
-                        local renameTo = ""
-                        section:CreateInput("Config name", "Config name", configName, function(value) configName = tostring(value or "default") end)
-                        -- Config actions are all the same shape; pair them on lines
-                        -- instead of one long column of buttons.
-                        local saveRow = section.CreateRow and section:CreateRow()
-                        if saveRow then
-                            saveRow:CreateButton("Save config", function()
-                                local name = tostring(configName ~= "" and configName or "default")
-                                if State:SaveConfig(name) then visual:Notify("Config", "Config saved: " .. name) else visual:Notify("Config", "Could not save.") end
-                            end)
-                            saveRow:CreateButton("Load config", function()
-                                local name = tostring(configName ~= "" and configName or "default")
-                                if State:LoadConfig(name) then visual:Notify("Config", "Config loaded: " .. name) else visual:Notify("Config", "Could not load.") end
-                            end)
-                        else
-                            section:CreateButton("Save config", function()
-                                local name = tostring(configName ~= "" and configName or "default")
-                                if State:SaveConfig(name) then visual:Notify("Config", "Config saved: " .. name) else visual:Notify("Config", "Could not save.") end
-                            end)
-                            section:CreateButton("Load config", function()
-                                local name = tostring(configName ~= "" and configName or "default")
-                                if State:LoadConfig(name) then visual:Notify("Config", "Config loaded: " .. name) else visual:Notify("Config", "Could not load.") end
-                            end)
-                        end
-                        local deleteRow = section.CreateRow and section:CreateRow()
-                        if deleteRow then
-                            deleteRow:CreateButton("Delete config", function()
-                                local name = tostring(configName ~= "" and configName or "default")
-                                if State:DeleteConfig(name) then visual:Notify("Config", "Config deleted: " .. name) else visual:Notify("Config", "Could not delete (does not exist?).") end
-                            end)
-                            deleteRow:CreateButton("List configs", function()
-                                local names = State:ListConfigs()
-                                if #names == 0 then visual:Notify("Config", "No saved config.") else visual:Notify("Config", table.concat(names, ", "), 6) end
-                            end)
-                        else
-                            section:CreateButton("Delete config", function()
-                                local name = tostring(configName ~= "" and configName or "default")
-                                if State:DeleteConfig(name) then visual:Notify("Config", "Config deleted: " .. name) else visual:Notify("Config", "Could not delete (does not exist?).") end
-                            end)
-                            section:CreateButton("List configs", function()
-                                local names = State:ListConfigs()
-                                if #names == 0 then visual:Notify("Config", "No saved config.") else visual:Notify("Config", table.concat(names, ", "), 6) end
-                            end)
-                        end
-                        -- Rename reads the "Nome" box as the source and a second box
-                        -- as the target, so no extra state is needed beyond the two.
-                        section:CreateInput("Rename to", "New name", renameTo, function(value) renameTo = tostring(value or "") end)
-                        section:CreateButton("Rename config", function()
-                            local from = tostring(configName ~= "" and configName or "default")
-                            local to = tostring(renameTo ~= "" and renameTo or "")
-                            if to == "" then visual:Notify("Config", "Enter the new name in the field above.") return end
-                            if State:RenameConfig(from, to) then visual:Notify("Config", "Renamed: " .. from .. " -> " .. to) else visual:Notify("Config", "Could not rename (source missing or target already exists).") end
-                        end)
-                    end
-                    local reset = sectionFor(record, "Reset")
-                    if reset then
-                        reset:CreateButton("Restore defaults (all)", function()
-                            State:ResetDefaults()
-                            visual:Notify("Config", "All controls are back to default.")
-                        end)
-                        -- Reset a single module without touching the others. The
-                        -- page names map to modules in the core module registry.
-                        local modules = {"combat", "farm", "player", "fruits", "shop", "events", "extras", "teleport"}
-                        local chosen = "combat"
-                        -- The module picker and the button that resets it are one
-                        -- action; keep them on the same line.
-                        local resetRow = reset.CreateRow and reset:CreateRow()
-                        if resetRow then
-                            resetRow:CreateDropdown("Module", modules, chosen, function(value) chosen = tostring(value or "combat") end)
-                            resetRow:CreateButton("Restore module", function()
-                                local n = State:ResetModule(chosen)
-                                if n > 0 then visual:Notify("Config", "Module " .. chosen .. " restored (" .. n .. " controls).") else visual:Notify("Config", "No restorable control in " .. chosen .. ".") end
-                            end)
-                        else
-                            reset:CreateDropdown("Module", modules, chosen, function(value) chosen = tostring(value or "combat") end)
-                            reset:CreateButton("Restore module", function()
-                                local n = State:ResetModule(chosen)
-                                if n > 0 then visual:Notify("Config", "Module " .. chosen .. " restored (" .. n .. " controls).") else visual:Notify("Config", "No restorable control in " .. chosen .. ".") end
-                            end)
-                        end
-                    end
-                end
-            else
-                for _, definition in ipairs(page.controls) do
-                    local sea = definition.sea or page.sea
-                    local record = ensureTab(logicalName, sea)
-                    local section = sectionFor(record, groupFor(definition))
-                    if section then renderDefinition(definition, section) end
                 end
             end
         end
     end
-    local function applySea(sea)
-        if type(visual.SetCurrentSea) == "function" then visual:SetCurrentSea(sea or "Sea1") end
-    end
-    if type(uiModel.onSea) == "function" then uiModel.onSea(applySea) else applySea(State.Sea or "Sea1") end
     State.UIFrontend = visual
-    State.UITabs = renderedTabs
-else
-    -- Parked (or no shell): own no presentation and claim no frontend, so a
-    -- later Sea change can never reach a UI this backend does not have.
-    State.UIFrontend = nil
-    State.UITabs = nil
 end
 
--- Report the Blox Fruits backend into the shared Debug tab. Modules are
--- reported by load outcome, then the control registry is exposed as live
--- features so the player can see exactly which toggles are on and why a module
--- failed to load.
 do
     local Diag = env.__DEPHUB and env.__DEPHUB.Diagnostics
     if Diag and type(Diag.RegisterModule) == "function" then
-        Diag:SetEnvironment({["BloxFruits sea"] = tostring(State.Sea or "?")})
         Diag:SetEnvironment({["BloxFruits state"] = DISABLED and "disabled" or "enabled"})
-        local modules = State.Modules or {}
-        for _, name in ipairs({"core", "teleport", "combat", "bladhits", "flashstep", "farm", "player", "fruits", "shop", "events", "extras", "info"}) do
-            Diag:RegisterModule("features/bloxfruits/oss/" .. name .. ".lua")
-            local loaded = type(modules[name]) == "table"
+        for _, entry in ipairs(FEATURE_MODULES) do
+            local path = "features/bloxfruits/" .. entry.name .. ".lua"
+            Diag:RegisterModule(path)
+            local loaded = type(State.Features[entry.name]) == "table"
             local detail = loaded and "loaded" or "absent"
-            if not loaded and type(State.Errors) == "table" and State.Errors[name] ~= nil then detail = tostring(State.Errors[name]) end
-            Diag:Module("features/bloxfruits/oss/" .. name .. ".lua", loaded, detail)
-        end
-        local toggleCount, onCount = 0, 0
-        for key, value in pairs(State.Toggles or {}) do
-            toggleCount = toggleCount + 1
-            if value then onCount = onCount + 1 end
-        end
-        Diag:Note("BloxFruits toggles: " .. tostring(onCount) .. " on of " .. tostring(toggleCount))
-        if DISABLED then
-            Diag:Note("BloxFruits is DISABLED: no module initialised and the frontend is not built. Set DISABLED = false in src/games/bloxfruits.lua to turn it back on.")
+            if not loaded and type(State.Errors) == "table" then
+                for _, err in ipairs(State.Errors) do
+                    if tostring(err):find(entry.name, 1, true) then detail = tostring(err) break end
+                end
+            end
+            Diag:Module(path, loaded, detail)
         end
         Diag:Feature("BloxFruits.Enabled", function() return DISABLED and "no" or "yes" end)
-        Diag:Feature("BloxFruits.Sea", function() return tostring(State.Sea or "?") end)
-        Diag:Feature("BloxFruits.Toggles on", function()
-            local parts = {}
-            for key, value in pairs(State.Toggles or {}) do
-                if value then parts[#parts + 1] = key end
-            end
-            table.sort(parts)
-            return #parts > 0 and table.concat(parts, ", ") or "none"
-        end)
+        Diag:Feature("BloxFruits.Toggles on", function() return tostring(State:GetStatus().TogglesOn) end)
         Diag:Feature("BloxFruits.LastError", function() return tostring(State.LastError or "none") end)
-        if type(Diag.Watch) == "function" then
-            Diag:Watch("BloxFruits sea", function() return tostring(State.Sea or "?") end)
-            Diag:Watch("BloxFruits modules", function()
-                local loaded = 0
-                for _, module in pairs(State.Modules or {}) do if type(module) == "table" then loaded = loaded + 1 end end
-                return loaded
-            end)
-        end
-        if type(Diag.Command) == "function" then
-            Diag:Command("bf", function()
-                return "sea=" .. tostring(State.Sea or "?") .. " modules=" .. tostring((function()
-                    local n = 0
-                    for _, module in pairs(State.Modules or {}) do if type(module) == "table" then n = n + 1 end end
-                    return n
-                end)())
-            end)
-        end
     end
 end
 

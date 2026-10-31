@@ -406,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.15)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.16)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 733 checks):
+FEITO / FUNCIONANDO (verificado offline, 688 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -539,49 +539,55 @@ GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
 - O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
   CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
-EXCECAO DELIBERADA - Blox Fruits:- As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,
-  Player, Shop, Events, Settings) - nenhuma aba tem nome de jogo.
-- A CATEGORIA e o mar (Sea 1/2/3) de proposito: o filtro do shell
-  (_tabMatchesSea / _refileSeaTabs) so mostra a categoria do mar atual, para
-  que features de outro mar nao aparecam. Trocar por categorias de finalidade
-  vazaria features entre mares, entao o eixo mar e mantido por design.
+ARQUITETURA DO BLOX FRUITS (v0.1.16) -- features proprias, uma por arquivo:
+- O usuario pegou a arvore do Blox Fruits de open source e decidiu montar o
+  script dele com as features uma a uma, cada coisa no lugar certo. O molde:
+  src/games/features/bloxfruits/<nome>.lua, UMA feature por arquivo.
+- Cada feature e AUTO-CONTIDA: faz os proprios game:GetService, NAO depende do
+  DepHub nem do adapter, e publica um modulo com new()/Enable()/Disable() (+
+  GetStatus/Destroy). Ela pode ser colada em qualquer lugar ou carregada pelo
+  backend, sem arrastar dependencia.
+- O backend src/games/bloxfruits.lua so faz tres coisas: baixa a arvore, monta
+  o painel com a shell compartilhada e liga/desliga cada feature pelo toggle.
+  Ele NAO tem lista de knobs paralela -- range/intervalo saem do proprio modulo
+  por metodos (SetRange/SetInterval), e o backend so encaminha.
+- A arvore open-source antiga em features/bloxfruits/oss/ NAO e mais carregada
+  pelo backend (nem listada no manifest): as features dela vao sendo trazidas
+  pro molde proprio, comecando pela blade hit. Os arquivos seguem no disco, mas
+  nao entram no bundle de entrega.
+- Ao adicionar uma feature nova: cria features/bloxfruits/<nome>.lua no molde
+  acima, registra em FEATURE_MODULES no backend e na lista de arquivos das DUAS
+  entradas Blox Fruits do .github/dephub-games.json (senao o runtime nao baixa).
+  O teste tests/bloxfruits_tests.luau cobre o contrato (load, toggle, knobs,
+  Destroy) e tests/headless_tests.luau cobre o comportamento com remotes reais.
 
-FEATURES RECUPERADAS DO SCRIPT ANTIGO (Blox Fruits, v0.1.14):
-- O Blox Fruits antigo tinha modulos standalone (Context/Feature com Enable/
-  Disable) que foram apagados na migracao para o adapter OSS. Dois voltaram
-  portados para o molde atual (M.init(Core, UI) + UI.toggle/slider +
-  Core.register): features/bloxfruits/oss/bladhits.lua e flashstep.lua.
-- bladhits (aba PVP, secao BLADE HITS): auto-hit. Dispara os remotes do proprio
-  jogo (RE/RegisterAttack + RE/RegisterHit) em todos os alvos no alcance, num
-  laco com jitter; sliders de alcance/intervalo (ms) e switches das pastas
-  Enemies/Characters e de players.
-- O hitId e o ponto critico: id forjado e ignorado em conta nova, entao o
-  capture do combat (hookmetamethod "__namecall") le o id real que o cliente
-  manda. O id e POR SWING, portanto o combat agora publica cada novo id em
-  combat._onHitId e o bladhits espelha TODOS (antes so copiava o primeiro no
-  init e ficava com id velho depois do primeiro M1 real).
-- flashstep (aba Player, secao MOVEMENT): mantem o atributo FlashstepCooldown
-  do personagem zerado (SetAttribute + reaplica no AttributeChangedSignal) e
-  re-bind no CharacterAdded. UM toggle, e limpa conexoes no disable/unload.
-- Ao adicionar modulo OSS novo: entra no ORDER do adapter.lua, no array
-  OSS_MODULES do teste e na lista de arquivos das DUAS entradas Blox Fruits do
-  .github/dephub-games.json (senao o runtime nao baixa o arquivo).
+BLADE HIT (features/bloxfruits/bladhits.lua) -- a primeira feature propria:
+- Auto-hit: dispara os remotes do proprio jogo (RE/RegisterAttack +
+  RE/RegisterHit) em todos os alvos no alcance, num laco com jitter. E o que faz
+  um loop de farm/mastery funcionar -- o golpe chega mesmo quando a animacao do
+  swing nao alcancaria.
+- Resolve os remotes em Modules.Net (caminho atual) e cai pro Net solto em
+  ReplicatedStorage (builds antigas). Sem os remotes, Enable devolve false (o
+  backend avisa por Notify) em vez de explodir.
+- O hitId e o ponto critico: id forjado e ignorado em conta nova, entao o 4.
+  argumento do RegisterHit carrega LastHitId (SetHitId). Sem id capturado ainda
+  ele dispara igual, porque o jogo concede um no primeiro M1 real.
+- Knobs pelo proprio modulo: SetRange (10..300) e SetInterval (segundos, o
+  slider mostra ms). Pastas varridas: Workspace.Enemies, Workspace.Characters e
+  players (opcional, alcance proprio).
 
-BLOX FRUITS DESATIVADO (v0.1.15) -- master switch, NADA foi apagado:
-- `local DISABLED = true` em src/games/bloxfruits.lua. Com ele ligado: nenhum
-  modulo OSS inicializa (nenhuma feature registra controle) e o frontend nunca
-  e construido -- nenhuma aba, secao, categoria ou categoria de mar e criada,
-  entao nada do Blox Fruits aparece no painel. O backend continua resolvendo e
-  devolvendo seu State, entao o roteamento do loader e o tab Debug seguem
-  funcionando: e um backend PARKEADO, nao ausente.
-- A flag e repassada ao adapter como Context.Disabled; o adapter pula o init dos
-  modulos e o build de abas (os arquivos continuam sendo baixados e compilados,
-  o que mantem a arvore intacta e revertivel). State.Disabled/GetStatus()
-  .Disabled publicam o estado, e o Debug mostra "BloxFruits.Enabled = no" +
-  nota explicando como reativar.
+BLOX FRUITS DESATIVADO (v0.1.15) -- master switch, NADA e apagado:
+- `local DISABLED = true` em src/games/bloxfruits.lua. Com ele ligado nenhuma
+  feature carrega/instancia e o frontend nao e construido -- nada do Blox Fruits
+  aparece no painel. O backend continua resolvendo e devolvendo seu State, entao
+  o roteamento do loader e o tab Debug seguem funcionando: e um backend
+  PARKEADO, nao ausente.
 - Para voltar tudo: `DISABLED = false` (ou env.__DEPHUB_BF_DISABLED = false, o
   override que o teste usa para exercitar o caminho ativo sem editar o fonte).
   Nenhuma outra mudanca e necessaria.
+- ARMADILHA (ja mordeu aqui): em Lua `X and nil or Y` NUNCA devolve o ramo nil,
+  mesmo com X verdadeiro -- sempre cai no Y. Escrito assim, o parkeado continuou
+  construindo o frontend. Use if/else explicito.
 - ARMADILHA (ja mordeu aqui): em Lua `X and nil or Y` NUNCA devolve o ramo nil,
   mesmo com X verdadeiro -- sempre cai no Y. Escrito assim, o parkeado continuou
   construindo o frontend. Use if/else explicito.
