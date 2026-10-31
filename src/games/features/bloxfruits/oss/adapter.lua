@@ -13,6 +13,14 @@ local Factory = {}
 
 local ORDER = {"core", "teleport", "combat", "bladhits", "flashstep", "farm", "player", "fruits", "shop", "events", "extras", "info"}
 
+-- The backend is parked (see DISABLED in src/games/bloxfruits.lua). Passing
+-- Disabled = true keeps every module file on disk and still compiles them, so
+-- nothing is deleted and the tree stays intact -- it just skips the module init
+-- pass and the whole frontend build, so no tab, section, category or sea
+-- category is ever created. Every State method below keeps working and simply
+-- reports an empty registry. Removing this flag (or passing false) restores the
+-- adapter exactly as it was.
+
 local function readSource(loader, path)
     local ok, source = pcall(loader, path)
     if not ok then return false, tostring(source) end
@@ -47,7 +55,7 @@ function Factory.new(context)
     if not published then return false, "no writable shared environment for __DEPHUB_OSS_RUNTIME" end
 
     local prefix = context.PathPrefix or "src/games/features/bloxfruits/oss/"
-    local State = {Destroyed = false, Modules = {}, Errors = {}, Version = context.Version or "1.0"}
+    local State = {Destroyed = false, Modules = {}, Errors = {}, Version = context.Version or "1.0", Disabled = context.Disabled == true}
     local log = context.Warn or function() end
 
     local okUI, uiSource = readSource(loadSource, prefix .. "ui-headless.lua")
@@ -84,37 +92,42 @@ function Factory.new(context)
     local Core = State.Core
     Core.configure({verbose = false})
 
+    State.Disabled = context.Disabled == true
+
     UI.build(Core)
     -- Every tab the modules call UI.page() for has to exist before they init,
     -- because addTab is what creates the page object they attach controls to.
-    for _, tab in ipairs({
-        {"Info", "Player and script info"},
-        {"Farm", "Level farm and quests", "Sea1"},
-        {"Farm 2", "Level farm and quests", "Sea2"},
-        {"Farm 3", "Level farm and quests", "Sea3"},
-        {"PVP", "Combat, aura, aimbot, players"},
-        {"Teleport", "Move, islands and waypoints"},
-        {"Sea", "Sea travel and transitions", "Sea1,Sea2"},
-        {"Fruit", "Fruit ESP, collect and dealer"},
-        {"Shop", "Buy Sea 1 items", "Sea1"},
-        {"Shop 2", "Buy Sea 2 items", "Sea2"},
-        {"Shop 3", "Buy Sea 3 items", "Sea3"},
-        {"Raids/Events", "Raids, sea events, leviathan", "Sea2,Sea3"},
-        {"Extras", "Race V4, awakening, special bosses", "Sea3"},
-        {"Player", "Player ESP and mobility"},
-        {"Config", "Save and restore settings"},
-    }) do
-        UI.addTab(tab[1], tab[2], tab[3])
-    end
+    -- A disabled backend never reaches this list: no page, no tab, no category.
+    if not State.Disabled then
+        for _, tab in ipairs({
+            {"Info", "Player and script info"},
+            {"Farm", "Level farm and quests", "Sea1"},
+            {"Farm 2", "Level farm and quests", "Sea2"},
+            {"Farm 3", "Level farm and quests", "Sea3"},
+            {"PVP", "Combat, aura, aimbot, players"},
+            {"Teleport", "Move, islands and waypoints"},
+            {"Sea", "Sea travel and transitions", "Sea1,Sea2"},
+            {"Fruit", "Fruit ESP, collect and dealer"},
+            {"Shop", "Buy Sea 1 items", "Sea1"},
+            {"Shop 2", "Buy Sea 2 items", "Sea2"},
+            {"Shop 3", "Buy Sea 3 items", "Sea3"},
+            {"Raids/Events", "Raids, sea events, leviathan", "Sea2,Sea3"},
+            {"Extras", "Race V4, awakening, special bosses", "Sea3"},
+            {"Player", "Player ESP and mobility"},
+            {"Config", "Save and restore settings"},
+        }) do
+            UI.addTab(tab[1], tab[2], tab[3])
+        end
 
-    for _, name in ipairs(ORDER) do
-        if name ~= "core" then
-            local module = State.Modules[name]
-            if type(module.init) == "function" then
-                local ok, err = pcall(module.init, Core, UI)
-                if not ok then
-                    State.Errors[#State.Errors + 1] = name .. ".init: " .. tostring(err)
-                    log("Blox Fruits module init failed (" .. name .. "): " .. tostring(err))
+        for _, name in ipairs(ORDER) do
+            if name ~= "core" then
+                local module = State.Modules[name]
+                if type(module.init) == "function" then
+                    local ok, err = pcall(module.init, Core, UI)
+                    if not ok then
+                        State.Errors[#State.Errors + 1] = name .. ".init: " .. tostring(err)
+                        log("Blox Fruits module init failed (" .. name .. "): " .. tostring(err))
+                    end
                 end
             end
         end
@@ -175,6 +188,7 @@ function Factory.new(context)
         return {
             Version = self.Version,
             Sea = self.Sea,
+            Disabled = self.Disabled == true,
             RestoredConfig = self.RestoredConfig,
             Controls = self.UI and #self.UI._defs or 0,
             Modules = self.Modules,

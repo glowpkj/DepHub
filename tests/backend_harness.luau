@@ -597,7 +597,25 @@ local function sandbox(placeId, gameId)
         if fn then setfenv(fn, env) end
         return fn, err
     end
-    function context:Run(path) return assert(env.loadstring(sources[path]))() end
+    -- An optional vars table is published on getgenv() (the sandbox State, which
+    -- is what a backend reads as its environment) for the duration of the chunk.
+    -- This is how a test lifts a backend's own master switch -- e.g. the Blox
+    -- Fruits DISABLED flag -- without editing the source under test.
+    function context:Run(path, vars)
+        local previous = {}
+        if type(vars) == "table" then
+            for key, value in pairs(vars) do
+                previous[key] = context.State[key]
+                context.State[key] = value
+            end
+        end
+        local ok, result = pcall(function() return assert(env.loadstring(sources[path]))() end)
+        if type(vars) == "table" then
+            for key in pairs(vars) do context.State[key] = previous[key] end
+        end
+        assert(ok, result)
+        return result
+    end
     -- Install a remote's method the only way a real Instance allows: not by
     -- assigning the field (which raises), but by swapping the closure the
     -- Instance resolves, i.e. through the executor's hooking path. Tests use this

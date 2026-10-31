@@ -255,13 +255,15 @@ end
 do
     -- Blox Fruits now runs the vendored open-source script behind a headless
     -- adapter, so the loader contract is the control registry it publishes
-    -- rather than the old per-feature mock modules.
+    -- rather than the old per-feature mock modules. The backend is parked by
+    -- default now (DISABLED in the backend), so this contract is exercised with
+    -- the flag lifted, exactly as the repo runs it when Blox Fruits is on.
     local ctx = sandbox()
     for _, name in ipairs(OSS_MODULES) do
         local path = OSS_PREFIX .. name .. ".lua"
         ctx.Responses[path] = sources[path]
     end
-    local state = ctx:Run("src/games/bloxfruits.lua")
+    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
     check(type(state) == "table" and state.Destroyed == false, "actual Blox Fruits entry starts the OSS backend with no UI")
     check(state.UI ~= nil and state.UI.gui == nil, "Blox Fruits backend builds no window")
     check(state.Toggles and next(state.Toggles) ~= nil, "Blox Fruits publishes its toggles for the frontend")
@@ -278,6 +280,22 @@ do
 
     state:Destroy()
     check(state.Destroyed and ctx.State.__DEPHUB.BloxFruits == nil, "Blox Fruits cleanup releases state")
+end
+
+do
+    -- Parked by default: the backend still resolves for the loader, but nothing
+    -- initialises and no toggle is published -- what keeps Blox Fruits out of
+    -- the panel while every file stays on disk.
+    local ctx = sandbox()
+    for _, name in ipairs(OSS_MODULES) do
+        local path = OSS_PREFIX .. name .. ".lua"
+        ctx.Responses[path] = sources[path]
+    end
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table" and state.Disabled == true, "the Blox Fruits entry loads parked by default")
+    check(next(state.Toggles or {}) == nil, "a parked Blox Fruits publishes no toggle")
+    check(#state:ListControls() == 0, "a parked Blox Fruits registers no control")
+    state:Destroy()
 end
 
 do

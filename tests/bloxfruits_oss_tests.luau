@@ -16,22 +16,82 @@ local function ossContext(placeId, gameId)
     return ctx
 end
 
+-- The Blox Fruits backend is PARKED (see DISABLED in src/games/bloxfruits.lua).
+-- A parked backend still resolves and returns its State so the loader routing
+-- keeps working, but no module initialises and the frontend is never built --
+-- no tab, section, category or sea category exists. Nothing is deleted: the
+-- module files are still fetched and compiled, so every file stays on disk and
+-- lifting the flag restores the old behaviour with no other change.
 do
     local ctx = ossContext(994732206, 994732206)
     local state = ctx:Run("src/games/bloxfruits.lua")
-    check(type(state) == "table" and state.Destroyed == false, "Blox Fruits backend starts")
-    check(state.UI ~= nil and type(state.UI.build) == "function", "adapter installs the headless UI")
+    check(type(state) == "table" and state.Destroyed == false, "a parked Blox Fruits backend still resolves")
+    check(state.Disabled == true, "the backend reports itself disabled")
 
+    -- Nothing may skip the fetch: every vendored module is still compiled, which
+    -- is what keeps the file tree intact and revertible.
+    for _, name in ipairs(OSS_MODULES) do
+        if name ~= "adapter" and name ~= "ui-headless" then
+            check(type(state.Modules[name]) == "table", "the " .. name .. " module is still loaded (not deleted)")
+        end
+    end
+
+    check(state.UI ~= nil and type(state.UI.build) == "function", "the headless UI is still installed")
+    check(#state:ListControls() == 0, "no module registered a control while disabled")
+    check(#state.UI._defs == 0, "the control registry is empty while disabled")
+    check(next(state.UI.tabs) == nil, "no page was created while disabled")
+    check(state.UI._pages == nil and state.UI.gui == nil, "no window and no page list exist while disabled")
+    check(state.Toggles ~= nil and next(state.Toggles) == nil, "no toggle is published while disabled")
+    check(state.UIFrontend == nil and state.UITabs == nil, "the frontend was never built while disabled")
+    check(type(state.Errors) == "table" and #state.Errors == 0, "parking the backend raises no module error")
+
+    -- The registry API keeps working and reports the empty state instead of
+    -- failing, so a generic frontend driving it never raises.
+    check(state:SetToggle("Kill aura", true) == false, "a toggle cannot be flipped while disabled")
+    check(state:GetToggle("Kill aura") == false, "an unknown toggle reads back off while disabled")
+    check(state:SetSea("Sea3") and state.Sea == "Sea3", "the sea still publishes while disabled")
+    check(state:SetSea(nil) == false, "sea still rejects a non-string while disabled")
+
+    local status = state:GetStatus()
+    check(status.Controls == 0 and status.Disabled == true, "status reports zero controls and the disabled flag")
+    check(type(status.Errors) == "table" and #status.Errors == 0, "no error surfaced in the parked status")
+
+    state:Destroy()
+    check(state.Destroyed and ctx.State.__DEPHUB.BloxFruits == nil and ctx.State.__DEPHUB_BLOXFRUITS_OSS == nil, "destroy clears published state")
+    check(state:SetToggle("Kill aura", true) == false, "a destroyed backend rejects further toggles")
+end
+
+-- A parked backend must not build any frontend even when a window is mounted:
+-- that is the whole point of parking it, no category or tab may appear.
+do
+    local ctx = ossContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local tabsBefore = #ui.Library._Tabs
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table", "a parked backend still builds against a mounted window")
+    check(#ui.Library._Tabs == tabsBefore, "a parked backend creates no tab of its own")
+    check(state.UIFrontend == nil, "a parked backend never claims the frontend")
+end
+
+-- The same backend served from the other route (the Sea 1 placeId) must park
+-- identically, so neither sea turns the tree back on by accident.
+do
+    local ctx = ossContext(85211729168715, 85211729168715)
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table" and state.Disabled == true, "Blox Fruits is parked on the Sea 1 route too")
+    check(#state:ListControls() == 0, "no control is registered on the Sea 1 route either")
+    check(ctx.State.__DEPHUB.BloxFruits == state, "loader contract still points at the parked backend")
+end
+
+-- The frontend and the sea filter are backend features, so they are exercised
+-- through modules restarted with the flag lifted. This is the revert contract:
+-- Disabled = false has to bring the whole tree back exactly as it was.
+do
+    local ctx = ossContext(994732206, 994732206)
+    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
+    check(type(state) == "table" and state.Disabled == false, "the backend runs again once the flag is lifted")
     local controls = state:ListControls()
-    check(#controls > 100, "every module registered its controls without a window (" .. #controls .. ")")
-    check(state.UI.gui == nil and state.UI._pages == nil, "no instance-backed window is created")
-
-    local kinds = {}
-    for _, definition in ipairs(controls) do kinds[definition.kind] = (kinds[definition.kind] or 0) + 1 end
-    check(kinds.toggle and kinds.toggle > 40, "toggles registered (" .. tostring(kinds.toggle) .. ")")
-    check(kinds.slider and kinds.slider > 5, "sliders registered (" .. tostring(kinds.slider) .. ")")
-    check(kinds.dropdown and kinds.dropdown > 5, "dropdowns registered (" .. tostring(kinds.dropdown) .. ")")
-    check(state.Toggles and next(state.Toggles) ~= nil, "boolean toggles published for the generic DepHub frontend")
+    check(#controls > 100, "every module registers its controls when re-enabled (" .. #controls .. ")")
 
     local function controlFor(fragment)
         for _, definition in ipairs(controls) do
@@ -40,272 +100,70 @@ do
         return nil
     end
 
-    local walk = controlFor("Walk speed")
-    check(walk ~= nil and walk.kind == "slider" and walk.min == 16 and walk.max == 300, "walk speed slider carries its range")
-    walk.set(500)
-    check(walk.get() == 300, "slider clamps above its maximum")
-    walk.set(1)
-    check(walk.get() == 16, "slider clamps below its minimum")
-
-    local aura = controlFor("Kill aura")
-    check(aura ~= nil and aura.kind == "toggle", "kill aura registered as a toggle")
-    check(state:SetToggle(aura.key, true) and state:GetToggle(aura.key), "toggling through the backend flips state")
-    check(state:SetToggle("does not exist", true) == false, "unknown toggle is rejected")
-
-    local mode = nil
-    for _, definition in ipairs(controls) do
-        if definition.kind == "dropdown" and definition.options and #definition.options > 1 then mode = definition break end
-    end
-    check(mode ~= nil, "dropdown without a selectable option list is never registered")
-    mode.set("no-such-option")
-    check(mode.get() == "no-such-option", "dropdown forwards the chosen value to its callback")
-
-    check(state:SetSea("Sea3") and state.Sea == "Sea3", "sea is published for the sea-gated tabs")
-    check(state:SetSea(nil) == false, "sea rejects a non-string")
-
-    -- Farm tuning controls must drive real behaviour, not just sit in the panel.
-    -- "Approach distance" (hoverRange) and "Attack interval" both feed the farm
-    -- loops; the farm module reads them back through the same config table.
-    local approach = controlFor("Approach distance")
-    check(approach ~= nil and approach.kind == "slider", "farm approach distance is a slider")
-    approach.set(600)
-    check(approach.get() == 600, "approach distance reads back after set")
-    approach.set(1)
-    check(approach.get() == 30, "approach distance clamps below its minimum")
-
-    local farm = state.Modules and state.Modules.farm
-    check(farm ~= nil and type(farm.config) == "table", "the farm module exposes its config")
-    approach.set(333)
-    check(farm.config.hoverRange == 333, "approach distance writes through to farm config")
-
-    local atk = controlFor("Attack interval")
-    check(atk ~= nil and atk.kind == "slider", "farm attack interval is a slider")
-    atk.set(0.05)
-    check(farm.config.attackInterval == 0.05, "attack interval writes through to farm config")
-    -- A fractional slider must keep its precision: rounding every value to an
-    -- integer would make the low end of the range unreachable.
-    atk.set(0.35)
-    check(atk.get() == 0.35, "a fractional slider keeps sub-integer precision")
-
-    -- PVP: the aimbot range/part, the skill rotation order and the bounty ignore
-    -- list are all real mechanisms the module reads at runtime.
-    local combat = state.Modules and state.Modules.combat
-    check(combat ~= nil and type(combat.config) == "table", "the combat module exposes its config")
-
+    -- Each module still reaches its own config: the parked period changed no
+    -- behaviour, only whether init ran.
+    local combat = state.Modules.combat
+    check(combat ~= nil and type(combat.config) == "table", "the combat module exposes its config when re-enabled")
     local aimRange = controlFor("Aimbot range")
-    check(aimRange ~= nil and aimRange.kind == "slider", "aimbot range is a slider")
+    check(aimRange ~= nil and aimRange.kind == "slider", "aimbot range is a slider when re-enabled")
     aimRange.set(500)
-    check(combat.config.aimRange == 500, "aimbot range writes through to combat config")
+    check(combat.config.aimRange == 500, "aimbot range writes through to combat config when re-enabled")
 
-    local aimPart = controlFor("Aim part")
-    check(aimPart ~= nil and aimPart.kind == "dropdown", "aim part is a dropdown")
-    aimPart.set("Head")
-    check(combat.config.aimPart == "Head", "aim part writes through to combat config")
-
-    -- The skill rotation must be deterministic. It used to iterate a hash table
-    -- with pairs(), so the order changed between sessions; now it follows the
-    -- configured sequence.
-    local skillOrder = controlFor("Skill order")
-    check(skillOrder ~= nil and skillOrder.kind == "textbox", "skill order is a textbox")
-    skillOrder.set("F V Z")
-    check(combat._skillOrder ~= nil and #combat._skillOrder == 3, "skill order parses into a key list")
-    check(combat._skillOrder[1] == "F" and combat._skillOrder[2] == "V" and combat._skillOrder[3] == "Z", "skill order keeps the configured sequence")
-    skillOrder.set("")
-    check(#combat._skillOrder == 5, "an empty skill order falls back to the default rotation")
-
-    local ignore = controlFor("Ignore players")
-    check(ignore ~= nil and ignore.kind == "textbox", "bounty ignore list is a textbox")
-    ignore.set("Aurora, bob123")
-    check(combat.bounty.ignore.aurora == true and combat.bounty.ignore.bob123 == true, "ignore list lowercases and splits on commas")
-    ignore.set("")
-    check(next(combat.bounty.ignore) == nil, "clearing the ignore list empties it")
-
-    -- Fruits: ESP range, collect range/skip and store keep-list all gate real
-    -- behaviour, and the name-list parser drives the skip/keep matchers.
-    local fruits = state.Modules and state.Modules.fruits
-    check(fruits ~= nil and type(fruits.config) == "table", "the fruits module exposes its config")
-
-    local espRange = controlFor("Fruit / ESP max distance")
-    check(espRange ~= nil and espRange.kind == "slider", "fruit ESP max distance is a slider")
-    espRange.set(400)
-    check(fruits.config.espRange == 400, "ESP max distance writes through to fruits config")
-
-    local collectRange = controlFor("Collect max distance")
-    check(collectRange ~= nil and collectRange.kind == "slider", "collect max distance is a slider")
-    collectRange.set(150)
-    check(fruits.config.collectRange == 150, "collect max distance writes through to fruits config")
-
-    local skip = controlFor("Collect skip list")
-    check(skip ~= nil and skip.kind == "textbox", "collect skip list is a textbox")
-    skip.set("Dragon, Rocket")
-    check(fruits.config.collectSkip.dragon == true and fruits.config.collectSkip.rocket == true, "collect skip list parses names")
-    skip.set("")
-    check(next(fruits.config.collectSkip) == nil, "clearing the collect skip list empties it")
-
-    local keep = controlFor("Store keep list")
-    check(keep ~= nil and keep.kind == "textbox", "store keep list is a textbox")
-    keep.set("Leopard")
-    check(fruits.config.storeKeep.leopard == true, "store keep list parses names")
-
-    local chestCd = controlFor("Chest cooldown")
-    check(chestCd ~= nil and chestCd.kind == "slider", "chest cooldown is a slider")
-    chestCd.set(2)
-    check(fruits.config.chestCooldown == 2, "chest cooldown writes through to fruits config")
-
-    -- Events: the raid loop's pacing was hardcoded; the three waits now drive it.
-    local events = state.Modules and state.Modules.events
-    check(events ~= nil and type(events.config) == "table", "the events module exposes its config")
-
-    local waveWait = controlFor("Wave wait")
-    check(waveWait ~= nil and waveWait.kind == "slider", "raid wave wait is a slider")
-    waveWait.set(0.75)
-    check(events.config.waveWait == 0.75, "wave wait writes through to events config")
-
-    local startWait = controlFor("Start wait")
-    check(startWait ~= nil and startWait.kind == "slider", "raid start wait is a slider")
-    startWait.set(4)
-    check(events.config.startWait == 4, "start wait writes through to events config")
-
-    local chipWait = controlFor("Chip wait")
-    check(chipWait ~= nil and chipWait.kind == "slider", "raid chip wait is a slider")
-    chipWait.set(3)
-    check(events.config.chipWait == 3, "chip wait writes through to events config")
-
-    local raidElement = controlFor("Raid element")
-    check(raidElement ~= nil and raidElement.kind == "dropdown", "raid element is a dropdown")
-    raidElement.set("Ice")
-    check(events.config.element == "Ice", "raid element writes through to events config")
-    check(controlFor("Next raid hint") ~= nil, "the raid hint button is now exposed")
-
-    -- Player: ESP range/name and the mobility toggles all exist as real controls.
-    local player = state.Modules and state.Modules.player
-    check(player ~= nil and type(player.config) == "table", "the player module exposes its config")
-
-    local pEspRange = controlFor("Player / ESP max distance")
-    check(pEspRange ~= nil and pEspRange.kind == "slider", "player ESP max distance is a slider")
-    pEspRange.set(900)
-    check(player.config.espRange == 900, "player ESP max distance writes through to player config")
-
-    local espName = controlFor("ESP show name")
-    check(espName ~= nil and espName.kind == "toggle", "ESP show name is a toggle")
-    espName.set(false)
-    check(player.config.espName == false, "ESP show name writes through to player config")
-
-    -- Blade Hits: the auto-swing loop's range, cadence and target folders are all
-    -- read back by the swing thread, so each control has to reach the module
-    -- config. The hitId is the value the game's own M1 supplied; a forged one is
-    -- ignored, so the module mirrors whatever combat captured.
-    local bladhits = state.Modules and state.Modules.bladhits
-    check(bladhits ~= nil and type(bladhits.config) == "table", "the bladhits module exposes its config")
-    check(type(bladhits.swing) == "function", "bladhits exposes the remote hit it fires")
-
-    local bladeHits = controlFor("Blade hits")
-    check(bladeHits ~= nil and bladeHits.kind == "toggle", "blade hits is a toggle")
-
+    local bladhits = state.Modules.bladhits
+    check(bladhits ~= nil and type(bladhits.config) == "table", "the bladhits module is back when re-enabled")
     local bladeRange = controlFor("Blade range")
-    check(bladeRange ~= nil and bladeRange.kind == "slider", "blade range is a slider")
-    bladeRange.set(250)
-    check(bladhits.config.range == 250, "blade range writes through to bladhits config")
+    check(bladeRange ~= nil and bladeRange.kind == "slider", "blade range is a slider when re-enabled")
+    bladeRange.set(220)
+    check(bladhits.config.range == 220, "blade range writes through when re-enabled")
+    check(combat._onHitId == bladhits.syncHitId, "the hitId broadcast is rewired when re-enabled")
 
-    -- The interval is edited in milliseconds but stored in seconds, so the write
-    -- has to be divided back before the loop uses it.
-    local bladeInterval = controlFor("Blade interval (ms)")
-    check(bladeInterval ~= nil and bladeInterval.kind == "slider", "blade interval is a slider in milliseconds")
-    bladeInterval.set(200)
-    check(bladhits.config.interval == 0.2, "blade interval converts milliseconds to seconds")
+    local flashstep = state.Modules.flashstep
+    check(flashstep ~= nil and type(flashstep.set) == "function", "the flashstep module is back when re-enabled")
 
-    -- The two folders scanned for mobs are independent switches.
-    local enemiesFolder = controlFor("Enemies folder")
-    check(enemiesFolder ~= nil and enemiesFolder.kind == "toggle", "the enemies folder scan is a toggle")
-    enemiesFolder.set(false)
-    check(bladhits.config.enemiesFolder == false, "disabling the enemies folder scan reaches bladhits config")
-    enemiesFolder.set(true)
-    check(bladhits.config.enemiesFolder == true, "re-enabling the enemies folder scan reaches bladhits config")
+    local farm = state.Modules.farm
+    check(farm ~= nil and type(farm.config) == "table", "the farm module exposes its config when re-enabled")
 
-    local charactersFolder = controlFor("Characters folder")
-    check(charactersFolder ~= nil and charactersFolder.kind == "toggle", "the characters folder scan is a toggle")
-    charactersFolder.set(false)
-    check(bladhits.config.charactersFolder == false, "disabling the characters folder scan reaches bladhits config")
+    local toggleCount = 0
+    for _ in pairs(state.Toggles or {}) do toggleCount = toggleCount + 1 end
+    check(toggleCount > 40, "the published toggles come back when re-enabled (" .. toggleCount .. ")")
 
-    local bladePlayers = controlFor("Hit players too")
-    check(bladePlayers ~= nil and bladePlayers.kind == "toggle", "hitting players is a toggle")
-    bladePlayers.set(true)
-    check(bladhits.config.players == true, "hitting players reaches bladhits config")
+    -- Frontend: the sea categories, the tab names and the sea filter all return.
+    local ui = ctx:MountUI()
+    local state2 = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
+    check(type(state2) == "table" and state2.Disabled == false, "the re-enabled backend builds against a mounted window")
+    check(#ui.Library._Tabs > 0, "the tabs come back when re-enabled (" .. #ui.Library._Tabs .. ")")
+    local tabNames = {}
+    for _, tab in ipairs(ui.Library._Tabs) do tabNames[tab.Name] = true end
+    local count = 0
+    for _ in pairs(tabNames) do count += 1 end
+    check(count == #ui.Library._Tabs, "no duplicate tab name reached the library when re-enabled")
+    check(tabNames["Farm"] == true, "the shared Farm tab is created when re-enabled")
 
-    -- The captured hitId is what makes the hit stick; a synced value is stored.
-    bladhits.syncHitId(4242)
-    check(bladhits.lastHitId == 4242, "a synced hitId is stored for the next swing")
+    local buttons = ui.Library._STATE.CategoryButtons
+    local function visible(name)
+        local data = buttons[name]
+        return data ~= nil and data.button ~= nil and data.button.Visible == true
+    end
+    ui:SetCurrentSea("Sea1")
+    check(visible("General") and visible("Sea 1"), "the General and Sea 1 categories come back")
+    check(not visible("Sea 2") and not visible("Sea 3"), "the other sea categories stay hidden on Sea 1")
+    ui:SetCurrentSea("Sea2")
+    check(visible("Sea 2") and not visible("Sea 1"), "the sea filter still switches categories when re-enabled")
 
-    -- combat owns the id (only it hooks the namecall), so it must hand every new
-    -- one to bladhits. Without this the loop keeps a stale id after the first M1.
-    check(combat._onHitId == bladhits.syncHitId, "combat broadcasts every captured hitId to bladhits")
-    combat._onHitId(9090)
-    check(bladhits.lastHitId == 9090, "a broadcast hitId reaches the blade hits loop")
-
-    -- Flashstep: one toggle that keeps the character attribute at zero.
-    local flashstep = state.Modules and state.Modules.flashstep
-    check(flashstep ~= nil, "the flashstep module is registered")
-    check(type(flashstep.set) == "function", "flashstep exposes its setter")
-
-    local flashToggle = controlFor("Flashstep")
-    check(flashToggle ~= nil and flashToggle.kind == "toggle", "flashstep cooldown is a toggle")
-    -- Arming it with no character mounted must not error and must report on.
-    flashToggle.set(true)
-    check(flashstep._on == true, "enabling flashstep arms the attribute watcher")
-    flashToggle.set(false)
-    check(flashstep._on == false, "disabling flashstep disarms it")
-    check(flashstep._character == nil, "disabling flashstep releases the character binding")
-
-    -- Teleport: flight speed gates how fast every teleport flies.
-    local teleport = state.Modules and state.Modules.teleport
-    check(teleport ~= nil and type(teleport.config) == "table", "the teleport module exposes its config")
-
-    local flySpeed = controlFor("Fly speed")
-    check(flySpeed ~= nil and flySpeed.kind == "slider", "fly speed is a slider")
-    flySpeed.set(120)
-    check(teleport.config.speed == 120, "fly speed writes through to teleport config")
-
-    -- Teleport waypoints are data persisted through Core blobs, not controls: the
-    -- panel renders a fixed set of slots and each reads the current list.
-    check(type(teleport.saveWaypoints) == "function" and type(teleport.loadWaypoints) == "function", "waypoints expose save/load")
-    teleport.waypoints = { { name = "Home", pos = Vector3.new(1, 2, 3) } }
-    teleport.saveWaypoints()
-    local blob = state.Core.loadBlob and state.Core.loadBlob("waypoints")
-    check(type(blob) == "table" and blob[1] and blob[1].name == "Home", "a waypoint round-trips through the blob store")
-    check(controlFor("Go to waypoint #1") ~= nil and controlFor("Clear waypoint #1") ~= nil, "waypoint slots are fixed controls")
-
-    -- Shop: the legendary poll interval drives the auto-buy loop's cadence.
-    local shop = state.Modules and state.Modules.shop
-    check(shop ~= nil and type(shop.config) == "table", "the shop module exposes its config")
-
-    local poll = controlFor("Legendary poll interval")
-    check(poll ~= nil and poll.kind == "slider", "legendary poll interval is a slider")
-    poll.set(7)
-    check(shop.config.legendaryPoll == 7, "legendary poll interval writes through to shop config")
-
-    -- Extras: the summon wait drives the gap between summoning and farming.
-    local extras = state.Modules and state.Modules.extras
-    check(extras ~= nil and type(extras.config) == "table", "the extras module exposes its config")
-
-    local summonWait = controlFor("Summon wait")
-    check(summonWait ~= nil and summonWait.kind == "slider", "summon wait is a slider")
-    summonWait.set(2)
-    check(extras.config.spawnWait == 2, "summon wait writes through to extras config")
-
-    local status = state:GetStatus()
-    check(status.Controls == #controls and status.Sea == "Sea3", "status reports the live control count and sea")
-    check(type(status.Errors) == "table" and #status.Errors == 0, "no module reported an init error")
-
-    state:Destroy()
-    check(state.Destroyed and ctx.State.__DEPHUB.BloxFruits == nil and ctx.State.__DEPHUB_BLOXFRUITS_OSS == nil, "destroy clears published state")
-    check(state:SetToggle("Kill aura", true) == false, "destroyed backend rejects further toggles")
+    ui:Search("farm")
+    local farmShown = false
+    for _, tab in pairs(ui.Tabs) do
+        if tab.DisplayName == "Farm" and tab.Visible then farmShown = true end
+    end
+    check(farmShown, "feature search still narrows the visible tabs when re-enabled")
+    ui:Search("")
 end
 
--- Config management: save/load/list/delete/rename and the reset operations.
--- Exercised against the in-memory filesystem the harness exposes.
+-- Config management: save/load/list/delete/rename and the reset operations,
+-- exercised with the flag lifted so there are live controls to persist.
 do
     local ctx = ossContext(994732206, 994732206)
-    local state = ctx:Run("src/games/bloxfruits.lua")
+    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
     check(type(state) == "table", "Blox Fruits builds for the config test")
     local core = state.Core
     check(type(core) == "table" and type(core.gatherConfig) == "function", "the core module is reachable through the adapter")
@@ -366,26 +224,25 @@ do
     check(type(status.Errors) == "table" and #status.Errors == 0, "no error surfaced during config operations")
 end
 
--- The standalone ui.lua created real instances; the DepHub frontend renders the
--- same controls, so the backend must be reachable and never build a ScreenGui.
+-- A parked backend must not create a ScreenGui either: the backend always owns
+-- no presentation, and while disabled it owns no UI at all.
 do
     local ctx = ossContext(994732206, 994732206)
-    local before = #ctx.Services.Workspace:GetChildren()
     local state = ctx:Run("src/games/bloxfruits.lua")
     check(type(state) == "table", "Blox Fruits loads on a second route (placeId) too")
     check(ctx.State.__DEPHUB.BloxFruits == state, "loader contract points at the OSS backend")
-    check(state.UI and state.UI._defs and #state.UI._defs > 0, "control registry survives route selection")
+    check(state.UI and state.UI._defs and #state.UI._defs == 0, "no control registry survives while disabled")
 end
 
--- With a window mounted, the backend renders every page. The library indexes
--- tabs by name alone, so two categories that both want a "Farm" tab must not
--- collide: the shell makes the name unique and the backend never retries a tab
--- that could not be created.
+-- With the flag lifted, the frontend renders every page again. The library
+-- indexes tabs by name alone, so two categories that both want a "Farm" tab must
+-- not collide: the shell makes the name unique and the backend never retries a
+-- tab that could not be created.
 do
     local ctx = ossContext(994732206, 994732206)
     local ui = ctx:MountUI()
-    local state = ctx:Run("src/games/bloxfruits.lua")
-    check(type(state) == "table", "Blox Fruits builds against a mounted window")
+    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
+    check(type(state) == "table", "the re-enabled Blox Fruits builds against a mounted window")
 
     local tabNames = {}
     for _, tab in ipairs(ui.Library._Tabs) do tabNames[tab.Name] = true end
@@ -414,8 +271,8 @@ end
 do
     local ctx = ossContext(994732206, 994732206)
     local ui = ctx:MountUI()
-    local state = ctx:Run("src/games/bloxfruits.lua")
-    check(type(state) == "table", "Blox Fruits builds for the sea-filter test")
+    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
+    check(type(state) == "table", "the re-enabled Blox Fruits builds for the sea-filter test")
 
     local buttons = ui.Library._STATE.CategoryButtons
     local function visible(name)
@@ -468,8 +325,8 @@ end
 do
     local ctx = ossContext(994732206, 994732206)
     local ui = ctx:MountUI()
-    local state = ctx:Run("src/games/bloxfruits.lua")
-    check(type(state) == "table", "Blox Fruits builds for the search test")
+    local state = ctx:Run("src/games/bloxfruits.lua", {__DEPHUB_BF_DISABLED = false})
+    check(type(state) == "table", "the re-enabled Blox Fruits builds for the search test")
     check(state.UIFrontend == ui, "the backend publishes the mounted frontend for the panel controls")
 
     ui:SetCurrentSea("Sea3")

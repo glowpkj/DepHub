@@ -406,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.14)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.15)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 778 checks):
+FEITO / FUNCIONANDO (verificado offline, 733 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -422,6 +422,10 @@ FEITO / FUNCIONANDO (verificado offline, 778 checks):
 - 11 jogos roteados: Violence District, Blood Strike, Steal An Egg, MM2,
   Noob Piece, TSB, Restaurant Tycoon 3, AOTR, Volleyball 4.2, Blox Fruits
   (Sea 1/2), Universal.
+- Blox Fruits PARKEADO (v0.1.15): o backend resolve e o loader roteia, mas
+  DISABLED = true faz nenhum modulo inicializar e o frontend nao ser construido
+  -- nada do Blox Fruits aparece no painel. Tudo continua no disco; ver a secao
+  "BLOX FRUITS DESATIVADO" abaixo.
 - Abas montam controles (bug do CreateSection corrigido em v0.0.98).
 - Fix do mouse do shell (v0.0.97).
 - Volleyball 4.2 ESQUELETO + 1 feature (v0.1.11/0.1.12): as features antigas
@@ -535,8 +539,7 @@ GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
 - O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
   CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
-EXCECAO DELIBERADA - Blox Fruits:
-- As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,
+EXCECAO DELIBERADA - Blox Fruits:- As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,
   Player, Shop, Events, Settings) - nenhuma aba tem nome de jogo.
 - A CATEGORIA e o mar (Sea 1/2/3) de proposito: o filtro do shell
   (_tabMatchesSea / _refileSeaTabs) so mostra a categoria do mar atual, para
@@ -563,6 +566,25 @@ FEATURES RECUPERADAS DO SCRIPT ANTIGO (Blox Fruits, v0.1.14):
 - Ao adicionar modulo OSS novo: entra no ORDER do adapter.lua, no array
   OSS_MODULES do teste e na lista de arquivos das DUAS entradas Blox Fruits do
   .github/dephub-games.json (senao o runtime nao baixa o arquivo).
+
+BLOX FRUITS DESATIVADO (v0.1.15) -- master switch, NADA foi apagado:
+- `local DISABLED = true` em src/games/bloxfruits.lua. Com ele ligado: nenhum
+  modulo OSS inicializa (nenhuma feature registra controle) e o frontend nunca
+  e construido -- nenhuma aba, secao, categoria ou categoria de mar e criada,
+  entao nada do Blox Fruits aparece no painel. O backend continua resolvendo e
+  devolvendo seu State, entao o roteamento do loader e o tab Debug seguem
+  funcionando: e um backend PARKEADO, nao ausente.
+- A flag e repassada ao adapter como Context.Disabled; o adapter pula o init dos
+  modulos e o build de abas (os arquivos continuam sendo baixados e compilados,
+  o que mantem a arvore intacta e revertivel). State.Disabled/GetStatus()
+  .Disabled publicam o estado, e o Debug mostra "BloxFruits.Enabled = no" +
+  nota explicando como reativar.
+- Para voltar tudo: `DISABLED = false` (ou env.__DEPHUB_BF_DISABLED = false, o
+  override que o teste usa para exercitar o caminho ativo sem editar o fonte).
+  Nenhuma outra mudanca e necessaria.
+- ARMADILHA (ja mordeu aqui): em Lua `X and nil or Y` NUNCA devolve o ramo nil,
+  mesmo com X verdadeiro -- sempre cai no Y. Escrito assim, o parkeado continuou
+  construindo o frontend. Use if/else explicito.
 
 NAO VALIDADO EM JOGO:
 - Mecanismos especificos de cada jogo (remotes, animation ids, offsets) estao

@@ -6,7 +6,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local env = type(getgenv) == "function" and getgenv() or _G
 local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env.__DEPHUB.Log or function() end
-
 -- Backend for the vendored open-source Blox Fruits script.
 --
 -- It owns no presentation: the DepHub frontend renders from this contract and
@@ -15,6 +14,22 @@ local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env._
 
 local OSS_PATH = "src/games/features/bloxfruits/oss/"
 local VERSION = "1.0.0"
+
+-- MASTER SWITCH -- the whole Blox Fruits backend is parked.
+--
+-- Nothing is deleted: every module file, the adapter, the tests and the manifest
+-- stay exactly as they are, and flipping this one flag back to `false` restores
+-- the previous behaviour with no other change. While it is `true`:
+--   * no OSS module initialises (no feature registers anything), and
+--   * the frontend is never built: no tab, section, category or sea category is
+--     created, so nothing from Blox Fruits appears in the panel.
+-- The backend still resolves and returns its State, so the loader routing and
+-- the Debug tab keep working -- it is a parked backend, not a missing one.
+--
+-- __DEPHUB_BF_DISABLED (read below the literal) is the override the offline
+-- tests use to start the backend running without editing the source under test.
+local DISABLED = true
+if type(env.__DEPHUB_BF_DISABLED) == "boolean" then DISABLED = env.__DEPHUB_BF_DISABLED end
 
 local previous = type(env.__DEPHUB_BLOXFRUITS_OSS) == "table" and env.__DEPHUB_BLOXFRUITS_OSS or nil
 if previous and type(previous.Destroy) == "function" then pcall(previous.Destroy, previous) end
@@ -75,6 +90,7 @@ local Context = {
     Env = env,
     Sea = "Sea1",
     Version = VERSION,
+    Disabled = DISABLED,
     Warn = report,
     PathPrefix = OSS_PATH,
     LoadSource = loadSource
@@ -172,7 +188,12 @@ function State:Destroy()
 end
 
 
-local visual = env.__DEPHUB and env.__DEPHUB.UI
+local Visual = env.__DEPHUB and env.__DEPHUB.UI
+-- `DISABLED and nil or Visual` would always yield Visual: in Lua that idiom
+-- cannot return a nil "then" branch, so the parked backend kept building the
+-- frontend. An explicit branch is the only correct form here.
+local visual = nil
+if not DISABLED then visual = Visual end
 local uiModel = State.UI
 local pageAliases = {
     ["Info"] = "Home",
@@ -472,6 +493,11 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
     if type(uiModel.onSea) == "function" then uiModel.onSea(applySea) else applySea(State.Sea or "Sea1") end
     State.UIFrontend = visual
     State.UITabs = renderedTabs
+else
+    -- Parked (or no shell): own no presentation and claim no frontend, so a
+    -- later Sea change can never reach a UI this backend does not have.
+    State.UIFrontend = nil
+    State.UITabs = nil
 end
 
 -- Report the Blox Fruits backend into the shared Debug tab. Modules are
@@ -482,8 +508,9 @@ do
     local Diag = env.__DEPHUB and env.__DEPHUB.Diagnostics
     if Diag and type(Diag.RegisterModule) == "function" then
         Diag:SetEnvironment({["BloxFruits sea"] = tostring(State.Sea or "?")})
+        Diag:SetEnvironment({["BloxFruits state"] = DISABLED and "disabled" or "enabled"})
         local modules = State.Modules or {}
-        for _, name in ipairs({"core", "teleport", "combat", "farm", "player", "fruits", "shop", "events", "extras", "info"}) do
+        for _, name in ipairs({"core", "teleport", "combat", "bladhits", "flashstep", "farm", "player", "fruits", "shop", "events", "extras", "info"}) do
             Diag:RegisterModule("features/bloxfruits/oss/" .. name .. ".lua")
             local loaded = type(modules[name]) == "table"
             local detail = loaded and "loaded" or "absent"
@@ -496,6 +523,10 @@ do
             if value then onCount = onCount + 1 end
         end
         Diag:Note("BloxFruits toggles: " .. tostring(onCount) .. " on of " .. tostring(toggleCount))
+        if DISABLED then
+            Diag:Note("BloxFruits is DISABLED: no module initialised and the frontend is not built. Set DISABLED = false in src/games/bloxfruits.lua to turn it back on.")
+        end
+        Diag:Feature("BloxFruits.Enabled", function() return DISABLED and "no" or "yes" end)
         Diag:Feature("BloxFruits.Sea", function() return tostring(State.Sea or "?") end)
         Diag:Feature("BloxFruits.Toggles on", function()
             local parts = {}
