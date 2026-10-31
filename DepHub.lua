@@ -7,8 +7,12 @@ local ipairs = ipairs
 local pcall = pcall
 
 local Players = game:GetService("Players")
-local localPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 local env = type(getgenv) == "function" and getgenv() or _G
+
+-- Prova de vida: imprime antes de qualquer logica que possa retornar cedo ou
+-- travar, para que "nao aparece nada" signifique sempre "o corpo nao rodou" e
+-- nunca "rodou e saiu em silencio".
+pcall(print, "[DepHub] loader starting...")
 
 local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
 -- Source hosts in fallback order. raw.githubusercontent.com serves a branch ref
@@ -23,7 +27,7 @@ local HOST_TEMPLATES = {
     "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.1.04"
+local VERSION = "0.1.05"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -131,6 +135,9 @@ if env[EXECUTED_KEY]
     and previousState.GameId == gameId
     and previousState.SourceRef == sourceRef
     and sessionHealthy() then
+    -- Já existe uma sessão viva desta mesma versão: nada a fazer. Logar deixa
+    -- explicito, em vez de parecer que o loader morreu em silencio.
+    log("Already running v" .. VERSION .. " (session healthy); skipping reload.")
     return true
 end
 

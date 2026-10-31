@@ -21,10 +21,13 @@ do
         check(ctx:Run("DepHub.lua") == true, "loader succeeds for route " .. case[3])
         check(ctx.State.__DEPHUB_LOADER_STATE.status == "success", "successful loader records success state")
         check(ctx.State.__DEPHUB.Mode == case[3], "loader records the backend label")
-        check(#ctx.Logs == 5, "loader emits its startup identity lines plus the source host")
-        check(ctx.Logs[1] and ctx.Logs[1]:match("^Starting loader v%d+%.%d+%.%d+$") ~= nil and ctx.Logs[2] == "Executor detected: Test", "startup logs have no old prefix")
-        check(ctx.Logs[3] == "PlaceId: " .. case[1] and ctx.Logs[4] == "GameId: " .. case[2], "game identity logs preserved")
-        check(ctx.Logs[5] and ctx.Logs[5]:match("^Source: https://") ~= nil, "loader logs the resolved source host")
+        -- The loader proves liveness first (a raw print before any early return),
+        -- then emits the four identity lines and the resolved source host.
+        check(#ctx.Logs == 6, "loader emits its liveness line plus the startup identity lines")
+        check(ctx.Logs[1] == "[DepHub] loader starting...", "the loader proves liveness before any early return")
+        check(ctx.Logs[2] and ctx.Logs[2]:match("^Starting loader v%d+%.%d+%.%d+$") ~= nil and ctx.Logs[3] == "Executor detected: Test", "startup logs have no old prefix")
+        check(ctx.Logs[4] == "PlaceId: " .. case[1] and ctx.Logs[5] == "GameId: " .. case[2], "game identity logs preserved")
+        check(ctx.Logs[6] and ctx.Logs[6]:match("^Source: https://") ~= nil, "loader logs the resolved source host")
         if case[3] == "rt3" then check(ctx.State.__DEPHUB.BloxFruits == nil, "RT3 boolean never stored as Blox Fruits state") end
         ctx:FlushDeferred()
         check(ctx.State.__DEPHUB.Updater.Started, "updater still starts using fresh code")
@@ -53,6 +56,20 @@ do
         check(ctx:Run("DepHub.lua") == true, "old UI session migrates without duplicate-success guard blocking it")
         check(removed.Loading and removed.Universal and removed.Updater and removed.Runtime and removed.Window, "migration destroys legacy handles despite missing game keys")
         check(ctx.State.__DEPHUB_UI_MODULES == nil and ctx.State.__DEPHUB_UI_LOADING == nil and ctx.State.__DEPHUB.Window == nil, "legacy frontend handles cleared")
+    end
+
+    -- Regression: the loader used to declare `Players.LocalPlayer or
+    -- Players.PlayerAdded:Wait()` and never use it. When LocalPlayer is nil that
+    -- :Wait() blocks the whole thread -- no print, no error, no panel -- which is
+    -- exactly the "I ran it and nothing happens" symptom. The declaration is
+    -- dead code and must stay gone; a blocking wait must not reappear at load.
+    do
+        local ctx = sandbox()
+        local loaderSource = ctx.Sources["DepHub.lua"]
+        check(not loaderSource:find("PlayerAdded:Wait()", 1, true),
+            "the loader has no blocking PlayerAdded:Wait() at startup")
+        check(loaderSource:find('pcall(print, "[DepHub] loader starting...")', 1, true) ~= nil,
+            "the loader proves liveness before any early return")
     end
 end
 

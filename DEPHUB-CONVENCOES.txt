@@ -246,7 +246,13 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
 (d) CDN velho -> "nao carregou".
     O executor busca de raw.githubusercontent.com, que serve versao defasada por
     minutos apos o push. Se a versao no log for antiga, espere ou use ?v=<versao>
-    na URL. Nao e bug do codigo.
+    na URL. Nao e bug do codigo. O jsDelivr (cdn.jsdelivr.net/gh/...@main/) tem o
+    mesmo problema e cacheia POR ARQUIVO, entao pode servir version.txt velho com
+    DepHub.lua novo -- o log mostra "remote 0.0.99" enquanto o main ja e 0.1.x.
+    Para forcar: POST/GET em https://purge.jsdelivr.net/gh/glowpkj/DepHub@main/
+    <arquivo> (ex. src/version.txt) que purga e propaga em segundos. No executor,
+    o cache tambem pode prender a URL fixa do bootstrap: adicione ?cb=<os.time()>
+    na linha que o usuario cola.
 
 (e) GUI crua no backend.
     Instance.new("ScreenGui"/"Frame"/"TextButton") no backend e proibido. O
@@ -263,6 +269,16 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
     A linha (CreateRow/Kit.Row) divide a largura igualmente entre os filhos.
     Com 3+ controles o label do toggle trunca ate sumir. Agrupe pares (toggle +
     o slider dele, ou os switches da mesma funcionalidade).
+
+(h) Wait() bloqueante no inicio do loader -> "rodei e nao aparece nada".
+    O loader declarava `Players.LocalPlayer or Players.PlayerAdded:Wait()` e
+    nunca usava a variavel. Com LocalPlayer nil no instante do run, o :Wait()
+    segura a thread inteira: sem print, sem erro, sem painel -- parece que o
+    script morreu, mas esta travado. Nunca coloque Wait() bloqueante no corpo
+    do loader; se precisar esperar algo, faca dentro de task.spawn. O loader
+    agora imprime uma linha de vida ("[DepHub] loader starting...") ANTES de
+    qualquer retorno cedo, e um run repetido de sessao saudavel loga
+    "Already running vX" em vez de retornar true em silencio.
 
 
 --------------------------------------------------------------------------------
@@ -315,14 +331,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.04)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.05)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
 HStack:
 
-FEITO / FUNCIONANDO (verificado offline, 789 checks):
+FEITO / FUNCIONANDO (verificado offline, 797 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
