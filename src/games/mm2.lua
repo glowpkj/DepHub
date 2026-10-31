@@ -178,12 +178,24 @@ do
         -- Coin collection is a farm loop -> Farm.
         local coins=Kit.Section(Kit.Tab("Coin Farm","Farm"),"Collect coins","Left")
         if coins then
-            coins:CreateToggle("Auto collect",false,function(value)
-                State:SetAutoCoins(value)
-            end)
-            coins:CreateSlider("Safe distance",0,80,State.Values.CoinSafeDistance,function(value)
-                State:SetCoinSafeDistance(value)
-            end)
+            -- Auto collect + the distance it keeps share a line; the interval is
+            -- its own row.
+            local coinRow=Kit.Row(coins)
+            if coinRow then
+                coinRow:CreateToggle("Auto collect",false,function(value)
+                    State:SetAutoCoins(value)
+                end)
+                coinRow:CreateSlider("Safe distance",0,80,State.Values.CoinSafeDistance,function(value)
+                    State:SetCoinSafeDistance(value)
+                end)
+            else
+                coins:CreateToggle("Auto collect",false,function(value)
+                    State:SetAutoCoins(value)
+                end)
+                coins:CreateSlider("Safe distance",0,80,State.Values.CoinSafeDistance,function(value)
+                    State:SetCoinSafeDistance(value)
+                end)
+            end
             coins:CreateSlider("Interval (seconds)",0.02,0.3,State.Values.CoinDelay,function(value)
                 State:SetCoinDelay(value)
             end)
@@ -192,18 +204,40 @@ do
         -- Gun drop is a farm action with a visual ESP bit -> Farm.
         local gun=Kit.Section(Kit.Tab("Gun Drop","Farm"),"Dropped gun","Left")
         if gun then
-            gun:CreateToggle("Gun ESP",false,function(value)
-                State:SetGunDropESP(value)
-            end)
-            gun:CreateToggle("Auto pickup gun",false,function(value)
-                State:SetAutoGetGun(value)
-            end)
-            gun:CreateSlider("Safe distance from Murder",5,80,State.Values.GunSafeDistance,function(value)
-                State:SetGunSafeDistance(value)
-            end)
-            gun:CreateSlider("Pickup hold time",0.05,0.5,State.Values.GunPickupHold,function(value)
-                State:SetGunPickupHold(value)
-            end)
+            -- The two gun switches share a line, then the two value sliders, which
+            -- pair with the feature each drives.
+            local gunRow=Kit.Row(gun)
+            if gunRow then
+                gunRow:CreateToggle("Gun ESP",false,function(value)
+                    State:SetGunDropESP(value)
+                end)
+                gunRow:CreateToggle("Auto pickup gun",false,function(value)
+                    State:SetAutoGetGun(value)
+                end)
+            else
+                gun:CreateToggle("Gun ESP",false,function(value)
+                    State:SetGunDropESP(value)
+                end)
+                gun:CreateToggle("Auto pickup gun",false,function(value)
+                    State:SetAutoGetGun(value)
+                end)
+            end
+            local gunSliderRow=Kit.Row(gun)
+            if gunSliderRow then
+                gunSliderRow:CreateSlider("Safe distance from Murder",5,80,State.Values.GunSafeDistance,function(value)
+                    State:SetGunSafeDistance(value)
+                end)
+                gunSliderRow:CreateSlider("Pickup hold time",0.05,0.5,State.Values.GunPickupHold,function(value)
+                    State:SetGunPickupHold(value)
+                end)
+            else
+                gun:CreateSlider("Safe distance from Murder",5,80,State.Values.GunSafeDistance,function(value)
+                    State:SetGunSafeDistance(value)
+                end)
+                gun:CreateSlider("Pickup hold time",0.05,0.5,State.Values.GunPickupHold,function(value)
+                    State:SetGunPickupHold(value)
+                end)
+            end
         end
 
         -- Teleport-to-player is a movement/player action -> Movement.

@@ -540,6 +540,45 @@ do
     check(pcall(function() library:AddSlider(section, "Amount", 0, 100, 50, 0, function() end) end), "AddSlider builds a control")
     check(pcall(function() library:AddButton(section, "Run", function() end) end), "AddButton builds a control")
 
+    -- HStack: controls grouped side by side. The row builds a container with a
+    -- horizontal UIListLayout, takes the controls through the same Add* API, and
+    -- re-shares the row width across them so each gets 1/N of the line.
+    local row = section:AddHStack()
+    check(type(row) == "table" and row.__tag == "HStack", "AddHStack returns an HStack handle")
+    check(row.CreateToggle ~= nil and row.CreateSlider ~= nil, "an HStack handle exposes the same Create* builders as a section")
+    local rowT1 = row:CreateToggle("Row A", false, function() end)
+    local rowT2 = row:CreateToggle("Row B", false, function() end)
+    check(rowT1 ~= nil and rowT2 ~= nil, "an HStack accepts controls through its own Create* builders")
+    -- The row reflow must have split the width 50/50 between the two children.
+    local rowFrame = row.Raw
+    check(type(rowFrame) == "table", "the HStack handle exposes its container frame")
+    local rowLayout = rowFrame:FindFirstChildOfClass("UIListLayout")
+    check(rowLayout ~= nil and rowLayout.FillDirection == ThemeEnum.FillDirection.Horizontal, "an HStack lays its children out horizontally")
+    local rowKids = {}
+    for _, child in ipairs(rowFrame:GetChildren()) do
+        if child.ClassName == "Frame" then rowKids[#rowKids + 1] = child end
+    end
+    check(#rowKids == 2, "the HStack holds its two controls")
+    check(rowKids[1].Size.X.Scale == 0.5 and rowKids[2].Size.X.Scale == 0.5, "an HStack shares its width evenly across both controls")
+
+    -- VStack: a named vertical group, same stacked layout as the section body.
+    local stack = section:AddVStack()
+    check(type(stack) == "table" and stack.__tag == "VStack", "AddVStack returns a VStack handle")
+    check(pcall(function() stack:CreateToggle("Stacked", false, function() end) end), "a VStack accepts controls through its own builders")
+    local stackFrame = stack.Raw
+    local stackLayout = stackFrame:FindFirstChildOfClass("UIListLayout")
+    check(stackLayout ~= nil and stackLayout.FillDirection == ThemeEnum.FillDirection.Vertical, "a VStack lays its children out vertically")
+
+    -- Section height hugs its content. The body's UIListLayout.AbsoluteContentSize
+    -- already includes the body's UIPadding, so the section must be sized to the
+    -- measured content exactly -- the old `+ 24` left a dead band under the last
+    -- control, which is the empty space that showed up at the bottom of a section.
+    check(_THEME_PARTS["src/core/ui/theme/public-api.luau"] ~= nil, "the theme's public-api part is available")
+    local publicApi = _THEME_PARTS["src/core/ui/theme/public-api.luau"]
+    check(publicApi:find("AbsoluteContentSize.Y", 1, true) ~= nil, "the section height reads the body layout's measured content")
+    check(publicApi:find("innerH + 24", 1, true) == nil, "the section height no longer adds a constant to the measured content")
+    check(publicApi:find("(innerH > 0) and innerH or 0", 1, true) ~= nil, "the section height is the measured content itself (or zero)")
+
     -- The fixed Dashboard tab the loader builds from every game. Against the
     -- real theme this exercises CreateDashboardBanner (greeting/avatar + server
     -- card) and CreatePerformanceDashboard (live metrics), which is exactly

@@ -401,10 +401,24 @@ do
     if Kit then
         local farming=Kit.Section(Kit.Tab("Farm","Farm"),"Automation","Left")
         if farming then
-            farming:CreateToggle("Auto farm",backend.Toggles.AutoFarm,function(v) backend:SetAutoFarm(v) end)
-            farming:CreateToggle("Auto attack",backend.Toggles.AutoAttack,function(v) backend:SetAutoAttack(v) end)
-            farming:CreateToggle("Auto quest",backend.Toggles.AutoQuest,function(v) backend:SetAutoQuest(v) end)
-            farming:CreateToggle("Auto chest",backend.Toggles.AutoChest,function(v) backend:SetAutoChest(v) end)
+            -- The four automation switches share lines; chest interval drives Auto
+            -- chest so it keeps its row, and the two dropdowns keep theirs.
+            local farmRow1=Kit.Row(farming)
+            if farmRow1 then
+                farmRow1:CreateToggle("Auto farm",backend.Toggles.AutoFarm,function(v) backend:SetAutoFarm(v) end)
+                farmRow1:CreateToggle("Auto attack",backend.Toggles.AutoAttack,function(v) backend:SetAutoAttack(v) end)
+            else
+                farming:CreateToggle("Auto farm",backend.Toggles.AutoFarm,function(v) backend:SetAutoFarm(v) end)
+                farming:CreateToggle("Auto attack",backend.Toggles.AutoAttack,function(v) backend:SetAutoAttack(v) end)
+            end
+            local farmRow2=Kit.Row(farming)
+            if farmRow2 then
+                farmRow2:CreateToggle("Auto quest",backend.Toggles.AutoQuest,function(v) backend:SetAutoQuest(v) end)
+                farmRow2:CreateToggle("Auto chest",backend.Toggles.AutoChest,function(v) backend:SetAutoChest(v) end)
+            else
+                farming:CreateToggle("Auto quest",backend.Toggles.AutoQuest,function(v) backend:SetAutoQuest(v) end)
+                farming:CreateToggle("Auto chest",backend.Toggles.AutoChest,function(v) backend:SetAutoChest(v) end)
+            end
             farming:CreateSlider("Chest interval",0.1,2,backend.Values.AutoChestDelay,function(v) backend:SetAutoChestDelay(v) end)
             farming:CreateDropdown("Weapon type",{"Fists","Sword"},backend.Values.WeaponCategory,function(v) backend:SetWeaponCategory(v) end)
             local enemies=backend:GetEnemyTypes()
@@ -415,8 +429,15 @@ do
 
         local visuals=Kit.Section(Kit.Tab("ESP","Visual"),"Exploration","Left")
         if visuals then
-            visuals:CreateToggle("Chest ESP",backend.Toggles.ChestESP,function(v) backend:SetChestESP(v) end)
-            visuals:CreateToggle("Island ESP",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
+            -- The three ESP switches are the same decision; pair two, then one.
+            local espRow=Kit.Row(visuals)
+            if espRow then
+                espRow:CreateToggle("Chest ESP",backend.Toggles.ChestESP,function(v) backend:SetChestESP(v) end)
+                espRow:CreateToggle("Island ESP",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
+            else
+                visuals:CreateToggle("Chest ESP",backend.Toggles.ChestESP,function(v) backend:SetChestESP(v) end)
+                visuals:CreateToggle("Island ESP",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
+            end
             visuals:CreateToggle("NPC ESP",backend.Toggles.GachaESP,function(v) backend:SetGachaESP(v) end)
         end
 
@@ -426,11 +447,21 @@ do
             if type(islands)=="table" and #islands>0 then
                 travel:CreateDropdown("Island",islands,backend.Values.SelectedIsland,function(v) backend:SetSelectedIsland(v) end)
             end
-            travel:CreateToggle("Auto teleport to island",backend.Toggles.IslandTeleport,function(v) backend:SetIslandTeleport(v) end)
-            travel:CreateButton("Go to selected island",function()
-                local ok=backend:TeleportIsland(backend.Values.SelectedIsland)
-                if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleport started." or "Could not teleport.") end
-            end)
+            -- Auto teleport + the two go-buttons share the action row.
+            local travelRow=Kit.Row(travel)
+            if travelRow then
+                travelRow:CreateToggle("Auto teleport to island",backend.Toggles.IslandTeleport,function(v) backend:SetIslandTeleport(v) end)
+                travelRow:CreateButton("Go to selected island",function()
+                    local ok=backend:TeleportIsland(backend.Values.SelectedIsland)
+                    if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleport started." or "Could not teleport.") end
+                end)
+            else
+                travel:CreateToggle("Auto teleport to island",backend.Toggles.IslandTeleport,function(v) backend:SetIslandTeleport(v) end)
+                travel:CreateButton("Go to selected island",function()
+                    local ok=backend:TeleportIsland(backend.Values.SelectedIsland)
+                    if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleport started." or "Could not teleport.") end
+                end)
+            end
             travel:CreateButton("Go to Wandering Gacha",function()
                 local ok=backend:TeleportWanderingGacha()
                 if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleport started." or "Gacha not found.") end

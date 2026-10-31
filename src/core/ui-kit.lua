@@ -90,6 +90,25 @@ end
 -- Kept here so every game presents the same finalidades in the same order.
 Kit.CATEGORIES = { "Visual", "Combat", "Farm", "Movement", "Player", "World", "Misc", "Settings" }
 
+-- Group controls side by side on one line. Returns a row handle with the same
+-- Create* builders a section has (CreateToggle / CreateSlider / ...). The row
+-- shares its width across the controls added to it, so a toggle and the slider
+-- that drives it sit on one line instead of two full-width rows.
+function Kit.Row(section)
+    if not (section and type(section.CreateRow) == "function") then return nil end
+    local ok, row = pcall(function() return section:CreateRow() end)
+    if ok and row then return row end
+    return nil
+end
+
+-- Group controls as a named vertical stack (same stacked look, one box).
+function Kit.Stack(section)
+    if not (section and type(section.CreateStack) == "function") then return nil end
+    local ok, stack = pcall(function() return section:CreateStack() end)
+    if ok and stack then return stack end
+    return nil
+end
+
 function Kit.categoryIcon(name)
     return CATEGORY_ICONS[name] or "layers"
 end

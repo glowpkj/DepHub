@@ -237,22 +237,44 @@ do
     if Kit then
         local farm=Kit.Section(Kit.Tab("Restaurant Farm","Farm"),"Farm","Left")
         if farm then
-            farm:CreateToggle("Auto farm",runtime.Features.AutoFarm and runtime.Features.AutoFarm.Enabled==true,function(v)
-                if runtime.Features.AutoFarm then runtime.Features.AutoFarm.Toggle(v) end
-            end)
-            farm:CreateToggle("Friends farm",runtime.Features.AutoFarmFriends and runtime.Features.AutoFarmFriends.Enabled==true,function(v)
-                if runtime.Features.AutoFarmFriends then runtime.Features.AutoFarmFriends.Toggle(v) end
-            end)
+            -- The two farm switches are the same loop; one line.
+            local farmRow=Kit.Row(farm)
+            if farmRow then
+                farmRow:CreateToggle("Auto farm",runtime.Features.AutoFarm and runtime.Features.AutoFarm.Enabled==true,function(v)
+                    if runtime.Features.AutoFarm then runtime.Features.AutoFarm.Toggle(v) end
+                end)
+                farmRow:CreateToggle("Friends farm",runtime.Features.AutoFarmFriends and runtime.Features.AutoFarmFriends.Enabled==true,function(v)
+                    if runtime.Features.AutoFarmFriends then runtime.Features.AutoFarmFriends.Toggle(v) end
+                end)
+            else
+                farm:CreateToggle("Auto farm",runtime.Features.AutoFarm and runtime.Features.AutoFarm.Enabled==true,function(v)
+                    if runtime.Features.AutoFarm then runtime.Features.AutoFarm.Toggle(v) end
+                end)
+                farm:CreateToggle("Friends farm",runtime.Features.AutoFarmFriends and runtime.Features.AutoFarmFriends.Enabled==true,function(v)
+                    if runtime.Features.AutoFarmFriends then runtime.Features.AutoFarmFriends.Toggle(v) end
+                end)
+            end
         end
 
         local kitchen=Kit.Section(Kit.Tab("Kitchen","Farm"),"Kitchen","Left")
         if kitchen then
-            kitchen:CreateToggle("Instant cook",runtime.Features.InstantCook and runtime.Features.InstantCook.Enabled==true,function(v)
-                if runtime.Features.InstantCook then runtime.Features.InstantCook.Toggle(v) end
-            end)
-            kitchen:CreateToggle("Collect drops",runtime.Features.AutoDrop and runtime.Features.AutoDrop.Enabled==true,function(v)
-                if runtime.Features.AutoDrop then runtime.Features.AutoDrop.Toggle(v) end
-            end)
+            -- Both kitchen switches are the same station automation; one line.
+            local kitchenRow=Kit.Row(kitchen)
+            if kitchenRow then
+                kitchenRow:CreateToggle("Instant cook",runtime.Features.InstantCook and runtime.Features.InstantCook.Enabled==true,function(v)
+                    if runtime.Features.InstantCook then runtime.Features.InstantCook.Toggle(v) end
+                end)
+                kitchenRow:CreateToggle("Collect drops",runtime.Features.AutoDrop and runtime.Features.AutoDrop.Enabled==true,function(v)
+                    if runtime.Features.AutoDrop then runtime.Features.AutoDrop.Toggle(v) end
+                end)
+            else
+                kitchen:CreateToggle("Instant cook",runtime.Features.InstantCook and runtime.Features.InstantCook.Enabled==true,function(v)
+                    if runtime.Features.InstantCook then runtime.Features.InstantCook.Toggle(v) end
+                end)
+                kitchen:CreateToggle("Collect drops",runtime.Features.AutoDrop and runtime.Features.AutoDrop.Enabled==true,function(v)
+                    if runtime.Features.AutoDrop then runtime.Features.AutoDrop.Toggle(v) end
+                end)
+            end
         end
 
         local status=Kit.Section(Kit.Tab("Status","Misc"),"Runtime","Left")

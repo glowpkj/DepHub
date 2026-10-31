@@ -530,6 +530,89 @@ function Library:_unwrap(target)
     return target
 end
 
+-- The set of Add* builders a section/row handle exposes. Every control is
+-- created with Size.X.Scale = 1 (full width) by its builder; a horizontal row
+-- re-shares that width across its children after each add (see _makeRowHandle).
+local CONTROL_ADDERS = {
+    "AddToggle", "AddSlider", "AddDropdown", "AddMultiDropdown", "AddKeybind",
+    "AddButton", "AddLabel", "AddParagraph", "AddTextbox", "AddColorPicker",
+    "AddConfigList", "AddSeparator", "AddChipBar",
+}
+
+-- Build a handle that creates its controls inside `target` (a Frame that lives
+-- in a section body) instead of directly on the section body.
+--
+-- For a VStack the target is a plain vertical frame: same stacked look the body
+-- already had, but as a named box a backend can nest, so a group of controls can
+-- be reasoned about and moved as one.
+--
+-- For an HStack the target is a horizontal frame with a UIListLayout in Row
+-- direction. Roblox lays the children out left-to-right and, because the frame
+-- is AutomaticSize.Y, the row grows to its tallest control. Because every
+-- control hard-codes a full-width (Scale 1) box, the row re-shares the width
+-- after every add: N children each get 1/N of the row minus the gaps, so a
+-- toggle and its slider sit side by side on one line instead of stacking into
+-- two full-width rows.
+local function _makeRowHandle(lib, target, horizontal)
+    local h = { __isHandle = true, Raw = target, __tag = horizontal and "HStack" or "VStack" }
+    local gap = horizontal and 8 or 0
+
+    local function reflow()
+        if not horizontal then return end
+        local kids = {}
+        for _, child in ipairs(target:GetChildren()) do
+            if child:IsA("GuiObject") and not child:IsA("UIListLayout")
+                and not child:IsA("UIPadding") and not child:IsA("UICorner")
+                and not child:IsA("UIStroke") and not child:IsA("UISizeConstraint") then
+                kids[#kids + 1] = child
+            end
+        end
+        local n = #kids
+        if n == 0 then return end
+        -- Share the row width: each child takes an equal share of (100% - gaps).
+        local perChildScale = 1 / n
+        for _, child in ipairs(kids) do
+            child.Size = UDim2.new(perChildScale, -math.floor(gap * (n - 1) / n), 0, child.Size.Y.Offset)
+        end
+    end
+
+    for _, adder in ipairs(CONTROL_ADDERS) do
+        h[adder] = function(_, ...)
+            local args = table.pack(...)
+            local ok, handle = pcall(function()
+                return lib[adder](lib, target, table.unpack(args, 1, args.n))
+            end)
+            if not ok then return nil end
+            -- Every control handle exposes its container as .Raw. In a real client
+            -- the builder already parented it to `target`; parenting again is a
+            -- no-op that makes the row work against a test double too, where the
+            -- builder's parent argument may be ignored.
+            local raw = type(handle) == "table" and handle.Raw
+            if raw ~= nil and raw.Parent ~= target then
+                raw.Parent = target
+            end
+            reflow()
+            return handle
+        end
+    end
+
+    -- Create* aliases so a row created through the demon-ui adapter
+    -- (section:CreateRow()) can add controls with the same vocabulary as a
+    -- section (row:CreateToggle(...)).
+    h.CreateToggle = function(_, ...) return h.AddToggle(h, ...) end
+    h.CreateSlider = function(_, ...) return h.AddSlider(h, ...) end
+    h.CreateDropdown = function(_, ...) return h.AddDropdown(h, ...) end
+    h.CreateButton = function(_, ...) return h.AddButton(h, ...) end
+    h.CreateInput = function(_, ...) return h.AddTextbox(h, ...) end
+    h.CreateParagraph = function(_, ...) return h.AddParagraph(h, ...) end
+    h.CreateSeparator = function(_, ...) return h.AddSeparator(h, ...) end
+    h.CreateLabel = function(_, ...) return h.AddLabel(h, ...) end
+
+    h.Reflow = function() reflow() end
+    if horizontal then reflow() end
+    return h
+end
+
 function Library:_wrapSection(rawBody)
     if not rawBody then return nil end
     local lib = self
@@ -547,6 +630,50 @@ function Library:_wrapSection(rawBody)
     h.AddConfigList = function(_, ...) return lib:AddConfigList(rawBody, ...) end
     h.AddSeparator = function(_, ...) return lib:AddSeparator(rawBody, ...) end
     h.AddChipBar = function(_, ...) return lib:AddChipBar(rawBody, ...) end
+
+    -- Group controls side by side on one line. `n` children each get an equal
+    -- share of the row width (a toggle and the slider that drives it, etc.).
+    h.AddHStack = function(_, opts)
+        opts = type(opts) == "table" and opts or {}
+        local host = lib:_unwrap(rawBody)
+        local row = Instance.new("Frame")
+        row.Parent = host
+        row.Name = "HStack"
+        row.Size = UDim2.new(1, 0, 0, 0)
+        row.AutomaticSize = Enum.AutomaticSize.Y
+        row.BackgroundTransparency = 1
+        row.BorderSizePixel = 0
+        local rl = Instance.new("UIListLayout")
+        rl.Parent = row
+        rl.FillDirection = Enum.FillDirection.Horizontal
+        rl.SortOrder = Enum.SortOrder.LayoutOrder
+        rl.Padding = UDim.new(0, 8)
+        rl.VerticalAlignment = Enum.VerticalAlignment.Top
+        local rowPad = Instance.new("UIPadding")
+        rowPad.Parent = row
+        return _makeRowHandle(lib, row, true)
+    end
+
+    -- Group controls as a vertical stack: the same upward layout the body uses,
+    -- but as a named box a backend can nest and reason about as one unit.
+    h.AddVStack = function(_, opts)
+        opts = type(opts) == "table" and opts or {}
+        local host = lib:_unwrap(rawBody)
+        local col = Instance.new("Frame")
+        col.Parent = host
+        col.Name = "VStack"
+        col.Size = UDim2.new(1, 0, 0, 0)
+        col.AutomaticSize = Enum.AutomaticSize.Y
+        col.BackgroundTransparency = 1
+        col.BorderSizePixel = 0
+        local cl = Instance.new("UIListLayout")
+        cl.Parent = col
+        cl.FillDirection = Enum.FillDirection.Vertical
+        cl.SortOrder = Enum.SortOrder.LayoutOrder
+        cl.Padding = UDim.new(0, lib:_densityPadding(8))
+        return _makeRowHandle(lib, col, false)
+    end
+
     return h
 end
 

@@ -174,37 +174,82 @@ do
     if Kit then
         local autoblock = Kit.Section(Kit.Tab("Autoblock", "Combat"), "Blocking", "Left")
         if autoblock then
-            autoblock:CreateToggle("Auto block", State.Toggles.AutoBlock, function(v) State:SetAutoBlock(v) end)
-            autoblock:CreateToggle("M1 after block", State.Toggles.M1AfterBlock, function(v) State:SetM1AfterBlock(v) end)
-            autoblock:CreateToggle("Face attacker", State.Toggles.FaceAttacker, function(v) State:SetFaceAttacker(v) end)
-            autoblock:CreateToggle("Block dash", State.Toggles.DashBlock, function(v) State:SetDashBlock(v) end)
-            autoblock:CreateToggle("Block skills", State.Toggles.SkillBlock, function(v) State:SetSkillBlock(v) end)
-            autoblock:CreateToggle("Check facing", State.Toggles.FacingCheck, function(v) State:SetFacingCheck(v) end)
+            -- The seven blocking switches are the same kind of decision; lay them
+            -- out three to a line instead of a seven-row column.
+            local function blockRow(a, b, c)
+                local row = Kit.Row(autoblock)
+                if row then
+                    row:CreateToggle(a[1], a[2], a[3])
+                    row:CreateToggle(b[1], b[2], b[3])
+                    if c then row:CreateToggle(c[1], c[2], c[3]) end
+                else
+                    autoblock:CreateToggle(a[1], a[2], a[3])
+                    autoblock:CreateToggle(b[1], b[2], b[3])
+                    if c then autoblock:CreateToggle(c[1], c[2], c[3]) end
+                end
+            end
+            blockRow({"Auto block", State.Toggles.AutoBlock, function(v) State:SetAutoBlock(v) end},
+                     {"M1 after block", State.Toggles.M1AfterBlock, function(v) State:SetM1AfterBlock(v) end})
+            blockRow({"Face attacker", State.Toggles.FaceAttacker, function(v) State:SetFaceAttacker(v) end},
+                     {"Block dash", State.Toggles.DashBlock, function(v) State:SetDashBlock(v) end})
+            blockRow({"Block skills", State.Toggles.SkillBlock, function(v) State:SetSkillBlock(v) end},
+                     {"Check facing", State.Toggles.FacingCheck, function(v) State:SetFacingCheck(v) end})
             autoblock:CreateToggle("Prediction", State.Toggles.Prediction, function(v) State:SetPrediction(v) end)
         end
 
         local ranges = Kit.Section(Kit.Tab("Ranges", "Combat"), "Range and timing", "Left")
         if ranges then
-            ranges:CreateSlider("Normal range", 0, 60, State.Values.NormalRange, function(v) State:SetNormalRange(v) end)
-            ranges:CreateSlider("Special range", 0, 120, State.Values.SpecialRange, function(v) State:SetSpecialRange(v) end)
-            ranges:CreateSlider("Skill range", 0, 120, State.Values.SkillRange, function(v) State:SetSkillRange(v) end)
-            ranges:CreateSlider("Skill hold", 0, 5, State.Values.SkillHold, function(v) State:SetSkillHold(v) end)
+            -- Five sliders: the first two pair on a line, then one per row.
+            local rangeRow = Kit.Row(ranges)
+            if rangeRow then
+                rangeRow:CreateSlider("Normal range", 0, 60, State.Values.NormalRange, function(v) State:SetNormalRange(v) end)
+                rangeRow:CreateSlider("Special range", 0, 120, State.Values.SpecialRange, function(v) State:SetSpecialRange(v) end)
+            else
+                ranges:CreateSlider("Normal range", 0, 60, State.Values.NormalRange, function(v) State:SetNormalRange(v) end)
+                ranges:CreateSlider("Special range", 0, 120, State.Values.SpecialRange, function(v) State:SetSpecialRange(v) end)
+            end
+            local rangeRow2 = Kit.Row(ranges)
+            if rangeRow2 then
+                rangeRow2:CreateSlider("Skill range", 0, 120, State.Values.SkillRange, function(v) State:SetSkillRange(v) end)
+                rangeRow2:CreateSlider("Skill hold", 0, 5, State.Values.SkillHold, function(v) State:SetSkillHold(v) end)
+            else
+                ranges:CreateSlider("Skill range", 0, 120, State.Values.SkillRange, function(v) State:SetSkillRange(v) end)
+                ranges:CreateSlider("Skill hold", 0, 5, State.Values.SkillHold, function(v) State:SetSkillHold(v) end)
+            end
             ranges:CreateSlider("Counter delay", 0, 1, State.Values.CounterDelay, function(v) State:SetCounterDelay(v) end)
         end
 
         local detection = Kit.Section(Kit.Tab("Detection", "Combat"), "Detection", "Left")
         if detection then
-            detection:CreateSlider("Box size", 0, 40, State.Values.DetectionBoxSize, function(v) State:SetDetectionBoxSize(v) end)
-            detection:CreateSlider("Scan (Hz)", 1, 120, State.Values.ScanHz, function(v) State:SetScanHz(v) end)
+            local detRow1 = Kit.Row(detection)
+            if detRow1 then
+                detRow1:CreateSlider("Box size", 0, 40, State.Values.DetectionBoxSize, function(v) State:SetDetectionBoxSize(v) end)
+                detRow1:CreateSlider("Scan (Hz)", 1, 120, State.Values.ScanHz, function(v) State:SetScanHz(v) end)
+            else
+                detection:CreateSlider("Box size", 0, 40, State.Values.DetectionBoxSize, function(v) State:SetDetectionBoxSize(v) end)
+                detection:CreateSlider("Scan (Hz)", 1, 120, State.Values.ScanHz, function(v) State:SetScanHz(v) end)
+            end
             detection:CreateSlider("Facing dot", -1, 1, State.Values.FacingDot, function(v) State:SetFacingDot(v) end)
-            detection:CreateToggle("Show detection box", State.Toggles.ShowDetectionBox, function(v) State:SetShowDetectionBox(v) end)
-            detection:CreateToggle("Unknown logger", State.Toggles.UnknownLogger, function(v) State:SetUnknownLogger(v) end)
+            local detRow2 = Kit.Row(detection)
+            if detRow2 then
+                detRow2:CreateToggle("Show detection box", State.Toggles.ShowDetectionBox, function(v) State:SetShowDetectionBox(v) end)
+                detRow2:CreateToggle("Unknown logger", State.Toggles.UnknownLogger, function(v) State:SetUnknownLogger(v) end)
+            else
+                detection:CreateToggle("Show detection box", State.Toggles.ShowDetectionBox, function(v) State:SetShowDetectionBox(v) end)
+                detection:CreateToggle("Unknown logger", State.Toggles.UnknownLogger, function(v) State:SetUnknownLogger(v) end)
+            end
         end
 
         local prediction = Kit.Section(Kit.Tab("Prediction", "Combat"), "Prediction", "Left")
         if prediction then
-            prediction:CreateSlider("Prediction time", 0, 1, State.Values.PredictionTime, function(v) State:SetPredictionTime(v) end)
-            prediction:CreateSlider("Prediction extra", 0, 12, State.Values.PredictionExtra, function(v) State:SetPredictionExtra(v) end)
+            local predRow = Kit.Row(prediction)
+            if predRow then
+                predRow:CreateSlider("Prediction time", 0, 1, State.Values.PredictionTime, function(v) State:SetPredictionTime(v) end)
+                predRow:CreateSlider("Prediction extra", 0, 12, State.Values.PredictionExtra, function(v) State:SetPredictionExtra(v) end)
+            else
+                prediction:CreateSlider("Prediction time", 0, 1, State.Values.PredictionTime, function(v) State:SetPredictionTime(v) end)
+                prediction:CreateSlider("Prediction extra", 0, 12, State.Values.PredictionExtra, function(v) State:SetPredictionExtra(v) end)
+            end
         end
 
         local debug = Kit.Section(Kit.Tab("Debug", "Misc"), "Diagnostics", "Left")
@@ -214,11 +259,20 @@ do
                 return type(info) == "table" and tostring(info) or "No debug data."
             end
             debug:CreateParagraph("State", statusText())
-            debug:CreateToggle("Debug", State.Toggles.Debug, function(v) State:SetDebug(v) end)
-            debug:CreateButton("Reset combat", function()
-                local ok = State:ResetCombatState()
-                if type(UI.Notify) == "function" then UI:Notify("TSB", ok and "Combat state reset." or "Could not reset.") end
-            end)
+            local debugRow = Kit.Row(debug)
+            if debugRow then
+                debugRow:CreateToggle("Debug", State.Toggles.Debug, function(v) State:SetDebug(v) end)
+                debugRow:CreateButton("Reset combat", function()
+                    local ok = State:ResetCombatState()
+                    if type(UI.Notify) == "function" then UI:Notify("TSB", ok and "Combat state reset." or "Could not reset.") end
+                end)
+            else
+                debug:CreateToggle("Debug", State.Toggles.Debug, function(v) State:SetDebug(v) end)
+                debug:CreateButton("Reset combat", function()
+                    local ok = State:ResetCombatState()
+                    if type(UI.Notify) == "function" then UI:Notify("TSB", ok and "Combat state reset." or "Could not reset.") end
+                end)
+            end
         end
     end
 end

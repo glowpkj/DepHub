@@ -928,7 +928,22 @@ do
         local predictTab = Kit.Tab("Ball Predict", "Visual")
         local predict = Kit.Section(predictTab, "Prediction", "Left")
         if predict then
-            predict:CreateToggle("Ball Predict", State.Toggles.BallPredict, function(v) State:SetToggle("BallPredict", v) end)
+            -- The marker/tracer only respect the distance gate, so the slider that
+            -- sets it belongs next to the toggle it modifies, on the same line.
+            local topRow = Kit.Row(predict)
+            if topRow then
+                topRow:CreateToggle("Ball Predict", State.Toggles.BallPredict, function(v) State:SetToggle("BallPredict", v) end)
+                -- Distance gate: 0 predicts at any range. A far ball is ignored
+                -- rather than shown with a bad prediction.
+                topRow:CreateSlider("Prediction range", 0, 2000, Config.maxPredictDistance, function(v)
+                    Config.maxPredictDistance = tonumber(v) or 0
+                end)
+            else
+                predict:CreateToggle("Ball Predict", State.Toggles.BallPredict, function(v) State:SetToggle("BallPredict", v) end)
+                predict:CreateSlider("Prediction range", 0, 2000, Config.maxPredictDistance, function(v)
+                    Config.maxPredictDistance = tonumber(v) or 0
+                end)
+            end
             predict:CreateDropdown("Mode", State.Modes, State.Mode, function(v)
                 if State:SetMode(v) then
                     if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", "Mode " .. tostring(v) .. " selected.") end
@@ -936,18 +951,21 @@ do
                     if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", "Invalid mode.") end
                 end
             end)
-            -- Distance gate: 0 predicts at any range. Only the marker/tracer respect
-            -- it, so a far ball is ignored rather than shown with a bad prediction.
-            predict:CreateSlider("Prediction range", 0, 2000, Config.maxPredictDistance, function(v)
-                Config.maxPredictDistance = tonumber(v) or 0
-            end)
             predict:CreateParagraph("Prediction", "Personal predicts your own ball; Match covers both teams; Future is not configured yet. The marker is green inside the court (where the ball counts) and red outside.")
         end
 
         local assist = Kit.Section(predictTab, "Auto Position", "Left")
         if assist then
-            assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
-            assist:CreateToggle("Instant", Config.instantMove, function(v) Config.instantMove = v == true end)
+            -- The two switches are the same feature (positioning) so they share a
+            -- line; the three sliders keep their own rows.
+            local modeRow = Kit.Row(assist)
+            if modeRow then
+                modeRow:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
+                modeRow:CreateToggle("Instant", Config.instantMove, function(v) Config.instantMove = v == true end)
+            else
+                assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
+                assist:CreateToggle("Instant", Config.instantMove, function(v) Config.instantMove = v == true end)
+            end
             assist:CreateSlider("Offset above ground", 0, 20, Config.positionOffsetY, function(v) Config.positionOffsetY = tonumber(v) or 0 end)
             assist:CreateSlider("Minimum distance", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
             assist:CreateSlider("Movement smoothing", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
@@ -957,16 +975,29 @@ do
         -- Jump helpers are movement.
         local movement = Kit.Section(Kit.Tab("Jump", "Movement"), "Jump", "Left")
         if movement then
-            movement:CreateToggle("Forced jump", State.Toggles.JumpForce, function(v)
-                State:SetToggle("JumpForce", v)
-                if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", v and "Forced jump ON" or "Forced jump off") end
-            end)
+            -- Forced jump and Auto Jump are the same job (jump for you), so the
+            -- pair shares a line; the power slider keeps its own row.
+            local jumpRow = Kit.Row(movement)
+            if jumpRow then
+                jumpRow:CreateToggle("Forced jump", State.Toggles.JumpForce, function(v)
+                    State:SetToggle("JumpForce", v)
+                    if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", v and "Forced jump ON" or "Forced jump off") end
+                end)
+                jumpRow:CreateToggle("Auto Jump", Config.autoJump, function(v)
+                    Config.autoJump = v == true
+                end)
+            else
+                movement:CreateToggle("Forced jump", State.Toggles.JumpForce, function(v)
+                    State:SetToggle("JumpForce", v)
+                    if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", v and "Forced jump ON" or "Forced jump off") end
+                end)
+                movement:CreateToggle("Auto Jump", Config.autoJump, function(v)
+                    Config.autoJump = v == true
+                end)
+            end
             movement:CreateSlider("Jump Power", 50, 500, Config.jumpPower, function(v)
                 Config.jumpPower = tonumber(v) or 120
                 if State.Toggles.JumpForce then applyJump() end
-            end)
-            movement:CreateToggle("Auto Jump", Config.autoJump, function(v)
-                Config.autoJump = v == true
             end)
             movement:CreateParagraph("Jump", "Forced jump enables jumping in zones that block it: applies the Jump Power every frame and keeps the jump state enabled. Disabling restores what the game had. Auto Jump jumps on its own while it is on.")
         end

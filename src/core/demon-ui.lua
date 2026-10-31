@@ -217,6 +217,15 @@ function DemonUI:CreateTab(name, category, sea)
         function wrapper:CreateParagraph(titleText, bodyText)
             return self.Adapter.Library:AddParagraph(self.Control, tostring(titleText or ""), tostring(bodyText or ""))
         end
+        -- Group controls side by side on one line. Returns a row handle with the
+        -- same Create* builders; children each take an equal share of the width.
+        function wrapper:CreateRow()
+            return self.Adapter.Library:AddHStack(self.Control)
+        end
+        -- Group controls as a named vertical stack.
+        function wrapper:CreateStack()
+            return self.Adapter.Library:AddVStack(self.Control)
+        end
         self.Sections[title] = wrapper
         return wrapper
     end

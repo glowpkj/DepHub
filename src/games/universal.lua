@@ -603,25 +603,44 @@ do
         -- ---------------------------------------------------------------------
         local movement = Kit.Section(Kit.Tab("Movement", "Movement"), "Movement")
         if movement then
-            movement:CreateToggle("WalkSpeed", State.Toggles.WalkSpeed, function(v)
-                State:SetWalkSpeedEnabled(v)
-            end)
-            movement:CreateSlider("WalkSpeed (value)", 16, 500, State.Values.WalkSpeed, function(v)
-                State.Values.WalkSpeed = tonumber(v) or State.Values.WalkSpeed
-                State:ApplyMovement()
-            end)
-            movement:CreateToggle("JumpPower", State.Toggles.Jump, function(v) State:SetJumpEnabled(v) end)
-            movement:CreateSlider("JumpPower (value)", 50, 500, State.Values.JumpPower, function(v)
-                State.Values.JumpPower = tonumber(v) or State.Values.JumpPower
-                State:ApplyMovement()
-            end)
-            movement:CreateToggle("Fly", State.Toggles.Fly, function(v) State:SetFly(v) end)
-            movement:CreateSlider("Fly speed", 20, 500, State.Values.FlySpeed, function(v)
-                State.Values.FlySpeed = tonumber(v) or State.Values.FlySpeed
-            end)
-            movement:CreateToggle("Noclip", State.Toggles.Noclip, function(v) State:SetNoclip(v) end)
-            movement:CreateToggle("BunnyHop", State.Toggles.BunnyHop, function(v) State:SetBunnyHop(v) end)
-            movement:CreateToggle("Infinite jump", State.Toggles.InfiniteJump, function(v) State:SetInfiniteJump(v) end)
+            -- Each feature is a toggle plus the slider that drives it. The pair
+            -- belongs on one line: the switch on the left, its value on the right.
+            local function moveRow(toggleLabel, toggleOn, toggleCb, sliderLabel, min, max, value, sliderCb)
+                local row = Kit.Row(movement)
+                if row then
+                    row:CreateToggle(toggleLabel, toggleOn, toggleCb)
+                    row:CreateSlider(sliderLabel, min, max, value, sliderCb)
+                else
+                    movement:CreateToggle(toggleLabel, toggleOn, toggleCb)
+                    movement:CreateSlider(sliderLabel, min, max, value, sliderCb)
+                end
+            end
+            moveRow("WalkSpeed", State.Toggles.WalkSpeed, function(v) State:SetWalkSpeedEnabled(v) end,
+                "WalkSpeed (value)", 16, 500, State.Values.WalkSpeed, function(v)
+                    State.Values.WalkSpeed = tonumber(v) or State.Values.WalkSpeed
+                    State:ApplyMovement()
+                end)
+            moveRow("JumpPower", State.Toggles.Jump, function(v) State:SetJumpEnabled(v) end,
+                "JumpPower (value)", 50, 500, State.Values.JumpPower, function(v)
+                    State.Values.JumpPower = tonumber(v) or State.Values.JumpPower
+                    State:ApplyMovement()
+                end)
+            moveRow("Fly", State.Toggles.Fly, function(v) State:SetFly(v) end,
+                "Fly speed", 20, 500, State.Values.FlySpeed, function(v)
+                    State.Values.FlySpeed = tonumber(v) or State.Values.FlySpeed
+                end)
+            -- The three plain switches share a line; the bhop delay slider drives
+            -- BunnyHop, so it sits beside the switch pair.
+            local switchRow = Kit.Row(movement)
+            if switchRow then
+                switchRow:CreateToggle("Noclip", State.Toggles.Noclip, function(v) State:SetNoclip(v) end)
+                switchRow:CreateToggle("BunnyHop", State.Toggles.BunnyHop, function(v) State:SetBunnyHop(v) end)
+                switchRow:CreateToggle("Infinite jump", State.Toggles.InfiniteJump, function(v) State:SetInfiniteJump(v) end)
+            else
+                movement:CreateToggle("Noclip", State.Toggles.Noclip, function(v) State:SetNoclip(v) end)
+                movement:CreateToggle("BunnyHop", State.Toggles.BunnyHop, function(v) State:SetBunnyHop(v) end)
+                movement:CreateToggle("Infinite jump", State.Toggles.InfiniteJump, function(v) State:SetInfiniteJump(v) end)
+            end
             movement:CreateSlider("Bhop delay", 0.01, 1, State.Values.BhopDelay, function(v)
                 State.Values.BhopDelay = tonumber(v) or State.Values.BhopDelay
             end)
@@ -630,35 +649,81 @@ do
         local visuals = Kit.Section(Kit.Tab("Visual", "Visual"), "Visual")
         if visuals then
             visuals:CreateToggle("ESP", State.Toggles.ESP, function(v) State:SetESP(v) end)
-            visuals:CreateToggle("Names", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
-            visuals:CreateToggle("Distance", State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
-            visuals:CreateToggle("Health", State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
-            visuals:CreateToggle("Team check", State.Toggles.TeamCheck, function(v) State.Toggles.TeamCheck = v == true end)
-            visuals:CreateToggle("Team colors", State.Toggles.TeamColors, function(v) State.Toggles.TeamColors = v == true end)
-            visuals:CreateToggle("Chams", State.Toggles.Chams, function(v) State.Toggles.Chams = v == true end)
+            -- The four ESP element switches share a line, then the range slider.
+            local espRow = Kit.Row(visuals)
+            if espRow then
+                espRow:CreateToggle("Names", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
+                espRow:CreateToggle("Distance", State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
+                espRow:CreateToggle("Health", State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
+            else
+                visuals:CreateToggle("Names", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
+                visuals:CreateToggle("Distance", State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
+                visuals:CreateToggle("Health", State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
+            end
             visuals:CreateSlider("ESP range", 100, 10000, State.Values.ESPRange, function(v)
                 State.Values.ESPRange = tonumber(v) or State.Values.ESPRange
             end)
-            visuals:CreateToggle("Tracers", State.Toggles.Tracers, function(v) State:SetTracers(v) end)
-            visuals:CreateToggle("Fullbright", State.Toggles.Fullbright, function(v) State:SetFullbright(v) end)
-            visuals:CreateToggle("Infinite zoom", State.Toggles.InfiniteZoom, function(v) State:SetInfiniteZoom(v) end)
+            local espRow2 = Kit.Row(visuals)
+            if espRow2 then
+                espRow2:CreateToggle("Team check", State.Toggles.TeamCheck, function(v) State.Toggles.TeamCheck = v == true end)
+                espRow2:CreateToggle("Team colors", State.Toggles.TeamColors, function(v) State.Toggles.TeamColors = v == true end)
+                espRow2:CreateToggle("Chams", State.Toggles.Chams, function(v) State.Toggles.Chams = v == true end)
+            else
+                visuals:CreateToggle("Team check", State.Toggles.TeamCheck, function(v) State.Toggles.TeamCheck = v == true end)
+                visuals:CreateToggle("Team colors", State.Toggles.TeamColors, function(v) State.Toggles.TeamColors = v == true end)
+                visuals:CreateToggle("Chams", State.Toggles.Chams, function(v) State.Toggles.Chams = v == true end)
+            end
+            local lightRow = Kit.Row(visuals)
+            if lightRow then
+                lightRow:CreateToggle("Tracers", State.Toggles.Tracers, function(v) State:SetTracers(v) end)
+                lightRow:CreateToggle("Fullbright", State.Toggles.Fullbright, function(v) State:SetFullbright(v) end)
+                lightRow:CreateToggle("Infinite zoom", State.Toggles.InfiniteZoom, function(v) State:SetInfiniteZoom(v) end)
+            else
+                visuals:CreateToggle("Tracers", State.Toggles.Tracers, function(v) State:SetTracers(v) end)
+                visuals:CreateToggle("Fullbright", State.Toggles.Fullbright, function(v) State:SetFullbright(v) end)
+                visuals:CreateToggle("Infinite zoom", State.Toggles.InfiniteZoom, function(v) State:SetInfiniteZoom(v) end)
+            end
         end
 
         local combat = Kit.Section(Kit.Tab("Combat", "Combat"), "Combat")
         if combat then
-            combat:CreateToggle("Aimbot (right button)", State.Toggles.Aimbot, function(v) State.Toggles.Aimbot = v == true end)
-            combat:CreateSlider("Aimbot FOV", 10, 360, State.Values.AimbotFOV, function(v)
-                State.Values.AimbotFOV = tonumber(v) or State.Values.AimbotFOV
-            end)
+            -- Aimbot switch + its FOV on one line, then the aim part dropdown.
+            local aimRow = Kit.Row(combat)
+            if aimRow then
+                aimRow:CreateToggle("Aimbot (right button)", State.Toggles.Aimbot, function(v) State.Toggles.Aimbot = v == true end)
+                aimRow:CreateSlider("Aimbot FOV", 10, 360, State.Values.AimbotFOV, function(v)
+                    State.Values.AimbotFOV = tonumber(v) or State.Values.AimbotFOV
+                end)
+            else
+                combat:CreateToggle("Aimbot (right button)", State.Toggles.Aimbot, function(v) State.Toggles.Aimbot = v == true end)
+                combat:CreateSlider("Aimbot FOV", 10, 360, State.Values.AimbotFOV, function(v)
+                    State.Values.AimbotFOV = tonumber(v) or State.Values.AimbotFOV
+                end)
+            end
             combat:CreateDropdown("Aim part", {"Head", "HumanoidRootPart", "UpperTorso", "Torso"}, State.Values.AimPart, function(v)
                 State.Values.AimPart = tostring(v)
             end)
-            combat:CreateToggle("Silent aim", State.Toggles.SilentAim, function(v) State:SetSilentAim(v) end)
-            combat:CreateSlider("Silent aim range", 50, 2000, State.Values.SilentAimRange, function(v)
-                State.Values.SilentAimRange = tonumber(v) or State.Values.SilentAimRange
-            end)
-            combat:CreateToggle("Anti-fling", State.Toggles.AntiFling, function(v) State:SetAntiFling(v) end)
-            combat:CreateToggle("Anti-void", State.Toggles.AntiVoid, function(v) State:SetAntiVoid(v) end)
+            local silentRow = Kit.Row(combat)
+            if silentRow then
+                silentRow:CreateToggle("Silent aim", State.Toggles.SilentAim, function(v) State:SetSilentAim(v) end)
+                silentRow:CreateSlider("Silent aim range", 50, 2000, State.Values.SilentAimRange, function(v)
+                    State.Values.SilentAimRange = tonumber(v) or State.Values.SilentAimRange
+                end)
+            else
+                combat:CreateToggle("Silent aim", State.Toggles.SilentAim, function(v) State:SetSilentAim(v) end)
+                combat:CreateSlider("Silent aim range", 50, 2000, State.Values.SilentAimRange, function(v)
+                    State.Values.SilentAimRange = tonumber(v) or State.Values.SilentAimRange
+                end)
+            end
+            -- The two anti-* guards share a line; void height drives Anti-void.
+            local guardRow = Kit.Row(combat)
+            if guardRow then
+                guardRow:CreateToggle("Anti-fling", State.Toggles.AntiFling, function(v) State:SetAntiFling(v) end)
+                guardRow:CreateToggle("Anti-void", State.Toggles.AntiVoid, function(v) State:SetAntiVoid(v) end)
+            else
+                combat:CreateToggle("Anti-fling", State.Toggles.AntiFling, function(v) State:SetAntiFling(v) end)
+                combat:CreateToggle("Anti-void", State.Toggles.AntiVoid, function(v) State:SetAntiVoid(v) end)
+            end
             combat:CreateSlider("Void height", -500, 0, State.Values.VoidHeight, function(v)
                 State.Values.VoidHeight = tonumber(v) or State.Values.VoidHeight
             end)
@@ -678,19 +743,42 @@ do
 
         local server = Kit.Section(Kit.Tab("Server", "Misc"), "Server")
         if server then
-            server:CreateButton("Server hop", function()
-                State:ServerHop()
-                if type(UI.Notify) == "function" then UI:Notify("Universal", "Searching for a server.") end
-            end)
-            server:CreateButton("Rejoin", function() State:Rejoin() end)
-            server:CreateButton("Teleport tool", function()
-                State:CreateTeleportTool()
-                if type(UI.Notify) == "function" then UI:Notify("Universal", "Teleport tool created.") end
-            end)
-            server:CreateButton("Dex Explorer", function()
-                State:RunDex()
-                if type(UI.Notify) == "function" then UI:Notify("Universal", "Dex requested.") end
-            end)
+            -- The four server actions are the same shape; two per line keeps the
+            -- section from being a long column of buttons.
+            local serverRow1 = Kit.Row(server)
+            if serverRow1 then
+                serverRow1:CreateButton("Server hop", function()
+                    State:ServerHop()
+                    if type(UI.Notify) == "function" then UI:Notify("Universal", "Searching for a server.") end
+                end)
+                serverRow1:CreateButton("Rejoin", function() State:Rejoin() end)
+            else
+                server:CreateButton("Server hop", function()
+                    State:ServerHop()
+                    if type(UI.Notify) == "function" then UI:Notify("Universal", "Searching for a server.") end
+                end)
+                server:CreateButton("Rejoin", function() State:Rejoin() end)
+            end
+            local serverRow2 = Kit.Row(server)
+            if serverRow2 then
+                serverRow2:CreateButton("Teleport tool", function()
+                    State:CreateTeleportTool()
+                    if type(UI.Notify) == "function" then UI:Notify("Universal", "Teleport tool created.") end
+                end)
+                serverRow2:CreateButton("Dex Explorer", function()
+                    State:RunDex()
+                    if type(UI.Notify) == "function" then UI:Notify("Universal", "Dex requested.") end
+                end)
+            else
+                server:CreateButton("Teleport tool", function()
+                    State:CreateTeleportTool()
+                    if type(UI.Notify) == "function" then UI:Notify("Universal", "Teleport tool created.") end
+                end)
+                server:CreateButton("Dex Explorer", function()
+                    State:RunDex()
+                    if type(UI.Notify) == "function" then UI:Notify("Universal", "Dex requested.") end
+                end)
+            end
         end
 
         local status = Kit.Section(Kit.Tab("Status", "Misc"), "Diagnostics")

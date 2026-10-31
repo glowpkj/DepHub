@@ -536,27 +536,61 @@ do
     if Kit then
         local visual = Kit.Section(Kit.Tab("Visual", "Visual"), "ESP", "Left")
         if visual then
-            visual:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
-            visual:CreateToggle(State.ToggleLabels.ESPKiller, State.Toggles.ESPKiller, function(v) State:SetToggle("ESPKiller", v) end)
-            visual:CreateToggle(State.ToggleLabels.ESPSurvivor, State.Toggles.ESPSurvivor, function(v) State:SetToggle("ESPSurvivor", v) end)
-            visual:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
-            visual:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State:SetToggle("ESPNames", v) end)
-            visual:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State:SetToggle("ESPDistance", v) end)
+            -- All seven ESP element switches are the same kind of decision, so they
+            -- share lines three-up; the two value sliders keep their own rows.
+            local espRow1 = Kit.Row(visual)
+            if espRow1 then
+                espRow1:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
+                espRow1:CreateToggle(State.ToggleLabels.ESPKiller, State.Toggles.ESPKiller, function(v) State:SetToggle("ESPKiller", v) end)
+            else
+                visual:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
+                visual:CreateToggle(State.ToggleLabels.ESPKiller, State.Toggles.ESPKiller, function(v) State:SetToggle("ESPKiller", v) end)
+            end
+            local espRow1b = Kit.Row(visual)
+            if espRow1b then
+                espRow1b:CreateToggle(State.ToggleLabels.ESPSurvivor, State.Toggles.ESPSurvivor, function(v) State:SetToggle("ESPSurvivor", v) end)
+                espRow1b:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
+            else
+                visual:CreateToggle(State.ToggleLabels.ESPSurvivor, State.Toggles.ESPSurvivor, function(v) State:SetToggle("ESPSurvivor", v) end)
+                visual:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
+            end
+            local espRow2 = Kit.Row(visual)
+            if espRow2 then
+                espRow2:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State:SetToggle("ESPNames", v) end)
+                espRow2:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State:SetToggle("ESPDistance", v) end)
+            else
+                visual:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State:SetToggle("ESPNames", v) end)
+                visual:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State:SetToggle("ESPDistance", v) end)
+            end
             visual:CreateSlider("Max distance", 50, 5000, State.Values.Range, function(v) State:SetValue("Range", v) end)
             visual:CreateSlider("Text size", 8, 30, State.Values.TextSize, function(v) State:SetValue("TextSize", v) end)
         end
 
         local world = Kit.Section(Kit.Tab("Generators", "World"), "Repair and skill check", "Left")
         if world then
-            world:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
-            world:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
+            -- Both switches drive the same generator helper, so they share a line.
+            local genRow = Kit.Row(world)
+            if genRow then
+                genRow:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
+                genRow:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
+            else
+                world:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
+                world:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
+            end
             world:CreateSlider("Repair range", 4, 40, State.Values.RepairRange, function(v) State:SetValue("RepairRange", v) end)
         end
 
         local combat = Kit.Section(Kit.Tab("Parry", "Combat"), "Auto parry", "Left")
         if combat then
-            combat:CreateToggle(State.ToggleLabels.AutoParry, State.Toggles.AutoParry, function(v) State:SetToggle("AutoParry", v) end)
-            combat:CreateToggle(State.ToggleLabels.AutoEquip, State.Toggles.AutoEquip, function(v) State:SetToggle("AutoEquip", v) end)
+            -- The two parry switches share a line; the two value sliders keep their rows.
+            local parryRow = Kit.Row(combat)
+            if parryRow then
+                parryRow:CreateToggle(State.ToggleLabels.AutoParry, State.Toggles.AutoParry, function(v) State:SetToggle("AutoParry", v) end)
+                parryRow:CreateToggle(State.ToggleLabels.AutoEquip, State.Toggles.AutoEquip, function(v) State:SetToggle("AutoEquip", v) end)
+            else
+                combat:CreateToggle(State.ToggleLabels.AutoParry, State.Toggles.AutoParry, function(v) State:SetToggle("AutoParry", v) end)
+                combat:CreateToggle(State.ToggleLabels.AutoEquip, State.Toggles.AutoEquip, function(v) State:SetToggle("AutoEquip", v) end)
+            end
             combat:CreateSlider("Parry range", 5, 40, State.Values.ParryRange, function(v) State:SetValue("ParryRange", v) end)
             combat:CreateSlider("Parry cooldown", 0.5, 5, State.Values.ParryCooldown, function(v) State:SetValue("ParryCooldown", v) end)
         end

@@ -155,4 +155,17 @@ do
     for _, expected in ipairs({"Auto Position", "Instant", "Movement smoothing", "Offset above ground", "Minimum distance", "Forced jump", "Jump Power", "Prediction range", "Auto Jump", "Ceiling no collision"}) do
         check(labels[expected] == true, "Volleyball registers its control: " .. expected)
     end
+
+    -- The tabs group related controls into horizontal rows: the Prediction
+    -- section puts the Ball Predict switch next to the range slider it gates,
+    -- the Auto Position section puts its two switches on one line, and the Jump
+    -- section puts its two switches on one line. Each row must hold the pair it
+    -- was built for, so the grouping is real and not just a layout hint.
+    local groups = ui.Library._Groups or {}
+    check(#groups >= 3, "Volleyball built at least three control rows")
+    local rowPairs = {}
+    for _, group in ipairs(groups) do
+        if group.Kind == "HStack" and group._n == 2 then rowPairs[#rowPairs + 1] = true end
+    end
+    check(#rowPairs >= 3, "every Volleyball pair row is a two-control horizontal stack")
 end

@@ -376,22 +376,48 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                         local configName = "default"
                         local renameTo = ""
                         section:CreateInput("Config name", "Config name", configName, function(value) configName = tostring(value or "default") end)
-                        section:CreateButton("Save config", function()
-                            local name = tostring(configName ~= "" and configName or "default")
-                            if State:SaveConfig(name) then visual:Notify("Config", "Config saved: " .. name) else visual:Notify("Config", "Could not save.") end
-                        end)
-                        section:CreateButton("Load config", function()
-                            local name = tostring(configName ~= "" and configName or "default")
-                            if State:LoadConfig(name) then visual:Notify("Config", "Config loaded: " .. name) else visual:Notify("Config", "Could not load.") end
-                        end)
-                        section:CreateButton("Delete config", function()
-                            local name = tostring(configName ~= "" and configName or "default")
-                            if State:DeleteConfig(name) then visual:Notify("Config", "Config deleted: " .. name) else visual:Notify("Config", "Could not delete (does not exist?).") end
-                        end)
-                        section:CreateButton("List configs", function()
-                            local names = State:ListConfigs()
-                            if #names == 0 then visual:Notify("Config", "No saved config.") else visual:Notify("Config", table.concat(names, ", "), 6) end
-                        end)
+                        -- Config actions are all the same shape; pair them on lines
+                        -- instead of one long column of buttons.
+                        local saveRow = section.CreateRow and section:CreateRow()
+                        if saveRow then
+                            saveRow:CreateButton("Save config", function()
+                                local name = tostring(configName ~= "" and configName or "default")
+                                if State:SaveConfig(name) then visual:Notify("Config", "Config saved: " .. name) else visual:Notify("Config", "Could not save.") end
+                            end)
+                            saveRow:CreateButton("Load config", function()
+                                local name = tostring(configName ~= "" and configName or "default")
+                                if State:LoadConfig(name) then visual:Notify("Config", "Config loaded: " .. name) else visual:Notify("Config", "Could not load.") end
+                            end)
+                        else
+                            section:CreateButton("Save config", function()
+                                local name = tostring(configName ~= "" and configName or "default")
+                                if State:SaveConfig(name) then visual:Notify("Config", "Config saved: " .. name) else visual:Notify("Config", "Could not save.") end
+                            end)
+                            section:CreateButton("Load config", function()
+                                local name = tostring(configName ~= "" and configName or "default")
+                                if State:LoadConfig(name) then visual:Notify("Config", "Config loaded: " .. name) else visual:Notify("Config", "Could not load.") end
+                            end)
+                        end
+                        local deleteRow = section.CreateRow and section:CreateRow()
+                        if deleteRow then
+                            deleteRow:CreateButton("Delete config", function()
+                                local name = tostring(configName ~= "" and configName or "default")
+                                if State:DeleteConfig(name) then visual:Notify("Config", "Config deleted: " .. name) else visual:Notify("Config", "Could not delete (does not exist?).") end
+                            end)
+                            deleteRow:CreateButton("List configs", function()
+                                local names = State:ListConfigs()
+                                if #names == 0 then visual:Notify("Config", "No saved config.") else visual:Notify("Config", table.concat(names, ", "), 6) end
+                            end)
+                        else
+                            section:CreateButton("Delete config", function()
+                                local name = tostring(configName ~= "" and configName or "default")
+                                if State:DeleteConfig(name) then visual:Notify("Config", "Config deleted: " .. name) else visual:Notify("Config", "Could not delete (does not exist?).") end
+                            end)
+                            section:CreateButton("List configs", function()
+                                local names = State:ListConfigs()
+                                if #names == 0 then visual:Notify("Config", "No saved config.") else visual:Notify("Config", table.concat(names, ", "), 6) end
+                            end)
+                        end
                         -- Rename reads the "Nome" box as the source and a second box
                         -- as the target, so no extra state is needed beyond the two.
                         section:CreateInput("Rename to", "New name", renameTo, function(value) renameTo = tostring(value or "") end)
@@ -412,11 +438,22 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                         -- page names map to modules in the core module registry.
                         local modules = {"combat", "farm", "player", "fruits", "shop", "events", "extras", "teleport"}
                         local chosen = "combat"
-                        reset:CreateDropdown("Module", modules, chosen, function(value) chosen = tostring(value or "combat") end)
-                        reset:CreateButton("Restore module", function()
-                            local n = State:ResetModule(chosen)
-                            if n > 0 then visual:Notify("Config", "Module " .. chosen .. " restored (" .. n .. " controls).") else visual:Notify("Config", "No restorable control in " .. chosen .. ".") end
-                        end)
+                        -- The module picker and the button that resets it are one
+                        -- action; keep them on the same line.
+                        local resetRow = reset.CreateRow and reset:CreateRow()
+                        if resetRow then
+                            resetRow:CreateDropdown("Module", modules, chosen, function(value) chosen = tostring(value or "combat") end)
+                            resetRow:CreateButton("Restore module", function()
+                                local n = State:ResetModule(chosen)
+                                if n > 0 then visual:Notify("Config", "Module " .. chosen .. " restored (" .. n .. " controls).") else visual:Notify("Config", "No restorable control in " .. chosen .. ".") end
+                            end)
+                        else
+                            reset:CreateDropdown("Module", modules, chosen, function(value) chosen = tostring(value or "combat") end)
+                            reset:CreateButton("Restore module", function()
+                                local n = State:ResetModule(chosen)
+                                if n > 0 then visual:Notify("Config", "Module " .. chosen .. " restored (" .. n .. " controls).") else visual:Notify("Config", "No restorable control in " .. chosen .. ".") end
+                            end)
+                        end
                     end
                 end
             else

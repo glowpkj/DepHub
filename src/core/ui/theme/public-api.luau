@@ -1084,8 +1084,14 @@ function Library:CreateSection(tabName, title, summary, defaultOpen, columnName,
 
     local function updateHeight(animate)
         if not body or not body.Parent then return end
+        -- UIListLayout.AbsoluteContentSize.Y ALREADY includes the body's
+        -- UIPadding (top 10 + bottom 14). The old code added +24 on top of that,
+        -- so every section carried a redundant 24px of dead space under its last
+        -- control -- the empty band the player saw at the bottom of a section.
+        -- Hug the real content instead: a section is exactly as tall as its
+        -- header plus what it holds.
         local innerH = bodyLayout.AbsoluteContentSize.Y
-        local contentH = (innerH > 0) and (innerH + 24) or 24
+        local contentH = (innerH > 0) and innerH or 0
         local maxH = 450
         local contentArea = self._UI.ContentArea
         if contentArea and contentArea.AbsoluteSize.Y > 0 then

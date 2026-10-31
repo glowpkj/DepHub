@@ -356,37 +356,87 @@ do
     if Kit then
         local esp=Kit.Section(Kit.Tab("Titan ESP","Visual"),"Visuals","Left")
         if esp then
-            esp:CreateToggle("Titan ESP",M.Toggles.TitanESP,function(v) M:SetToggle("TitanESP",v) end)
-            esp:CreateToggle("Show nape",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
-            esp:CreateToggle("Expand nape",M.Toggles.NapeExtend,function(v) M:SetToggle("NapeExtend",v) end)
-            esp:CreateSlider("Nape multiplier",0,2,M.Values.NapeMultiplier,function(v) M:SetNapeMultiplier(v) end)
+            -- ESP + its two nape switches share lines; the nape multiplier slider
+            -- drives "Expand nape" so it keeps its own row.
+            local espRow=Kit.Row(esp)
+            if espRow then
+                espRow:CreateToggle("Titan ESP",M.Toggles.TitanESP,function(v) M:SetToggle("TitanESP",v) end)
+                espRow:CreateToggle("Show nape",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
+            else
+                esp:CreateToggle("Titan ESP",M.Toggles.TitanESP,function(v) M:SetToggle("TitanESP",v) end)
+                esp:CreateToggle("Show nape",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
+            end
+            local espRow2=Kit.Row(esp)
+            if espRow2 then
+                espRow2:CreateToggle("Expand nape",M.Toggles.NapeExtend,function(v) M:SetToggle("NapeExtend",v) end)
+                espRow2:CreateSlider("Nape multiplier",0,2,M.Values.NapeMultiplier,function(v) M:SetNapeMultiplier(v) end)
+            else
+                esp:CreateToggle("Expand nape",M.Toggles.NapeExtend,function(v) M:SetToggle("NapeExtend",v) end)
+                esp:CreateSlider("Nape multiplier",0,2,M.Values.NapeMultiplier,function(v) M:SetNapeMultiplier(v) end)
+            end
             esp:CreateToggle("Expand Attack Titan target",M.Toggles.ErenExtend,function(v) M:SetToggle("ErenExtend",v) end)
         end
 
         local combat=Kit.Section(Kit.Tab("Farm","Combat"),"Autofarm","Left")
         if combat then
-            combat:CreateToggle("Titan Ripper",M.Toggles.TitanRipper,function(v) M:SetToggle("TitanRipper",v) end)
-            combat:CreateToggle("Skill autofarm",M.Toggles.SkillAutofarm,function(v) M:SetToggle("SkillAutofarm",v) end)
+            -- Autofarm switches are the same decision, so they pair on lines.
+            local farmRow=Kit.Row(combat)
+            if farmRow then
+                farmRow:CreateToggle("Titan Ripper",M.Toggles.TitanRipper,function(v) M:SetToggle("TitanRipper",v) end)
+                farmRow:CreateToggle("Skill autofarm",M.Toggles.SkillAutofarm,function(v) M:SetToggle("SkillAutofarm",v) end)
+            else
+                combat:CreateToggle("Titan Ripper",M.Toggles.TitanRipper,function(v) M:SetToggle("TitanRipper",v) end)
+                combat:CreateToggle("Skill autofarm",M.Toggles.SkillAutofarm,function(v) M:SetToggle("SkillAutofarm",v) end)
+            end
             combat:CreateToggle("Classic autofarm",M.Toggles.ClassicAutofarm,function(v) M:SetToggle("ClassicAutofarm",v) end)
         end
 
         local movement=Kit.Section(Kit.Tab("Movement","Movement"),"Movement","Left")
         if movement then
-            movement:CreateToggle("Farm noclip",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
-            movement:CreateSlider("Travel speed",50,2000,M.Values.TravelSpeed,function(v) M:SetTravelSpeed(v) end)
-            movement:CreateButton("Go to refill",function()
-                local ok=M:TeleportToRefill()
-                if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R",ok and "Heading to refill." or "Refill not found.") end
-            end)
-            movement:CreateButton("Cancel movement",function() M:CancelTeleport() end)
+            -- Farm noclip + travel speed share a line; the two actions share one.
+            local moveRow=Kit.Row(movement)
+            if moveRow then
+                moveRow:CreateToggle("Farm noclip",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
+                moveRow:CreateSlider("Travel speed",50,2000,M.Values.TravelSpeed,function(v) M:SetTravelSpeed(v) end)
+            else
+                movement:CreateToggle("Farm noclip",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
+                movement:CreateSlider("Travel speed",50,2000,M.Values.TravelSpeed,function(v) M:SetTravelSpeed(v) end)
+            end
+            local moveBtnRow=Kit.Row(movement)
+            if moveBtnRow then
+                moveBtnRow:CreateButton("Go to refill",function()
+                    local ok=M:TeleportToRefill()
+                    if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R",ok and "Heading to refill." or "Refill not found.") end
+                end)
+                moveBtnRow:CreateButton("Cancel movement",function() M:CancelTeleport() end)
+            else
+                movement:CreateButton("Go to refill",function()
+                    local ok=M:TeleportToRefill()
+                    if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R",ok and "Heading to refill." or "Refill not found.") end
+                end)
+                movement:CreateButton("Cancel movement",function() M:CancelTeleport() end)
+            end
         end
 
         local assist=Kit.Section(Kit.Tab("Assistance","Misc"),"Automation","Left")
         if assist then
-            assist:CreateToggle("Refill blades",M.Toggles.AutoBladeRefill,function(v) M:SetToggle("AutoBladeRefill",v) end)
-            assist:CreateToggle("Auto grab escape",M.Toggles.AutoGrabEscape,function(v) M:SetToggle("AutoGrabEscape",v) end)
-            assist:CreateToggle("Anti-injury",M.Toggles.AntiInjury,function(v) M:SetToggle("AntiInjury",v) end)
-            assist:CreateToggle("Auto retry",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
+            -- Five safety switches, all the same decision; pair them on lines.
+            local assistRow1=Kit.Row(assist)
+            if assistRow1 then
+                assistRow1:CreateToggle("Refill blades",M.Toggles.AutoBladeRefill,function(v) M:SetToggle("AutoBladeRefill",v) end)
+                assistRow1:CreateToggle("Auto grab escape",M.Toggles.AutoGrabEscape,function(v) M:SetToggle("AutoGrabEscape",v) end)
+            else
+                assist:CreateToggle("Refill blades",M.Toggles.AutoBladeRefill,function(v) M:SetToggle("AutoBladeRefill",v) end)
+                assist:CreateToggle("Auto grab escape",M.Toggles.AutoGrabEscape,function(v) M:SetToggle("AutoGrabEscape",v) end)
+            end
+            local assistRow2=Kit.Row(assist)
+            if assistRow2 then
+                assistRow2:CreateToggle("Anti-injury",M.Toggles.AntiInjury,function(v) M:SetToggle("AntiInjury",v) end)
+                assistRow2:CreateToggle("Auto retry",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
+            else
+                assist:CreateToggle("Anti-injury",M.Toggles.AntiInjury,function(v) M:SetToggle("AntiInjury",v) end)
+                assist:CreateToggle("Auto retry",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
+            end
             assist:CreateToggle("Anti-AFK",M.Toggles.AntiAFK,function(v) M:SetToggle("AntiAFK",v) end)
         end
 

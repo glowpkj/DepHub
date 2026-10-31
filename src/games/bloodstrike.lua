@@ -299,14 +299,40 @@ do
     if Kit then
         local visual = Kit.Section(Kit.Tab("ESP", "Visual"), "Players", "Left")
         if visual then
-            visual:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
-            visual:CreateToggle(State.ToggleLabels.TeamCheck, State.Toggles.TeamCheck, function(v) State:SetToggle("TeamCheck", v) end)
-            visual:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
-            visual:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
-            visual:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
-            visual:CreateToggle(State.ToggleLabels.ESPHealth, State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
-            visual:CreateSlider("Max distance", 50, 5000, State.Values.Range, function(v) State:SetRange(v) end)
-            visual:CreateSlider("Text size", 8, 30, State.Values.TextSize, function(v) State:SetTextSize(v) end)
+            -- Six ESP element switches, all the same decision; two lines of three,
+            -- then the two value sliders.
+            local espRow1 = Kit.Row(visual)
+            if espRow1 then
+                espRow1:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
+                espRow1:CreateToggle(State.ToggleLabels.TeamCheck, State.Toggles.TeamCheck, function(v) State:SetToggle("TeamCheck", v) end)
+            else
+                visual:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
+                visual:CreateToggle(State.ToggleLabels.TeamCheck, State.Toggles.TeamCheck, function(v) State:SetToggle("TeamCheck", v) end)
+            end
+            local espRow1b = Kit.Row(visual)
+            if espRow1b then
+                espRow1b:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
+                espRow1b:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
+            else
+                visual:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
+                visual:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
+            end
+            local espRow2 = Kit.Row(visual)
+            if espRow2 then
+                espRow2:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
+                espRow2:CreateToggle(State.ToggleLabels.ESPHealth, State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
+            else
+                visual:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State.Toggles.ESPDistance = v == true end)
+                visual:CreateToggle(State.ToggleLabels.ESPHealth, State.Toggles.ESPHealth, function(v) State.Toggles.ESPHealth = v == true end)
+            end
+            local espSliderRow = Kit.Row(visual)
+            if espSliderRow then
+                espSliderRow:CreateSlider("Max distance", 50, 5000, State.Values.Range, function(v) State:SetRange(v) end)
+                espSliderRow:CreateSlider("Text size", 8, 30, State.Values.TextSize, function(v) State:SetTextSize(v) end)
+            else
+                visual:CreateSlider("Max distance", 50, 5000, State.Values.Range, function(v) State:SetRange(v) end)
+                visual:CreateSlider("Text size", 8, 30, State.Values.TextSize, function(v) State:SetTextSize(v) end)
+            end
         end
     end
 end

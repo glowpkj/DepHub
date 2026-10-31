@@ -71,6 +71,20 @@ constructor default (`src/core/ui/theme/constructor.luau`). Where the loader or 
 backend does not pass a `ToggleKey`, the default is N. The player can rebind at
 runtime through the keybind overlay.
 
+## 4c. Sections hug their content; group related controls in rows
+
+A section is exactly as tall as its content -- the shell sizes it to the body's
+`UIListLayout.AbsoluteContentSize.Y`, which already includes the body's padding.
+Do not add a constant on top of it (an old `+24` left an empty band under the
+last control).
+
+Group controls that belong together on one line with `section:CreateRow()` (or
+`Kit.Row(section)`): a toggle next to the slider that drives it, or the switches
+of the same feature. **At most two controls per row** -- three or more truncates
+toggle labels to nothing. Leave a section as a plain vertical stack when the
+flow is naturally sequential. `section:CreateStack()` (or `Kit.Stack`) is the
+named vertical group.
+
 ## 5. Version in place
 
 Version bumps touch **both** `src/version.txt` and the `VERSION` line in

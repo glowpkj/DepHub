@@ -261,25 +261,48 @@ do
     if Kit then
         local speed = Kit.Section(Kit.Tab("Speed", "Movement"), "Movement", "Left")
         if speed then
-            speed:CreateToggle("Speed boost", State.Toggles.Speed, function(v) State:SetToggle("Speed", v) end)
-            speed:CreateSlider("Walk speed", 16, 300, State.Values.WalkSpeed, function(v) State:SetSpeed(v) end)
+            -- The switch and the speed it sets share a line.
+            local speedRow = Kit.Row(speed)
+            if speedRow then
+                speedRow:CreateToggle("Speed boost", State.Toggles.Speed, function(v) State:SetToggle("Speed", v) end)
+                speedRow:CreateSlider("Walk speed", 16, 300, State.Values.WalkSpeed, function(v) State:SetSpeed(v) end)
+            else
+                speed:CreateToggle("Speed boost", State.Toggles.Speed, function(v) State:SetToggle("Speed", v) end)
+                speed:CreateSlider("Walk speed", 16, 300, State.Values.WalkSpeed, function(v) State:SetSpeed(v) end)
+            end
         end
 
         local tpTab = Kit.Tab("Teleport", "Movement")
         local fly = Kit.Section(tpTab, "Flight", "Left")
         if fly then
             fly:CreateSlider("Flight speed", 50, 1000, State.Values.FlySpeed, function(v) State:SetFlySpeed(v) end)
-            fly:CreateButton("Report current position", function()
-                local p = State:FlyToPosition()
-                if not p then UI:Notify("Teleport", "No character") return end
-                UI:Notify("Position", string.format("X %.1f  Y %.1f  Z %.1f", p.X, p.Y, p.Z))
-            end)
-            fly:CreateButton("Save waypoint here", function()
-                local p = State:FlyToPosition()
-                if not p then UI:Notify("Teleport", "No character") return end
-                State:AddWaypoint(nil, p)
-                UI:Notify("Waypoint", "Saved (total " .. tostring(#State.Waypoints) .. ")")
-            end)
+            -- The two position actions are the same shape; one line.
+            local flyRow = Kit.Row(fly)
+            if flyRow then
+                flyRow:CreateButton("Report current position", function()
+                    local p = State:FlyToPosition()
+                    if not p then UI:Notify("Teleport", "No character") return end
+                    UI:Notify("Position", string.format("X %.1f  Y %.1f  Z %.1f", p.X, p.Y, p.Z))
+                end)
+                flyRow:CreateButton("Save waypoint here", function()
+                    local p = State:FlyToPosition()
+                    if not p then UI:Notify("Teleport", "No character") return end
+                    State:AddWaypoint(nil, p)
+                    UI:Notify("Waypoint", "Saved (total " .. tostring(#State.Waypoints) .. ")")
+                end)
+            else
+                fly:CreateButton("Report current position", function()
+                    local p = State:FlyToPosition()
+                    if not p then UI:Notify("Teleport", "No character") return end
+                    UI:Notify("Position", string.format("X %.1f  Y %.1f  Z %.1f", p.X, p.Y, p.Z))
+                end)
+                fly:CreateButton("Save waypoint here", function()
+                    local p = State:FlyToPosition()
+                    if not p then UI:Notify("Teleport", "No character") return end
+                    State:AddWaypoint(nil, p)
+                    UI:Notify("Waypoint", "Saved (total " .. tostring(#State.Waypoints) .. ")")
+                end)
+            end
         end
 
         local wp = Kit.Section(tpTab, "Waypoints", "Right")

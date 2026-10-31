@@ -282,6 +282,46 @@ local function NewWindow()
         library._Controls[#library._Controls + 1] = {Kind = "paragraph", Title = title, Body = body}
         return {Kind = "paragraph"}
     end
+    -- VStack/HStack: a named grouping container. Controls added through the
+    -- returned handle record exactly like section controls, so tests see the
+    -- same flat list; Row/Stack just marks how they are laid out.
+    local function makeGroup(kind)
+        local group = {Kind = kind, _n = 0}
+        group.AddToggle = function(_, ...) group._n = group._n + 1; return library:AddToggle(nil, ...) end
+        group.AddSlider = function(_, ...) group._n = group._n + 1; return library:AddSlider(nil, ...) end
+        group.AddDropdown = function(_, ...) group._n = group._n + 1; return library:AddDropdown(nil, ...) end
+        group.AddMultiDropdown = function(_, ...) group._n = group._n + 1; return library:AddDropdown(nil, ...) end
+        group.AddButton = function(_, ...) group._n = group._n + 1; return library:AddButton(nil, ...) end
+        group.AddTextbox = function(_, ...) group._n = group._n + 1; return library:AddTextbox(nil, ...) end
+        group.AddKeybind = function(_, ...) group._n = group._n + 1; return {Kind = "keybind"} end
+        group.AddColorPicker = function(_, ...) group._n = group._n + 1; return {Kind = "colorpicker"} end
+        group.AddParagraph = function(_, ...) group._n = group._n + 1; return library:AddParagraph(nil, ...) end
+        group.AddSeparator = function(_, ...) group._n = group._n + 1; return {Kind = "separator"} end
+        group.AddLabel = function(_, ...) group._n = group._n + 1; return {Kind = "label"} end
+        group.AddChipBar = function(_, ...) group._n = group._n + 1; return {Kind = "chipbar"} end
+        group.AddConfigList = function(_, ...) group._n = group._n + 1; return {Kind = "configlist"} end
+        group.CreateToggle = function(_, ...) return group.AddToggle(group, ...) end
+        group.CreateSlider = function(_, ...) return group.AddSlider(group, ...) end
+        group.CreateDropdown = function(_, ...) return group.AddDropdown(group, ...) end
+        group.CreateButton = function(_, ...) return group.AddButton(group, ...) end
+        group.CreateInput = function(_, ...) return group.AddTextbox(group, ...) end
+        group.CreateParagraph = function(_, ...) return group.AddParagraph(group, ...) end
+        group.CreateSeparator = function(_, ...) return group.AddSeparator(group, ...) end
+        group.CreateLabel = function(_, ...) return group.AddLabel(group, ...) end
+        return group
+    end
+    function library:AddHStack()
+        local group = makeGroup("HStack")
+        library._Groups = library._Groups or {}
+        library._Groups[#library._Groups + 1] = group
+        return group
+    end
+    library.AddVStack = function() 
+        local group = makeGroup("VStack")
+        library._Groups = library._Groups or {}
+        library._Groups[#library._Groups + 1] = group
+        return group
+    end
     function library:Notify(title, message) library.Notifications = library.Notifications or {}; library.Notifications[#library.Notifications + 1] = {title, message} end
     function library:SetActiveCategory(category, tab) state.ActiveCategory = category; state.ActiveTab = tab end
     -- The loader builds a fixed Dashboard tab from every game: a banner

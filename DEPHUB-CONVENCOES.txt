@@ -104,6 +104,13 @@ harness rejeita e em jogo briga com o tema). O backend so USA a API abaixo.
     sec:CreateInput(label, placeholder, inicial, callback)
     sec:CreateParagraph(titulo, texto)
 
+    -- Agrupar controles lado a lado numa linha (menos poluicao, aba mais curta):
+    local row = sec:CreateRow()        -- ou Kit.Row(sec)
+    row:CreateToggle(...)              -- cada controle ocupa uma fatia igual da linha
+    row:CreateSlider(...)              -- (2 controles = 50% cada)
+
+    local col = sec:CreateStack()      -- ou Kit.Stack(sec): grupo vertical nomeado
+
 Regras da API:
 - Todos os labels visiveis ao jogador em INGLES, curtos e claros (nomes de
   aba/secao, labels de controle, paragrafos, notificacoes e textos do tab
@@ -111,6 +118,14 @@ Regras da API:
   de instancias/pastas do jogo.
 - CreateSection exige "Left" ou "Right". Nao passe resumo/descricao no lugar.
 - Nada de UI criada fora do shell.
+- VStack/HStack (CreateRow/CreateStack): agrupe SO o que faz sentido junto --
+  o toggle e o slider que ele comanda, ou os switches da MESMA funcionalidade.
+  Use no maximo 2 controles por linha: 3+ deixa o label do toggle ilegivel
+  (ele trunca). Onde a secao for um fluxo vertical natural, deixe empilhado.
+- A secao ENCOLHE ate o conteudo: nao existe sobra embaixo. A altura e o
+  `UIListLayout.AbsoluteContentSize.Y` do corpo (que JA inclui o UIPadding do
+  corpo) -- nao some nada a mais (o antigo `+24` criava uma faixa vazia embaixo
+  do ultimo controle; bug real). Ver secao 8.
 
 Tecla de abrir/fechar: o padrao global e N (Enum.KeyCode.N), definido em
 src/core/demon-ui.lua (WINDOW_OPTIONS.ToggleKey) e no default do construtor do
@@ -237,6 +252,18 @@ Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
     Instance.new("ScreenGui"/"Frame"/"TextButton") no backend e proibido. O
     harness rejeita e em jogo conflita com o tema. Use a API do shell.
 
+(f) Somar padding a altura da secao -> faixa VAZIA embaixo do conteudo.
+    `UIListLayout.AbsoluteContentSize.Y` JA inclui o UIPadding do corpo. O shell
+    somava +24 em cima disso, entao toda secao ficava 24px mais alta que o
+    conteudo -- o buraco que aparecia embaixo do ultimo controle (visto na
+    secao "Prediction" do Volleyball 4.2). A altura agora e o conteudo medido,
+    sem soma. Nao "conserte" re-adicionando padding.
+
+(g) VStack/HStack: no maximo 2 controles por linha.
+    A linha (CreateRow/Kit.Row) divide a largura igualmente entre os filhos.
+    Com 3+ controles o label do toggle trunca ate sumir. Agrupe pares (toggle +
+    o slider dele, ou os switches da mesma funcionalidade).
+
 
 --------------------------------------------------------------------------------
 9. CHECKLIST ANTES DE DAR COMO PRONTO
@@ -288,13 +315,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.00)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.01)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
-concluida e o passe de UI em ingles:
+concluida, o passe de UI em ingles e o conserto da altura das secoes + VStack/
+HStack:
 
-FEITO / FUNCIONANDO (verificado offline, 735 checks):
+FEITO / FUNCIONANDO (verificado offline, 751 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -343,12 +371,19 @@ MIGRACAO PARA CATEGORIAS (concluida):
 - Universal: Movement / Visual / Combat / Player (Social) / Misc (Server,
   Status).
 
-PENDENTE - VStack/HStack:
-- O usuario quer o conteudo das abas reorganizado com VStack/HStack (empilhar
-  vertical + linhas horizontais para agrupar controles lado a lado, menos
-  poluido). Hoje o shell so tem empilhamento vertical dentro da secao
-  (UIListLayout + AutomaticCanvasSize.Y). Nao construir antes de receber a
-  foto de referencia do usuario mostrando o estado atual das abas.
+ALTURA DAS SECOES + VSTACK/HSTACK (concluido em v0.1.01):
+- A secao encolhe ate o conteudo: a altura e o `AbsoluteContentSize.Y` do corpo
+  (que JA inclui o UIPadding). O `+24` extra que criava a faixa vazia embaixo do
+  ultimo controle foi removido.
+- VStack/HStack reais no shell: `sec:CreateRow()` (ou `Kit.Row(sec)`) cria uma
+  linha horizontal com UIListLayout e divide a largura igualmente entre os
+  controles adicionados; `sec:CreateStack()` (ou `Kit.Stack(sec)`) cria um grupo
+  vertical nomeado. Exposto no adapter (section:CreateRow / :CreateStack).
+- Aplicado em todos os jogos: pares toggle+slider e switches da mesma
+  funcionalidade passam a dividir a mesma linha (no maximo 2 por linha), o que
+  encurta bastante as abas.
+- Cobertura: testes de tema (AddHStack reflow 50/50, VStack vertical, altura da
+  secao = conteudo) e de backend (Volleyball usa linhas de par).
 
 EXCECAO DELIBERADA - Blox Fruits:
 - As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,
