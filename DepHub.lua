@@ -23,7 +23,7 @@ local HOST_TEMPLATES = {
     "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.0.98"
+local VERSION = "0.0.99"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -476,6 +476,20 @@ Diag:Module("demon-ui window", true, "janela criada")
 
 env.__DEPHUB.DemonUI = window
 env.__DEPHUB.UI = window
+
+-- The UI kit every backend uses to build its part of the shell in the standard
+-- shape (category -> tab -> section -> controls). Centralizing the category/tab/
+-- section creation here is what keeps the "column must be Left/Right" contract
+-- in one place instead of re-implemented (and mis-implemented) per game.
+do
+    local okKit, kitModule = loadModule("src/core/ui-kit.lua", false)
+    if okKit and type(kitModule) == "table" then
+        env.__DEPHUB.UIKit = kitModule
+        Diag:Module("src/core/ui-kit.lua", true, "carregado")
+    else
+        Diag:Module("src/core/ui-kit.lua", false, tostring(kitModule))
+    end
+end
 
 -- Fixed Dashboard tab: every game gets the same home screen, created here by
 -- the loader so it exists no matter which backend (or no backend) runs. It

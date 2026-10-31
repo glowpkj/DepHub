@@ -489,6 +489,11 @@ local function sandbox(placeId, gameId)
         })
         self.State.__DEPHUB = self.State.__DEPHUB or {}
         self.State.__DEPHUB.UI = window
+        -- The UI kit is loaded by the loader in game; a test that runs a backend
+        -- directly (without the loader) still needs it, so mount it here too, the
+        -- same way the loader does.
+        local okKit, kit = pcall(function() return env.loadstring(sources['src/core/ui-kit.lua'])() end)
+        if okKit and type(kit) == 'table' then self.State.__DEPHUB.UIKit = kit end
         return window, window.Library
     end
     env._provided = {}

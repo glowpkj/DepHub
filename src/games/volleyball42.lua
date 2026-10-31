@@ -917,73 +917,67 @@ end
 State:Start()
 
 local UI = (env.__DEPHUB or {}).UI
-if type(UI) == "table" and type(UI.CreateTab) == "function" then
-    local tabs = {}
-    local function section(tabName, sectionName, column)
-        local tab = tabs[tabName]
-        if not tab then
-            tab = UI:CreateTab(tabName, "All")
-            tabs[tabName] = tab
+-- ---------------------------------------------------------------------------
+-- Presentation: grouped by CATEGORY (finalidade), never by game name. The
+-- prediction/auto-position work is visual + positioning assistance (Visual), the
+-- jump helpers are Movement, and clearing ceiling collision is a World change.
+-- ---------------------------------------------------------------------------
+do
+    local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+        local predictTab = Kit.Tab("Ball Predict", "Visual")
+        local predict = Kit.Section(predictTab, "Previsão", "Left")
+        if predict then
+            predict:CreateToggle("Ball Predict", State.Toggles.BallPredict, function(v) State:SetToggle("BallPredict", v) end)
+            predict:CreateDropdown("Modo", State.Modes, State.Mode, function(v)
+                if State:SetMode(v) then
+                    if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", "Modo " .. tostring(v) .. " selecionado.") end
+                else
+                    if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", "Modo inválido.") end
+                end
+            end)
+            -- Distance gate: 0 predicts at any range. Only the marker/tracer respect
+            -- it, so a far ball is ignored rather than shown with a bad prediction.
+            predict:CreateSlider("Alcance da previsão", 0, 2000, Config.maxPredictDistance, function(v)
+                Config.maxPredictDistance = tonumber(v) or 0
+            end)
+            predict:CreateParagraph("Previsão", "Personal prevê a bola do próprio jogador; Match cobre as equipes; Future ainda não está configurado. O marcador fica verde dentro da quadra (onde a bola conta) e vermelho fora.")
         end
-        if not tab then return nil end
-        return tab:CreateSection(sectionName, column or "Left")
-    end
-    local function notify(message)
-        if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", message) end
-    end
 
-    -- Left column: prediction and the Auto Position that uses it.
-    local predict = section("Ball Predict", "Previsão", "Left")
-    if predict then
-        predict:CreateToggle("Ball Predict", State.Toggles.BallPredict, function(v) State:SetToggle("BallPredict", v) end)
-        predict:CreateDropdown("Modo", State.Modes, State.Mode, function(v)
-            if State:SetMode(v) then
-                notify("Modo " .. tostring(v) .. " selecionado.")
-            else
-                notify("Modo inválido.")
-            end
-        end)
-        -- Distance gate: 0 predicts at any range. Only the marker/tracer respect
-        -- it, so a far ball is ignored rather than shown with a bad prediction.
-        predict:CreateSlider("Alcance da previsão", 0, 2000, Config.maxPredictDistance, function(v)
-            Config.maxPredictDistance = tonumber(v) or 0
-        end)
-        predict:CreateParagraph("Previsão", "Personal prevê a bola do próprio jogador; Match cobre as equipes; Future ainda não está configurado. O marcador fica verde dentro da quadra (onde a bola conta) e vermelho fora.")
-    end
+        local assist = Kit.Section(predictTab, "Auto Position", "Left")
+        if assist then
+            assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
+            assist:CreateToggle("Instantâneo", Config.instantMove, function(v) Config.instantMove = v == true end)
+            assist:CreateSlider("Offset acima do chão", 0, 20, Config.positionOffsetY, function(v) Config.positionOffsetY = tonumber(v) or 0 end)
+            assist:CreateSlider("Distância mínima", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
+            assist:CreateSlider("Suavidade do movimento", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
+            assist:CreateParagraph("Auto Position", "Leva o personagem ao ponto de queda previsto. Instantâneo teleporta direto; desligado usa movimento suave, cuja velocidade é o slider de suavidade.")
+        end
 
-    local assist = section("Ball Predict", "Auto Position", "Left")
-    if assist then
-        assist:CreateToggle("Auto Position", State.Toggles.AutoPosition, function(v) State:SetToggle("AutoPosition", v) end)
-        assist:CreateToggle("Instantâneo", Config.instantMove, function(v) Config.instantMove = v == true end)
-        assist:CreateSlider("Offset acima do chão", 0, 20, Config.positionOffsetY, function(v) Config.positionOffsetY = tonumber(v) or 0 end)
-        assist:CreateSlider("Distância mínima", 0, 20, Config.moveThreshold, function(v) Config.moveThreshold = tonumber(v) or 0 end)
-        assist:CreateSlider("Suavidade do movimento", 0.05, 1, Config.moveSmoothing, function(v) Config.moveSmoothing = tonumber(v) or 0.35 end)
-        assist:CreateParagraph("Auto Position", "Leva o personagem ao ponto de queda previsto. Instantâneo teleporta direto; desligado usa movimento suave, cuja velocidade é o slider de suavidade.")
-    end
+        -- Jump helpers are movement.
+        local movement = Kit.Section(Kit.Tab("Pulo", "Movement"), "Pulo", "Left")
+        if movement then
+            movement:CreateToggle("Pulo forçado", State.Toggles.JumpForce, function(v)
+                State:SetToggle("JumpForce", v)
+                if type(UI.Notify) == "function" then UI:Notify("Volleyball 4.2", v and "Pulo forçado LIGADO" or "Pulo forçado desligado") end
+            end)
+            movement:CreateSlider("Jump Power", 50, 500, Config.jumpPower, function(v)
+                Config.jumpPower = tonumber(v) or 120
+                if State.Toggles.JumpForce then applyJump() end
+            end)
+            movement:CreateToggle("Auto Jump", Config.autoJump, function(v)
+                Config.autoJump = v == true
+            end)
+            movement:CreateParagraph("Pulo", "Pulo forçado liga o pulo mesmo em zonas que o bloqueiam: aplica o Jump Power todo frame e mantém o estado de pulo habilitado. Ao desligar, restaura o que o jogo tinha. Auto Jump pula sozinho enquanto ele está ligado.")
+        end
 
-    -- Right column: movement (jump) and collision.
-    local movement = section("Ball Predict", "Pulo", "Right")
-    if movement then
-        movement:CreateToggle("Pulo forçado", State.Toggles.JumpForce, function(v)
-            State:SetToggle("JumpForce", v)
-            notify(v and "Pulo forçado LIGADO" or "Pulo forçado desligado")
-        end)
-        movement:CreateSlider("Jump Power", 50, 500, Config.jumpPower, function(v)
-            Config.jumpPower = tonumber(v) or 120
-            if State.Toggles.JumpForce then applyJump() end
-        end)
-        movement:CreateToggle("Auto Jump", Config.autoJump, function(v)
-            Config.autoJump = v == true
-        end)
-        movement:CreateParagraph("Pulo", "Pulo forçado liga o pulo mesmo em zonas que o bloqueiam: aplica o Jump Power todo frame e mantém o estado de pulo habilitado. Ao desligar, restaura o que o jogo tinha. Auto Jump pula sozinho enquanto ele está ligado.")
-    end
-
-    -- Ceiling parts are what the ball bounces off; clearing their collision
-    -- removes them as an obstacle for the player. On by default.
-    local collision = section("Ball Predict", "Colisão", "Right")
-    if collision then
-        collision:CreateToggle("Ceiling sem colisão", State.Toggles.CeilingNoClip, function(v) State:SetToggle("CeilingNoClip", v) end)
-        collision:CreateParagraph("Colisão", "Tira a colisão das parts Ceiling para você (padrão ligado). A bola continua batendo nelas. Ao desligar, a colisão volta ao original.")
+        -- Ceiling parts are what the ball bounces off; clearing their collision
+        -- removes them as an obstacle for the player. On by default.
+        local collision = Kit.Section(Kit.Tab("Colisão", "World"), "Colisão", "Left")
+        if collision then
+            collision:CreateToggle("Ceiling sem colisão", State.Toggles.CeilingNoClip, function(v) State:SetToggle("CeilingNoClip", v) end)
+            collision:CreateParagraph("Colisão", "Tira a colisão das parts Ceiling para você (padrão ligado). A bola continua batendo nelas. Ao desligar, a colisão volta ao original.")
+        end
     end
 end
 

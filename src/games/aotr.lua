@@ -341,60 +341,63 @@ env.__DEPHUB=env.__DEPHUB or {}
 env.__DEPHUB.AOTR=M
 
 local UI=(env.__DEPHUB or {}).UI
-if type(UI)=="table" and type(UI.CreateTab)=="function" then
-    local tabs={}
-    local function dephubSection(ui, tabs, tabName, sectionName, column)
-    local tab=tabs[tabName]
-    if not tab then
-        tab=ui:CreateTab(tabName,"All")
-        tabs[tabName]=tab
-    end
-    if not tab then return nil end
-    return tab:CreateSection(sectionName,column or "Left")
-end
-local function dephubNotify(ui,title,message)
-    if ui and type(ui.Notify)=="function" then ui:Notify(title,message) end
-end
+-- ---------------------------------------------------------------------------
+-- Presentation: grouped by CATEGORY (finalidade), never by game name. This game
+-- uses only the categories it actually has:
+--   Visual   - what to see on the titans (ESP / nape markers)
+--   Combat   - titan-farming automation
+--   Movement - traversal and teleport helpers
+--   Misc     - everything that keeps the run alive plus the diagnostics panel
+-- The category -> tab -> section creation goes through the shared UI kit, so the
+-- "column must be Left/Right" contract lives in one place.
+-- ---------------------------------------------------------------------------
+do
+    local Kit=env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+        local esp=Kit.Section(Kit.Tab("Titan ESP","Visual"),"Visuals","Left")
+        if esp then
+            esp:CreateToggle("Titan ESP",M.Toggles.TitanESP,function(v) M:SetToggle("TitanESP",v) end)
+            esp:CreateToggle("Mostrar nuca",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
+            esp:CreateToggle("Expandir nuca",M.Toggles.NapeExtend,function(v) M:SetToggle("NapeExtend",v) end)
+            esp:CreateSlider("Multiplicador da nuca",0,2,M.Values.NapeMultiplier,function(v) M:SetNapeMultiplier(v) end)
+            esp:CreateToggle("Expandir alvo do Attack Titan",M.Toggles.ErenExtend,function(v) M:SetToggle("ErenExtend",v) end)
+        end
 
-    local esp=dephubSection(UI,tabs,"Titan ESP","Visuals","Left")
-    if esp then
-        esp:CreateToggle("Titan ESP",M.Toggles.TitanESP,function(v) M:SetToggle("TitanESP",v) end)
-        esp:CreateToggle("Mostrar nuca",M.Toggles.NapeVisible,function(v) M:SetToggle("NapeVisible",v) end)
-        esp:CreateToggle("Expandir nuca",M.Toggles.NapeExtend,function(v) M:SetToggle("NapeExtend",v) end)
-        esp:CreateSlider("Multiplicador da nuca",0,2,M.Values.NapeMultiplier,function(v) M:SetNapeMultiplier(v) end)
-        esp:CreateToggle("Expandir alvo do Attack Titan",M.Toggles.ErenExtend,function(v) M:SetToggle("ErenExtend",v) end)
-    end
-    local assist=dephubSection(UI,tabs,"Assistência","Automação","Left")
-    if assist then
-        assist:CreateToggle("Repor lâminas",M.Toggles.AutoBladeRefill,function(v) M:SetToggle("AutoBladeRefill",v) end)
-        assist:CreateToggle("Pegar escape automaticamente",M.Toggles.AutoGrabEscape,function(v) M:SetToggle("AutoGrabEscape",v) end)
-        assist:CreateToggle("Anti-injury",M.Toggles.AntiInjury,function(v) M:SetToggle("AntiInjury",v) end)
-        assist:CreateToggle("Tentar novamente",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
-        assist:CreateToggle("Anti-AFK",M.Toggles.AntiAFK,function(v) M:SetToggle("AntiAFK",v) end)
-    end
-    local movement=dephubSection(UI,tabs,"Movement","Movimento","Left")
-    if movement then
-        movement:CreateToggle("Noclip do farm",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
-        movement:CreateSlider("Travel speed",50,2000,M.Values.TravelSpeed,function(v) M:SetTravelSpeed(v) end)
-        movement:CreateButton("Ir até o refill",function()
-            local ok=M:TeleportToRefill()
-            dephubNotify(UI,"AOT:R",ok and "Indo até o refill." or "Refill não encontrado.")
-        end)
-        movement:CreateButton("Cancelar movimento",function() M:CancelTeleport() end)
-    end
-    local combat=dephubSection(UI,tabs,"Farm","Combate","Left")
-    if combat then
-        combat:CreateToggle("Titan Ripper",M.Toggles.TitanRipper,function(v) M:SetToggle("TitanRipper",v) end)
-        combat:CreateToggle("Skill autofarm",M.Toggles.SkillAutofarm,function(v) M:SetToggle("SkillAutofarm",v) end)
-        combat:CreateToggle("Classic autofarm",M.Toggles.ClassicAutofarm,function(v) M:SetToggle("ClassicAutofarm",v) end)
-    end
-    local status=dephubSection(UI,tabs,"Status","Diagnóstico","Left")
-    if status then
-        status:CreateParagraph("Estado atual",M:GetStatus())
-        status:CreateButton("Checar ShadowBan",function()
-            M:CheckShadowBan()
-            dephubNotify(UI,"AOT:R","Diagnóstico solicitado.")
-        end)
+        local combat=Kit.Section(Kit.Tab("Farm","Combat"),"Autofarm","Left")
+        if combat then
+            combat:CreateToggle("Titan Ripper",M.Toggles.TitanRipper,function(v) M:SetToggle("TitanRipper",v) end)
+            combat:CreateToggle("Skill autofarm",M.Toggles.SkillAutofarm,function(v) M:SetToggle("SkillAutofarm",v) end)
+            combat:CreateToggle("Classic autofarm",M.Toggles.ClassicAutofarm,function(v) M:SetToggle("ClassicAutofarm",v) end)
+        end
+
+        local movement=Kit.Section(Kit.Tab("Movement","Movement"),"Movimento","Left")
+        if movement then
+            movement:CreateToggle("Noclip do farm",M.Toggles.ClassicNoclip,function(v) M:SetToggle("ClassicNoclip",v) end)
+            movement:CreateSlider("Travel speed",50,2000,M.Values.TravelSpeed,function(v) M:SetTravelSpeed(v) end)
+            movement:CreateButton("Ir até o refill",function()
+                local ok=M:TeleportToRefill()
+                if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R",ok and "Indo até o refill." or "Refill não encontrado.") end
+            end)
+            movement:CreateButton("Cancelar movimento",function() M:CancelTeleport() end)
+        end
+
+        local assist=Kit.Section(Kit.Tab("Assistência","Misc"),"Automação","Left")
+        if assist then
+            assist:CreateToggle("Repor lâminas",M.Toggles.AutoBladeRefill,function(v) M:SetToggle("AutoBladeRefill",v) end)
+            assist:CreateToggle("Pegar escape automaticamente",M.Toggles.AutoGrabEscape,function(v) M:SetToggle("AutoGrabEscape",v) end)
+            assist:CreateToggle("Anti-injury",M.Toggles.AntiInjury,function(v) M:SetToggle("AntiInjury",v) end)
+            assist:CreateToggle("Tentar novamente",M.Toggles.AutoRetry,function(v) M:SetToggle("AutoRetry",v) end)
+            assist:CreateToggle("Anti-AFK",M.Toggles.AntiAFK,function(v) M:SetToggle("AntiAFK",v) end)
+        end
+
+        local status=Kit.Section(Kit.Tab("Status","Misc"),"Diagnóstico","Left")
+        if status then
+            status:CreateParagraph("Estado atual",M:GetStatus())
+            status:CreateButton("Checar ShadowBan",function()
+                M:CheckShadowBan()
+                if UI and type(UI.Notify)=="function" then UI:Notify("AOT:R","Diagnóstico solicitado.") end
+            end)
+        end
     end
 end
 return M

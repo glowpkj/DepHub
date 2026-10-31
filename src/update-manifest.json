@@ -1,17 +1,18 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-30T16:46:32.025210+00:00",
-  "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
-  "version": "0.0.98",
+  "generatedAt": "2026-10-31T14:55:00.287Z",
+  "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
+  "version": "0.0.99",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "36364c628fd13225d97e931719102edf876bc048a6686d97213f36611bfc9d50",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "version": "9a46f693e61b10ea9c3fc606c83bb7e5cdfe84ad67c6f80fd6499fbdbc34216e",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
@@ -25,44 +26,15 @@
         "src/games/updates/66654135.txt"
       ]
     },
-    "114234929420007": {
-      "name": "Blood Strike",
-      "version": "632f4f2ebb741b866c4be473c67c4f908676b06ef7c000bf6cea1ef7948d990b",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
-      "files": [
-        "DepHub.lua",
-        "src/version.txt",
-        "src/core/demon-ui.lua",
-        "src/core/ui/demon-theme.luau",
-        "src/core/updater.lua",
-        "src/core/diagnostics.lua",
-        "src/games/bloodstrike.lua",
-        "src/games/updates/114234929420007.txt"
-      ]
-    },
-    "107778070777162": {
-      "name": "Steal An Egg",
-      "version": "f9c93ab1ac114162aea5ecd5e17934124c0c48dee6114882fb1a7e8d2c0249d7",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
-      "files": [
-        "DepHub.lua",
-        "src/version.txt",
-        "src/core/demon-ui.lua",
-        "src/core/ui/demon-theme.luau",
-        "src/core/updater.lua",
-        "src/core/diagnostics.lua",
-        "src/games/steal-a-egg.lua",
-        "src/games/updates/107778070777162.txt"
-      ]
-    },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "b6b09380df452b439d3412be587574baaf8a641f8e05194747d86ad2930b4081",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "version": "258b241695f81c6991ecc124275ab9e7063401debd1b1e2b20a9a0a38e0930b7",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/oss/adapter.lua",
@@ -84,12 +56,13 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "1d1895776196f204cdc258152d77653f82076d912a1577f2106e43717e4bd9f3",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "version": "db9b03e18e0264fc15adc9b3e926bd7b77c400b611657d840b40a6068b9fce82",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
@@ -99,12 +72,13 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "60261b3da48b0c992a95f884bf6f7a41393e5104ae700208729f5ef1a6be51bc",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "version": "e746d988ce7f3302649cac5fcd22f58e3bd32420ae84cbfaf9f7ba03ce983370",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
@@ -116,14 +90,47 @@
         "src/games/updates/3808081382.txt"
       ]
     },
-    "119048529960596": {
-      "name": "Restaurant Tycoon 3",
-      "version": "77a13d6efcb33dcac735ddb0465667a81e0bdee9b39d70fff6540234f7a34b6e",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+    "114234929420007": {
+      "name": "Blood Strike",
+      "version": "7a0f9b5c91a5a0ca91b9a0efb8d8e3323717f24927d0426d4308b62aac055067",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
+        "src/core/ui/demon-theme.luau",
+        "src/core/updater.lua",
+        "src/core/diagnostics.lua",
+        "src/games/bloodstrike.lua",
+        "src/games/updates/114234929420007.txt"
+      ]
+    },
+    "107778070777162": {
+      "name": "Steal An Egg",
+      "version": "44320757d779836059900e6d20fd55b5b1ea5ef7b272832c5a0ca36f181eec05",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
+        "src/core/ui/demon-theme.luau",
+        "src/core/updater.lua",
+        "src/core/diagnostics.lua",
+        "src/games/steal-a-egg.lua",
+        "src/games/updates/107778070777162.txt"
+      ]
+    },
+    "119048529960596": {
+      "name": "Restaurant Tycoon 3",
+      "version": "3aa770e5f538388e4acf33fb87196b1e027fcb253877701021d91c901c7e3d4a",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
+      "files": [
+        "DepHub.lua",
+        "src/version.txt",
+        "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/anti-afk.lua",
         "src/core/dashboard.lua",
@@ -142,12 +149,13 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "941c3025fcd8ef4509dbb1c610f3032ae3a9ddfa4a63c8fddee0471d46a36107",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "version": "18ffb53f44192ee9ce22fe0b69ef174c97ba118e5fd05b48a576c26732d8553c",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/oss/adapter.lua",
@@ -169,12 +177,13 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "c4d64d01ad234292cf6f36347a00a4034f77b42a595a007074db8c9e2e724265",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "version": "6937f08583ca7288f5cfd7c77fd37eb8e681b6be8ec5d93354a2985af99d54d1",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
@@ -196,12 +205,13 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "80671dd040dac93dd43e75d4c02afbcfa52da417c8c802a251934410b317dfbf",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "version": "bd7da96202b73855e12ac91d20a11ffa1300fbd559f904cf7e924f706728800d",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
@@ -211,12 +221,13 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "f41006ab5a1c9d078ab7943cb0d19041561db8d59ba95f8fcebdb75ea855cafb",
-      "commit": "ec07a4244001bc68d772fd6dd444628973d414d5",
+      "version": "b84ad6375e19aeb00d8de6b0d2e127f544329718ce8f78d733110838c331be8f",
+      "commit": "c40605fee474c9315ef51fde766cf824ba6a24aa",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
+        "src/core/ui-kit.lua",
         "src/core/ui/demon-theme.luau",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",

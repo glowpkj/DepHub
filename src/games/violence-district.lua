@@ -523,50 +523,42 @@ function State:Destroy()
 end
 
 -- ---------------------------------------------------------------------------
--- Presentation: the shared shell. Tabs and sections are the backend's job.
+-- Presentation: the shared shell. Tabs are grouped by CATEGORY (finalidade),
+-- never by game name. This game uses only the categories it actually has:
+--   Visual  - who to see on screen
+--   World   - generator repair (a map object) and its skill-check minigame
+--   Combat  - parry timing
+-- The group -> tab -> section creation goes through the shared UI kit, so the
+-- "column must be Left/Right" contract lives in one place.
 -- ---------------------------------------------------------------------------
--- The shared shell's tab:CreateSection(title, column) adapter takes the title
--- and the column ("Left"/"Right") only; the library rejects any other column
--- value with an error. Passing a summary string as the second argument made the
--- column invalid, the pcall swallowed the error, and the whole tab came up empty
--- (which is exactly what happened here). Keep the call to the two arguments the
--- adapter actually reads.
-local function sectionFor(tab, name, column)
-    if not (tab and type(tab.CreateSection) == "function") then return nil end
-    local ok, section = pcall(function() return tab:CreateSection(name, column) end)
-    if ok then return section end
-    return nil
-end
-
 do
-    local UI = env.__DEPHUB and env.__DEPHUB.UI
-    if type(UI) == "table" and type(UI.CreateTab) == "function" then
-        local okTab, tab = pcall(function() return UI:CreateTab("Violence District", "All") end)
-        if okTab and tab then
-            local esp = sectionFor(tab, "ESP", "Left")
-            if esp then
-                esp:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
-                esp:CreateToggle(State.ToggleLabels.ESPKiller, State.Toggles.ESPKiller, function(v) State:SetToggle("ESPKiller", v) end)
-                esp:CreateToggle(State.ToggleLabels.ESPSurvivor, State.Toggles.ESPSurvivor, function(v) State:SetToggle("ESPSurvivor", v) end)
-                esp:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
-                esp:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State:SetToggle("ESPNames", v) end)
-                esp:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State:SetToggle("ESPDistance", v) end)
-                esp:CreateSlider("Distancia maxima", 50, 5000, State.Values.Range, function(v) State:SetValue("Range", v) end)
-                esp:CreateSlider("Tamanho do texto", 8, 30, State.Values.TextSize, function(v) State:SetValue("TextSize", v) end)
-            end
-            local gen = sectionFor(tab, "Gerador", "Right")
-            if gen then
-                gen:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
-                gen:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
-                gen:CreateSlider("Alcance do reparo", 4, 40, State.Values.RepairRange, function(v) State:SetValue("RepairRange", v) end)
-            end
-            local combat = sectionFor(tab, "Combate", "Right")
-            if combat then
-                combat:CreateToggle(State.ToggleLabels.AutoParry, State.Toggles.AutoParry, function(v) State:SetToggle("AutoParry", v) end)
-                combat:CreateToggle(State.ToggleLabels.AutoEquip, State.Toggles.AutoEquip, function(v) State:SetToggle("AutoEquip", v) end)
-                combat:CreateSlider("Alcance do parry", 5, 40, State.Values.ParryRange, function(v) State:SetValue("ParryRange", v) end)
-                combat:CreateSlider("Recarga do parry", 0.5, 5, State.Values.ParryCooldown, function(v) State:SetValue("ParryCooldown", v) end)
-            end
+    local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+        local visual = Kit.Section(Kit.Tab("Visual", "Visual"), "ESP", "Left")
+        if visual then
+            visual:CreateToggle(State.ToggleLabels.ESP, State.Toggles.ESP, function(v) State:SetToggle("ESP", v) end)
+            visual:CreateToggle(State.ToggleLabels.ESPKiller, State.Toggles.ESPKiller, function(v) State:SetToggle("ESPKiller", v) end)
+            visual:CreateToggle(State.ToggleLabels.ESPSurvivor, State.Toggles.ESPSurvivor, function(v) State:SetToggle("ESPSurvivor", v) end)
+            visual:CreateToggle(State.ToggleLabels.Chams, State.Toggles.Chams, function(v) State:SetToggle("Chams", v) end)
+            visual:CreateToggle(State.ToggleLabels.ESPNames, State.Toggles.ESPNames, function(v) State:SetToggle("ESPNames", v) end)
+            visual:CreateToggle(State.ToggleLabels.ESPDistance, State.Toggles.ESPDistance, function(v) State:SetToggle("ESPDistance", v) end)
+            visual:CreateSlider("Distancia maxima", 50, 5000, State.Values.Range, function(v) State:SetValue("Range", v) end)
+            visual:CreateSlider("Tamanho do texto", 8, 30, State.Values.TextSize, function(v) State:SetValue("TextSize", v) end)
+        end
+
+        local world = Kit.Section(Kit.Tab("Geradores", "World"), "Reparo e skill check", "Left")
+        if world then
+            world:CreateToggle(State.ToggleLabels.AutoRepair, State.Toggles.AutoRepair, function(v) State:SetToggle("AutoRepair", v) end)
+            world:CreateToggle(State.ToggleLabels.AutoSkillCheck, State.Toggles.AutoSkillCheck, function(v) State:SetToggle("AutoSkillCheck", v) end)
+            world:CreateSlider("Alcance do reparo", 4, 40, State.Values.RepairRange, function(v) State:SetValue("RepairRange", v) end)
+        end
+
+        local combat = Kit.Section(Kit.Tab("Parry", "Combat"), "Auto parry", "Left")
+        if combat then
+            combat:CreateToggle(State.ToggleLabels.AutoParry, State.Toggles.AutoParry, function(v) State:SetToggle("AutoParry", v) end)
+            combat:CreateToggle(State.ToggleLabels.AutoEquip, State.Toggles.AutoEquip, function(v) State:SetToggle("AutoEquip", v) end)
+            combat:CreateSlider("Alcance do parry", 5, 40, State.Values.ParryRange, function(v) State:SetValue("ParryRange", v) end)
+            combat:CreateSlider("Recarga do parry", 0.5, 5, State.Values.ParryCooldown, function(v) State:SetValue("ParryCooldown", v) end)
         end
     end
 end

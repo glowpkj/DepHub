@@ -591,19 +591,17 @@ end
 -- same code the console commands and the Debug probes read.
 do
     local UI = (env.__DEPHUB or {}).UI
-    if type(UI) == "table" and type(UI.CreateTab) == "function" then
-        local tabs = {}
-        local function section(tabName, sectionName, column)
-            local tab = tabs[tabName]
-            if not tab then tab = UI:CreateTab(tabName, "Universal"); tabs[tabName] = tab end
-            if not tab then return nil end
-            return tab:CreateSection(sectionName, column or "Left")
-        end
-        local function notify(title, message)
-            if type(UI.Notify) == "function" then UI:Notify(title, message) end
-        end
-
-        local movement = section("Movement", "Movimento")
+    local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+        -- ---------------------------------------------------------------------
+        -- Presentation: grouped by CATEGORY (finalidade), never by game name.
+        --   Movement - movement toggles/sliders
+        --   Visual   - ESP and lighting
+        --   Combat   - aim/attack helpers and the anti-fling/void guards
+        --   Player   - chat loop
+        --   Misc     - server actions and diagnostics
+        -- ---------------------------------------------------------------------
+        local movement = Kit.Section(Kit.Tab("Movement", "Movement"), "Movimento")
         if movement then
             movement:CreateToggle("WalkSpeed", State.Toggles.WalkSpeed, function(v)
                 State:SetWalkSpeedEnabled(v)
@@ -629,7 +627,7 @@ do
             end)
         end
 
-        local visuals = section("Visuals", "Visual")
+        local visuals = Kit.Section(Kit.Tab("Visual", "Visual"), "Visual")
         if visuals then
             visuals:CreateToggle("ESP", State.Toggles.ESP, function(v) State:SetESP(v) end)
             visuals:CreateToggle("Nomes", State.Toggles.ESPNames, function(v) State.Toggles.ESPNames = v == true end)
@@ -646,7 +644,7 @@ do
             visuals:CreateToggle("Zoom infinito", State.Toggles.InfiniteZoom, function(v) State:SetInfiniteZoom(v) end)
         end
 
-        local combat = section("Combate", "Combate")
+        local combat = Kit.Section(Kit.Tab("Combate", "Combat"), "Combate")
         if combat then
             combat:CreateToggle("Aimbot (botão direito)", State.Toggles.Aimbot, function(v) State.Toggles.Aimbot = v == true end)
             combat:CreateSlider("FOV do aimbot", 10, 360, State.Values.AimbotFOV, function(v)
@@ -666,7 +664,7 @@ do
             end)
         end
 
-        local social = section("Social", "Social")
+        local social = Kit.Section(Kit.Tab("Social", "Player"), "Social")
         if social then
             social:CreateToggle("Chat loop", State.Toggles.ChatLoop, function(v) State:SetChatLoop(v) end)
             social:CreateInput("Mensagem do chat", State.Values.ChatMessage, State.Values.ChatMessage, function(v)
@@ -678,25 +676,28 @@ do
             social:CreateButton("Enviar mensagem uma vez", function() State:SendChat() end)
         end
 
-        local server = section("Servidor", "Servidor")
+        local server = Kit.Section(Kit.Tab("Servidor", "Misc"), "Servidor")
         if server then
             server:CreateButton("Server hop", function()
                 State:ServerHop()
-                notify("Universal", "Procurando servidor.")
+                if type(UI.Notify) == "function" then UI:Notify("Universal", "Procurando servidor.") end
             end)
             server:CreateButton("Rejoin", function() State:Rejoin() end)
-            server:CreateButton("Teleport tool", function() State:CreateTeleportTool(); notify("Universal", "Tool de teleporte criada.") end)
+            server:CreateButton("Teleport tool", function()
+                State:CreateTeleportTool()
+                if type(UI.Notify) == "function" then UI:Notify("Universal", "Tool de teleporte criada.") end
+            end)
             server:CreateButton("Dex Explorer", function()
                 State:RunDex()
-                notify("Universal", "Dex solicitado.")
+                if type(UI.Notify) == "function" then UI:Notify("Universal", "Dex solicitado.") end
             end)
         end
 
-        local status = section("Status", "Diagnóstico")
+        local status = Kit.Section(Kit.Tab("Status", "Misc"), "Diagnóstico")
         if status then
             status:CreateParagraph("Estado atual", State:GetStatus())
             status:CreateButton("Atualizar status", function()
-                notify("Universal", State:GetStatus())
+                if type(UI.Notify) == "function" then UI:Notify("Universal", State:GetStatus()) end
             end)
         end
     end

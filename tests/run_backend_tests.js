@@ -8,7 +8,7 @@ const luau = process.argv[2];
 if (!luau) throw new Error('Usage: node tests/run_backend_tests.js /path/to/luau');
 const files = ['src/games/aotr.lua', 'src/games/features/aotr/assistance.lua', 'DepHub.lua', 'src/games/bloxfruits.lua', 'src/games/universal.lua',
   'src/games/rt3.lua', 'src/core/runtime.lua', 'src/core/updater.lua', 'src/core/scheduler.lua', 'src/core/health-monitor.lua',
-  'src/core/demon-ui.lua',
+  'src/core/demon-ui.lua', 'src/core/ui-kit.lua',
   'src/games/noobpiece.lua',
   'src/games/features/mm2/roletracker.lua', 'src/games/features/tsb/autoblock-v3.lua',
   'src/games/tsb.lua', 'src/games/volleyball42.lua'];

@@ -22,3 +22,6 @@ _backup_*/
 
 # Third-party reference material used during development; never published.
 opensources/
+
+# Local image assets are working material, not part of the shipped bundle.
+src/assets/

@@ -39,7 +39,7 @@ do
         assertNoBloxTabs(ui.Library, "MM2")
         local names = tabNames(ui.Library)
         check(#names > 0, "MM2 registers its own tabs")
-        for _, expected in ipairs({"Roles", "Coin Farm", "Gun Drop", "Players"}) do
+        for _, expected in ipairs({"Roles", "Coin Farm", "Gun Drop", "Jogadores"}) do
             local found = false
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "MM2 registers its tab: " .. expected)
@@ -56,7 +56,7 @@ do
         assertNoSeaCategories(ui.Library, "AOTR")
         assertNoBloxTabs(ui.Library, "AOTR")
         local names = tabNames(ui.Library)
-        for _, expected in ipairs({"Titan ESP", "Assistência", "Movement", "Status"}) do
+        for _, expected in ipairs({"Titan ESP", "Farm", "Movement", "Assistência", "Status"}) do
             local found = false
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "AOTR registers its tab: " .. expected)
@@ -103,6 +103,9 @@ do
             for _, name in ipairs(names) do if name == expected then found = true end end
             check(found, "TSB registers its tab: " .. expected)
         end
+        local cats = {}
+        for category in pairs(ui.Library._STATE.CategoryButtons or {}) do cats[category] = true end
+        check(cats["Combat"] == true and cats["Misc"] == true, "TSB groups its tabs into Combat / Misc")
         check(#ui.Library._Controls > 0, "TSB builds controls")
     end
 
@@ -115,9 +118,15 @@ do
         assertNoSeaCategories(ui.Library, "Volleyball42")
         assertNoBloxTabs(ui.Library, "Volleyball42")
         local names = tabNames(ui.Library)
-        local found = false
-        for _, name in ipairs(names) do if name == "Ball Predict" then found = true end end
-        check(found, "Volleyball 4.2 registers its Ball Predict tab")
+        local found = {}
+        for _, name in ipairs(names) do found[name] = true end
+        check(found["Ball Predict"], "Volleyball 4.2 registers its Ball Predict tab")
+        check(found["Pulo"], "Volleyball 4.2 registers its Pulo tab")
+        check(found["Colisão"], "Volleyball 4.2 registers its Colisão tab")
+        local cats = {}
+        for category in pairs(ui.Library._STATE.CategoryButtons or {}) do cats[category] = true end
+        check(cats["Visual"] == true and cats["Movement"] == true and cats["World"] == true,
+            "Volleyball 4.2 groups its tabs into Visual / Movement / World")
         check(#ui.Library._Controls > 0, "Volleyball 4.2 builds controls")
     end
 
@@ -133,8 +142,13 @@ do
         check(#names > 0, "Universal registers its own tabs")
         local found = {}
         for _, name in ipairs(names) do found[name] = true end
-        for _, expected in ipairs({"Movement", "Visuals", "Combate", "Social", "Servidor", "Status"}) do
+        for _, expected in ipairs({"Movement", "Visual", "Combate", "Social", "Servidor", "Status"}) do
             check(found[expected], "Universal registers its tab: " .. expected)
+        end
+        local cats = {}
+        for category in pairs(ui.Library._STATE.CategoryButtons or {}) do cats[category] = true end
+        for _, expected in ipairs({"Movement", "Visual", "Combat", "Player", "Misc"}) do
+            check(cats[expected] == true, "Universal registers its category: " .. expected)
         end
     end
 

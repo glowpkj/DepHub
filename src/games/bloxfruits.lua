@@ -231,6 +231,15 @@ local ALWAYS_VISIBLE = {
 }
 
 local function ensureTab(name, sea)
+    -- The repository rule is "tabs by finalidade, never by game name". Here the
+    -- tab NAMES are already finalidades (Farm, Combat, Teleport, Player, Shop,
+    -- Events, Settings) -- no tab is named after the game. What varies is the
+    -- CATEGORY heading, and this is the one deliberate exception: Blox Fruits
+    -- spans three seas whose features must not show while the player is on
+    -- another sea, so the category is the sea (Sea 1/2/3) and the shell's sea
+    -- filter (_tabMatchesSea / _refileSeaTabs) shows only the current sea's
+    -- heading. Swapping those for finalidade categories would surface Sea 3
+    -- features on Sea 1, so the sea axis is kept by design.
     local category = categoryForControl(sea)
     -- A logical tab can be shared by more than one sea (Farm, Shop). The sea
     -- scope stored on the shell tab is what decides whether it is shown, so a

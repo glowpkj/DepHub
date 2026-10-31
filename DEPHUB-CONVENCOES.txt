@@ -281,29 +281,50 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.0.98)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.0.99)
 --------------------------------------------------------------------------------
 
-Este documento define o ALVO. O que existe hoje esta entre o antigo e o alvo:
+Este documento define o ALVO. Este retrato reflete a migracao para categorias
+concluida:
 
-FEITO / FUNCIONANDO (verificado offline, 721 checks):
+FEITO / FUNCIONANDO (verificado offline, 735 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
 - 11 jogos roteados: Violence District, Blood Strike, Steal An Egg, MM2,
   Noob Piece, TSB, Restaurant Tycoon 3, AOTR, Volleyball 4.2, Blox Fruits
   (Sea 1/2), Universal.
-- Abas de Violence District / Blood Strike / Steal An Egg montam controles
-  (bug do CreateSection corrigido em v0.0.98).
+- Abas montam controles (bug do CreateSection corrigido em v0.0.98).
 - Fix do mouse do shell (v0.0.97).
 
-AINDA NO ESQUEMA ANTIGO (a migrar para categorias):
-- A maioria dos jogos cria a aba com nome proprio (ex.: "ESP", "Speed",
-  "Violence District") e nao usa CreateCategory. So o Blox Fruits ja usa
-  CreateCategory (Sea 1 / Sea 2). A migracao para Visual/Combat/Farm/... e o
-  proximo trabalho - jogo a jogo, validando cada um.
-- O helper `sectionFor` do tipo antigo ainda existe em alguns backends (call
-  correta, so verboso).
+MIGRACAO PARA CATEGORIAS (concluida nesta versao):
+- Todos os backends agora organizam por CATEGORIA de finalidade
+  (Visual / Combat / Farm / Movement / Player / World / Misc), nunca por nome
+  de jogo, e criam so as categorias que usam.
+- Um kit compartilhado (src/core/ui-kit.lua, publicado em
+  env.__DEPHUB.UIKit) centraliza categoria -> aba -> secao e clampa a coluna
+  para Left/Right num unico lugar; o helper `sectionFor`/`dephubSection`
+  copiado em cada jogo foi removido.
+- Violence District: Visual (ESP) / World (Geradores) / Combat (Parry).
+- Blood Strike: Visual (ESP, secoes unificadas).
+- Steal An Egg: Movement (Speed, Teleport).
+- MM2: Visual (Roles) / Farm (Coin Farm, Gun Drop) / Movement (Jogadores).
+- AOTR: Visual (Titan ESP) / Combat (Farm) / Movement / Misc (Assistencia,
+  Status).
+- Noob Piece: Farm / Visual (ESP) / Movement (Travel) / Player (Team).
+- RT3: Farm (Restaurant Farm, Kitchen) / Misc (Status).
+- TSB: Combat (Autoblock, Ranges, Detection, Prediction) / Misc (Debug).
+- Volleyball 4.2: Visual (Ball Predict) / Movement (Pulo) / World (Colisao).
+- Universal: Movement / Visual / Combat / Player (Social) / Misc (Servidor,
+  Status).
+
+EXCECAO DELIBERADA - Blox Fruits:
+- As ABAS do Blox Fruits ja sao por finalidade (Farm, Combat, Teleport,
+  Player, Shop, Events, Settings) - nenhuma aba tem nome de jogo.
+- A CATEGORIA e o mar (Sea 1/2/3) de proposito: o filtro do shell
+  (_tabMatchesSea / _refileSeaTabs) so mostra a categoria do mar atual, para
+  que features de outro mar nao aparecam. Trocar por categorias de finalidade
+  vazaria features entre mares, entao o eixo mar e mantido por design.
 
 NAO VALIDADO EM JOGO:
 - Mecanismos especificos de cada jogo (remotes, animation ids, offsets) estao

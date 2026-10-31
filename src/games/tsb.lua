@@ -164,68 +164,62 @@ local okStart,started=pcall(State.Start,State)
 if not okStart or not started then pcall(State.Destroy,State) return false end
 
 local UI = (env.__DEPHUB or {}).UI
-if type(UI) == "table" and type(UI.CreateTab) == "function" then
-    local tabs = {}
-    local function section(tabName, sectionName, column)
-        local tab = tabs[tabName]
-        if not tab then
-            tab = UI:CreateTab(tabName, "All")
-            tabs[tabName] = tab
+-- ---------------------------------------------------------------------------
+-- Presentation: grouped by CATEGORY (finalidade), never by game name. Everything
+-- except the diagnostics panel is combat (blocking, ranges, detection,
+-- prediction), so it all lives in Combat as separate tabs; Debug is Misc.
+-- ---------------------------------------------------------------------------
+do
+    local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+        local autoblock = Kit.Section(Kit.Tab("Autoblock", "Combat"), "Bloqueio", "Left")
+        if autoblock then
+            autoblock:CreateToggle("Auto block", State.Toggles.AutoBlock, function(v) State:SetAutoBlock(v) end)
+            autoblock:CreateToggle("M1 após bloquear", State.Toggles.M1AfterBlock, function(v) State:SetM1AfterBlock(v) end)
+            autoblock:CreateToggle("Encarar atacante", State.Toggles.FaceAttacker, function(v) State:SetFaceAttacker(v) end)
+            autoblock:CreateToggle("Bloquear dash", State.Toggles.DashBlock, function(v) State:SetDashBlock(v) end)
+            autoblock:CreateToggle("Bloquear skills", State.Toggles.SkillBlock, function(v) State:SetSkillBlock(v) end)
+            autoblock:CreateToggle("Checar direção (facing)", State.Toggles.FacingCheck, function(v) State:SetFacingCheck(v) end)
+            autoblock:CreateToggle("Previsão", State.Toggles.Prediction, function(v) State:SetPrediction(v) end)
         end
-        if not tab then return nil end
-        return tab:CreateSection(sectionName, column or "Left")
-    end
-    local function notify(title, message)
-        if type(UI.Notify) == "function" then UI:Notify(title, message) end
-    end
 
-    local autoblock = section("Autoblock", "Bloqueio", "Left")
-    if autoblock then
-        autoblock:CreateToggle("Auto block", State.Toggles.AutoBlock, function(v) State:SetAutoBlock(v) end)
-        autoblock:CreateToggle("M1 após bloquear", State.Toggles.M1AfterBlock, function(v) State:SetM1AfterBlock(v) end)
-        autoblock:CreateToggle("Encarar atacante", State.Toggles.FaceAttacker, function(v) State:SetFaceAttacker(v) end)
-        autoblock:CreateToggle("Bloquear dash", State.Toggles.DashBlock, function(v) State:SetDashBlock(v) end)
-        autoblock:CreateToggle("Bloquear skills", State.Toggles.SkillBlock, function(v) State:SetSkillBlock(v) end)
-        autoblock:CreateToggle("Checar direção (facing)", State.Toggles.FacingCheck, function(v) State:SetFacingCheck(v) end)
-        autoblock:CreateToggle("Previsão", State.Toggles.Prediction, function(v) State:SetPrediction(v) end)
-    end
-
-    local ranges = section("Ranges", "Alcance e tempo", "Left")
-    if ranges then
-        ranges:CreateSlider("Alcance normal", 0, 60, State.Values.NormalRange, function(v) State:SetNormalRange(v) end)
-        ranges:CreateSlider("Alcance especial", 0, 120, State.Values.SpecialRange, function(v) State:SetSpecialRange(v) end)
-        ranges:CreateSlider("Alcance de skill", 0, 120, State.Values.SkillRange, function(v) State:SetSkillRange(v) end)
-        ranges:CreateSlider("Tempo de skill", 0, 5, State.Values.SkillHold, function(v) State:SetSkillHold(v) end)
-        ranges:CreateSlider("Atraso do counter", 0, 1, State.Values.CounterDelay, function(v) State:SetCounterDelay(v) end)
-    end
-
-    local detection = section("Detection", "Detecção", "Left")
-    if detection then
-        detection:CreateSlider("Tamanho da caixa", 0, 40, State.Values.DetectionBoxSize, function(v) State:SetDetectionBoxSize(v) end)
-        detection:CreateSlider("Scan (Hz)", 1, 120, State.Values.ScanHz, function(v) State:SetScanHz(v) end)
-        detection:CreateSlider("Facing dot", -1, 1, State.Values.FacingDot, function(v) State:SetFacingDot(v) end)
-        detection:CreateToggle("Mostrar caixa de detecção", State.Toggles.ShowDetectionBox, function(v) State:SetShowDetectionBox(v) end)
-        detection:CreateToggle("Log de desconhecidos", State.Toggles.UnknownLogger, function(v) State:SetUnknownLogger(v) end)
-    end
-
-    local prediction = section("Prediction", "Previsão", "Left")
-    if prediction then
-        prediction:CreateSlider("Tempo de previsão", 0, 1, State.Values.PredictionTime, function(v) State:SetPredictionTime(v) end)
-        prediction:CreateSlider("Extra de previsão", 0, 12, State.Values.PredictionExtra, function(v) State:SetPredictionExtra(v) end)
-    end
-
-    local debug = section("Debug", "Diagnóstico", "Left")
-    if debug then
-        local function statusText()
-            local info = State:GetDebugInfo()
-            return type(info) == "table" and tostring(info) or "Sem dados de debug."
+        local ranges = Kit.Section(Kit.Tab("Ranges", "Combat"), "Alcance e tempo", "Left")
+        if ranges then
+            ranges:CreateSlider("Alcance normal", 0, 60, State.Values.NormalRange, function(v) State:SetNormalRange(v) end)
+            ranges:CreateSlider("Alcance especial", 0, 120, State.Values.SpecialRange, function(v) State:SetSpecialRange(v) end)
+            ranges:CreateSlider("Alcance de skill", 0, 120, State.Values.SkillRange, function(v) State:SetSkillRange(v) end)
+            ranges:CreateSlider("Tempo de skill", 0, 5, State.Values.SkillHold, function(v) State:SetSkillHold(v) end)
+            ranges:CreateSlider("Atraso do counter", 0, 1, State.Values.CounterDelay, function(v) State:SetCounterDelay(v) end)
         end
-        debug:CreateParagraph("Estado", statusText())
-        debug:CreateToggle("Debug", State.Toggles.Debug, function(v) State:SetDebug(v) end)
-        debug:CreateButton("Resetar combate", function()
-            local ok = State:ResetCombatState()
-            notify("TSB", ok and "Estado de combate resetado." or "Não foi possível resetar.")
-        end)
+
+        local detection = Kit.Section(Kit.Tab("Detection", "Combat"), "Detecção", "Left")
+        if detection then
+            detection:CreateSlider("Tamanho da caixa", 0, 40, State.Values.DetectionBoxSize, function(v) State:SetDetectionBoxSize(v) end)
+            detection:CreateSlider("Scan (Hz)", 1, 120, State.Values.ScanHz, function(v) State:SetScanHz(v) end)
+            detection:CreateSlider("Facing dot", -1, 1, State.Values.FacingDot, function(v) State:SetFacingDot(v) end)
+            detection:CreateToggle("Mostrar caixa de detecção", State.Toggles.ShowDetectionBox, function(v) State:SetShowDetectionBox(v) end)
+            detection:CreateToggle("Log de desconhecidos", State.Toggles.UnknownLogger, function(v) State:SetUnknownLogger(v) end)
+        end
+
+        local prediction = Kit.Section(Kit.Tab("Prediction", "Combat"), "Previsão", "Left")
+        if prediction then
+            prediction:CreateSlider("Tempo de previsão", 0, 1, State.Values.PredictionTime, function(v) State:SetPredictionTime(v) end)
+            prediction:CreateSlider("Extra de previsão", 0, 12, State.Values.PredictionExtra, function(v) State:SetPredictionExtra(v) end)
+        end
+
+        local debug = Kit.Section(Kit.Tab("Debug", "Misc"), "Diagnóstico", "Left")
+        if debug then
+            local function statusText()
+                local info = State:GetDebugInfo()
+                return type(info) == "table" and tostring(info) or "Sem dados de debug."
+            end
+            debug:CreateParagraph("Estado", statusText())
+            debug:CreateToggle("Debug", State.Toggles.Debug, function(v) State:SetDebug(v) end)
+            debug:CreateButton("Resetar combate", function()
+                local ok = State:ResetCombatState()
+                if type(UI.Notify) == "function" then UI:Notify("TSB", ok and "Estado de combate resetado." or "Não foi possível resetar.") end
+            end)
+        end
     end
 end
 

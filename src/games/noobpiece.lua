@@ -387,63 +387,64 @@ if not ok then
 end
 
 local UI=(env.__DEPHUB or {}).UI
-if type(UI)=="table" and type(UI.CreateTab)=="function" then
-    local tabs={}
-    local function dephubSection(ui, tabs, tabName, sectionName, column)
-    local tab=tabs[tabName]
-    if not tab then
-        tab=ui:CreateTab(tabName,"All")
-        tabs[tabName]=tab
-    end
-    if not tab then return nil end
-    return tab:CreateSection(sectionName,column or "Left")
-end
-local function dephubNotify(ui,title,message)
-    if ui and type(ui.Notify)=="function" then ui:Notify(title,message) end
-end
+-- ---------------------------------------------------------------------------
+-- Presentation: grouped by CATEGORY (finalidade), never by game name. This game
+-- uses only the categories it actually has:
+--   Farm     - the farm/premium loop (attack, quest, chest, weapon)
+--   Visual   - what to see (chest / island / NPC ESP)
+--   Movement - island travel and teleports
+--   Player   - team selection and auto-team
+-- The category -> tab -> section creation goes through the shared UI kit.
+-- ---------------------------------------------------------------------------
+do
+    local Kit=env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+        local farming=Kit.Section(Kit.Tab("Farm","Farm"),"Automação","Left")
+        if farming then
+            farming:CreateToggle("Auto farm",backend.Toggles.AutoFarm,function(v) backend:SetAutoFarm(v) end)
+            farming:CreateToggle("Auto attack",backend.Toggles.AutoAttack,function(v) backend:SetAutoAttack(v) end)
+            farming:CreateToggle("Auto quest",backend.Toggles.AutoQuest,function(v) backend:SetAutoQuest(v) end)
+            farming:CreateToggle("Auto chest",backend.Toggles.AutoChest,function(v) backend:SetAutoChest(v) end)
+            farming:CreateSlider("Intervalo do chest",0.1,2,backend.Values.AutoChestDelay,function(v) backend:SetAutoChestDelay(v) end)
+            farming:CreateDropdown("Tipo de arma",{"Fists","Sword"},backend.Values.WeaponCategory,function(v) backend:SetWeaponCategory(v) end)
+            local enemies=backend:GetEnemyTypes()
+            if type(enemies)=="table" and #enemies>0 then
+                farming:CreateDropdown("Inimigo",enemies,backend.Values.SelectedEnemy,function(v) backend:SetSelectedEnemy(v) end)
+            end
+        end
 
-    local farming=dephubSection(UI,tabs,"Farm","Automação","Left")
-    if farming then
-        farming:CreateToggle("Auto farm",backend.Toggles.AutoFarm,function(v) backend:SetAutoFarm(v) end)
-        farming:CreateToggle("Auto attack",backend.Toggles.AutoAttack,function(v) backend:SetAutoAttack(v) end)
-        farming:CreateToggle("Auto quest",backend.Toggles.AutoQuest,function(v) backend:SetAutoQuest(v) end)
-        farming:CreateToggle("Auto chest",backend.Toggles.AutoChest,function(v) backend:SetAutoChest(v) end)
-        farming:CreateSlider("Intervalo do chest",0.1,2,backend.Values.AutoChestDelay,function(v) backend:SetAutoChestDelay(v) end)
-        farming:CreateDropdown("Tipo de arma",{"Fists","Sword"},backend.Values.WeaponCategory,function(v) backend:SetWeaponCategory(v) end)
-        local enemies=backend:GetEnemyTypes()
-        if type(enemies)=="table" and #enemies>0 then
-            farming:CreateDropdown("Inimigo",enemies,backend.Values.SelectedEnemy,function(v) backend:SetSelectedEnemy(v) end)
+        local visuals=Kit.Section(Kit.Tab("ESP","Visual"),"Exploração","Left")
+        if visuals then
+            visuals:CreateToggle("ESP de chests",backend.Toggles.ChestESP,function(v) backend:SetChestESP(v) end)
+            visuals:CreateToggle("ESP de ilhas",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
+            visuals:CreateToggle("ESP de NPCs",backend.Toggles.GachaESP,function(v) backend:SetGachaESP(v) end)
         end
-    end
-    local visuals=dephubSection(UI,tabs,"ESP","Exploração","Left")
-    if visuals then
-        visuals:CreateToggle("ESP de chests",backend.Toggles.ChestESP,function(v) backend:SetChestESP(v) end)
-        visuals:CreateToggle("ESP de ilhas",backend.Toggles.IslandESP,function(v) backend:SetIslandESP(v) end)
-        visuals:CreateToggle("ESP de NPCs",backend.Toggles.GachaESP,function(v) backend:SetGachaESP(v) end)
-    end
-    local travel=dephubSection(UI,tabs,"Travel","Teleporte","Left")
-    if travel then
-        local islands=backend:GetIslandNames()
-        if type(islands)=="table" and #islands>0 then
-            travel:CreateDropdown("Ilha",islands,backend.Values.SelectedIsland,function(v) backend:SetSelectedIsland(v) end)
+
+        local travel=Kit.Section(Kit.Tab("Travel","Movement"),"Teleporte","Left")
+        if travel then
+            local islands=backend:GetIslandNames()
+            if type(islands)=="table" and #islands>0 then
+                travel:CreateDropdown("Ilha",islands,backend.Values.SelectedIsland,function(v) backend:SetSelectedIsland(v) end)
+            end
+            travel:CreateToggle("Teleporte automático para ilha",backend.Toggles.IslandTeleport,function(v) backend:SetIslandTeleport(v) end)
+            travel:CreateButton("Ir para ilha selecionada",function()
+                local ok=backend:TeleportIsland(backend.Values.SelectedIsland)
+                if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleporte iniciado." or "Não foi possível teleportar.") end
+            end)
+            travel:CreateButton("Ir para Wandering Gacha",function()
+                local ok=backend:TeleportWanderingGacha()
+                if UI and type(UI.Notify)=="function" then UI:Notify("Noob Piece",ok and "Teleporte iniciado." or "Gacha não encontrado.") end
+            end)
         end
-        travel:CreateToggle("Teleporte automático para ilha",backend.Toggles.IslandTeleport,function(v) backend:SetIslandTeleport(v) end)
-        travel:CreateButton("Ir para ilha selecionada",function()
-            local ok=backend:TeleportIsland(backend.Values.SelectedIsland)
-            dephubNotify(UI,"Noob Piece",ok and "Teleporte iniciado." or "Não foi possível teleportar.")
-        end)
-        travel:CreateButton("Ir para Wandering Gacha",function()
-            local ok=backend:TeleportWanderingGacha()
-            dephubNotify(UI,"Noob Piece",ok and "Teleporte iniciado." or "Gacha não encontrado.")
-        end)
-    end
-    local team=dephubSection(UI,tabs,"Team","Equipe","Left")
-    if team then
-        local teams=backend:GetTeams()
-        if type(teams)=="table" and #teams>0 then
-            team:CreateDropdown("Equipe",teams,backend.Values.SelectedTeam,function(v) backend:SetSelectedTeam(v) end)
+
+        local team=Kit.Section(Kit.Tab("Team","Player"),"Equipe","Left")
+        if team then
+            local teams=backend:GetTeams()
+            if type(teams)=="table" and #teams>0 then
+                team:CreateDropdown("Equipe",teams,backend.Values.SelectedTeam,function(v) backend:SetSelectedTeam(v) end)
+            end
+            team:CreateToggle("Auto team",backend.Toggles.AutoTeam,function(v) backend:SetAutoTeam(v) end)
         end
-        team:CreateToggle("Auto team",backend.Toggles.AutoTeam,function(v) backend:SetAutoTeam(v) end)
     end
 end
 

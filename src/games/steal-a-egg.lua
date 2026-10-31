@@ -252,58 +252,42 @@ function State:Destroy()
 end
 
 -- ---------------------------------------------------------------------------
--- Presentation: the shared shell. Tabs and sections are the backend's job.
+-- Presentation: grouped by CATEGORY (finalidade), never a per-game tab. Speed
+-- and teleport are both movement, so they live in the Movement category.
 -- ---------------------------------------------------------------------------
--- The shared shell adapter's tab:CreateSection(title, column) takes the title
--- and the column ("Left"/"Right") only; the library rejects any other column.
--- Passing a summary where the column belongs made the section error inside the
--- pcall and the whole tab came up empty. Keep the two arguments it reads.
-local function sectionFor(tab, name, column)
-    if not (tab and type(tab.CreateSection) == "function") then return nil end
-    local ok, section = pcall(function() return tab:CreateSection(name, column) end)
-    if ok then return section end
-    return nil
-end
-
 do
     local UI = env.__DEPHUB and env.__DEPHUB.UI
-    if type(UI) == "table" and type(UI.CreateTab) == "function" then
-        -- Speed tab
-        local okSpeed, speedTab = pcall(function() return UI:CreateTab("Speed", "All") end)
-        if okSpeed and speedTab then
-            local section = sectionFor(speedTab, "Movimento", "Left")
-            if section then
-                section:CreateToggle("Speed boost", State.Toggles.Speed, function(v) State:SetToggle("Speed", v) end)
-                section:CreateSlider("Walk speed", 16, 300, State.Values.WalkSpeed, function(v) State:SetSpeed(v) end)
-            end
+    local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+        local speed = Kit.Section(Kit.Tab("Speed", "Movement"), "Movimento", "Left")
+        if speed then
+            speed:CreateToggle("Speed boost", State.Toggles.Speed, function(v) State:SetToggle("Speed", v) end)
+            speed:CreateSlider("Walk speed", 16, 300, State.Values.WalkSpeed, function(v) State:SetSpeed(v) end)
         end
 
-        -- Teleport tab
-        local okTp, tpTab = pcall(function() return UI:CreateTab("Teleport", "All") end)
-        if okTp and tpTab then
-            local fly = sectionFor(tpTab, "Voo", "Left")
-            if fly then
-                fly:CreateSlider("Velocidade do voo", 50, 1000, State.Values.FlySpeed, function(v) State:SetFlySpeed(v) end)
-                fly:CreateButton("Notificar posicao atual", function()
-                    local p = State:FlyToPosition()
-                    if not p then UI:Notify("Teleport", "Sem personagem") return end
-                    UI:Notify("Posicao", string.format("X %.1f  Y %.1f  Z %.1f", p.X, p.Y, p.Z))
-                end)
-                fly:CreateButton("Salvar waypoint aqui", function()
-                    local p = State:FlyToPosition()
-                    if not p then UI:Notify("Teleport", "Sem personagem") return end
-                    State:AddWaypoint(nil, p)
-                    UI:Notify("Waypoint", "Salvo (total " .. tostring(#State.Waypoints) .. ")")
-                end)
-            end
+        local tpTab = Kit.Tab("Teleport", "Movement")
+        local fly = Kit.Section(tpTab, "Voo", "Left")
+        if fly then
+            fly:CreateSlider("Velocidade do voo", 50, 1000, State.Values.FlySpeed, function(v) State:SetFlySpeed(v) end)
+            fly:CreateButton("Notificar posicao atual", function()
+                local p = State:FlyToPosition()
+                if not p then UI:Notify("Teleport", "Sem personagem") return end
+                UI:Notify("Posicao", string.format("X %.1f  Y %.1f  Z %.1f", p.X, p.Y, p.Z))
+            end)
+            fly:CreateButton("Salvar waypoint aqui", function()
+                local p = State:FlyToPosition()
+                if not p then UI:Notify("Teleport", "Sem personagem") return end
+                State:AddWaypoint(nil, p)
+                UI:Notify("Waypoint", "Salvo (total " .. tostring(#State.Waypoints) .. ")")
+            end)
+        end
 
-            local wp = sectionFor(tpTab, "Waypoints", "Right")
-            if wp then
-                for _, waypoint in ipairs(State.Waypoints) do
-                    wp:CreateButton("Ir: " .. waypoint.name, function() State:Go(waypoint.pos) end)
-                end
-                wp:CreateParagraph("Waypoints", "Nenhum salvo ainda. Use 'Salvar waypoint aqui' na coluna da esquerda enquanto estiver no lugar desejado.")
+        local wp = Kit.Section(tpTab, "Waypoints", "Right")
+        if wp then
+            for _, waypoint in ipairs(State.Waypoints) do
+                wp:CreateButton("Ir: " .. waypoint.name, function() State:Go(waypoint.pos) end)
             end
+            wp:CreateParagraph("Waypoints", "Nenhum salvo ainda. Use 'Salvar waypoint aqui' na coluna da esquerda enquanto estiver no lugar desejado.")
         end
     end
 end
