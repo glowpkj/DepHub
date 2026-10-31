@@ -151,7 +151,7 @@ do
 
     -- Auto repair: fires RepairEvent(point, true) at the nearest generator.
     local repairCalls = {}
-    repairRemote.FireServer = function(_, ...) repairCalls[#repairCalls + 1] = {...} end
+    repairRemote = ctx:SetMethod(repairRemote, "FireServer", function(_, ...) repairCalls[#repairCalls + 1] = {...} end)
     backend:SetToggle("AutoRepair", true)
     ctx.Services.RunService.Heartbeat:Fire(0.016)
     check(#repairCalls == 1 and repairCalls[1][1] == genPoint and repairCalls[1][2] == true,
@@ -171,7 +171,7 @@ do
     -- Skill check: a Skillcheck-gen object on the character fires the success
     -- result remote for the generator being repaired.
     local skillCalls = {}
-    skillRemote.FireServer = function(_, ...) skillCalls[#skillCalls + 1] = {...} end
+    ctx:SetMethod(skillRemote, "FireServer", function(_, ...) skillCalls[#skillCalls + 1] = {...} end)
     backend:SetToggle("AutoRepair", true)
     ctx.Services.RunService.Heartbeat:Fire(0.016) -- starts the repair, remembers the generator
     backend:SetToggle("AutoSkillCheck", true)
@@ -185,7 +185,7 @@ do
     -- Auto parry: a known parryable animation fired by the killer in range fires
     -- the dagger remote, and the cooldown blocks an immediate second fire.
     local parryCount = 0
-    parryRemote.FireServer = function() parryCount = parryCount + 1 end
+    ctx:SetMethod(parryRemote, "FireServer", function() parryCount = parryCount + 1 end)
     local backpack = object("Backpack", "Backpack", ctx.Player)
     ctx.Player.Backpack = backpack
     object("Tool", "Parrying Dagger", backpack)

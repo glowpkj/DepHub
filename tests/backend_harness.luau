@@ -146,6 +146,14 @@ function instanceMeta:__newindex(key, value)
         if GUI_ONLY_MEMBERS[key] and not GUI_CLASSES[class] then
             error(string.format("%s is not a valid member of %s", tostring(key), tostring(class)), 2)
         end
+        -- A remote's own methods live on the shared metatable, so a field
+        -- assignment cannot shadow them in the real client -- it raises instead.
+        -- Modelling that here is what stops a wrap-by-assignment from passing in
+        -- tests and then failing in game with "FireServer is not a valid member".
+        if (class == "RemoteEvent" and key == "FireServer")
+            or (class == "RemoteFunction" and (key == "InvokeServer" or key == "FireServer")) then
+            error(string.format("%s is not a valid member of %s", tostring(key), tostring(class)), 2)
+        end
         self._props[key] = value
     end
 end
@@ -185,9 +193,13 @@ function methods:InvokeServer(...)
     return nil
 end
 local Instance = {}
+-- Every double created, so executor-style hooking can locate the Instance that
+-- owns a method closure (hookfunction takes only the function, not the owner).
+local INSTANCES = {}
 function Instance.new(class)
     assert(class ~= "ScreenGui" and class ~= "TextButton" and class ~= "Frame", "Frontend instance created: " .. class)
     local object = setmetatable({_props={ClassName=class, Name=class}, _children={}, _attributes={}}, instanceMeta)
+    INSTANCES[#INSTANCES + 1] = object
     -- Instance container signals, available on every double so feature modules
     -- that watch children/descendants bind exactly like they do in Roblox.
     object.ChildAdded = signal()
@@ -195,10 +207,22 @@ function Instance.new(class)
     object.DescendantAdded = signal()
     object.DescendantRemoving = signal()
     -- Remote event doubles expose the client/server signals features connect to.
+    -- Each remote also gets its OWN FireServer/InvokeServer closure (not the
+    -- shared table method) so an executor-style hook can be routed back to the
+    -- exact Instance that owns it, the way hookfunction patches one closure.
     if class == "RemoteEvent" or class == "RemoteFunction" or class == "BindableEvent" then
         object.OnClientEvent = signal()
         object.OnServerEvent = signal()
         object.OnServerInvoke = signal()
+        object._props.FireServer = function(self, ...)
+            self.Fired = self.Fired or {}
+            self.Fired[#self.Fired + 1] = {...}
+        end
+        object._props.InvokeServer = function(self, ...)
+            self.Invoked = self.Invoked or {}
+            self.Invoked[#self.Invoked + 1] = {...}
+            return nil
+        end
     end
     return object
 end
@@ -271,45 +295,12 @@ local function NewWindow()
         state.CategoryTabs[category][#state.CategoryTabs[category] + 1] = name
         return {Name = name, Button = button}
     end
-    function library:CreateSection(tabName, title, _, _, column)
-        -- Mirror the real library's contract: the column must be "Left" or
-        -- "Right" (or nil -> "Left"). A backend that passes a summary/other
-        -- string where the column belongs would have its section silently
-        -- dropped in game; failing here keeps that bug from reaching the panel.
-        if column ~= nil and column ~= "Left" and column ~= "Right" then
-            error("[DoD UI] CreateSection column must be 'Left' or 'Right'.")
-        end
-        if not state.ContentPages[tabName] then return nil end
-        return {TabName = tabName, Title = title, Column = column or "Left"}
-    end
-    function library:AddToggle(_, label, default, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "toggle", Label = label, Callback = callback}
-        return {Kind = "toggle", Value = default}
-    end
-    function library:AddSlider(_, label, min, max, default, _, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Callback = callback}
-        return {Kind = "slider", Value = default}
-    end
-    function library:AddDropdown(_, label, options, index, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback}
-        return {Kind = "dropdown", Value = options[index]}
-    end
-    function library:AddButton(_, label, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "button", Label = label, Callback = callback}
-        return {Kind = "button"}
-    end
-    function library:AddTextbox(_, label, _, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "textbox", Label = label, Callback = callback}
-        return {Kind = "textbox", Value = ""}
-    end
-    function library:AddParagraph(_, title, body)
-        library._Controls[#library._Controls + 1] = {Kind = "paragraph", Title = title, Body = body}
-        return {Kind = "paragraph"}
-    end
     -- VStack/HStack: a named grouping container. Controls added through the
     -- returned handle record exactly like section controls, so tests see the
-    -- same flat list; Row/Stack just marks how they are laid out.
-    local function makeGroup(kind)
+    -- same flat list; Row/Stack just marks how they are laid out. Declared before
+    -- CreateSection so the section handle built there can close over it.
+    local makeGroup
+    makeGroup = function(kind)
         local group = {Kind = kind, _n = 0}
         group.AddToggle = function(_, ...) group._n = group._n + 1; return library:AddToggle(nil, ...) end
         group.AddSlider = function(_, ...) group._n = group._n + 1; return library:AddSlider(nil, ...) end
@@ -332,21 +323,57 @@ local function NewWindow()
         group.CreateParagraph = function(_, ...) return group.AddParagraph(group, ...) end
         group.CreateSeparator = function(_, ...) return group.AddSeparator(group, ...) end
         group.CreateLabel = function(_, ...) return group.AddLabel(group, ...) end
-        return group
-    end
-    function library:AddHStack()
-        local group = makeGroup("HStack")
         library._Groups = library._Groups or {}
         library._Groups[#library._Groups + 1] = group
         return group
     end
-    library.AddVStack = function() 
-        local group = makeGroup("VStack")
-        library._Groups = library._Groups or {}
-        library._Groups[#library._Groups + 1] = group
-        return group
+    function library:CreateSection(tabName, title, _, _, column)
+        -- Mirror the real library's contract: the column must be "Left" or
+        -- "Right" (or nil -> "Left"). A backend that passes a summary/other
+        -- string where the column belongs would have its section silently
+        -- dropped in game; failing here keeps that bug from reaching the panel.
+        if column ~= nil and column ~= "Left" and column ~= "Right" then
+            error("[DoD UI] CreateSection column must be 'Left' or 'Right'.")
+        end
+        if not state.ContentPages[tabName] then return nil end
+        -- The real library returns a WRAPPED section handle (theme-apply's
+        -- _wrapSection), and AddHStack/AddVStack live on that handle, not on the
+        -- library. The stub has to return the same shape, or a wrong call site
+        -- (Library:AddHStack) would pass here and fail in game.
+        local section = {TabName = tabName, Title = title, Column = column or "Left", __tag = "Section"}
+        section.AddHStack = function() return makeGroup("HStack") end
+        section.AddVStack = function() return makeGroup("VStack") end
+        return section
+    end
+    function library:AddToggle(_, label, default, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "toggle", Label = label, Callback = callback}
+        return {Kind = "toggle", Value = default}
+    end
+    function library:AddSlider(_, label, min, max, default, _, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Callback = callback}
+        return {Kind = "slider", Value = default}
+    end
+    function library:AddDropdown(_, label, options, index, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback}
+        return {Kind = "dropdown", Value = options[index]}
+    end
+    function library:AddButton(_, label, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "button", Label = label, Callback = callback}
+        return {Kind = "button"}
+    end
+    function library:AddTextbox(_, label, _, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "textbox", Label = label, Callback = callback}
+        return {Kind = "textbox", Value = ""}
     end
     function library:Notify(title, message) library.Notifications = library.Notifications or {}; library.Notifications[#library.Notifications + 1] = {title, message} end
+    function library:AddParagraph(_, title, body)
+        library._Controls[#library._Controls + 1] = {Kind = "paragraph", Title = title, Body = body}
+        return {Kind = "paragraph"}
+    end
+    function library:AddToggle(_, label, default, callback)
+        library._Controls[#library._Controls + 1] = {Kind = "toggle", Label = label, Callback = callback}
+        return {Kind = "toggle", Value = default}
+    end
     function library:SetActiveCategory(category, tab) state.ActiveCategory = category; state.ActiveTab = tab end
     -- The loader builds a fixed Dashboard tab from every game: a banner
     -- (greeting/avatar + server card) and the live performance metrics. The
@@ -492,7 +519,7 @@ local function sandbox(placeId, gameId)
     -- Workspace physics/query surface used by prediction and movement features.
     services.Workspace.Gravity = 196.2
     function services.Workspace:Raycast() return nil end
-    local context = {State={}, Logs={}, Requests={}, Responses={}, Deferred={}, Spawned={}, Services=services, Player=player}
+    local context = {State={}, Logs={}, Requests={}, Responses={}, Deferred={}, Spawned={}, Services=services, Player=player, Instances=INSTANCES}
     local game = {PlaceId=placeId or 1, GameId=gameId or 2, JobId="job"}
     function game:GetService(name) return assert(services[name], "Unexpected service " .. name) end
     function game:IsLoaded() return true end
@@ -527,6 +554,30 @@ local function sandbox(placeId, gameId)
         getgenv=function() return context.State end, identifyexecutor=function() return "Test" end,
         print=function(message) context.Logs[#context.Logs + 1] = tostring(message) end,
         warn=function(message) context.Logs[#context.Logs + 1] = tostring(message) end,
+        -- Executor hooking primitives, modelled faithfully enough for the real
+        -- call sites: hookfunction swaps a method closure on the Instance that
+        -- owns it (per-instance, not a field assignment -- a field assignment on
+        -- a real remote raises), and restorefunction puts the original back.
+        -- Each remote owns its own closure, so the owner is found by identity.
+        hookfunction=function(target, replacement)
+            if type(target) ~= "function" or type(replacement) ~= "function" then return nil end
+            local owner, name
+            for i = #context.Instances, 1, -1 do
+                local inst = context.Instances[i]
+                for _, method in ipairs({"FireServer", "InvokeServer"}) do
+                    if inst._props[method] == target then owner, name = inst, method; break end
+                end
+                if owner then break end
+            end
+            if not owner then return nil end
+            owner._props[name] = replacement
+            return {Instance = owner, Name = name, Original = target}
+        end,
+        restorefunction=function(handle)
+            if type(handle) ~= "table" or not handle.Instance then return end
+            handle.Instance._props[handle.Name] = handle.Original
+            return handle.Original
+        end,
         task={wait=function() end, cancel=function() end,
             defer=function(fn, ...) context.Deferred[#context.Deferred + 1] = {Fn=fn, Args={...}} end,
             -- task.delay is scheduled as deferred work so tests can run it with
@@ -540,6 +591,15 @@ local function sandbox(placeId, gameId)
         return fn, err
     end
     function context:Run(path) return assert(env.loadstring(sources[path]))() end
+    -- Install a remote's method the only way a real Instance allows: not by
+    -- assigning the field (which raises), but by swapping the closure the
+    -- Instance resolves, i.e. through the executor's hooking path. Tests use this
+    -- to make a remote record into their own table; production code reaches the
+    -- same slot via hookfunction.
+    function context:SetMethod(instance, name, fn)
+        instance._props[name] = fn
+        return fn
+    end
     function context:FlushDeferred()
         local pending = self.Deferred
         self.Deferred = {}
@@ -606,6 +666,11 @@ local function sandbox(placeId, gameId)
     -- environment (getgenv), not from chunk-locals, so publish the same runtime
     -- table a real executor's module would see.
     context.State.__DEPHUB_OSS_RUNTIME = {game = game, task = env.task}
+    -- Executor globals live on getgenv() (the sandbox State), which is where
+    -- features read them (diagnostics, the aim hook). Publish the hooking
+    -- primitives there too, matching how a real executor exposes them.
+    context.State.hookfunction = env.hookfunction
+    context.State.restorefunction = env.restorefunction
     return context
 end
 local ossContext = sandbox()

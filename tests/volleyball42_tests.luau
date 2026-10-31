@@ -200,7 +200,7 @@ do
     -- Animations tree, and an Animator under the humanoid's Animator slot.
     local fired = {}
     local remote = Instance.new("RemoteEvent"); remote.Name = "PlayerAction"
-    remote.FireServer = function(_, ...) fired[#fired + 1] = {...} end
+    ctx:SetMethod(remote, "FireServer", function(_, ...) fired[#fired + 1] = {...} end)
 
     local remotes = Instance.new("Folder"); remotes.Name = "Remotes"; remotes.Parent = ctx.Services.ReplicatedStorage
     remote.Parent = remotes
@@ -314,13 +314,14 @@ do
     local ctx = sandbox(1316421563, 1316421563)
     ctx:MountUI()
 
-    -- The PlayerAction remote, with a plain FireServer (as the game has). The
-    -- wrapper replaces this attribute and must put it back.
+    -- The PlayerAction remote, with its own FireServer closure (as the game has:
+    -- an Instance method, not an assignable field). The wrapper hooks it through
+    -- hookfunction while on and restores it on disable.
     local remotes = Instance.new("Folder"); remotes.Name, remotes.Parent = "Remotes", ctx.Services.ReplicatedStorage
     local actions = Instance.new("RemoteEvent"); actions.Name, actions.Parent = "PlayerAction", remotes
     local firedCalls = {}
     local originalFireServer = function(_, ...) firedCalls[#firedCalls + 1] = {...} end
-    actions.FireServer = originalFireServer
+    ctx:SetMethod(actions, "FireServer", originalFireServer)
 
     -- Character with a root at the origin: the two set parts are (-22,15,0) and
     -- (22,15,0), so the origin is between them -- we place the root nearer one
@@ -365,10 +366,13 @@ do
     state:Act("SpawnBall")
     check(state.AimCount == aimedBefore, "spike/block/spawn do not trigger the aim")
 
-    -- Disabling restores the original FireServer exactly.
+    -- Disabling restores the original FireServer exactly. The restore happens
+    -- through restorefunction (the hook is not a field the test could compare by
+    -- assignment), so assert the closure the remote now resolves is the original.
     state:SetToggle("AutoSetAim", false)
     check(actions.FireServer == originalFireServer, "disabling restores the original FireServer")
     check(state.AimWrapped == false, "the remote is no longer wrapped after disabling")
+    check(state.AimHookHandle == nil and state.AimField == nil, "disabling clears the hook bookkeeping")
 
     -- Re-enable and prove Destroy unwraps too.
     state:SetToggle("AutoSetAim", true)

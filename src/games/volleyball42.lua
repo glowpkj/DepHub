@@ -112,9 +112,16 @@ local State = {
     ServeTask = nil,
     LastAnimation = nil,
     LastError = nil,
-    -- Auto Set Aim: wraps PlayerAction.FireServer while on, so a set turns the
-    -- body toward the nearest fixed set position on that frame.
-    OriginalFireServer = nil,
+    -- Auto Set Aim: hooks PlayerAction.FireServer while on, so a set turns the
+    -- body toward the nearest fixed set position on that frame. Roblox keeps
+    -- instance methods on a shared metatable, so the method is intercepted with
+    -- the executor's hookfunction (keeping the restore handle), not by assigning
+    -- a field -- a plain assignment raises "FireServer is not a valid member of
+    -- RemoteEvent". FieldRecords fall back to a rawset patch for plain-function
+    -- doubles (the test harness) only.
+    AimHookHandle = nil,
+    AimHookTarget = nil,
+    AimField = nil,
     AimWrapped = false,
     AimCount = 0,
     LastSetAim = nil,
@@ -262,19 +269,22 @@ local function aimAtNearestSet()
     return faceYaw(root, root.Position, target.Position)
 end
 
--- Envelopa PlayerAction.FireServer para girar o corpo no frame do set. O metodo
--- original e guardado e chamado normalmente (o jogo recebe a acao igual), so
--- olhamos os argumentos antes. Desligar restaura o metodo original.
+-- Intercepta PlayerAction.FireServer para girar o corpo no frame do set. O
+-- metodo real e preservado e chamado normalmente (o jogo recebe a acao igual),
+-- so olhamos os argumentos antes. Um metodo de Instance NAO pode ser trocado por
+-- atribuicao (raise "not a valid member"), entao usamos hookfunction (executor),
+-- com fallback para rawset so em doubles de funcao pura (harness). Desligar
+-- restaura pelo handle (restorefunction) ou pelo campo salvo.
 local function enableAim()
     if State.AimWrapped then return true end
     local remote = Actions and type(Actions.GetRemote) == "function" and Actions.GetRemote() or nil
     if not remote then return false, "PlayerAction remote ausente" end
 
-    local original = remote.FireServer
-    if type(original) ~= "function" then return false, "FireServer ausente" end
-    State.OriginalFireServer = original
+    -- A leitura de um membro ausente raise; um RemoteEvent expoe FireServer.
+    local okRead, original = pcall(function() return remote.FireServer end)
+    if not okRead or type(original) ~= "function" then return false, "FireServer ausente" end
 
-    remote.FireServer = function(self, action, ...)
+    local wrapped = function(self, action, ...)
         local result = original(self, action, ...)
         -- "Setting"/"Backsetting" e o que o set dispara; ignora todo o resto
         -- (spike, block, spawn, serve nao devem virar o corpo).
@@ -287,16 +297,56 @@ local function enableAim()
         return result
     end
 
-    State.AimWrapped = true
-    return true
+    local env = type(getgenv) == "function" and getgenv() or _G
+    local hook = env.hookfunction or _G.hookfunction
+    if type(hook) == "function" then
+        local okHook, handle = pcall(hook, original, wrapped)
+        if okHook and handle ~= nil then
+            State.AimHookHandle = handle
+            State.AimHookTarget = original
+            State.AimWrapped = true
+            return true
+        end
+    end
+
+    -- Fallback: so funciona num double cujo FireServer e um campo proprio
+    -- (o harness). Num Instance real a atribuicao raise, por isso vem por ultimo
+    -- e protegida; se falhar, nao deixamos o estado marcado como ativo.
+    local current = remote.FireServer
+    if rawget(remote, "FireServer") == current then
+        local okSet = pcall(function() remote.FireServer = wrapped end)
+        if okSet and remote.FireServer == wrapped then
+            State.AimHookTarget = original
+            State.AimField = {Remote = remote, Original = original}
+            State.AimWrapped = true
+            return true
+        end
+    end
+
+    return false, "nao foi possivel interceptar FireServer (hookfunction indisponivel)"
 end
 
 local function disableAim()
-    local remote = Actions and type(Actions.GetRemote) == "function" and Actions.GetRemote() or nil
-    if remote and State.OriginalFireServer then
-        pcall(function() remote.FireServer = State.OriginalFireServer end)
+    if State.AimHookHandle and State.AimHookTarget then
+        local env = type(getgenv) == "function" and getgenv() or _G
+        local restore = env.restorefunction or _G.restorefunction
+        if type(restore) == "function" then
+            pcall(restore, State.AimHookHandle)
+        else
+            -- restorefunction ausente: re-hooka o alvo de volta para o original.
+            local hook = env.hookfunction or _G.hookfunction
+            if type(hook) == "function" then pcall(hook, State.AimHookTarget, State.AimHookTarget) end
+        end
     end
-    State.OriginalFireServer = nil
+    if State.AimField then
+        local field = State.AimField
+        if field.Remote and field.Remote.FireServer then
+            pcall(function() field.Remote.FireServer = field.Original end)
+        end
+    end
+    State.AimHookHandle = nil
+    State.AimHookTarget = nil
+    State.AimField = nil
     State.AimWrapped = false
 end
 

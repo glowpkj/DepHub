@@ -232,11 +232,11 @@ function DemonUI:CreateTab(name, category, sea)
         -- Group controls side by side on one line. Returns a row handle with the
         -- same Create* builders; children each take an equal share of the width.
         function wrapper:CreateRow()
-            return self.Adapter.Library:AddHStack(self.Control)
+            return self.Control:AddHStack()
         end
         -- Group controls as a named vertical stack.
         function wrapper:CreateStack()
-            return self.Adapter.Library:AddVStack(self.Control)
+            return self.Control:AddVStack()
         end
         self.Sections[title] = wrapper
         return wrapper

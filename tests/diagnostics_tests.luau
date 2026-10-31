@@ -136,7 +136,7 @@ do
     local remote = Instance.new("RemoteFunction")
     remote.Name = "GET"
     local forwarded = nil
-    remote.InvokeServer = function(_, ...) forwarded = {...}; return "resp" end
+    ctx:SetMethod(remote, "InvokeServer", function(_, ...) forwarded = {...}; return "resp" end)
     -- Provide an executor-style hookfunction that swaps a method on its owner.
     local originalMethod = remote.InvokeServer
     local hookCalls = 0
