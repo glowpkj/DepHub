@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-10-31T17:13:40.428Z",
-  "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+  "generatedAt": "2026-10-31T17:13:55.685568+00:00",
+  "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
   "version": "0.1.09",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "87d038ef8495fbd778b79d81e57665d3c493d99da205e922455047791d6cecd2",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -29,7 +29,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "9581778b12efd3d0b647b225da7a7dcc92345b7591fa747d9831afaf526c2ae7",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,7 +57,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "7bf646d92c90d9bd7a75f4bdbf4512b3144f0e30d2cb4cfeadaba04a2e349404",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -74,7 +74,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "3dab292189ffa06b62f01e5bed2d6f469c834165e120129974a865310069b2f0",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -94,7 +94,7 @@
     "114234929420007": {
       "name": "Blood Strike",
       "version": "8e161a820333f32142fed885f1f0da55c7caa0064d020aa157685baf6467c5fb",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -110,7 +110,7 @@
     "107778070777162": {
       "name": "Steal An Egg",
       "version": "f726b2222aeb821a53bb80d7396b5a0950a4a9a42c7c35b6807e07a4423e3760",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -126,7 +126,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "4689a09704cb7e83a7696c4a03882de755edb9b5b093ca5bdfb9ec93832ad6e1",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -151,7 +151,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "adb522360ac474db0895e0ff38171843c7f23115230d997bf782fac306029e04",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -179,7 +179,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "090f690dd6791a7b1b5ed5a69671a8358c5307abdf2dd0a459850ad39c70e72c",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -207,7 +207,7 @@
     "93978595733734": {
       "name": "Violence District",
       "version": "8961a367c3160ffe9ab0da04f63cd6af84dc5631ff6d75c5fd69f7edc26bf5da",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -223,7 +223,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "00c43d24fbc1eab80b9b6dac8b128e5a1a88c0e02534341eb461e29e7b6164be",
-      "commit": "03e2630cb561de4f1331db11df90e62bf35cc1ba",
+      "commit": "d407bda9a1b8dbe34b626ca12c0b584aa11ad494",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -244,38 +244,38 @@
   },
   "recentUpdates": [
     {
-      "Version": "ec07a42",
-      "Date": "2026-10-30T13:46:11-03:00",
+      "Version": "d407bda",
+      "Date": "2026-10-31T14:13:40-03:00",
       "Changes": [
-        "v0.0.98: shared UI - backends' tabs actually show their controls"
+        "Fix AddHStack call site and hook remote methods instead of assigning (v0.1.09)"
       ]
     },
     {
-      "Version": "cc8df64",
-      "Date": "2026-10-30T13:42:32-03:00",
+      "Version": "4907ed9",
+      "Date": "2026-10-31T14:06:42-03:00",
       "Changes": [
-        "v0.0.97: shared UI - stop re-locking the mouse on close"
+        "Loader: prefer raw and accept only the host serving this exact version (v0.1.08)"
       ]
     },
     {
-      "Version": "a0ab55e",
-      "Date": "2026-10-30T13:38:14-03:00",
+      "Version": "bc058bd",
+      "Date": "2026-10-31T13:54:40-03:00",
       "Changes": [
-        "v0.0.96: Violence District - build the panel without blocking on remotes"
+        "UI: keyboard-independent __DEPHUB_TOGGLE() global (v0.1.07)"
       ]
     },
     {
-      "Version": "d5d632a",
-      "Date": "2026-10-30T13:35:06-03:00",
+      "Version": "c8d49a7",
+      "Date": "2026-10-31T13:47:10-03:00",
       "Changes": [
-        "v0.0.95: Violence District - new backend from the verified in-game research"
+        "Loader: remove blocking game.Loaded:Wait() and add startup progress logs (v0.1.06)"
       ]
     },
     {
-      "Version": "528ce58",
-      "Date": "2026-10-30T12:52:50-03:00",
+      "Version": "acdc9f4",
+      "Date": "2026-10-31T13:43:22-03:00",
       "Changes": [
-        "v0.0.94: shared UI - fix the mouse getting stuck when the panel closes"
+        "Loader fix: remove blocking PlayerAdded:Wait() dead code (v0.1.05)"
       ]
     }
   ]
