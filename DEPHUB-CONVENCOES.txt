@@ -1,0 +1,316 @@
+================================================================================
+DepHub - CONVENCOES DE ARQUITETURA (leia antes de programar ou adicionar jogo)
+================================================================================
+
+Este arquivo e o contrato do repositorio. Se voce vai mexer no DepHub - corrigir
+um jogo, adicionar um jogo novo, criar um recurso - siga o que esta aqui. Nao e
+sugestao: e o padrao. O AGENTS.md (raiz) tem as mesmas regras em forma curta e
+continua valendo; este arquivo e a versao de trabalho, com o "como".
+
+Se voce so vai ler uma secao, leia a 1 (categorias) e a 9 (checklist antes de
+dar como pronto).
+
+
+--------------------------------------------------------------------------------
+1. ORGANIZACAO POR CATEGORIA, NUNCA POR NOME DE JOGO
+--------------------------------------------------------------------------------
+
+Regra dura: **nenhuma aba leva o nome do jogo.**
+
+Errado:
+    UI:CreateTab("Violence District", "All")     -- aba com nome do jogo
+    UI:CreateTab("MM2", "All")                   -- idem
+    UI:CreateTab("Speed", "All")                 -- nome de recurso virando aba
+
+Certo: a aba e uma CATEGORIA de finalidade, igual em todo jogo:
+
+    Visual   - ESP, highlight/chams, billboard, info na tela, trackers,
+               indicadores visuais, distancia, nome, vida.
+    Combat   - aimbot, silent aim, assistencia de mira, auto-parry, auto-block,
+               habilidades e qualquer coisa de combate/PvP.
+    Farm     - auto farm, coleta automatica, progressao, missoes, loops.
+    Movement - fly, speed, noclip, teleport, pulo, movimentacao.
+    Player   - coisas do jogador/personagem: vida, stamina, interacoes.
+    World    - mapa, ambiente, objetos do mundo, portas, geradores, itens no chao.
+    Misc     - ferramentas que nao encaixam em nenhuma acima.
+    Settings - configuracoes gerais, salvar/carregar, keybinds globais.
+
+Um jogo cria SOMENTE as categorias que ele realmente usa. Nao crie categoria
+vazia para "ficar padrao". Um jogo com so ESP e speed cria Visual e Movement -
+nada mais.
+
+A superficie de abas do usuario fica assim (mesma logica em todo jogo):
+
+    GENERAL
+      Visual
+      Combat
+      Movement
+
+e dentro de cada categoria vivem os recursos daquela finalidade. O jogador
+encontra "onde fica o ESP" sem decorar o jogo, porque ESP esta sempre em Visual.
+
+
+--------------------------------------------------------------------------------
+2. FRONTEND E BACKEND ANDAM JUNTOS
+--------------------------------------------------------------------------------
+
+O "frontend" (a experiencia de navegacao no shell compartilhado) e o "backend"
+(o modulo src/games/<jogo>.lua que cria as categorias e liga os recursos) tem
+que refletir a MESMA organizacao.
+
+- Cada recurso pertence a UMA categoria logica, no backend e na UI.
+- Nunca registre o mesmo recurso em dois lugares.
+- O nome da categoria no backend e o mesmo que aparece na UI.
+- Particularidades de cada jogo sao preservadas: o RESOURCE pode ser unico do
+  jogo, mas ele mora na categoria correta (ex.: "Auto Repair de gerador" e do
+  jogo, mas e Farm/World, nao uma aba "Gerador" solta).
+
+Arquitetura modular: cada modulo tem uma responsabilidade clara. Nada de um
+arquivo que faz tudo, nada de uma funcao que e chamada de dez lugares diferentes
+fazendo coisas diferentes.
+
+
+--------------------------------------------------------------------------------
+3. API DO SHELL (o que o backend pode chamar)
+--------------------------------------------------------------------------------
+
+O shell compartilhado e DONO de toda a GUI. O backend NAO cria GUI crua
+(Instance.new("ScreenGui"/"Frame"/"TextButton") e proibido no backend - o
+harness rejeita e em jogo briga com o tema). O backend so USA a API abaixo.
+
+    local UI = env.__DEPHUB.UI          -- a janela compartilhada
+
+    UI:CreateCategory(nome, icone)      -- icone e um nome de icone do tema
+    UI:CreateTab(nome, categoria, sea)  -- cria uma aba DENTRO de uma categoria
+                                        -- (a assinatura e (nome, categoria))
+    UI:CreateCategory so e preciso se a categoria ainda nao existir; o adapter
+    cria sozinho se voce passar uma que nao existe.
+
+    local tab = UI:CreateTab("Visual", "Visual")   -- categoria Visual -> aba Visual?
+    -- ATENCAO: a assinatura real e UI:CreateTab(name, category).
+    -- O jeito correto de ter a categoria "Visual" com a aba "ESP" e:
+    --     UI:CreateCategory("Visual", "eye")
+    --     local tab = UI:CreateTab("ESP", "Visual")
+
+    local sec = tab:CreateSection(titulo, coluna)  -- coluna = "Left" ou "Right"
+    -- CreateSection aceita SOMENTE "Left" ou "Right". Qualquer outro valor
+    -- gera erro e a secao inteira e descartada (a aba fica VAZIA). Este foi um
+    -- bug real: ver secao 8.
+
+    sec:CreateToggle(label, inicial, callback)
+    sec:CreateSlider(label, min, max, inicial, callback)
+    sec:CreateDropdown(label, opcoes, inicial, callback)
+    sec:CreateButton(label, callback)
+    sec:CreateInput(label, placeholder, inicial, callback)
+    sec:CreateParagraph(titulo, texto)
+
+Regras da API:
+- Todos os labels em portugues, curtos e claros (o usuario e brasileiro).
+- CreateSection exige "Left" ou "Right". Nao passe resumo/descricao no lugar.
+- Nada de UI criada fora do shell.
+
+Ponte de compatibilidade: hoje varios backends usam um helper local
+`sectionFor(tab, name, column)` que so chama tab:CreateSection(name, column).
+Mantenha esse padrao se for o estilo do arquivo; o importante e passar (nome,
+coluna) - e SOMENTE isso.
+
+
+--------------------------------------------------------------------------------
+4. CONFIGURACOES POR FUNCIONALIDADE
+--------------------------------------------------------------------------------
+
+Um recurso com estado ativo tem que ter configuracao propria. Um botao
+ligar/desligar sozinho nao basta quando existem parametros que importam.
+
+    ESP ativado        [toggle]
+      Alcance          [slider]  50 .. 5000
+      Mostrar nome     [toggle]
+      Mostrar distancia[toggle]
+      Chams            [toggle]
+
+    Auto Parry         [toggle]
+      Alcance do parry [slider]
+      Recarga          [slider]
+      Equipar sozinho  [toggle]
+
+Regras:
+- Toggle para ligar/desligar. Slider para numeros. Dropdown para modo.
+  Input para texto. Keybind para atalho.
+- As configuracoes sao CONTEXTUAIS: cada recurso mostra so o que e relevante.
+- Todo controle muda comportamento de verdade (ver secao 6). Controle enfeite
+  nao existe.
+- Quando dois controles mudam a mesma coisa, e UM controle so.
+
+
+--------------------------------------------------------------------------------
+5. SEM DUPLICACAO
+--------------------------------------------------------------------------------
+
+Antes de adicionar, procure o que ja existe:
+
+- mesma funcionalidade em dois arquivos?
+- dois controles que fazem a mesma coisa?
+- duas abas com o mesmo conteudo?
+- configuracao espalhada em varios lugares?
+- dois modulos que fazem a mesma coisa?
+- codigo morto / implementacao antiga ainda referenciada?
+
+Se dois recursos sao realmente equivalentes (ex.: "boost" e "bypass" que ambos
+so setam a forca do pulo), eles sao UM recurso com UM controle. Mescle.
+
+Mas: NAO remova funcionalidade unica so porque PARECE com outra. Merge so quando
+o comportamento e de fato o mesmo. Na duvida, mantenha e documente.
+
+Sistemas compartilhados (movimento, teleport, ESP base) vivem em
+src/core/ ou em src/games/features/ e sao reusados - nunca copiados para dentro
+de cada jogo.
+
+
+--------------------------------------------------------------------------------
+6. O CONTROLE PRECISA MUDAR O COMPORTAMENTO
+--------------------------------------------------------------------------------
+
+Todo toggle/slider/dropdown tem que alterar o estado vivo. Se mexer no controle
+nao muda o que o codigo faz em tempo real, e decoracao e nao entra.
+
+E o inverso tambem: todo recurso que liga, tem que DESLIGAR limpo.
+- restaurar valores originais
+- desconectar conexoes (connections)
+- destruir partes/GUI que criou
+- limpar estado publicado (env[...])
+
+Recurso que deixa residuo ao desligar esta incompleto.
+
+
+--------------------------------------------------------------------------------
+7. LIMPEZA E DESCARGA
+--------------------------------------------------------------------------------
+
+Todo backend define State:Destroy() que:
+- para todo loop/toggle ativo
+- desconecta TODAS as connections guardadas
+- destroi tudo que criou (highlight, billboard, parte)
+- limpa env[STATE_KEY] e env.__DEPHUB.<Jogo>
+
+O loader re-adiciona um backend sem vazar: se o modulo rodar duas vezes, a
+primeira copia e destruida antes (o backend faz isso no topo: se ja existe
+State anterior com Destroy, chama Destroy).
+
+Nunca deixe uma connection viva depois do Destroy. O harness testa isso.
+
+
+--------------------------------------------------------------------------------
+8. ARMADILHAS CONHECIDAS (bugs reais que ja aconteceram - nao repita)
+--------------------------------------------------------------------------------
+
+(a) CreateSection com coluna errada -> ABA VAZIA.
+    tab:CreateSection(titulo, coluna) aceita SO "Left" ou "Right". Passar um
+    resumo/descricao no lugar da coluna faz a secao dar erro dentro de um pcall,
+    o erro e engolido, e NENHUM controle e criado. A aba aparece, mas vazia.
+    Foi exatamente o bug do Violence District / Blood Strike / Steal An Egg.
+
+(b) WaitForChild bloqueante no topo do modulo -> CARGA TRAVADA.
+    Nao use WaitForChild(name, timeout) para resolver remotes no caminho de
+    carregamento. Se o remote demora ou nao existe, voce trava a montagem da
+    aba por dezenas de segundos. Resolva remotes LAZY (FindFirstChild dentro de
+    uma resolveRemotes() chamada depois de montar a aba e de novo num defer).
+
+(c) Mouse travando ao abrir/fechar painel -> shell, NAO backend.
+    MouseBehavior pertence ao script de camera do jogo; ele reaplica o valor a
+    cada frame. NUNCA capture e restaure MouseBehavior (isso re-trava o ponteiro
+    no centro ao fechar). O shell so libera (Default) enquanto o painel esta
+    aberto e devolve o mouse ao jogo ao fechar. Backend nao mexe em mouse.
+
+(d) CDN velho -> "nao carregou".
+    O executor busca de raw.githubusercontent.com, que serve versao defasada por
+    minutos apos o push. Se a versao no log for antiga, espere ou use ?v=<versao>
+    na URL. Nao e bug do codigo.
+
+(e) GUI crua no backend.
+    Instance.new("ScreenGui"/"Frame"/"TextButton") no backend e proibido. O
+    harness rejeita e em jogo conflita com o tema. Use a API do shell.
+
+
+--------------------------------------------------------------------------------
+9. CHECKLIST ANTES DE DAR COMO PRONTO
+--------------------------------------------------------------------------------
+
+Rode o gate COMPLETO e so diga "pronto" se passar:
+
+    node tests/run_backend_tests.js "$env:USERPROFILE\tools\luau-win\luau.exe"
+    node tests/validate_repo.js
+    node tools/bundle.js "$PWD" "$PWD\dist\DepHub.lua"
+    node tests/verify_bundle.js "$PWD\dist\DepHub.lua" "$env:USERPROFILE\tools\luau-win\luau.exe" <placeId> <gameId> <rota>
+
+Antes disso, confirme:
+[ ] a aba do meu jogo monta COM controles (nao vazia) - teste afirma isso
+[ ] todo controle muda comportamento de verdade
+[ ] todo recurso ligado desliga limpo (Destroy sem residuo)
+[ ] sem GUI crua no backend
+[ ] sem WaitForChild bloqueante no carregamento
+[ ] categorias por finalidade, sem aba com nome de jogo
+[ ] sem duplicacao de recurso/controle
+[ ] testes atualizados: quando remove/merge um controle, atualize o teste
+[ ] bump de versao nos DOIS arquivos (src/version.txt E DepHub.lua linha 26)
+[ ] manifest regenerado + linha de changelog no arquivo do jogo
+[ ] git pull --rebase origin main antes do push
+
+
+--------------------------------------------------------------------------------
+10. ADICIONANDO UM JOGO NOVO (passo a passo)
+--------------------------------------------------------------------------------
+
+1. Decida as CATEGORIAS que o jogo precisa (Visual? Combat? Farm? Movement?).
+   So as que usar.
+2. Crie src/games/<jogo>.lua seguindo um backend existente como modelo
+   (src/games/bloodstrike.lua e um bom esqueleto).
+3. No topo: State com Toggles/Values/ToggleLabels, cleanup de copia anterior.
+4. Roteie no loader: adicione a entrada em `targets` no DepHub.lua com o PlaceId
+   E o GameId, com as flags do jogo (ex.: MeuJogo = true) e o Core.
+5. Monte as categorias + abas + secoes + controles via a API do shell.
+6. Resolva remotes lazy (resolveRemotes()), nunca WaitForChild bloqueante.
+7. Implemente SetToggle/SetValue e ligue cada controle ao comportamento real.
+8. State:Destroy() limpa tudo.
+9. Registre no .github/dephub-games.json (key = gameId, com files[], name).
+10. Crie src/games/updates/<gameId>.txt com a linha de changelog.
+11. Escreva/atualize tests/<jogo>_tests.luau e rode o gate.
+12. Bump de versao + manifest + commit + pull --rebase + push.
+
+Nunca force um backend de um jogo dentro de outro. Nao toque em jogo que a
+tarefa nao pede.
+
+
+--------------------------------------------------------------------------------
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.0.98)
+--------------------------------------------------------------------------------
+
+Este documento define o ALVO. O que existe hoje esta entre o antigo e o alvo:
+
+FEITO / FUNCIONANDO (verificado offline, 721 checks):
+- Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
+  temas, notificacoes, Dashboard).
+- Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
+- 11 jogos roteados: Violence District, Blood Strike, Steal An Egg, MM2,
+  Noob Piece, TSB, Restaurant Tycoon 3, AOTR, Volleyball 4.2, Blox Fruits
+  (Sea 1/2), Universal.
+- Abas de Violence District / Blood Strike / Steal An Egg montam controles
+  (bug do CreateSection corrigido em v0.0.98).
+- Fix do mouse do shell (v0.0.97).
+
+AINDA NO ESQUEMA ANTIGO (a migrar para categorias):
+- A maioria dos jogos cria a aba com nome proprio (ex.: "ESP", "Speed",
+  "Violence District") e nao usa CreateCategory. So o Blox Fruits ja usa
+  CreateCategory (Sea 1 / Sea 2). A migracao para Visual/Combat/Farm/... e o
+  proximo trabalho - jogo a jogo, validando cada um.
+- O helper `sectionFor` do tipo antigo ainda existe em alguns backends (call
+  correta, so verboso).
+
+NAO VALIDADO EM JOGO:
+- Mecanismos especificos de cada jogo (remotes, animation ids, offsets) estao
+  baseados em pesquisa in-game; qualquer patch do jogo pode quebra-los. O
+  harness prova o contrato offline, nao a funcionalidade no cliente real.
+
+Regra de ouro do repositorio: nunca simule funcionamento. Se algo nao da pra
+implementar confiavel, explique por que em vez de entregar um stub que finge
+funcionar.
+================================================================================

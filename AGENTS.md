@@ -3,6 +3,12 @@
 These are standing rules for any agent working in this repository. Apply them to
 every change, without being asked.
 
+> **Read `DEPHUB-CONVENCOES.txt` first** (root). It is the working contract for
+> this repo: how to organize tabs by *category* (never by game name), the shell
+> UI API, per-feature config rules, the known traps that already caused bugs, and
+> the exact checklist before calling anything done. The short rules below still
+> apply; that file is the "how".
+
 ## 1. Build the minimum that works — nothing that does not need to exist
 
 The default failure mode here is **doing more than the task needs**: extra
