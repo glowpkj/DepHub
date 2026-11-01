@@ -23,18 +23,61 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local Kit = {}
 
--- Icons for the standard categories, so every game's sidebar looks the same for
--- the same finalidade. Names are theme icon names (see the shell's GetIcon).
-local CATEGORY_ICONS = {
+-- Icon NAMES from the RedzLib icon catalogue (src/core/redz-icons.lua), so every
+-- game's sidebar looks the same for the same finalidade. These are names the
+-- library resolves to real asset ids through GetIconByName -- NOT emojis. A name
+-- that is not in the catalogue simply yields no icon (the tab renders without
+-- one), so a wrong name degrades quietly instead of showing a stray glyph.
+-- Keep the vocabulary here (one place) so the whole panel stays consistent.
+local ICONS = {
+    -- categories
     Visual = "eye",
-    Combat = "crosshair",
-    Farm = "wheat",
-    Movement = "move-3d",
-    Player = "user",
+    Combat = "swords",
+    Farm = "sprout",
+    Movement = "rocket",
+    Player = "shield",
     World = "globe",
     Misc = "wrench",
     Settings = "settings",
+    General = "home",
+    -- tabs (game panels + the fixed loader tabs)
+    Dashboard = "barchart",
+    Debug = "flaskconical",
+    Unsupported = "shieldclose",
+    Fruits = "apple",
+    Fruit = "apple",
+    ESP = "eye",
+    Travel = "rocket",
+    Teleport = "rocket",
+    Raid = "flag",
+    Shop = "shoppingcart",
+    Quest = "scroll",
+    Roles = "venetianmask",
+    ["Coin Farm"] = "coins",
+    ["Gun Drop"] = "crosshair",
+    Players = "users",
+    Social = "messagecircle",
+    Server = "server",
+    Status = "trendingup",
+    Speed = "electricity",
+    Autoblock = "shieldcheck",
+    Parry = "shield",
+    Assistance = "target",
+    Prediction = "scan",
+    Detection = "scan",
+    Ranges = "ruler",
+    Visuals = "eye",
+    ["Restaurant Farm"] = "utensils",
+    Kitchen = "microwave",
+    Generators = "network",
+    Team = "users",
+    ["Titan ESP"] = "mountain",
+    Titans = "mountain",
 }
+Kit.EMOJI = ICONS
+
+-- The category icon NAME for a finalidade, or a sensible default.
+local CATEGORY_ICONS = ICONS
 
 -- Resolve the shared shell. Returns nil (never errors) when there is no UI, so
 -- a backend can call the kit unconditionally and simply build nothing.
@@ -57,12 +100,12 @@ end
 -- Create a tab inside a category. Category defaults to the tab's own name so a
 -- single-tab game stays trivial, but the normal call passes the finalidade:
 --     Kit.Tab("ESP", "Visual")
-function Kit.Tab(name, category)
+function Kit.Tab(name, category, icon)
     local ui = window()
     if not ui then return nil end
     category = category or name
     Kit.Category(category)
-    local ok, tab = pcall(function() return ui:CreateTab(name, category) end)
+    local ok, tab = pcall(function() return ui:CreateTab(name, category, icon or ICONS[name]) end)
     if ok and tab then return tab end
     return nil
 end
@@ -80,8 +123,8 @@ end
 
 -- One-call convenience: tab (in a category) + section, which is the shape almost
 -- every feature uses. Returns the section (or nil).
-function Kit.Panel(tabName, category, sectionTitle, column)
-    local tab = Kit.Tab(tabName, category)
+function Kit.Panel(tabName, category, sectionTitle, column, icon)
+    local tab = Kit.Tab(tabName, category, icon)
     if not tab then return nil end
     return Kit.Section(tab, sectionTitle or tabName, column)
 end
@@ -109,8 +152,9 @@ function Kit.Stack(section)
     return nil
 end
 
+-- The icon name for a category (or tab); a neutral default for an unknown one.
 function Kit.categoryIcon(name)
-    return CATEGORY_ICONS[name] or "layers"
+    return CATEGORY_ICONS[name] or ICONS.General
 end
 
 return Kit

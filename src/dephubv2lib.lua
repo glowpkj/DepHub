@@ -13,7 +13,14 @@
 -- Public API (the part DepHub consumes):
 --   local lib = Library                     -- this module's export
 --   local win = lib:MakeWindow({Title=, SubTitle=, ScriptFolder=})
---   local tab = win:MakeTab({Title=, Icon=})
+--   local tab = win:MakeTab({Title=, Icon=})   -- Icon is an icon NAME resolved
+--                                              --   through GetIconByName (see
+--                                              --   src/redz-icons.lua) or a raw
+--                                              --   asset id; an unknown name (or
+--                                              --   an emoji) leaves the tab with
+--                                              --   no icon
+--   -- The window's starting size is read from lib.Default.UISize (a UDim2) at
+--   -- MakeWindow time; MakeWindow itself takes no Size option.
 --   tab:AddSection(title)                   -- visual header (string only)
 --   tab:AddToggle/Slider/Button/TextBox/Dropdown/Paragraph/Keybind/...
 --   win:Notify({Title=, Content=, Icon=, Duration=})
@@ -172,7 +179,16 @@ Library.Save=Library.Default
 -- Signal connection helper, theme path reader, theme value/collection appliers,
 -- and the wrapped file writer used to persist flags.
 -- ===========================================================================
-local ViewportSize=workspace.CurrentCamera.ViewportSize local u=function(
+-- DepHub: a escala da UI. O redz original usa ViewportSize.Y/450, ou seja a
+-- janela CRESCE em telas grandes (numa tela 1080p a escala passa de 2.2x e o
+-- painel de 600x420 vira 1356x949 -- enorme). Aqui a escala e relativa a uma
+-- altura de referencia (900), presa ao intervalo [0.75, 1.25]: numa tela 1080p a
+-- escala fica ~1.13x e o painel aparece perto do tamanho declarado, sem encher a
+-- tela. A referencia e fixa de proposito -- a janela deve ter o MESMO tamanho em
+-- qualquer tela, em vez de crescer com a resolucao.
+local ViewportSize=workspace.CurrentCamera.ViewportSize
+local SCALE_DIVISOR=900
+local u=function(
 
 u, v, w)
 table.insert(Library.Connections,u[w or"Connect"](u,v))end
@@ -587,7 +603,10 @@ return O:sub(1,#P)==P end local P=function(
 
 
 P)
-return(ViewportSize.Y/450)*P end local Q=function(
+-- A escala final: ViewportSize.Y / SCALE_DIVISOR, presa a [0.75, 1.25] para nao
+-- ficar minuscula nem gigante em telas extremas. Numa tela 1080p (~1017 de
+-- altura util) da ~1.13x -- o painel de 600x420 aparece com ~678x474 na tela.
+return(math.clamp((ViewportSize and ViewportSize.Y or SCALE_DIVISOR)/SCALE_DIVISOR,0.75,1.25))*P end local Q=function(
 
 
 Q)
@@ -911,7 +930,11 @@ end
 am.Set=am.SetText
 an.Set=an.SetValue
 ao.Set=ao.SetValue
-end local al=function(
+end
+-- Build one tab button: the clickable row (TextButton), its title label, the
+-- selection marker frame, the content container, and the icon. The icon is an
+-- ImageLabel showing the resolved asset id (or nothing when there is no icon).
+local al=function(
 
 al, am, an)
 local ao=createInstance("TextButton","Button",an,{
@@ -980,6 +1003,11 @@ Padding=UDim.new(0,5)
 }
 })
 
+-- DepHub: icone da aba. Agora so existe o caminho de ImageLabel: o Icon ja vem
+-- do MakeTab resolvido pelo catalogo da propria biblioteca (asset id ou nil). Um
+-- Icon nil (nome desconhecido / sem icone) simplesmente nao desenha nada e a aba
+-- fica sem icone -- era o pedido ("se nao tiver, deixa sem"). O caminho de emoji
+-- (TextLabel) foi removido: nao se usa mais emoji nos icones.
 local ar=createInstance("ImageLabel",ao,{
 Position=UDim2.new(0,8,0.5),
 Size=UDim2.new(0,13,0,13),
@@ -987,15 +1015,13 @@ AnchorPoint=Vector2.new(0,0.5),
 BackgroundTransparency=1,
 ImageTransparency=0.3,
 Image=am.Icon or""
-})local as=function()
-
-
+})
+local as=function()
 local as=string.sub(ar.Image,1,13)=="rbxassetid://"
 local at=ao.Title
 ar.Visible=as
 at.Size=UDim2.new(1,as and-25 or-15,1)
 at.Position=UDim2.fromOffset(as and 25 or 15)end
-
 
 u(ar:GetPropertyChangedSignal"Image",as)
 as()
@@ -1159,12 +1185,25 @@ Color="Colors.Background"
 }
 }
 
-local ar=createInstance("TextButton",OutBox,{
+-- DepHub: o popup do dropdown e um singleton reaproveitado por TODOS os
+-- dropdowns. O pai original aqui era o global `OutBox`, que o refactor deixou
+-- sem binding (== nil) -- por SetValues, um argumento posicional nil vira
+-- `Parent=nil`, entao o popup nascia solto com o frame "Dropdown" preso no
+-- Position/Size literais (fromOffset(50,50) / fromOffset(160,100)). Sem dono
+-- ele nao renderiza, mas assim que algo o parenta (ar.Parent=Y) ele aparece
+-- exatamente nesse canto fixo, por cima do conteudo -- o "box escuro com a
+-- lupa" que o usuario reportou. O overlay real da biblioteca e o local `aa`
+-- (OutBox de notificacao, tela cheia e ja escalado); usar ele como pai base
+-- mantem o popup dentro do overlay correto e fora do fluxo de conteudo.
+local ar=createInstance("TextButton",aa,{
 Size=UDim2.fromScale(1,1),
 BackgroundTransparency=1,
 Active=true,
 Text=""
 })
+-- DepHub: nasce sempre fechado -- so aparece quando um dropdown e aberto de
+-- verdade (aT faz ar.Parent=Y).
+ar.Visible=false
 
 local as=createInstance("Frame","Dropdown",ar,{
 Size=UDim2.fromOffset(ap,100),
@@ -1388,6 +1427,9 @@ aT)
 if not aC then
 aE=aT
 ar.Parent=Y
+-- DepHub: abre de fato -- Visible e controlado aqui e no close (aU), nao pelo
+-- pai, para o singleton nunca ficar visivel fora de um open real.
+ar.Visible=true
 return true
 end end local aU=function()
 
@@ -1405,6 +1447,9 @@ aC=true
 ay:Play()
 ay.Completed:Wait()
 ar.Parent=nil
+-- DepHub: fecha de fato -- esconde junto com o desparent, senao o Visible=true
+-- do open ficaria grudado e o box reapareceria no proximo parent.
+ar.Visible=false
 aC=false end local aV=function()
 
 
@@ -2841,6 +2886,15 @@ if ac==self then
 return nil
 end
 
+-- DepHub: o popup de dropdown e um singleton (X) compartilhado por todos os
+-- dropdowns de todas as abas. Se uma aba for trocada com o popup aberto, ele
+-- continuaria parentado em Y (a pasta Dropdowns) e apareceria preso no canto
+-- fixo por cima da outra aba. Fechar na troca de aba garante que o proximo
+-- dropdown sempre reabra do zero, reposicionado pelo holder dele.
+if ac and X then
+X.CloseDropdown()
+end
+
 if ac then
 U[ac].Unselect()
 end
@@ -2970,9 +3024,15 @@ local ax=av[2]or av.Icon or av.Image
 assert(type(aw)=="string",`"Tab.Title" 'string' expected, got {typeof(aw)}`)
 assert(ax==nil or type(ax)=="string",`"Tab.Icon" 'string' expected, got {typeof(ax)}`)
 
+-- DepHub: o icone da aba e resolvido pelo catalogo da PROPRIA biblioteca. Um
+-- nome (ex.: "rocket", "sword", "cherry") vira o asset id real do redz; um
+-- asset id cru passa direto; um nome que nao existe no catalogo vira nil -- e a
+-- aba aparece SEM icone, que e o pedido ("se nao tiver, deixa sem"). Emoji nao
+-- tem tratamento especial: nao e um nome do catalogo nem um asset id, entao
+-- simplesmente nao resolve e a aba fica sem icone.
 local ay=setmetatable({
 Selected=self.SelectedTab==#S+1,
-Icon=Library:GetIconByName(ax),
+Icon=type(ax)=="string"and#ax>0 and Library:GetIconByName(ax) or nil,
 Title=aw,
 
 Parent=self,
@@ -3847,24 +3907,81 @@ self.Flags=ag
 -- uma tabela local no proprio repo. Sem ela o GetIconByName simplesmente nao
 -- acha o nome e o controle sai sem icone -- que e o comportamento degradado que
 -- o proprio redz ja tinha.
+-- DepHub: o catalogo de icones e VENDORED no repo (src/core/redz-icons.lua) --
+-- e o arquivo Icons.lua real que o redz publicava (818 nomes -> asset ids). O
+-- redz original tentava loadstring({ScriptFolder}/Icons.lua) e caia para uma
+-- tabela minuscula de 4 nomes; por isso qualquer outro icone saia vazio e a
+-- shell forcava emoji. Aqui o catalogo completo entra primeiro, via o mesmo
+-- caminho que o loader usa para os modulos, e o fallback de 4 nomes so existe
+-- para o caso extremo de o catalogo nao carregar.
+--
+-- Os valores guardados sao ids SEM o prefixo rbxassetid:// -- o GetIconByName
+-- (abaixo) e quem acrescenta o prefixo. Guardar o valor ja com prefixo faria
+-- o id sair com dois "rbxassetid://" e o icone nao carregaria.
 self.Icons=(function()
 local ah=ae.ScriptFolder
 
-local ai,aj=pcall(function()
-return loadstring(readFileSafe(`{ah}/Icons.lua`))()
+-- 1) Catalogo real vendorado no repo (nomes -> "rbxassetid://id"). Normaliza
+--    para guardar o valor sem prefixo, que e o formato que o GetIconByName usa.
+--    Resolve o arquivo pelo mesmo caminho que o loader usa para os modulos: o
+--    httpGet publicado (no bundle ele serve de BUNDLED_SOURCES, sem rede) ou,
+--    sem ele, game:HttpGet da SourceBaseURL (execucao normal pela rede).
+--
+--    O resolver publicado devolve APENAS o corpo (uma string), enquanto o
+--    httpGet interno do loader devolve (ok, corpo). Os dois formatos sao
+--    aceitos aqui, e o caminho de rede so roda quando nao ha resolver nenhum --
+--    assim o bundle nunca toca a rede (o verify_bundle falha se tocar).
+local ao,ap=pcall(function()
+    local base=(getgenv and getgenv().__DEPHUB and getgenv().__DEPHUB.SourceBaseURL)
+        or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+    local url=base.."src/core/redz-icons.lua"
+    -- Aceita as duas formas: (corpo) e (ok, corpo). O resolver do bundle devolve
+    -- so o corpo; o httpGet do loader devolve (ok, corpo). Se o corpo vier vazio
+    -- a tentativa inteira e descartada.
+    local function tryFetch(fn,arg)
+        if type(fn)~="function"then return nil end
+        local a,b=pcall(fn,arg)
+        if not a then return nil end
+        if type(a)=="string"and#a>0 and a~=true then return a end
+        if type(b)=="string"and#b>0 then return b end
+        return nil
+    end
+    local get=__dephubHttpGet or __DEPHUB_HTTP_GET
+    local source=tryFetch(get,url) or tryFetch(get,"src/core/redz-icons.lua")
+    if not source then return nil end
+    local chunk=loadstring(source)
+    if type(chunk)~="function"then return nil end
+    return chunk()
 end)
-
-if ai and type(aj)=="table"then
-return aj
+if ao and type(ap)=="table"then
+    local normalized={}
+    for name,value in pairs(ap)do
+        if type(value)=="string"then
+            normalized[name]=(value:gsub("^rbxassetid://",""))
+        end
+    end
+    if next(normalized)~=nil then return normalized end
 end
 
--- Icones usados pelo DepHub (nomes que os backends passam em CreateCategory e
--- nos configs de painel). Asset ids do catalogo Roblox.
+-- 2) Compatibilidade: o Icons.lua local do redz, se existir ao lado do script.
+local ai,aj=pcall(function()
+    return loadstring(readFileSafe(`{ah}/Icons.lua`))()
+end)
+if ai and type(aj)=="table"then
+    local normalized={}
+    for name,value in pairs(aj)do
+        if type(value)=="string"then normalized[name]=(value:gsub("^rbxassetid://","")) end
+    end
+    return normalized
+end
+
+-- 3) Fallback minimo: os quatro nomes que a shell sempre teve. Valores SEM
+--    prefixo (o GetIconByName acrescenta).
 return{
-layers="rbxassetid://6031091004",
-swords="rbxassetid://6549167889",
-cherry="rbxassetid://6766380907",
-map="rbxassetid://6031280882",
+layers="6031091004",
+swords="6549167889",
+cherry="6766380907",
+map="6031280882",
 }
 end)()
 

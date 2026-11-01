@@ -228,6 +228,15 @@ do
     check(type(window.Notify) == "function", "the window exposes Notify")
     check(type(window.SelectTab) == "function", "the window exposes SelectTab")
 
+    -- The library reads its starting size from Default.UISize. Prove the value
+    -- the shell writes is a well-formed UDim2 the library can offset from (a
+    -- malformed one would make the window zero-sized / off-screen).
+    do
+        local defaultSize = library.Default.UISize
+        check(type(defaultSize) == "table" and type(defaultSize.X) == "table" and type(defaultSize.X.Offset) == "number",
+            "Default.UISize is a UDim2 with numeric offsets")
+    end
+
     local tab = window:MakeTab({Title = "Home"})
     check(type(tab) == "table", "MakeTab returns a tab")
     check(tab.IS_A_TAB == true, "the tab marks itself as a tab")
@@ -250,6 +259,21 @@ do
 
     local dropdown = tab:AddDropdown({Name = "My dropdown", Options = {"A", "B"}, Default = "A"})
     check(type(dropdown) == "table", "AddDropdown returns a handle")
+
+    -- Multi-select dropdown (RedzLib native): Depot's Skip/Keep lists use it.
+    local multi = tab:AddDropdown({Name = "My multi", Options = {"Dragon", "Leopard"}, Default = {"Dragon"}, MultiSelect = true})
+    check(type(multi) == "table", "AddDropdown with MultiSelect returns a handle")
+    check(multi.Kind == "Dropdown", "the multi-select dropdown is tagged as a Dropdown")
+
+    -- Icons are catalogue names now: a known name resolves to an asset id. An
+    -- unknown name (or an emoji) resolves to nothing and the tab is built with no
+    -- icon -- both must succeed without error.
+    local namedTab = window:MakeTab({Title = "Named Tab", Icon = "search"})
+    check(type(namedTab) == "table", "MakeTab accepts a named icon")
+    local unknownIconTab = window:MakeTab({Title = "Unknown Icon", Icon = "not-a-real-icon-name"})
+    check(type(unknownIconTab) == "table", "MakeTab tolerates an unknown icon name")
+    local emojiTab = window:MakeTab({Title = "Emoji Tab", Icon = "🍎"})
+    check(type(emojiTab) == "table", "MakeTab tolerates an emoji icon (no icon drawn)")
 
     local button = tab:AddButton({Name = "Click", Callback = function() end})
     check(type(button) == "table", "AddButton returns a handle")
@@ -281,10 +305,14 @@ do
 
         local ui = adapter.new({Name = "DepHub", Version = "0.0.0"})
         check(type(ui) == "table", "the adapter builds a shell")
-        check(ui:CreateCategory("Farm", "wheat") == true, "the shell creates a category")
+        check(ui:CreateCategory("Farm", "sprout") == true, "the shell creates a category")
 
-        local shellTab = ui:CreateTab("Auto Farm", "Farm")
-        check(type(shellTab) == "table", "the shell creates a tab")
+        -- The compact size is written where the real library reads it.
+        local appliedSize = ui.Library.Default and ui.Library.Default.UISize
+        check(appliedSize and appliedSize.X.Offset == 600 and appliedSize.Y.Offset == 420, "the shell applies the 600x420 size")
+
+        local shellTab = ui:CreateTab("Auto Farm", "Farm", "sprout")
+        check(type(shellTab) == "table", "the shell creates a tab with a named icon")
         check(shellTab.Key == "Farm|Auto Farm", "the tab records its category key")
         check(ui:CreateTab("Auto Farm", "Farm") == shellTab, "the shell reuses the same tab")
 
@@ -293,6 +321,9 @@ do
         check(type(shellSection:CreateToggle("Auto collect", true)) == "table", "section CreateToggle works")
         check(type(shellSection:CreateSlider("Range", 10, 200, 55)) == "table", "section CreateSlider works")
         check(type(shellSection:CreateDropdown("Island", {"One", "Two"}, "One")) == "table", "section CreateDropdown works")
+        local multiHandle = shellSection:CreateMultiDropdown("Skip list", {"Dragon", "Leopard"}, {"Dragon"}, function() end)
+        check(type(multiHandle) == "table", "section CreateMultiDropdown works")
+        check(type(multiHandle.Set) == "function", "the multi-dropdown handle exposes Set for restore")
         check(type(shellSection:CreateButton("Go", function() end)) == "table", "section CreateButton works")
         check(type(shellSection:CreateParagraph("Info", "Body")) == "table", "section CreateParagraph works")
         local input = shellSection:CreateInput("Command", "placeholder", "")

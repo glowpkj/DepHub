@@ -1,19 +1,21 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-01T02:49:10.520936+00:00",
-  "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
-  "version": "0.1.26",
+  "generatedAt": "2026-11-01T07:15:48.034Z",
+  "commit": "local",
+  "version": "0.1.27",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "0d94bf375df224ef3c08d2cc4838ef73814561be4588689037ad5bb601ba4db7",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "2e1600143b452eea5a65157f2c2e519429a3a6c11c537c4b3ffd100836e7c1d2",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
         "src/games/mm2.lua",
@@ -28,18 +30,22 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "d9f118a78ca3dd2079ef7ffca6fd3deb5df5d9df03a13293a75d05c9f6928ba6",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "c1559f78292b7c79f224beacef015ad94dbff3fcceaa00fdd2c8136ac444684d",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/bladhits.lua",
         "src/games/features/bloxfruits/fruit.lua",
         "src/games/features/bloxfruits/islands.lua",
+        "src/games/features/bloxfruits/silentaim.lua",
+        "src/games/features/bloxfruits/player.lua",
         "src/games/features/bloxfruits/teleport.lua",
         "src/games/updates/994732206.txt",
         "src/core/updater.lua",
@@ -48,14 +54,16 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "82300dbbbd100587b1976067e314fe7fb55a3038839bff41d4843b179a90a0b2",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "3deab18a6a1152464bd35710a3d38f050eee15fc4b38915f55e2ce0c4da07bdc",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
         "src/games/volleyball42.lua",
@@ -66,14 +74,16 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "decc525cabb1a13481baca0d94091bea914c126970735c5e993168c91a8a081c",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "d7cb25f87e257f02804aa666f8b355f780aef6e38373cd1bad287934e76edf31",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
         "src/games/tsb.lua",
@@ -86,14 +96,16 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "33813b7be6f1901caacaf5c067c05b4020dca99842df405384acaef05df47fac",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "48b6675c83011b6a94c29c3555be801de9b22edcaa46b57d1e0b2696ee4397c5",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
         "src/games/bloodstrike.lua",
@@ -102,14 +114,16 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "15ad4161bb99e21753cc1cdbb5daab250442cc778275037d56719eab91e4f87b",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "ad9cd7f1ed4447f9b332923583deeed52ea8787785f855e15cfeada0c0ed98ce",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
         "src/games/steal-a-egg.lua",
@@ -118,14 +132,16 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "1851a6c6892d164defad74cb7338a9fb331c246c48aaf3da4c3bd0b6040e88b7",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "397bf2d6272d942fdeacdcdf7552c8b44165d65b402882efab8d3151c090844f",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/anti-afk.lua",
         "src/core/dashboard.lua",
         "src/core/health-monitor.lua",
@@ -143,18 +159,22 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "414441517be0bdc50ac8b43a81d565aebac462875aa5ff466421d060bc541573",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "36f833c374fba9e754b59483204cb514136c2e794145f4bed9d37ae4926360e2",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/bladhits.lua",
         "src/games/features/bloxfruits/fruit.lua",
         "src/games/features/bloxfruits/islands.lua",
+        "src/games/features/bloxfruits/silentaim.lua",
+        "src/games/features/bloxfruits/player.lua",
         "src/games/features/bloxfruits/teleport.lua",
         "src/games/updates/85211729168715.txt",
         "src/core/updater.lua",
@@ -163,14 +183,16 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "d42a6da4e661a8ad0d3ccd4bcda9ce9ca104adea253c1f2260aa92ed307d1cbd",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "4a90f0ca6b59c20a4ad95d0ec69e0cb928f1d331b61cbee7e9d00ade26c51d80",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
         "src/core/tween-movement.lua",
@@ -191,14 +213,16 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "00a3562f32297d74d4fd6945153d6aa3b35722a42b458613643dd60e1851feb0",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "066f1a1d7b9eede7915a171e6f7e8562cf8cf4e8c603bc97e03bed451a8a52ed",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
         "src/games/violence-district.lua",
@@ -207,14 +231,16 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "b2a0ad52e41c3883001272e557d768438c308f3944e866ec9fd63be150dc2b53",
-      "commit": "9b33f4b5a6e682549b4722fe50dc261ec16f0a34",
+      "version": "f512d3a8e6040955efec6f9263c456017fe23fe4f7f8cad3cebb17915e2e6883",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
         "src/core/demon-ui.lua",
         "src/core/ui-kit.lua",
+        "src/core/config-store.lua",
         "src/dephubv2lib.lua",
+        "src/core/redz-icons.lua",
         "src/core/updater.lua",
         "src/core/diagnostics.lua",
         "src/games/aotr.lua",
@@ -227,41 +253,5 @@
       ]
     }
   },
-  "recentUpdates": [
-    {
-      "Version": "9b33f4b",
-      "Date": "2026-10-31T23:48:44-03:00",
-      "Changes": [
-        "\ufeffchore: v0.1.26 -- RedzLib shell and island arrival"
-      ]
-    },
-    {
-      "Version": "2df490c",
-      "Date": "2026-10-31T23:48:41-03:00",
-      "Changes": [
-        "\ufeffRedzLib: resolve icons in-repo; make the bundle verify route build the shell"
-      ]
-    },
-    {
-      "Version": "1620a51",
-      "Date": "2026-10-31T23:48:41-03:00",
-      "Changes": [
-        "\ufeffBlox Fruits: island teleport disarms itself on arrival"
-      ]
-    },
-    {
-      "Version": "88a2f35",
-      "Date": "2026-10-31T23:48:41-03:00",
-      "Changes": [
-        "\ufeffcore: retire the old theme, the shell runs on RedzLib"
-      ]
-    },
-    {
-      "Version": "801e417",
-      "Date": "2026-10-31T23:48:41-03:00",
-      "Changes": [
-        "\ufefftests: drive the shell through RedzLib (harness + render test)"
-      ]
-    }
-  ]
+  "recentUpdates": []
 }

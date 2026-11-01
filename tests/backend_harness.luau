@@ -119,14 +119,17 @@ local function typeof(value)
     if type(value) == "table" and value.__color then return "Color3" end
     if type(value) == "table" and value.__vector then return "Vector3" end
     if type(value) == "table" and value.__cframe then return "CFrame" end
+    -- Instance doubles are plain tables; the engine reports "Instance" for them,
+    -- and features that guard a remote with typeof(x) == "Instance" (the silent
+    -- aim hook does) depend on that. The _props.ClassName tag is the marker.
+    if type(value) == "table" and type(value._props) == "table" and value._props.ClassName then return "Instance" end
     return builtinTypeof(value)
 end
 -- GUI-only members the harness rejects on non-GUI instances (see __newindex).
 -- Position is deliberately absent: it is a real BasePart property.
 local GUI_ONLY_MEMBERS = {Visible = true, BackgroundColor3 = true, TextSize = true, Text = true, ZIndex = true}
 local GUI_CLASSES = {Frame = true, TextButton = true, TextLabel = true, ImageLabel = true, ScrollingFrame = true, ScreenGui = true}
-local methods, instanceMeta = {}, {}
-function instanceMeta:__index(key)
+local methods, instanceMeta = {}, {}function instanceMeta:__index(key)
     -- An own value (set by a feature or by an executor-style hook) wins over
     -- the shared method table, so per-instance overrides are observable.
     local own = self._props[key]
@@ -162,8 +165,15 @@ function instanceMeta:__newindex(key, value)
             error(string.format("%s is not a valid member of %s", tostring(key), tostring(class)), 2)
         end
         self._props[key] = value
+        -- On a Value object (NumberValue/...) the engine raises Changed whenever
+        -- Value is written. Firing it here lets a feature that watches a value
+        -- (the Player tab keeps Stun at 0) react exactly as it does in game.
+        if key == "Value" and self._isValueObject and self.Changed then
+            self.Changed:Fire(value)
+        end
     end
 end
+function instanceMeta:__tostring() return self._props.ClassName end
 function methods:GetChildren() return table.clone(self._children) end
 function methods:GetFullName() return self.Parent and self.Parent:GetFullName().."."..self.Name or self.Name end
 function methods:FindFirstChild(name) for _, child in ipairs(self._children) do if child.Name == name then return child end end end
@@ -191,10 +201,21 @@ function methods:IsDescendantOf(ancestor)
 end
 function methods:GetAttributes() if self.FailRead then error("Simulated read failure") end; return table.clone(self._attributes) end
 function methods:GetAttribute(key) return self._attributes[key] end
+-- Per-key attribute-changed signals, so a feature that re-applies an attribute
+-- when the game writes it back (e.g. keeping UnbreakableAll true) is testable:
+-- SetAttribute fires the signal for that key, exactly like Roblox.
+function methods:GetAttributeChangedSignal(key)
+    self._attrSignals = self._attrSignals or {}
+    local attrSignal = self._attrSignals[key]
+    if not attrSignal then attrSignal = signal(); self._attrSignals[key] = attrSignal end
+    return attrSignal
+end
 function methods:SetAttribute(key, value)
     if self.FailKey == key then self.FailKey = nil; error("Simulated attribute failure") end
     self._attributes[key] = value
     self.WriteCount = (self.WriteCount or 0) + 1
+    local signal = self._attrSignals and self._attrSignals[key]
+    if signal then signal:Fire() end
 end
 function methods:Destroy()
     for _, child in ipairs(self:GetChildren()) do child:Destroy() end
@@ -211,6 +232,21 @@ function methods:InvokeServer(...)
     self.Invoked[#self.Invoked + 1] = {...}
     return nil
 end
+-- The base __namecall the engine always provides: dispatch a method-style call
+-- to the instance's own closure. A feature that installs its own __namecall
+-- (via getrawmetatable(game)) chains to this one as `original`, exactly as the
+-- real executor hook does -- so the hook can rewrite args and still forward.
+-- The current method name lives in a module-level slot the test driver sets,
+-- mirroring the engine's `getnamecallmethod()`.
+local namecallMethod = nil
+function instanceMeta:__namecall(...)
+    local method = namecallMethod
+    local impl = self._props[method]
+    if type(impl) == "function" then return impl(self, ...) end
+    local shared = methods[method]
+    if shared then return shared(self, ...) end
+    error(tostring(method) .. " is not a valid member of " .. tostring(self._props.ClassName), 2)
+end
 local Instance = {}
 -- Every double created, so executor-style hooking can locate the Instance that
 -- owns a method closure (hookfunction takes only the function, not the owner).
@@ -225,6 +261,16 @@ function Instance.new(class)
     object.ChildRemoved = signal()
     object.DescendantAdded = signal()
     object.DescendantRemoving = signal()
+    -- Value objects (NumberValue/StringValue/...) and every double expose a
+    -- Changed signal. On a real Value object the engine fires it when Value
+    -- changes; here the __newindex metamethod below keeps `Value` in sync and
+    -- fires the same signal, so a feature that watches a NumberValue (e.g.
+    -- keeping Stun at 0) binds and re-applies exactly like it does in game.
+    object.Changed = signal()
+    if class == "NumberValue" or class == "IntValue" or class == "StringValue" or class == "BoolValue" or class == "ObjectValue" then
+        object._props.Value = 0
+    end
+    object._isValueObject = (class == "NumberValue" or class == "IntValue" or class == "StringValue" or class == "BoolValue" or class == "ObjectValue")
     -- Remote event doubles expose the client/server signals features connect to.
     -- Each remote also gets its OWN FireServer/InvokeServer closure (not the
     -- shared table method) so an executor-style hook can be routed back to the
@@ -380,12 +426,44 @@ local function NewWindow()
         return handle
     end
     function library:AddSlider(_, label, min, max, default, _, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Callback = callback}
+        library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Value = default, Callback = callback}
         return {Kind = "slider", Value = default}
     end
-    function library:AddDropdown(_, label, options, index, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback}
-        return {Kind = "dropdown", Value = options[index]}
+    -- The 4th arg is the Default VALUE (the real library's `Default = <option>`),
+    -- not an index: a single-select dropdown's Value is the chosen option string.
+    -- An unknown/nil default falls back to the first option, like the library.
+    function library:AddDropdown(_, label, options, default, callback, multi)
+        local initial = default
+        if multi ~= true and type(initial) ~= "string" then initial = options[1] end
+        local handle = {Kind = "dropdown", Value = initial, Options = options, MultiSelect = multi == true, Callback = callback}
+        library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback, MultiSelect = multi == true, Handle = handle}
+        -- Single-select: :SetValue moves the chosen option and fires the callback,
+        -- the way RedzLib's dropdown does when a saved config restores a choice.
+        function handle:SetValue(value)
+            if multi == true then return nil end
+            if self.Value == value then return nil end
+            self.Value = value
+            if self.Callback then self.Callback(self.Value) end
+            return self.Value
+        end
+        -- A multi-select dropdown in RedzLib hands its callback a SET table of the
+        -- selected names. Model that, plus the array-ifying the adapter does, so
+        -- tests can drive a selection and see the backend's array contract.
+        local selected = {}
+        if multi == true and type(default) == "table" then
+            for _, name in ipairs(default) do selected[name] = true end
+        end
+        function handle:Select(name, isSelected)
+            if multi ~= true then return nil end
+            selected[tostring(name)] = isSelected ~= false
+            if self.Callback then
+                local snapshot = {}
+                for option, on in pairs(selected) do if on then snapshot[option] = true end end
+                self.Callback(snapshot)
+            end
+            return selected
+        end
+        return handle
     end
     function library:AddButton(_, label, callback)
         library._Controls[#library._Controls + 1] = {Kind = "button", Label = label, Callback = callback}
@@ -438,7 +516,7 @@ local function NewWindow()
         handle.AddSection = function(_, title) return library:CreateSection(name, opt(title, "Title") or title) end
         handle.AddToggle = function(_, o) return library:AddToggle(nil, opt(o, "Name"), opt(o, "Default"), opt(o, "Callback")) end
         handle.AddSlider = function(_, o) return library:AddSlider(nil, opt(o, "Name"), opt(o, "Min"), opt(o, "Max"), opt(o, "Default"), opt(o, "Increment"), opt(o, "Callback")) end
-        handle.AddDropdown = function(_, o) return library:AddDropdown(nil, opt(o, "Name"), opt(o, "Options"), opt(o, "Default"), opt(o, "Callback")) end
+        handle.AddDropdown = function(_, o) return library:AddDropdown(nil, opt(o, "Name"), opt(o, "Options"), opt(o, "Default"), opt(o, "Callback"), opt(o, "MultiSelect")) end
         handle.AddButton = function(_, o) return library:AddButton(nil, opt(o, "Name"), opt(o, "Callback")) end
         handle.AddTextBox = function(_, o) return library:AddTextbox(nil, opt(o, "Name"), opt(o, "Default"), opt(o, "Callback")) end
         handle.AddParagraph = function(_, a, b)
@@ -459,6 +537,10 @@ end
 -- as the window; tests introspect `ui.Library._Tabs/_Categories/_Controls/_STATE`,
 -- so the export forwards those to the single instance the window built.
 return setmetatable({
+    -- RedzLib reads the starting window size from Library.Default.UISize, which
+    -- the adapter writes before MakeWindow. The double carries the same table so
+    -- that write is exercised (and a test can assert the applied size).
+    Default = { Theme = "Darker", UISize = UDim2.fromOffset(550, 380) },
     MakeWindow = function(_, options) return NewWindow() end
 }, {
     __index = function(_, key)
@@ -474,8 +556,20 @@ local function sandbox(placeId, gameId)
     player.Idled = signal()
     player.ChildAdded, player.ChildRemoved = signal(), signal()
     local players = {LocalPlayer=player, PlayerAdded=signal(), PlayerRemoving=signal()}
-    function players:GetPlayers() return {player} end
-    function players:FindFirstChild(name) if player.Name == name then return player end end
+    -- Test-only: register another player (with a character holding a
+    -- HumanoidRootPart) so features that scan players:GetPlayers() -- e.g. silent
+    -- aim's nearest-target search -- have someone to find. The entry carries the
+    -- distance helper a test sets up via AddPlayer below.
+    players.Extra = {}
+    function players:GetPlayers()
+        local list = {player}
+        for _, extra in ipairs(self.Extra) do list[#list + 1] = extra end
+        return list
+    end
+    function players:FindFirstChild(name)
+        if player.Name == name then return player end
+        for _, extra in ipairs(self.Extra) do if extra.Name == name then return extra end end
+    end
     function players:GetPlayerFromCharacter(character)
         for _, candidate in ipairs(players:GetPlayers()) do if candidate.Character == character then return candidate end end
     end
@@ -502,9 +596,14 @@ local function sandbox(placeId, gameId)
     for _, name in ipairs({"Button1Down", "Button1Up", "MouseMove", "KeyPress", "CaptureController", "ClickButton1", "MoveMouseRel"}) do
         vuser[name] = function() end
     end
+    -- Lighting is a real Instance double, not a plain table: features read
+    -- properties off it (Brightness, GlobalShadows, ...) and a plain {} would
+    -- error on that read. Instance doubles store arbitrary props in _props.
+    local lighting = Instance.new("Lighting")
+    lighting.GlobalShadows = true
     local services = {Players=players, RunService=run, UserInputService=input, TeleportService=teleport,
         TweenService=tween, VirtualInputManager=vim, VirtualUser=vuser,
-        Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting={},
+        Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting=lighting,
         ReplicatedStorage=Instance.new("ReplicatedStorage"), TextChatService=Instance.new("TextChatService"), HttpService={}}
     -- Minimal JSON codec for config round-trips: the config is flat scalars plus
     -- at most one level of nesting (keys, bounty), which is all this needs to
@@ -601,7 +700,7 @@ local function sandbox(placeId, gameId)
     -- Workspace physics/query surface used by prediction and movement features.
     services.Workspace.Gravity = 196.2
     function services.Workspace:Raycast() return nil end
-    local context = {State={}, Logs={}, Requests={}, Responses={}, Deferred={}, Spawned={}, Services=services, Player=player, Instances=INSTANCES}
+    local context = {State={}, Logs={}, Requests={}, Responses={}, Deferred={}, Spawned={}, Services=services, Player=player, Instances=INSTANCES, NamecallMethod=nil}
     local game = {PlaceId=placeId or 1, GameId=gameId or 2, JobId="job"}
     function game:GetService(name) return assert(services[name], "Unexpected service " .. name) end
     function game:IsLoaded() return true end
@@ -663,6 +762,19 @@ local function sandbox(placeId, gameId)
             handle.Instance._props[handle.Name] = handle.Original
             return handle.Original
         end,
+        -- Metamethod hooking, as an executor exposes it. Instances share ONE
+        -- metatable (instanceMeta), so getrawmetatable(game) hands it back and a
+        -- __namecall installed there sees every method-style call -- exactly the
+        -- surface the silent aim hook rewrites. setreadonly is advisory here (the
+        -- double is never actually locked), and newcclosure returns the function
+        -- unchanged, which is enough for the hook's behaviour to be observable.
+        getrawmetatable=function(target)
+            if target == game then return instanceMeta end
+            return getmetatable(target)
+        end,
+        setreadonly=function() return true end,
+        newcclosure=function(fn) return fn end,
+        getnamecallmethod=function() return namecallMethod end,
         task={wait=function() end, cancel=function() end,
             defer=function(fn, ...) context.Deferred[#context.Deferred + 1] = {Fn=fn, Args={...}} end,
             -- task.delay is scheduled as deferred work so tests can run it with
@@ -703,6 +815,25 @@ local function sandbox(placeId, gameId)
         instance._props[name] = fn
         return fn
     end
+    -- Register another player with a live character at `position`, so a feature
+    -- that scans players (silent aim's nearest target) can find it. Returns the
+    -- Player; `context:RemovePlayers()` clears them between tests.
+    function context:AddPlayer(name, position)
+        local target = Instance.new("Player")
+        target.Name = name
+        target.CharacterAdded, target.CharacterRemoving = signal(), signal()
+        local character = Instance.new("Model"); character.Name, character.Parent = "Character", target
+        local hrp = Instance.new("Part"); hrp.Name, hrp.Parent = "HumanoidRootPart", character
+        hrp.Position = position or Vector3.new(0, 0, 0)
+        local humanoid = Instance.new("Humanoid"); humanoid.Parent = character
+        humanoid.Health = 100
+        target.Character = character
+        context.Services.Players.Extra[#context.Services.Players.Extra + 1] = target
+        return target, character
+    end
+    function context:RemovePlayers()
+        context.Services.Players.Extra = {}
+    end
     function context:FlushDeferred()
         local pending = self.Deferred
         self.Deferred = {}
@@ -715,6 +846,26 @@ local function sandbox(placeId, gameId)
         local pending = self.Spawned
         self.Spawned = {}
         for _, call in ipairs(pending) do call.Fn(unpack(call.Args)) end
+    end
+    -- Emulate the client's method-style dispatch for a remote: `remote:FireServer(...)`.
+    -- In the real client that goes through the shared instance metatable's
+    -- __namecall. So if a feature installed a __namecall hook (the silent aim
+    -- does, via getrawmetatable(game)), it is the hook that runs and the remote
+    -- sees exactly what it forwarded -- which is how a test proves the position
+    -- was rewritten. Without a hook, the remote's own closure runs, as normal.
+    -- Returns nothing; inspect `remote.Fired` / `remote.Invoked` for what landed.
+    function context:FireRemote(remote, method, ...)
+        local hook = instanceMeta.__namecall
+        if type(hook) == "function" then
+            namecallMethod = method
+            local ok, err = pcall(hook, remote, ...)
+            namecallMethod = nil
+            if not ok then error(err, 2) end
+            return
+        end
+        local impl = remote._props[method]
+        assert(type(impl) == "function", "remote has no " .. tostring(method))
+        return impl(remote, ...)
     end
     function context:Provide(path, value)
         self.Responses[path] = 'return _provided[' .. string.format('%q', path) .. ']'
@@ -757,6 +908,11 @@ local function sandbox(placeId, gameId)
         return out
     end
     env.appendfile = function(name, data) fs[name] = (fs[name] or "") .. tostring(data) end
+    -- queue_on_teleport: executors use it to re-run a script after a teleport.
+    -- The auto-execute toggle records the queued script so a test can assert the
+    -- self re-exec line was handed to it (and that disabling clears it).
+    context.QueuedTeleportScript = nil
+    env.queue_on_teleport = function(script) context.QueuedTeleportScript = script end
     context.Env = env
     context.Sources = sources
     -- Core modules that the loader always fetches are served straight from the

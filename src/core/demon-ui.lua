@@ -17,9 +17,12 @@
 --
 -- Stable API handed to every backend through env.__DEPHUB.UI:
 --   UI:CreateCategory(name, icon)          -- groups tabs by purpose
---   UI:CreateTab(name, category)           -- returns a tab wrapper or nil
+--   UI:CreateTab(name, category, icon)     -- returns a tab wrapper or nil; icon
+--                                          --   is a Unicode emoji (or asset id)
 --   tab:CreateSection(title, column)       -- "Left" (default) or "Right"
 --   section:CreateToggle/Slider/Dropdown/Button/Input/Paragraph(...)
+--   section:CreateMultiDropdown(label, options, initial, callback)  -- multi-select;
+--                                          --   callback gets an array of names
 --   section:CreateRow() / section:CreateStack()   -- grouping handles
 --   UI:Notify(title, message, kind)
 --   UI:SetCurrentSea(sea)                  -- kept for compatibility; no-op filter
@@ -30,10 +33,16 @@ DemonUI.__index = DemonUI
 
 -- Window options shared by every game so the interface is identical everywhere.
 -- Changing anything here changes it for all games at once.
+--
+-- Size is a compact {width, height} in pixels. RedzLib reads the starting window
+-- size from `Library.Default.UISize` (a UDim2) -- it does NOT take a Size option
+-- in MakeWindow -- and clamps it to width 430..1000, height 200..500. The adapter
+-- writes the UDim2 there before building the window, so 600x420 is applied for
+-- real instead of being declared and dropped (which is what the old adapter did).
 local WINDOW_OPTIONS = {
     Title = "DepHub",
     SubTitle = "DepHub",
-    Size = UDim2.fromOffset(900, 580),
+    Size = { 600, 420 },
     -- The global open/close key. RedzLib has no key toggle of its own, so the
     -- adapter binds this: N by default, rebindable per run through `options`.
     ToggleKey = Enum.KeyCode.N
@@ -145,6 +154,71 @@ local function makeSection(adapter, tabHandle, title)
         })
     end
 
+    -- Multi-select dropdown: RedzLib supports it natively
+    -- (`AddDropdown{ MultiSelect = true }`). The callback receives a SET table
+    -- ({ "Dragon" = true }) -- the DepHub contract hands back a plain ARRAY of the
+    -- selected names instead, in the option order, so backends never depend on
+    -- the library's internal shape. `initial` is an array of pre-selected names.
+    -- The returned handle also exposes `:Set(names)` to restore a saved selection
+    -- (it re-adds the names, which is how RedzLib selects programmatically).
+    function section:CreateMultiDropdown(label, options, initial, callback)
+        local list = {}
+        for _, option in ipairs(type(options) == "table" and options or {}) do
+            list[#list + 1] = tostring(option)
+        end
+        if #list == 0 then list = { "None" } end
+
+        -- The selected set, kept here so an array can be rebuilt for the callback
+        -- and a saved selection restored, without reading the library's internals.
+        local selected = {}
+        local order = list
+        local function asArray()
+            local out = {}
+            for _, name in ipairs(order) do
+                if selected[name] then out[#out + 1] = name end
+            end
+            return out
+        end
+
+        local initialSet = {}
+        for _, name in ipairs(type(initial) == "table" and initial or {}) do
+            initialSet[tostring(name)] = true
+            selected[tostring(name)] = true
+        end
+
+        local handle = tabHandle:AddDropdown({
+            Name = tostring(label),
+            Options = list,
+            Default = initialSet,
+            MultiSelect = true,
+            Callback = function(value)
+                -- RedzLib passes the selected set; rebuild the ordered array from
+                -- it, keep it fresh, and hand the array to the caller.
+                selected = {}
+                if type(value) == "table" then
+                    for name, isSelected in pairs(value) do
+                        if isSelected then selected[tostring(name)] = true end
+                    end
+                end
+                if callback then callback(asArray()) end
+            end
+        })
+
+        -- The adapter's own restore path. The library has no SetValue for a
+        -- multi-select dropdown, so restore is "clear then re-add each name".
+        if handle and type(handle) == "table" then
+            handle.Set = function(_, names)
+                pcall(function() handle:Clear() end)
+                selected = {}
+                for _, name in ipairs(type(names) == "table" and names or {}) do
+                    selected[tostring(name)] = true
+                    pcall(function() handle:Add(tostring(name)) end)
+                end
+            end
+        end
+        return handle
+    end
+
     function section:CreateButton(label, callback)
         return tabHandle:AddButton({
             Name = tostring(label),
@@ -243,26 +317,33 @@ local function installDashboardBuilders(adapter, library)
             local metrics = record.Control:AddParagraph("Performance", "Session started")
             local startedAt = os.clock()
             local runService = Services.RunService
-            if runService and type(runService.RenderStepped) == "table" and type(runService.RenderStepped.Connect) == "function" then
+            -- RenderStepped e um RBXScriptSignal, NAO uma tabela Lua: a checagem
+            -- antiga (type(...) == "table") era falsa no Roblox e o medidor de
+            -- FPS nunca conectava. A propria conexao protegida por pcall e a
+            -- validacao -- se o sinal nao existir/conectar, nao ha medidor.
+            if runService then
                 local lastFrame = os.clock()
                 local frames = 0
                 local accum = 0
-                adapter._metricsConnection = runService.RenderStepped:Connect(function(deltaTime)
-                    local now = os.clock()
-                    frames = frames + 1
-                    accum = accum + (tonumber(deltaTime) or (now - lastFrame))
-                    lastFrame = now
-                    if accum >= 1 then
-                        local fps = math.floor(frames / accum)
-                        local elapsed = now - startedAt
-                        pcall(function()
-                            metrics:SetTitle(string.format("Performance  ·  %d FPS", fps))
-                            metrics:SetDescription(string.format("Session %02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), math.floor(elapsed % 60)))
-                        end)
-                        frames = 0
-                        accum = 0
-                    end
+                local ok, connection = pcall(function()
+                    return runService.RenderStepped:Connect(function(deltaTime)
+                        local now = os.clock()
+                        frames = frames + 1
+                        accum = accum + (tonumber(deltaTime) or (now - lastFrame))
+                        lastFrame = now
+                        if accum >= 1 then
+                            local fps = math.floor(frames / accum)
+                            local elapsed = now - startedAt
+                            pcall(function()
+                                metrics:SetTitle(string.format("Performance  ·  %d FPS", fps))
+                                metrics:SetDescription(string.format("Session %02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), math.floor(elapsed % 60)))
+                            end)
+                            frames = 0
+                            accum = 0
+                        end
+                    end)
                 end)
+                if ok and connection then adapter._metricsConnection = connection end
             end
             return metrics
         end
@@ -276,6 +357,17 @@ end
 function DemonUI.new(options)
     options = options or {}
     local library = loadLibrary()
+
+    -- Apply the compact window size through RedzLib's real API: MakeWindow takes
+    -- its starting size from `Library.Default.UISize`, which is a UDim2 (offset).
+    -- A `Size` argument to MakeWindow is ignored, so writing the UDim2 here is
+    -- what actually resizes the panel. RedzLib clamps it to width 430..1000,
+    -- height 200..500. Accept {w, h} pixels from options or the default.
+    local size = options.Size or WINDOW_OPTIONS.Size
+    if type(size) == "table" and type(size[1]) == "number" and type(size[2]) == "number"
+        and type(library.Default) == "table" then
+        library.Default.UISize = UDim2.fromOffset(size[1], size[2])
+    end
 
     local window = library:MakeWindow({
         Title = options.Name or WINDOW_OPTIONS.Title,
@@ -299,11 +391,11 @@ function DemonUI.new(options)
     -- `window.Library:CreateDashboardBanner(...)` calls resolve.
     installDashboardBuilders(self, library)
 
-    -- Open/close the panel without the keyboard. Some executers deliver
-    -- InputBegan with gameProcessed=true, so the shell ignores the toggle key on
-    -- purpose; this global flips the window's visibility directly and doubles as
-    -- a probe (if __DEPHUB_TOGGLE() works but the key does not, it is the
-    -- executor). RedzLib has no Toggle() of its own, so the adapter provides it.
+    -- The global open/close probe: flips the window without the keyboard (some
+    -- executers deliver InputBegan with gameProcessed=true). If __DEPHUB_TOGGLE()
+    -- works but the key does not, it is the executor. RedzLib's window has no
+    -- Toggle() of its own (only Minimize(), which flips the main frame's
+    -- Visible), so the adapter exposes it.
     function library:Toggle()
         if self.Destroyed then return false end
         window:Minimize()
@@ -317,23 +409,41 @@ function DemonUI.new(options)
         return true
     end
 
-    -- The global open/close key (N by default). RedzLib has no key binding, so
-    -- the adapter owns it: a keyboard InputBegan that is not game-processed (so
-    -- typing in chat never toggles) flips the window. The connection is kept so
-    -- Destroy can drop it.
+    -- Open/close key (N by default), bound through the LIBRARY'S OWN toggle: the
+    -- RedzLib window exposes NewMinimizer(keyCode), which connects the key and
+    -- calls the window Minimize() (it flips the main frame's Visible). The shell
+    -- used to hand-roll a UserInputService.InputBegan just for this; using the
+    -- library's own path keeps the behaviour identical to the library's.
     self.ToggleKey = options.ToggleKey or WINDOW_OPTIONS.ToggleKey
     do
-        local ok, input = pcall(function() return game:GetService("UserInputService") end)
-        if ok and input and type(input.InputBegan) == "table" and type(input.InputBegan.Connect) == "function" then
-            self._toggleKeyConnection = input.InputBegan:Connect(function(io, gameProcessed)
-                if gameProcessed then return end
-                if self.Destroyed then return end
-                if io.UserInputType ~= Enum.UserInputType.Keyboard then return end
-                if io.KeyCode == self.ToggleKey then
-                    pcall(function() self.Library:Toggle() end)
-                end
-            end)
+        local minimizer = nil
+        local ok, result = pcall(function()
+            if type(window.NewMinimizer) == "function" then
+                return window:NewMinimizer(self.ToggleKey)
+            end
+            return nil
+        end)
+        if ok and result ~= nil then
+            minimizer = result
+        else
+            -- Fallback: only if the library ever drops NewMinimizer. Same shape as
+            -- before (a non-game-processed keyboard press flips the window).
+            local okService, input = pcall(function() return game:GetService("UserInputService") end)
+            if okService and input then
+                local okConnect, connection = pcall(function()
+                    return input.InputBegan:Connect(function(io, gameProcessed)
+                        if gameProcessed then return end
+                        if self.Destroyed then return end
+                        if io.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                        if io.KeyCode == self.ToggleKey then
+                            pcall(function() self.Library:Toggle() end)
+                        end
+                    end)
+                end)
+                if okConnect and connection then self._toggleKeyConnection = connection end
+            end
         end
+        self._minimizer = minimizer
     end
 
     return self
@@ -354,7 +464,7 @@ function DemonUI:CreateCategory(name, icon)
     return true
 end
 
-function DemonUI:CreateTab(name, category)
+function DemonUI:CreateTab(name, category, icon)
     if self.Destroyed then return nil end
     name = tostring(name)
     category = tostring(category or DEFAULT_CATEGORY)
@@ -368,7 +478,13 @@ function DemonUI:CreateTab(name, category)
     local title = name
     if self._tabByName[title] then title = name .. " · " .. category end
 
-    local ok, tabHandle = pcall(function() return self.Window:MakeTab({ Title = title }) end)
+    -- The icon is a catalogue NAME (e.g. "rocket") the library resolves to a real
+    -- asset id, or a raw asset id. A name that is not in the catalogue resolves to
+    -- nothing, and the tab renders without an icon; nil means no icon too.
+    local options = { Title = title }
+    if type(icon) == "string" and #icon > 0 then options.Icon = icon end
+
+    local ok, tabHandle = pcall(function() return self.Window:MakeTab(options) end)
     if not ok or type(tabHandle) ~= "table" then
         return nil, tostring(tabHandle)
     end

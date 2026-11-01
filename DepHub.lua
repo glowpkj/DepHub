@@ -24,7 +24,7 @@ local HOST_TEMPLATES = {
     "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.1.26"
+local VERSION = "0.1.27"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -174,6 +174,11 @@ env.__DEPHUB.SourceBaseURL = env.__DEPHUB.SourceBaseURL or BASE_URL
 -- Published so each backend can make its own module URLs unique per session and
 -- avoid an executor serving a cached older revision (see CACHE_BUST above).
 env.__DEPHUB.SourceCacheBust = CACHE_BUST
+-- The source ref the session was launched with (the branch/ref argument). A
+-- backend re-executing itself (Auto execute via queue_on_teleport) re-reads this
+-- to relaunch the SAME build, instead of guessing. Kept on __DEPHUB next to
+-- SourceBaseURL so a backend can read both from one place.
+env.__DEPHUB.SourceRef = env.__DEPHUB.SourceRef or sourceRef
 env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 
@@ -511,6 +516,7 @@ Diag:Module("demon-ui window", true, "janela criada")
 log("Window built; loading backend...")
 
 env.__DEPHUB.DemonUI = window
+
 env.__DEPHUB.UI = window
 
 -- The UI kit every backend uses to build its part of the shell in the standard
@@ -537,7 +543,7 @@ end
 -- non-fatal: a dashboard that cannot be built must never stop the hub loading.
 local function buildDashboardTab()
     if type(window.CreateTab) ~= "function" or type(window.Library) ~= "table" then return false end
-    local ok, record = pcall(function() return window:CreateTab("Dashboard", "General") end)
+    local ok, record = pcall(function() return window:CreateTab("Dashboard", "General", "barchart") end)
     if not ok or type(record) ~= "table" or type(record.Name) ~= "string" then
         Diag:Note("Dashboard: CreateTab falhou: " .. tostring(record))
         return false
@@ -598,7 +604,7 @@ end
 if not knownTarget then
     Diag:Note("Unknown game: no backend loaded (universal disabled).")
     pcall(function()
-        local tab = window:CreateTab("Unsupported")
+        local tab = window:CreateTab("Unsupported", "General", "shieldclose")
         if tab then
             local section = tab:CreateSection("State", "Left")
             if section then
@@ -684,7 +690,8 @@ env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
 -- The one line the console sees on a healthy load.
 log("Backend loaded. DepHub v" .. VERSION .. " ready.")
-pcall(print, "DepHub v" .. VERSION)
+
+print("DepHub v" .. VERSION)
 
 task.defer(function()
     if env[STATE_KEY] ~= session or session.status ~= "success" then return end
