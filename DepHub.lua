@@ -494,7 +494,7 @@ local okDemon, demonModule = loadModule("src/core/demon-ui.lua", false)
 Diag:RegisterModule("src/core/demon-ui.lua")
 if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "function" then
     Diag:Module("src/core/demon-ui.lua", false, tostring(demonModule))
-    return fail("DemonOfDarknessUI nao carregou: " .. tostring(demonModule))
+    return fail("The UI shell did not load: " .. tostring(demonModule))
 end
 Diag:Module("src/core/demon-ui.lua", true, "loaded")
 log("UI module loaded; building window...")
@@ -505,7 +505,7 @@ local okWindow, window = pcall(demonModule.new, {
 })
 if not okWindow or type(window) ~= "table" then
     Diag:Module("demon-ui window", false, tostring(window))
-    return fail("Could not start DemonOfDarknessUI: " .. tostring(window))
+    return fail("Could not build the UI window: " .. tostring(window))
 end
 Diag:Module("demon-ui window", true, "janela criada")
 log("Window built; loading backend...")

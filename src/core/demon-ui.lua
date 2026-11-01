@@ -33,7 +33,10 @@ DemonUI.__index = DemonUI
 local WINDOW_OPTIONS = {
     Title = "DepHub",
     SubTitle = "DepHub",
-    Size = UDim2.fromOffset(900, 580)
+    Size = UDim2.fromOffset(900, 580),
+    -- The global open/close key. RedzLib has no key toggle of its own, so the
+    -- adapter binds this: N by default, rebindable per run through `options`.
+    ToggleKey = Enum.KeyCode.N
 }
 
 -- The one category every game has. Backends that want more (the Blox Fruits
@@ -314,6 +317,25 @@ function DemonUI.new(options)
         return true
     end
 
+    -- The global open/close key (N by default). RedzLib has no key binding, so
+    -- the adapter owns it: a keyboard InputBegan that is not game-processed (so
+    -- typing in chat never toggles) flips the window. The connection is kept so
+    -- Destroy can drop it.
+    self.ToggleKey = options.ToggleKey or WINDOW_OPTIONS.ToggleKey
+    do
+        local ok, input = pcall(function() return game:GetService("UserInputService") end)
+        if ok and input and type(input.InputBegan) == "table" and type(input.InputBegan.Connect) == "function" then
+            self._toggleKeyConnection = input.InputBegan:Connect(function(io, gameProcessed)
+                if gameProcessed then return end
+                if self.Destroyed then return end
+                if io.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                if io.KeyCode == self.ToggleKey then
+                    pcall(function() self.Library:Toggle() end)
+                end
+            end)
+        end
+    end
+
     return self
 end
 
@@ -436,6 +458,10 @@ end
 function DemonUI:Destroy()
     if self.Destroyed then return end
     self.Destroyed = true
+    if self._toggleKeyConnection then
+        pcall(function() self._toggleKeyConnection:Disconnect() end)
+        self._toggleKeyConnection = nil
+    end
     if self._metricsConnection then
         pcall(function() self._metricsConnection:Disconnect() end)
         self._metricsConnection = nil

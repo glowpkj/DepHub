@@ -62,7 +62,7 @@ for (const file of [path.join(root, 'DepHub.lua'), ...luaFiles(path.join(root, '
 // library markers must stay gone.
 for (const file of luaFiles(path.join(root, 'src/games'))) {
   const source = fs.readFileSync(file, 'utf8');
-  if (/CreateUI|MountUI|CreatePrompt|library\/|frontend\.lua|Library\.new|dephubCompact|dephubViolenceDistrict/.test(source)) {
+  if (/CreateUI|MountUI|CreatePrompt|library\/|frontend\.lua|Library\.new|dephubCompact|dephubViolenceDistrict|demon-theme|ui\/theme/.test(source)) {
     throw new Error('Retired frontend/library dependency remains in ' + file);
   }
 }

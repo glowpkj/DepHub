@@ -121,11 +121,30 @@ Regras da API:
 - VStack/HStack (CreateRow/CreateStack): agrupe SO o que faz sentido junto --
   o toggle e o slider que ele comanda, ou os switches da MESMA funcionalidade.
   Use no maximo 2 controles por linha: 3+ deixa o label do toggle ilegivel
-  (ele trunca). Onde a secao for um fluxo vertical natural, deixe empilhado.
+  (ele trunca). Onde a secao for um fluxo vertical natural, deixe empilhar.
+  NOTA (RedzLib): o RedzLib nao tem container lado a lado, entao CreateRow/
+  CreateStack hoje sao um handle que repassa os builders para a MESMA aba -- os
+  controles continuam sendo criados, so ficam empilhados. Toda chamada nos
+  backends continua valida; quando o RedzLib ganhar HStack, so o adapter muda.
 - A secao ENCOLHE ate o conteudo: nao existe sobra embaixo. A altura e o
   `UIListLayout.AbsoluteContentSize.Y` do corpo (que JA inclui o UIPadding do
   corpo) -- nao some nada a mais (o antigo `+24` criava uma faixa vazia embaixo
   do ultimo controle; bug real). Ver secao 8.
+
+BIBLIOTECA DE UI (RedzLib):
+- A GUI e renderizada pelo RedzLib vendored em src/dephubv2lib.lua (arquivo no
+  repo, editavel; NAO e baixado de terceiros). src/core/demon-ui.lua e o
+  ADAPTER: ele carrega o RedzLib e expoe a API do shell acima, mapeando cada
+  chamada para a chamada RedzLib equivalente. Os backends nunca falam com o
+  RedzLib direto.
+- O RedzLib nao tem o conceito de "categoria" (o DepHub agrupa abas por
+  finalidade): o adapter guarda o registro do grupo, e a aba continua expondo
+  `tab.Category`. Tambem nao tem CreateDashboardBanner/CreatePerformanceDashboard
+  nem Toggle() -- o adapter os fornece (paragrafo de saudacao/metricas e
+  `Window:Minimize()`), respeitando a assinatura que o loader ja chamava.
+- `Tab:AddSection(titulo)` do RedzLib e so um cabecalho visual (recebe string e
+  devolve o cabecalho); os controles vao para a ABA. O wrapper de secao do
+  adapter repassa os builders para a aba, o que da o mesmo resultado visual.
 
 Tecla de abrir/fechar: o padrao global e N (Enum.KeyCode.N), definido em
 src/core/demon-ui.lua (WINDOW_OPTIONS.ToggleKey) e no default do construtor do
@@ -465,9 +484,11 @@ UI EM INGLES (regra permanente):
 
 TECLA DE ABRIR/FECHAR = N:
 - Padrao global do shell em src/core/demon-ui.lua (WINDOW_OPTIONS.ToggleKey =
-  Enum.KeyCode.N) e default do construtor do tema (constructor.luau:
-  opts.ToggleKey or Enum.KeyCode.N). Onde loader/backend nao passam ToggleKey,
-  o default e N. O usuario pode trocar em runtime pela overlay de keybinds.
+  Enum.KeyCode.N). O adapter liga a tecla ao UserInputService (InputBegan): o
+  RedzLib nao tem binding proprio, entao quem fecha/abre e o
+  `self.Library:Toggle()` -> `Window:Minimize()`. Onde loader/backend nao passam
+  ToggleKey, o default e N. O usuario pode trocar em runtime pela overlay de
+  keybinds.
 
 MIGRACAO PARA CATEGORIAS (concluida):
 - Todos os backends organizam por CATEGORIA de finalidade

@@ -124,7 +124,8 @@ function walk(dir) {
 }
 walk(path.join(root, 'src/games'));
 
-for (const removed of ['src/ui', 'src/frontend', 'src/core/panel-host.lua', 'src/core/theme.lua', 'src/core/ui-guard.lua']) {
+for (const removed of ['src/ui', 'src/frontend', 'src/core/panel-host.lua', 'src/core/theme.lua', 'src/core/ui-guard.lua',
+  'src/core/ui', 'src/core/ui/theme', 'src/core/ui/demon-theme.luau', 'tools/split-demon-theme.js']) {
   if (exists(removed)) fail('Removed frontend code still exists: ' + removed);
 }
 
