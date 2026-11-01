@@ -664,19 +664,22 @@ do
     check(feature.TargetName == "NearTarget", "escolhe o jogador mais proximo")
 
     -- COM alvo: o remote sai com a posicao do alvo no slot 2, em vez da que o
-    -- jogo mandou. E o coracao do silent aim. O slot 2 e uma POSICAO (Vector3),
-    -- como uma skill real manda -- so assim o hook reescreve.
+    -- jogo mandou. E o coracao do silent aim -- comportamento IDENTICO ao script
+    -- original v3.4: reescreve qualquer slot 2 que nao seja booleano enquanto ha
+    -- alvo e o aim nao esta em excecao.
     local skillPosition = Vector3.new(5, 0, 5)
     ctx:FireRemote(attack, "FireServer", skillPosition)
     check(tostring(attack) == "RemoteEvent", "tostring de um remote devolve o nome da classe")
     check(attack.Fired ~= nil and #attack.Fired == 1, "o remote registrou um disparo")
     check(attack.Fired[1][1] == near.Character:FindFirstChild("HumanoidRootPart").Position, "a posicao enviada foi trocada pela do alvo")
 
-    -- BLINDAGEM DA CAMERA: uma chamada com o slot 2 que NAO e posicao (ex.: o
-    -- que a camera manda quando encosta numa part) passa intacta -- nao tira o
-    -- jogador do character.
-    ctx:FireRemote(attack, "FireServer", "nao-e-posicao")
-    check(attack.Fired[#attack.Fired][1] == "nao-e-posicao", "um slot 2 que nao e posicao passa intacto (camera/character nao quebram)")
+    -- Sem alvo NAO reescreve: a chamada sai intacta (o original so troca quando
+    -- Playersaimbot/TargetPosition existe). Um booleano no slot 2 tambem passa.
+    local noTargetPosition = Vector3.new(7, 7, 7)
+    feature.TargetPosition = nil
+    ctx:FireRemote(attack, "FireServer", noTargetPosition)
+    check(attack.Fired[#attack.Fired][1] == noTargetPosition, "sem alvo a posicao sai intacta")
+    feature:_SelectStep()
 
     -- O alvo se move: o proximo passo le a posicao nova.
     near.Character:FindFirstChild("HumanoidRootPart").Position = Vector3.new(120, 5, 0)

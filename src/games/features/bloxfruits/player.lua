@@ -65,6 +65,8 @@ function Feature.new(options)
     -- Levantado enquanto a PROPRIE feature escreve um atributo/value: os vigias
     -- de "manter ligado" so re-aplicam quando o JOGO tenta desfazer a escolha.
     self._SelfWrite = false
+    -- O Stun cujo Changed ja esta conectado (estado fora da instance).
+    self._StunWatched = nil
     -- O character atual + as conexoes dele (re-bind no respawn).
     self.Character = nil
     self.Connections = {}
@@ -127,10 +129,12 @@ function Feature:_ApplyStun(character)
     self:_WatchStun(stun)
 end
 
--- Reconecta o Changed do Stun uma vez por instance (marca com StunWatched).
+-- Reconecta o Changed do Stun uma vez por instance. O estado fica num campo do
+-- proprio objeto (nao na instance: escrever campo numa Instance real levanta
+-- "StunWatched is not a valid member of NumberValue").
 function Feature:_WatchStun(stun)
-    if stun.StunWatched then return end
-    stun.StunWatched = true
+    if self._StunWatched == stun then return end
+    self._StunWatched = stun
     self.Connections[#self.Connections + 1] = stun.Changed:Connect(function()
         -- O guarda corta o eco da propria escrita (que dispara Changed de novo);
         -- so a escrita do jogo (que nao vem com o guarda) e corrigida pra 0.
@@ -188,6 +192,7 @@ function Feature:_Unbind()
     end
     self.Connections = {}
     self.Character = nil
+    self._StunWatched = nil
 end
 
 -- --- Controles (chamados pelo backend) --------------------------------------

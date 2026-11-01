@@ -11297,6 +11297,8 @@ function Feature.new(options)
     -- Levantado enquanto a PROPRIE feature escreve um atributo/value: os vigias
     -- de "manter ligado" so re-aplicam quando o JOGO tenta desfazer a escolha.
     self._SelfWrite = false
+    -- O Stun cujo Changed ja esta conectado (estado fora da instance).
+    self._StunWatched = nil
     -- O character atual + as conexoes dele (re-bind no respawn).
     self.Character = nil
     self.Connections = {}
@@ -11359,10 +11361,12 @@ function Feature:_ApplyStun(character)
     self:_WatchStun(stun)
 end
 
--- Reconecta o Changed do Stun uma vez por instance (marca com StunWatched).
+-- Reconecta o Changed do Stun uma vez por instance. O estado fica num campo do
+-- proprio objeto (nao na instance: escrever campo numa Instance real levanta
+-- "StunWatched is not a valid member of NumberValue").
 function Feature:_WatchStun(stun)
-    if stun.StunWatched then return end
-    stun.StunWatched = true
+    if self._StunWatched == stun then return end
+    self._StunWatched = stun
     self.Connections[#self.Connections + 1] = stun.Changed:Connect(function()
         -- O guarda corta o eco da propria escrita (que dispara Changed de novo);
         -- so a escrita do jogo (que nao vem com o guarda) e corrigida pra 0.
@@ -11420,6 +11424,7 @@ function Feature:_Unbind()
     end
     self.Connections = {}
     self.Character = nil
+    self._StunWatched = nil
 end
 
 -- --- Controles (chamados pelo backend) --------------------------------------
@@ -11737,6 +11742,18 @@ end
 -- Instala o gancho de __namecall. Guarda o original pra restaurar depois.
 -- Devolve true se instalou. Sem getrawmetatable/newcclosure (executor que nao
 -- expoe) devolve false -- o Enable entao recusa, em vez de ligar um no-op.
+--
+-- O corpo do gancho e IDENTICO ao script original do usuario (v3.4), que e o
+-- que funcionava sem bugar nada:
+--   * `local args = {...}` e `old(unpack(args))` -- a tabela de varargs e
+--     remontada e reenviada inteira, exatamente como no original.
+--   * deteccao de remote pelo tostring de args[1] ("RemoteEvent"/"RemoteFunction").
+--   * SO reescreve quando ha alvo (TargetPosition ~= nil) e o aim nao esta em
+--     excecao. Sem alvo, a chamada sai intacta pelo caminho normal.
+--   * SEM pcall: o original nao tinha, e um pcall em volta do corpo muda o
+--     caminho da chamada (o executor entrega de outro jeito) e era o que saia do
+--     personagem so por ligar o toggle. O corpo aqui nao deve levantar: so le
+--     campos do proprio modulo e chama o original.
 function Feature:InstallHook()
     if self.Hooked then return true end
     if type(getrawmetatable) ~= "function" or type(newcclosure) ~= "function" then
@@ -11754,56 +11771,28 @@ function Feature:InstallHook()
 
     local self_ = self
     mt.__namecall = newcclosure(function(...)
-        -- Captura os varargs FORA da closure do pcall (dentro dela nao ha `...`).
-        local packed = { ... }
-        -- Tudo que o hook faz e protegido: se QUALQUER coisa aqui der erro (um
-        -- executor estranho, um remote inesperado), o erro NAO pode vazar pra
-        -- chamada do jogo -- senao a skill inteira morre ("nada funciona"). Em
-        -- falha, cai no original(...) puro, como se o aim nao estivesse ligado.
-        local ok, result = pcall(function()
-            local method = getnamecallmethod()
+        local method = getnamecallmethod()
+        local args = { ... }
 
-            local isFire = tostring(method) == "FireServer"
-            local isInvoke = tostring(method) == "InvokeServer"
+        local isFire = tostring(method) == "FireServer"
+        local isInvoke = tostring(method) == "InvokeServer"
 
-            if not (isFire or isInvoke) then
-                return original(unpack(packed))
-            end
-
-            local args = packed
-
-            -- Deteccao de remote IDENTICA ao script original do usuario: compara
-            -- o tostring do args[1] com o nome da classe. Era assim que o script
-            -- dele funcionava; trocar por typeof/IsA quebrou as skills (IsA pode
-            -- recursar pelo proprio __namecall e derrubar a chamada toda).
+        if isFire or isInvoke then
+            -- Deteccao de remote IDENTICA ao script original do usuario.
             local arg1Str = tostring(args[1])
             local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
 
             if isRemote then
-                local arg2 = args[2]
-                -- Nao mexe quando ha alvo nulo, quando o aim esta em excecao, ou
-                -- quando o slot 2 nao e uma POSICAO (Vector3) nem booleano.
-                --
-                -- Aqui esta a correcao do bug da camera: o __namecall ve TODAS
-                -- as chamadas do jogo, nao so as skills. Quando a camera encosta
-                -- numa part, o jogo faz outras chamadas de saida cujo arg2 NAO e
-                -- uma posicao de ataque; reescrever essas tirava o jogador do
-                -- character. So reescreve se args[2] for Vector3 (a posicao que
-                -- os ataques mandam) -- qualquer outra coisa passa intacta.
-                local isBool = (arg2 == true or arg2 == false)
-                local arg2Type = typeof(arg2)
-                local isPosition = (arg2Type == "Vector3" or arg2Type == "CFrame")
-                if not isBool and isPosition and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
+                local arg2Str = tostring(args[2])
+                local isBool = (arg2Str == "true" or arg2Str == "false")
+
+                if not isBool and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
                     args[2] = self_.TargetPosition
                 end
             end
+        end
 
-            return original(unpack(args))
-        end)
-
-        if ok then return result end
-        -- O pcall protegeu o jogo, mas a chamada ainda tem que ir: reenvia intacta.
-        return original(unpack(packed))
+        return original(unpack(args))
     end)
     self.Hooked = true
     return true
