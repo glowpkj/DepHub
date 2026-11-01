@@ -543,14 +543,13 @@ do
     local state = ctx:Run("src/games/bloxfruits.lua")
     check(type(state) == "table", "o backend sobe com o painel montado")
 
-    -- Personagem + mapa com Snow Mountain (o destino do voo).
+    -- Personagem. O destino do voo e a POSICAO da ilha selecionada por padrao no
+    -- Sea 2 (a primeira: Kingdom of Rose).
     local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
     ctx.Player.Character = char
     local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
     local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
-    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
-    local snow = Instance.new("Model"); snow.Name, snow.Parent = "SnowMountain", map
-    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 50, 0), snow
+    local rosePos = Vector3.new(-195.1, 155.3, 279.9)
 
     -- Acha o toggle "Island teleport" que o backend registrou.
     local islandToggle = nil
@@ -566,7 +565,7 @@ do
     check(state.Instances.islands ~= nil and state.Instances.islands.ToggleOn == true, "o backend arma a feature")
 
     -- Perto do destino: a chegada desliga o toggle sozinho.
-    root.Position = Vector3.new(0, 50, 0)
+    root.Position = rosePos
     ctx.Services.RunService.Heartbeat:Fire()
     check(islandToggle.Value == false, "chegar na ilha desliga o toggle do painel")
     check(state.Instances.islands.ToggleOn == false, "o backend tambem desarma ao chegar")
@@ -821,8 +820,8 @@ do
     fruit2:Destroy()
 end
 
--- (o gate que ele pediu). O destino e a instancia real workspace.Map.<Nome>; se
--- ela nao estiver no mapa, ele avisa em vez de voar pro vazio.
+-- (o gate que ele pediu). O destino e uma POSICAO fixa (Vector3) da lista do
+-- OpenSource; o voo vai direto pro ponto, sem lookup de instancia no mapa.
 do
     local ctx = bfContext(994732206, 994732206)
     local Islands = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "islands.lua"])()
@@ -833,47 +832,48 @@ do
     local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
     local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
 
-    -- A lista publica de destinos e POR MAR. O Sea 2 (mar padrao) tem as 12
-    -- ilhas por instancia mais o Cafe por posicao fixa; o Sea 3 tem o Castle on
-    -- Sea por posicao fixa.
+    -- A lista publica de destinos e POR MAR, e toda por POSICAO (as coordenadas
+    -- do OpenSource). Sea 1: 16 ilhas; Sea 2: 14; Sea 3: 15. Sem bosses.
+    local sea1 = Islands:IslandLabels("Sea1")
+    check(type(sea1) == "table" and #sea1 == 16, "o Sea 1 tem as 16 ilhas do OpenSource")
+    check(sea1[1] == "Middle Town" and sea1[16] == "Water 7", "o Sea 1 vai de Middle Town a Water 7")
+
     local sea2 = Islands:IslandLabels("Sea2")
-    check(type(sea2) == "table" and #sea2 == 13, "o Sea 2 tem as 12 ilhas + o Cafe")
-    check(sea2[1] == "Snow Mountain", "a primeira ilha do Sea 2 e Snow Mountain")
-    check(sea2[13] == "Cafe", "o Cafe e o ultimo destino do Sea 2")
+    check(type(sea2) == "table" and #sea2 == 14, "o Sea 2 tem as 14 ilhas do OpenSource")
+    check(sea2[1] == "Kingdom of Rose", "a primeira ilha do Sea 2 e Kingdom of Rose")
+    check(table.find(sea2, "Cafe") ~= nil and table.find(sea2, "Ice Castle") ~= nil, "o Cafe e o Ice Castle estao no Sea 2")
 
     local sea3 = Islands:IslandLabels("Sea3")
-    check(type(sea3) == "table" and #sea3 == 1 and sea3[1] == "Castle on Sea", "o Sea 3 tem o Castle on Sea")
+    check(type(sea3) == "table" and #sea3 == 15, "o Sea 3 tem as 15 ilhas do OpenSource")
+    check(table.find(sea3, "Castle on the Sea") ~= nil and table.find(sea3, "Hell Dimension") ~= nil, "Castle on the Sea e Hell Dimension estao no Sea 3")
 
     local islands = Islands.new({ teleport = motor, sea = 2 })
     check(islands.ToggleOn == false, "o toggle comeca desligado")
     check(islands.CurrentSea == "Sea2", "a feature comeca no mar passado (Sea 2)")
-    check(islands.Selected == "Snow Mountain", "a selecao comeca na primeira ilha do mar")
-
-    -- A pasta do mapa e a ilha real.
-    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
-    local snow = Instance.new("Model"); snow.Name, snow.Parent = "SnowMountain", map
-    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 0, 500), snow
+    check(islands.Selected == "Kingdom of Rose", "a selecao comeca na primeira ilha do mar")
 
     -- GATE: com o toggle desligado, selecionar NAO teleporta (so memoriza).
     check(islands:Select("Ice Castle") == true, "selecionar uma ilha e aceito")
     check(islands.Selected == "Ice Castle", "a selecao foi memorizada")
     check(motor:IsFlying() == false, "com o toggle desligado, selecionar NAO voa")
 
-    -- LIGAR o toggle vai pra ilha ja selecionada. Ice Castle ainda nao esta no
-    -- mapa -> ele avisa em vez de voar.
+    -- LIGAR o toggle vai pra ilha ja selecionada (por posicao, sem instancia).
     check(islands:SetEnabled(true) == true, "ligar o toggle e aceito")
-    check(islands.ToggleOn == true and motor:IsFlying() == false, "ilha fora do mapa nao voa e reporta")
-    check(islands.LastStatus:find("not in map"), "reporta que a ilha nao esta no mapa")
-
-    -- Escolher Snow Mountain (que ESTA no mapa) com o toggle ligado voa.
-    check(islands:Select("Snow Mountain") == true, "escolher uma ilha que existe e aceito")
-    check(motor:IsFlying() == true, "com o toggle ligado, escolher a ilha voa pra ela")
+    check(motor:IsFlying() == true, "com o toggle ligado, ligar voa pra ilha selecionada")
+    check(islands.LastStatus:find("Ice Castle"), "reporta que esta voando pro Ice Castle")
     motor:Cancel()
+
+    -- A vigia de chegada mira a POSICAO da ilha: mover o character pra la dispara.
+    local icePos = Vector3.new(6062.3, 155.3, -6880.9)
+    root.Position = icePos
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(islands.LastStatus:find("arrived at Ice Castle"), "a chegada ao Ice Castle e detectada pela posicao")
 
     -- Desligar o toggle para de agir.
     islands:SetEnabled(false)
     check(islands.ToggleOn == false, "desligar o toggle desarma")
-    check(islands:Select("Snow Mountain") == true, "com o toggle desligado, selecionar de novo e aceito")
+    root.Position = Vector3.new(0, 0, 0)
+    check(islands:Select("Kingdom of Rose") == true, "com o toggle desligado, selecionar de novo e aceito")
     check(motor:IsFlying() == false, "com o toggle desligado, de novo NAO voa")
 
     -- O pedido do usuario: desligar o toggle no MEIO de um voo tem que PARAR o
@@ -889,16 +889,13 @@ do
     -- Rotulo desconhecido nao entra.
     check(islands:Select("Nao Existe") == false, "ilha desconhecida e recusada")
 
-    -- Cafe: destino por POSICAO fixa. Nao ha instancia no mapa chamada Cafe, mas
-    -- ele voa mesmo assim -- porque o destino e um Vector3, nao uma instancia.
-    local cafePosition = Vector3.new(-379.38089, 73.6452713, 303.899628)
+    -- Cafe: destino por POSICAO (o ponto do OpenSource). Voa direto pro ponto.
+    local cafePosition = Vector3.new(-380.4, 72.8, 303.2)
     check(islands:Select("Cafe") == true, "Cafe e um destino aceito")
     check(islands.Selected == "Cafe", "a selecao do Cafe foi memorizada")
     check(islands:SetEnabled(true) == true, "armar o voo pro Cafe e aceito")
-    check(motor:IsFlying() == true, "o Cafe voa mesmo sem instancia no mapa (destino por posicao)")
+    check(motor:IsFlying() == true, "o Cafe voa direto pro ponto")
     check(islands.LastStatus:find("Cafe"), "reporta que esta voando pro Cafe")
-    -- A vigia de chegada mirou a POSICAO do Cafe (nao uma instancia): mover o
-    -- personagem pra la dispara a chegada.
     local cafeRoot = ctx.Player.Character:FindFirstChild("HumanoidRootPart")
     cafeRoot.Position = cafePosition
     ctx.Services.RunService.Heartbeat:Fire()
@@ -906,27 +903,33 @@ do
     islands:SetEnabled(false)
     motor:Cancel()
 
-    -- POR MAR: trocar o mar troca a lista. No Sea 3 so existe o Castle on Sea,
-    -- um destino por POSICAO fixa (nao ha instancia no mapa com esse nome). A
-    -- selecao do mar antigo nao vale no mar novo.
-    local castlePosition = Vector3.new(-5436.60986, 500, -3000)
+    -- POR MAR: trocar o mar troca a lista. No Sea 3 a primeira e o Port Town (por
+    -- posicao). A selecao do mar antigo nao vale no mar novo.
+    local portTownPos = Vector3.new(-610.4, 57.8, 6436.3)
     local sea3Labels = islands:SetSea(3)
     check(islands.CurrentSea == "Sea3", "SetSea troca o mar corrente")
-    check(#sea3Labels == 1 and sea3Labels[1] == "Castle on Sea", "o Sea 3 lista so o Castle on Sea")
-    check(islands.Selected == "Castle on Sea", "a selecao cai na primeira entrada do mar novo")
-    check(islands:Select("Snow Mountain") == false, "ilha do Sea 2 nao existe no Sea 3")
-    check(islands:Select("Castle on Sea") == true, "Castle on Sea e aceito no Sea 3")
-    check(islands:SetEnabled(true) == true, "armar o voo pro Castle on Sea e aceito")
-    check(motor:IsFlying() == true, "o Castle on Sea voa mesmo sem instancia no mapa (destino por posicao)")
-    check(islands.LastStatus:find("Castle on Sea"), "reporta que esta voando pro Castle on Sea")
-    local castleRoot = ctx.Player.Character:FindFirstChild("HumanoidRootPart")
-    castleRoot.Position = castlePosition
+    check(#sea3Labels == 15 and sea3Labels[1] == "Port Town", "o Sea 3 lista as 15 ilhas do OpenSource")
+    check(islands.Selected == "Port Town", "a selecao cai na primeira entrada do mar novo")
+    check(islands:Select("Kingdom of Rose") == false, "ilha do Sea 2 nao existe no Sea 3")
+    check(islands:Select("Port Town") == true, "Port Town e aceito no Sea 3")
+    check(islands:SetEnabled(true) == true, "armar o voo pro Port Town e aceito")
+    check(motor:IsFlying() == true, "o Port Town voa direto pro ponto")
+    check(islands.LastStatus:find("Port Town"), "reporta que esta voando pro Port Town")
+    local ptRoot = ctx.Player.Character:FindFirstChild("HumanoidRootPart")
+    ptRoot.Position = portTownPos
     ctx.Services.RunService.Heartbeat:Fire()
-    check(islands.LastStatus:find("arrived at Castle on Sea"), "a chegada ao Castle on Sea e detectada pela posicao")
+    check(islands.LastStatus:find("arrived at Port Town"), "a chegada ao Port Town e detectada pela posicao")
     islands:SetEnabled(false)
     motor:Cancel()
     islands:SetSea(2)
     check(islands.CurrentSea == "Sea2", "voltar pro Sea 2 restaura a lista do Sea 2")
+
+    -- Por mar: escolher troca a lista; ilha do Sea 1 nao existe no Sea 2.
+    local sea1Labels = islands:SetSea(1)
+    check(islands.CurrentSea == "Sea1" and #sea1Labels == 16, "SetSea(1) mostra as 16 ilhas do Sea 1")
+    check(islands:Select("Middle Town") == true, "Middle Town (Sea 1) e aceito no Sea 1")
+    check(islands:Select("Port Town") == false, "Port Town (Sea 3) nao existe no Sea 1")
+    islands:SetSea(2)
 
     -- Sem motor de teleporte, ligar recusa.
     local bare = Islands.new()
@@ -939,10 +942,8 @@ do
     local noRootChar = Instance.new("Model"); noRootChar.Name, noRootChar.Parent = "Character", ctx.Player
     ctx.Player.Character = noRootChar
     local body = Instance.new("Part"); body.Name, body.Parent = "Torso", noRootChar
-    -- Sem HumanoidRootPart: GoToInstance devolve nil (nao lanca).
-    local mapIsland = Instance.new("Model"); mapIsland.Name, mapIsland.Parent = "Fishmen", map
-    local dFloor = Instance.new("Part"); dFloor.Name, dFloor.Position, dFloor.Parent = "Floor", Vector3.new(0, 0, 0), mapIsland
-    check(islands:Select("Fishmen") == true, "escolher Fishmen (no mapa) e aceito")
+    -- Sem HumanoidRootPart: o motor devolve nil (nao lanca).
+    check(islands:Select("Snow Mountain") == true, "escolher Snow Mountain e aceito")
     islands:SetEnabled(false)
     local armed = islands:SetEnabled(true)
     check(armed == false, "SetEnabled propaga a falha quando o motor nao iniciou o voo")
@@ -962,7 +963,8 @@ end
 
 -- Chegada: quando o personagem fica perto do destino daquele voo, a feature
 -- avisa UMA vez (OnArrive) com o rotulo da ilha e para de vigiar. Nao dispara
--- longe do alvo, nem re-dispara depois de chegar mesmo mexendo um pouco.
+-- longe do alvo, nem re-dispara depois de chegar mesmo mexendo um pouco. O
+-- destino e a POSICAO do Snow Mountain na lista (por posicao, sem instancia).
 do
     local ctx = bfContext(994732206, 994732206)
     local Islands = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "islands.lua"])()
@@ -973,34 +975,34 @@ do
     local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
     local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
 
-    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
-    local snow = Instance.new("Model"); snow.Name, snow.Parent = "SnowMountain", map
-    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 50, 0), snow
+    -- A posicao do Snow Mountain no Sea 2 (a coordenada do OpenSource).
+    local snowPos = Vector3.new(856.2, 50.3, -5278.3)
 
     local islands = Islands.new({ teleport = motor })
     local arrivals = {}
     islands.OnArrive = function(_, arrived) arrivals[#arrivals + 1] = arrived end
 
-    -- Voa pra Snow Mountain.
+    -- Escolhe Snow Mountain e voa pra ela (com o toggle desarmado, Select so
+    -- memoriza; armar depois e que voa).
+    check(islands:Select("Snow Mountain") == true, "escolher Snow Mountain e aceito")
     check(islands:SetEnabled(true) == true, "o toggle arma com o motor")
-    check(motor:IsFlying() == true, "armar com a ilha no mapa voa")
+    check(motor:IsFlying() == true, "armar com a ilha selecionada voa")
 
-    -- Longe do destino (o alvo do voo e o pivot do model, ~(0,50,0); o HRP esta
-    -- em (0,0,0) -> 50 studs): nao conta como chegada.
+    -- Longe do destino (HRP em (0,0,0), alvo em (856.2,50.3,-5278.3)): nao conta.
     ctx.Services.RunService.Heartbeat:Fire()
     check(#arrivals == 0, "longe do destino ainda nao conta como chegada")
 
     -- Encosta no destino: dispara UMA vez, com o rotulo certo.
-    root.Position = Vector3.new(0, 50, 0)
+    root.Position = snowPos
     ctx.Services.RunService.Heartbeat:Fire()
     check(#arrivals == 1, "perto do destino a chegada dispara uma vez")
     check(arrivals[1] == "Snow Mountain", "a chegada reporta a ilha do voo")
     check(islands.LastStatus:find("arrived"), "o status passa a arrived")
 
     -- Mexer de leve depois de chegar NAO re-dispara (a vigia ja parou).
-    root.Position = Vector3.new(0, 55, 0)
+    root.Position = snowPos + Vector3.new(0, 5, 0)
     ctx.Services.RunService.Heartbeat:Fire()
-    root.Position = Vector3.new(0, 50, 0)
+    root.Position = snowPos
     ctx.Services.RunService.Heartbeat:Fire()
     check(#arrivals == 1, "mexer depois de chegar nao re-dispara a chegada")
 
@@ -1024,9 +1026,8 @@ do
     local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
     local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
 
-    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
-    local snow = Instance.new("Model"); snow.Name, snow.Parent = "SnowMountain", map
-    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 50, 0), snow
+    -- A posicao do Snow Mountain no Sea 2 (a coordenada do OpenSource).
+    local snowPos = Vector3.new(856.2, 50.3, -5278.3)
 
     -- Um sinal estrito: um USERDATA com metatable (como o RBXScriptSignal real,
     -- que NAO e uma tabela Lua). Com type(heartbeat) == "userdata" a checagem
@@ -1050,9 +1051,10 @@ do
     local arrivals = {}
     islands.OnArrive = function(_, arrived) arrivals[#arrivals + 1] = arrived end
 
+    check(islands:Select("Snow Mountain") == true, "escolher Snow Mountain e aceito")
     check(islands:SetEnabled(true) == true, "arma o voo com o sinal estrito")
-    check(motor:IsFlying() == true, "voa pra ilha no mapa")
-    root.Position = Vector3.new(0, 50, 0)
+    check(motor:IsFlying() == true, "voa pra ilha selecionada")
+    root.Position = snowPos
     for _, fn in ipairs(listeners) do fn() end
     check(#arrivals == 1, "a chegada dispara com um Heartbeat RBXScriptSignal de verdade")
     check(arrivals[1] == "Snow Mountain", "a chegada reporta a ilha certa")
@@ -1476,6 +1478,94 @@ do
     feature:Destroy()
 end
 
+-- Autoken / Autobuso (haki): mantem o Observation (Ken) e o Armament (Buso)
+-- ligados pelo MESMO mecanismo do OpenSource -- ve os atributos KenActive /
+-- BusoEnabled e so manda o remote de ligar quando estao desligados. Ken usa
+-- CommE:FireServer("Ken", true/false); Buso usa CommF_:InvokeServer("Buso").
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Player = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "player.lua"])()
+
+    -- Os remotes da haki em ReplicatedStorage.Remotes (o caminho do jogo).
+    local rstorage = ctx.Services.ReplicatedStorage
+    local remotes = Instance.new("Folder"); remotes.Name, remotes.Parent = "Remotes", rstorage
+    local commE = Instance.new("RemoteEvent"); commE.Name, commE.Parent = "CommE", remotes
+    local commF = Instance.new("RemoteFunction"); commF.Name, commF.Parent = "CommF_", remotes
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+
+    local feature = Player.new({})
+    feature:Enable()
+    -- Zera os variados remotes antes de cada passo (o loop e testado por passo).
+    local function resetFired() commE.Fired = {} commF.Invoked = {} end
+
+    -- Ken desligado no jogo: HakiStep manda ligar (Ken, true).
+    resetFired()
+    feature.KenOn = true
+    feature:HakiStep()
+    check(commE.Fired[#commE.Fired] ~= nil and commE.Fired[#commE.Fired][1] == "Ken" and commE.Fired[#commE.Fired][2] == true, "Ken desligado -> o passo manda Ken=true")
+
+    -- Ken JA ativo (o jogo marcou o atributo): nao re-manda (nada de spam).
+    resetFired()
+    char:SetAttribute("KenActive", true)
+    feature:HakiStep()
+    check(#commE.Fired == 0, "Ken ja ativo -> o passo nao re-manda (gate do atributo)")
+
+    -- Buso desligado: o passo invoca o remote Buso.
+    resetFired()
+    feature.KenOn = false
+    feature.BusoOn = true
+    feature:HakiStep()
+    check(commF.Invoked[#commF.Invoked] ~= nil and commF.Invoked[#commF.Invoked][1] == "Buso", "Buso desligado -> o passo invoca Buso")
+
+    -- Buso ja ativo: nao re-invoca.
+    resetFired()
+    char:SetAttribute("BusoEnabled", true)
+    feature:HakiStep()
+    check(#commF.Invoked == 0, "Buso ja ativo -> o passo nao re-invoca (gate do atributo)")
+
+    -- Desligar o Ken com ele ATIVO manda Ken=false; com ele inativo, nao manda.
+    resetFired()
+    feature.KenOn = true
+    feature:SetKen(false)
+    check(commE.Fired[#commE.Fired][2] == false, "desligar o Ken ativo manda Ken=false")
+    resetFired()
+    char:SetAttribute("KenActive", false)
+    feature.KenOn = true
+    feature:SetKen(false)
+    check(#commE.Fired == 0, "desligar o Ken inativo nao manda nada")
+
+    -- Desligar o Buso com ele ATIVO manda o toggle Buso de volta.
+    resetFired()
+    char:SetAttribute("BusoEnabled", true)
+    feature.BusoOn = true
+    feature:SetBuso(false)
+    check(commF.Invoked[#commF.Invoked] ~= nil and commF.Invoked[#commF.Invoked][1] == "Buso", "desligar o Buso ativo manda o toggle Buso")
+
+    -- O loop compartilhado: ligar o Ken agenda UM thread; ligar o Buso nao
+    -- duplica; desligar os dois cancela.
+    resetFired()
+    feature:SetKen(true)
+    check(feature.KenOn == true and feature.Threads.haki ~= nil, "SetKen liga e agenda o loop da haki")
+    local firstThread = feature.Threads.haki
+    feature:SetBuso(true)
+    check(feature.BusoOn == true and feature.Threads.haki == firstThread, "SetBuso nao duplica o loop (um so)")
+    feature:SetKen(false)
+    check(feature.Threads.haki == firstThread, "com o Buso ainda ligado o loop continua")
+    feature:SetBuso(false)
+    check(feature.Threads.haki == nil, "desligar os dois cancela o loop da haki")
+
+    -- Disable derruba o loop e zera os pedidos.
+    feature:SetKen(true)
+    feature:SetBuso(true)
+    feature:Disable()
+    check(feature.KenOn == false and feature.BusoOn == false, "Disable zera os pedidos de haki")
+    check(feature.Threads.haki == nil, "Disable cancela o loop da haki")
+
+    feature:Destroy()
+end
+
 -- Player cleanup: estado ORIGINAL restaurado (nao defaults) e o Stun que a
 -- FEATURE criou destruido. Um character que ja tinha valores do jogo volta com
 -- eles; um que nao tinha Stun nao pode sair com um Stun orfao.
@@ -1625,8 +1715,8 @@ do
 end
 
 -- A lista de ilhas do Travel e POR MAR: quando o jogo diz que o jogador esta no
--- Sea 3, o dropdown monta com os destinos do Sea 3 (Castle on Sea), nao com as
--- ilhas do Sea 2.
+-- Sea 3, o dropdown monta com os destinos do Sea 3 (a primeira e Port Town), nao
+-- com as ilhas do Sea 2.
 do
     local ctx = bfContext(994732206, 994732206)
     ctx.RealmSea = 3
@@ -1637,7 +1727,7 @@ do
     check(state:SetFeature("islands", true), "a feature de ilhas sobe no Sea 3")
     local feature = state:GetFeature("islands")
     check(feature ~= nil and feature.CurrentSea == "Sea3", "a feature fica no mar detectado (Sea 3)")
-    check(feature.Selected == "Castle on Sea", "a selecao cai no Castle on Sea do Sea 3")
+    check(feature.Selected == "Port Town", "a selecao cai na primeira ilha do Sea 3 (Port Town)")
 
     state:Destroy()
 end
@@ -1723,6 +1813,7 @@ do
         fruitEsp = true, fruitTrace = true, fruitGrab = true, fruitStore = true,
         fruitSkip = true, fruitKeep = true, island = true, islandOn = true,
         speed = true, unbreakable = true, waterwalk = true, flashstep = true,
+        autoken = true, autobuso = true,
         autoexec = true,
     }
     for key in pairs(expectedKeys) do

@@ -1,8 +1,10 @@
 local game = game
+local task = task
 local pcall = pcall
 local tonumber = tonumber
 
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- Player -- a aba so do LOCAL PLAYER. Nada de ESP de outros, nada de mexer no
@@ -67,6 +69,12 @@ function Feature.new(options)
     self.FlashstepCooldown = tonumber(options.flashstep) or Feature.DEFAULT_FLASHSTEP
     -- O stun sempre 0: enquanto ligado, a feature re-escreve o NumberValue.
     self.StunOn = true
+    -- Autoken / Autobuso: manter o Observation (Ken) e o Armament (Buso) haki
+    -- ligados. Cada um tem o seu pedido; um loop COMPARTILHADO os vigia.
+    self.KenOn = false
+    self.BusoOn = false
+    -- O loop da haki (um so, enquanto qualquer um dos dois estiver ligado).
+    self.Threads = {}
     -- Levantado enquanto a PROPRIE feature escreve um atributo/value: os vigias
     -- de "manter ligado" so re-aplicam quando o JOGO tenta desfazer a escolha.
     self._SelfWrite = false
@@ -320,6 +328,116 @@ function Feature:SetFlashstep(value)
     return true
 end
 
+-- --- Haki (Autoken / Autobuso) ----------------------------------------------
+-- Mantem o Observation Haki (Ken) e o Armament Haki (Buso) LIGADOS. O usuario
+-- descreveu como "auto-apertar a tecla", mas o script OpenSource faz melhor: em
+-- vez de simular tecla e torcer, ele olha o ESTADO (os atributos KenActive /
+-- BusoEnabled que o proprio jogo mantem) e so manda o remote de ligar quando o
+-- haki estiver DESLIGADO -- sem spam, e sem religar o que ja esta ligado. Segue
+-- o mesmo caminho do jogo:
+--   * Ken  -> Remotes.CommE:FireServer("Ken", true)   (ligar)
+--             Remotes.CommE:FireServer("Ken", false)  (desligar, so se ativo)
+--   * Buso -> Remotes.CommF_:InvokeServer("Buso")     (toggle; o jogo decide
+--             o lado pela flag atual, por isso o gate de BusoEnabled)
+-- Os dois compartilham UM loop (como no original): enquanto qualquer um dos dois
+-- estiver ligado, ele vigia a cada 0.5s e re-liga o que o jogo desligou.
+
+local HAKI_INTERVAL = 0.5
+
+-- Os remotes da haki, em ReplicatedStorage.Remotes (o caminho do jogo).
+function Feature:_remotes()
+    return ReplicatedStorage:FindFirstChild("Remotes")
+end
+
+-- Le um atributo do character OU do LocalPlayer (o jogo alterna onde guarda).
+local function readAttribute(character, name)
+    if character then
+        local value = character:GetAttribute(name)
+        if value ~= nil then return value end
+    end
+    if LocalPlayer then
+        local value = LocalPlayer:GetAttribute(name)
+        if value ~= nil then return value end
+    end
+    return nil
+end
+
+-- Um passo do loop: liga o que estiver pedido e desligado. Nao liga o que ja
+-- esta ligado (o gate de KenActive/BusoEnabled).
+function Feature:HakiStep()
+    local character = self.Character or myCharacter()
+    local remotes = self:_remotes()
+    if not character or not remotes then return false end
+    -- Ken: so manda ligar quando o atributo diz que NAO esta ativo.
+    if self.KenOn and readAttribute(character, "KenActive") ~= true then
+        local commE = remotes:FindFirstChild("CommE")
+        if commE then pcall(function() commE:FireServer("Ken", true) end) end
+    end
+    -- Buso: idem pelo BusoEnabled.
+    if self.BusoOn and readAttribute(character, "BusoEnabled") ~= true then
+        local commF = remotes:FindFirstChild("CommF_")
+        if commF then pcall(function() commF:InvokeServer("Buso") end) end
+    end
+    return true
+end
+
+-- O loop compartilhado: so roda enquanto KenOn ou BusoOn. Sai sozinho quando os
+-- dois desligam.
+function Feature:_SpawnHaki()
+    if self.Threads.haki then return end
+    self.Threads.haki = task.spawn(function()
+        while self.KenOn or self.BusoOn do
+            pcall(function() self:HakiStep() end)
+            task.wait(HAKI_INTERVAL)
+        end
+        self.Threads.haki = nil
+    end)
+end
+
+function Feature:_CancelHaki()
+    if self.Threads.haki then
+        pcall(function() task.cancel(self.Threads.haki) end)
+        self.Threads.haki = nil
+    end
+end
+
+-- Ken (Observation Haki). Ligar sobe o loop; desligar, se o haki estiver ATIVO,
+-- manda o remote de desligar (o jogo nao desliga sozinho).
+function Feature:SetKen(on)
+    self.KenOn = on == true
+    if self.KenOn then
+        self:_SpawnHaki()
+        return true
+    end
+    local character = self.Character or myCharacter()
+    local remotes = self:_remotes()
+    if character and remotes and readAttribute(character, "KenActive") == true then
+        local commE = remotes:FindFirstChild("CommE")
+        if commE then pcall(function() commE:FireServer("Ken", false) end) end
+    end
+    if not self.BusoOn then self:_CancelHaki() end
+    return true
+end
+
+-- Buso (Armament Haki). O remote Buso e um TOGGLE (o jogo decide o lado pela
+-- flag), entao desligar so manda se o BusoEnabled estiver ligado -- senao a
+-- gente ligaria em vez de desligar.
+function Feature:SetBuso(on)
+    self.BusoOn = on == true
+    if self.BusoOn then
+        self:_SpawnHaki()
+        return true
+    end
+    local character = self.Character or myCharacter()
+    local remotes = self:_remotes()
+    if character and remotes and readAttribute(character, "BusoEnabled") == true then
+        local commF = remotes:FindFirstChild("CommF_")
+        if commF then pcall(function() commF:InvokeServer("Buso") end) end
+    end
+    if not self.KenOn then self:_CancelHaki() end
+    return true
+end
+
 -- --- Ciclo de vida ----------------------------------------------------------
 
 function Feature:Enable()
@@ -341,6 +459,11 @@ function Feature:Disable()
     self.Enabled = false
     self:_Clear(self.Character or myCharacter())
     self:_Unbind()
+    -- Derruba o loop da haki: desligar a feature nao pode deixar o loop rodando.
+    -- Zera os pedidos (senao o loop entenderia que ainda quer) e cancela.
+    self.KenOn = false
+    self.BusoOn = false
+    self:_CancelHaki()
     if self.RespawnConnection then
         pcall(function() self.RespawnConnection:Disconnect() end)
         self.RespawnConnection = nil

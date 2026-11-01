@@ -814,7 +814,7 @@ local PANELS = {
                 if State.Instances.islands then
                     local ok = State.Instances.islands:Select(choice)
                     if State.Instances.islands.ToggleOn and not ok then
-                        instance.Notify("Island teleport", State.Instances.islands.LastStatus or "ilha fora do mapa.")
+                        instance.Notify("Island teleport", State.Instances.islands.LastStatus or "unknown island.")
                     end
                 end
             end
@@ -895,7 +895,31 @@ local PANELS = {
             end)
             State:RegisterConfig("flashstep", applyFlashstep, flashHandle)
 
-            section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, and Flashstep cooldown (0 = ready). Stun is kept at 0.")
+            -- Autoken / Autobuso: manter o Observation (Ken) e o Armament (Buso)
+            -- haki ligados. O mecanismo e o do script OpenSource: um loop que ve
+            -- os atributos KenActive/BusoEnabled e so manda o remote de ligar
+            -- quando o haki estiver desligado (nada de spam de tecla).
+            local function applyKen(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetKen(value) end
+            end
+            local kenToggle = section:CreateToggle("Autoken", State.Config.autoken == true, function(value)
+                applyKen(value)
+                State.Config.autoken = value == true
+            end)
+            State:RegisterConfig("autoken", applyKen, kenToggle)
+
+            local function applyBuso(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetBuso(value) end
+            end
+            local busoToggle = section:CreateToggle("Autobuso", State.Config.autobuso == true, function(value)
+                applyBuso(value)
+                State.Config.autobuso = value == true
+            end)
+            State:RegisterConfig("autobuso", applyBuso, busoToggle)
+
+            section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, Flashstep cooldown (0 = ready), and Autoken/Autobuso to keep Observation and Armament Haki on. Stun is kept at 0.")
         end,
     },
     -- CONFIG: os botoes de salvar/carregar. Nao e uma feature (nao tem toggle

@@ -18,13 +18,13 @@ local LocalPlayer = Players.LocalPlayer
 -- NAO tem motor proprio: usa o teleporte geral (options.teleport, a infra) por
 -- injecao, igual a fruta faz. Um motor de voo no script, nao dois.
 --
--- O destino e, por padrao, a INSTANCIA real no mapa (workspace.Map.<Nome>), nao
--- uma coordenada chumbada: isso nao quebra quando o mapa muda e usa exatamente os
--- nomes que o usuario confirmou. Se a instancia nao existir (mar errado, ilha
--- fora do mapa), ele AVISA em vez de voar pro vazio. Alguns destinos que nao sao
--- instancia do mapa (ex.: Cafe no Sea 2, Castle on Sea no Sea 3) usam uma POSICAO
--- fixa (Vector3) na mesma lista -- o resto do fluxo (gate do toggle, vigia de
--- chegada, auto-desligar) e igual.
+-- O destino e uma POSICAO fixa (Vector3) na lista: o personagem voa ate o ponto
+-- que o script OpenSource usa, que o usuario confirmou estar certo no mapa. Todos
+-- os destinos do dropdown sao por posicao -- nao ha mais lookup de instancia
+-- (workspace.Map.<Nome>): o usuario preferiu os pontos do OpenSource a instancia,
+-- que nem sempre existe com o nome esperado. (O caminho por INSTANCIA continua
+-- suportado no Go() caso alguma entrada futura use `instance`, mas nenhuma usa
+-- hoje.)
 --
 -- A lista de destinos e POR MAR (SEA_ISLANDS): Sea 1, Sea 2 e Sea 3 tem mapas e
 -- pontos fixos diferentes, entao o dropdown mostra so as ilhas do mar atual. O
@@ -49,9 +49,6 @@ local LocalPlayer = Players.LocalPlayer
 local Feature = {}
 Feature.__index = Feature
 
--- A pasta das ilhas: workspace.Map. De la saem as instancias por nome.
-local MAP_CONTAINER = "Map"
-
 -- A que distancia do destino o voo conta como CHEGOU. O teleporte chega a 5
 -- studs acima do alvo (ArrivalOffset), entao o limite tem que ser maior que
 -- isso, mas pequeno o bastante para nao disparar no meio do caminho. 25 studs e
@@ -64,44 +61,74 @@ local ARRIVAL_DISTANCE = 25
 -- usuario deixou isso claro). O backend descobre o mar atual e o dropdown e
 -- montado so a partir da lista daquele mar.
 --
--- Cada entrada tem um `label` (o rotulo que aparece) e UM tipo de destino:
---   * `instance = "NomeNoMapa"` -- a INSTANCIA real em workspace.Map.<Nome>. Usado
---     pelas ilhas: nao quebra quando o mapa muda de posicao e usa os nomes que o
---     usuario confirmou.
---   * `pos = Vector3.new(x,y,z)` -- uma POSICAO fixa no mundo. Usado por lugares
---     que NAO sao uma instancia do mapa (ex.: Cafe, Castle on Sea -- um ponto
---     dentro de uma cidade). A posicao e o ponto real do lugar (a rotacao do
---     CFrame NAO e usada: o motor so voa ate a posicao).
--- A tabela e explicita em vez de deduzida porque alguns rotulos bonitos nao
--- batem com o nome do mapa (ex.: Ghost Ship -> GhostShip).
+-- Cada entrada tem um `label` (o rotulo que aparece) e a POSICAO fixa
+-- (`pos = Vector3.new(x,y,z)`) do lugar no mundo. A rotacao do CFrame NAO e
+-- usada: o motor so voa ate a posicao. (O Go() ainda aceita `instance =
+-- "NomeNoMapa"` para um destino que seja a instancia real em workspace.Map.<Nome>,
+-- mas a lista atual e toda por posicao.)
+-- A tabela e explicita porque o rotulo bonito nao bate com nome de mapa nenhum.
 --
--- Os mapas vao sendo preenchidos conforme o usuario confirma os nomes/posicoes
--- de cada mar; um mar sem lista fica vazio (o dropdown avisa em vez de oferecer
--- destinos errados).
+-- Os mapas vem PRONTOS: as posicoes (Vector3) sao as do script OpenSource
+-- Blox Fruits, que o usuario confirmou em jogo (as dele estavam erradas e as do
+-- OpenSource voam no ponto certo). Sao TUDO por POSICAO -- o usuario preferiu os
+-- pontos do OpenSource a instancia do mapa: os devs do jogo nao mudam essas
+-- coordenadas, e a instancia nem sempre existe com o nome que a gente adivinha.
+-- Por isso nao ha mais `instance` aqui.
+--
+-- Uma lista POR MAR: cada mar tem o seu mapa, entao o dropdown mostra SO as
+-- ilhas do mar corrente (o backend descobre o mar e chama SetSea). Sem bosses --
+-- o usuario pediu so as ilhas.
 local SEA_ISLANDS = {
     Sea1 = {
-        -- A confirmar pelo usuario (nome das ilhas + pontos fixos do Sea 1).
+        { label = "Middle Town",        pos = Vector3.new(-1193.9, 12, -549.8) },
+        { label = "Pirate Starter",     pos = Vector3.new(1038, 15, 1550) },
+        { label = "Marine Starter",     pos = Vector3.new(-2674.5, 32.1, 2187.0) },
+        { label = "Jungle",             pos = Vector3.new(-1866.3, 29.9, 21.6) },
+        { label = "Buggy Island",       pos = Vector3.new(-981.0, 30.4, 3966.8) },
+        { label = "Desert Island",      pos = Vector3.new(999.9, 7.6, 4490.3) },
+        { label = "Snow Island",        pos = Vector3.new(1519.5, 78.0, -1510.9) },
+        { label = "Marineford",         pos = Vector3.new(-4763.7, 13.4, 4288.8) },
+        { label = "Sky Islands",        pos = Vector3.new(-4973.7, 280.7, -1119.4) },
+        { label = "Mob Island (Saber)", pos = Vector3.new(-1527.2, 34.1, -33.2) },
+        { label = "Impel Down",         pos = Vector3.new(5278.6, 7.1, 391.6) },
+        { label = "Colosseum",          pos = Vector3.new(-1973.1, 9.0, -2744.9) },
+        { label = "Volcano",            pos = Vector3.new(-5623.8, 17.0, 8314.1) },
+        { label = "Fishman Island",     pos = Vector3.new(3894.3, 4.0, -1915.2) },
+        { label = "Upper Sky Islands",  pos = Vector3.new(-6040.2, 5468.0, 1734.2) },
+        { label = "Water 7",            pos = Vector3.new(5430.4, 78.0, 3953.6) },
     },
     Sea2 = {
-        { label = "Snow Mountain",       instance = "SnowMountain" },
-        { label = "Indra Island",        instance = "IndraIsland" },
-        { label = "Ice Castle",          instance = "IceCastle" },
-        { label = "Green Bit",           instance = "GreenBit" },
-        { label = "Grave Island",        instance = "GraveIsland" },
-        { label = "Ghost Ship Interior", instance = "GhostShipInterior" },
-        { label = "Ghost Ship",          instance = "GhostShip" },
-        { label = "Forgotten Island",    instance = "ForgottenIsland" },
-        { label = "Fishmen",             instance = "Fishmen" },
-        { label = "Dressrosa",           instance = "Dressrosa" },
-        { label = "Darkbeard Arena",     instance = "DarkbeardArena" },
-        { label = "Dapper Jack Arena",   instance = "DapperJackArena" },
-        -- Destinos por POSICAO fixa (nao sao instancias do mapa). A posicao e o
-        -- ponto real do lugar (o motor so voa ate a posicao; rotacao nao e aplicada).
-        { label = "Cafe",                pos = Vector3.new(-379.38089, 73.6452713, 303.899628) },
+        { label = "Kingdom of Rose",  pos = Vector3.new(-195.1, 155.3, 279.9) },
+        { label = "Cafe",             pos = Vector3.new(-380.4, 72.8, 303.2) },
+        { label = "Mansion",          pos = Vector3.new(-393.3, 367.3, 687.5) },
+        { label = "Colosseum",        pos = Vector3.new(-1836.4, 72.8, 1360.2) },
+        { label = "Swan's Room",      pos = Vector3.new(2293.7, 12.5, 663.1) },
+        { label = "Factory",          pos = Vector3.new(431.0, 238.4, -433.2) },
+        { label = "Green Zone",       pos = Vector3.new(-2340.8, 155.3, -3396.3) },
+        { label = "Dark Arena",       pos = Vector3.new(3807.1, 11.8, -3452.2) },
+        { label = "Graveyard Island", pos = Vector3.new(-5577.9, 87.6, -782.2) },
+        { label = "Snow Mountain",    pos = Vector3.new(856.2, 50.3, -5278.3) },
+        { label = "Hot and Cold",     pos = Vector3.new(-5734.3, 49.4, -5146.4) },
+        { label = "Cursed Ship",      pos = Vector3.new(900.9, 144.0, 33072.6) },
+        { label = "Ice Castle",       pos = Vector3.new(6062.3, 155.3, -6880.9) },
+        { label = "Forgotten Island", pos = Vector3.new(-3194.2, 155.3, -10795.3) },
     },
     Sea3 = {
-        -- Castle on Sea e um ponto fixo do Sea 3 (posicao confirmada pelo usuario).
-        { label = "Castle on Sea",       pos = Vector3.new(-5436.60986, 500, -3000) },
+        { label = "Port Town",              pos = Vector3.new(-610.4, 57.8, 6436.3) },
+        { label = "Dragon Dojo",            pos = Vector3.new(5704.4, 1168.1, 937.0) },
+        { label = "Castle on the Sea",      pos = Vector3.new(-5436.6, 815.6, -2701.7) },
+        { label = "Floating Turtle",        pos = Vector3.new(-12164.6, -548.9, -8454.9) },
+        { label = "Friendly Arena",         pos = Vector3.new(5012.8, 72.8, -1570.6) },
+        { label = "Great Tree",             pos = Vector3.new(3036.3, 815.6, -7149.9) },
+        { label = "Haunted Castle",         pos = Vector3.new(-9530.6, -132.9, 5763.1) },
+        { label = "Beautiful Pirate Domain",pos = Vector3.new(5366.6, 71.2, -225.9) },
+        { label = "Mansion",                pos = Vector3.new(-12547.7, 290.1, -7487.1) },
+        { label = "North Pole",             pos = Vector3.new(-1141.1, 57.8, -14480.7) },
+        { label = "Sea of Treats",          pos = Vector3.new(-1505.3, 57.8, -10724.1) },
+        { label = "Secret Temple",          pos = Vector3.new(5226.2, 63.5, 858.8) },
+        { label = "Tiki Outpost",           pos = Vector3.new(-16641.5, 213.3, 435.4) },
+        { label = "Heavenly Dimension",     pos = Vector3.new(-22709.6, 5259.0, 3886.6) },
+        { label = "Hell Dimension",         pos = Vector3.new(-22737.6, 5120.0, 2234.6) },
     },
 }
 
@@ -143,32 +170,11 @@ end
 -- O mar que a lista esta mostrando agora.
 Feature.CurrentSea = DEFAULT_SEA
 
--- Acha a instancia da ilha em workspace.Map.<instancia>. Devolve a instancia ou
--- nil (se a pasta nao existir ou a ilha nao estiver no mapa).
-function Feature:IslandInstance(instanceName)
-    local map = workspace:FindFirstChild(MAP_CONTAINER)
-    if not map then return nil end
-    return map:FindFirstChild(instanceName)
-end
-
 -- A posicao do HumanoidRootPart agora, ou nil se nao ha character.
 function Feature:RootPosition()
     local character = LocalPlayer and LocalPlayer.Character
     local root = character and character:FindFirstChild("HumanoidRootPart")
     return root and root.Position or nil
-end
-
--- A posicao-mundo da instancia (Part -> Position; Model -> GetPivot). Espelha o
--- que o motor de teleporte usa como destino, para a vigia de chegada medir a
--- MESMA coisa que o voo persegue.
-function Feature:InstancePosition(instance)
-    if not instance then return nil end
-    if instance:IsA("BasePart") then return instance.Position end
-    if instance:IsA("Model") then
-        local pivot = instance:GetPivot()
-        return pivot and pivot.Position or nil
-    end
-    return nil
 end
 
 -- Vigia o voo ate o personagem ficar a <= ARRIVAL_DISTANCE do destino. No
@@ -282,10 +288,9 @@ end
 -- O voo de verdade. So acontece com o toggle ligado; e chamado pelo go() e
 -- toda vez que a selecao muda com o toggle ja ligado.
 --
--- Destino por INSTANCIA: acha em workspace.Map e manda o motor perseguir a
--- instancia (GoToInstance), com o alvo da vigia sendo a posicao dela. Destino
--- por POSICAO: manda o motor direto pra posicao (GoTo) e a vigia usa a mesma.
--- Nos dois casos a vigia mede a MESMA coisa que o motor persegue.
+-- Destino por POSICAO: manda o motor direto pra posicao da entrada (GoTo) e a
+-- vigia de chegada mede a mesma coisa que o motor persegue. A lista atual e toda
+-- por posicao (ver SEA_ISLANDS), entao este e o unico caminho.
 function Feature:Go()
     local motor = self.Teleport
     if not motor then
@@ -299,37 +304,10 @@ function Feature:Go()
         return false
     end
 
-    -- Destino por posicao fixa (ex.: Cafe): vai direto pro ponto.
-    if entry.pos then
-        -- Captura o SEGUNDO retorno do pcall: o pcall so diz que nao lancou; o
-        -- motor pode devolver nil (sem character/HRP) sem erro nenhum. Sem
-        -- olhar esse retorno, a feature armava a vigia e dizia "flying" sem voo.
-        local ok, started = pcall(function() return motor:GoTo(entry.pos) end)
-        if not ok then
-            self.LastStatus = "teleport failed"
-            self.LastError = "falha no voo"
-            return false
-        end
-        if started == nil then
-            self.LastStatus = "character not ready"
-            self.LastError = "sem personagem"
-            return false
-        end
-        self.LastStatus = ("flying to %s"):format(self.Selected)
-        self:_WatchArrival(self.Selected, entry.pos)
-        return true
-    end
-
-    -- Destino por instancia no mapa (as ilhas).
-    local island = self:IslandInstance(entry.instance)
-    if not island then
-        -- A instancia nao esta no mapa agora (mar errado, ilha removida). Avisa
-        -- em vez de voar pro vazio -- o objetivo e o jogador entender o porque.
-        self.LastStatus = ("not in map: workspace.Map.%s"):format(tostring(entry.instance))
-        return false
-    end
-    -- Mesmo cuidado: o retorno do motor diz se o voo comecou de fato.
-    local ok, started = pcall(function() return motor:GoToInstance(island) end)
+    -- Captura o SEGUNDO retorno do pcall: o pcall so diz que nao lancou; o motor
+    -- pode devolver nil (sem character/HRP) sem erro nenhum. Sem olhar esse
+    -- retorno, a feature armava a vigia e dizia "flying" sem voo.
+    local ok, started = pcall(function() return motor:GoTo(entry.pos) end)
     if not ok then
         self.LastStatus = "teleport failed"
         self.LastError = "falha no voo"
@@ -341,7 +319,7 @@ function Feature:Go()
         return false
     end
     self.LastStatus = ("flying to %s"):format(self.Selected)
-    self:_WatchArrival(self.Selected, self:InstancePosition(island))
+    self:_WatchArrival(self.Selected, entry.pos)
     return true
 end
 
