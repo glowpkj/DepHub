@@ -134,6 +134,17 @@ local methods, instanceMeta = {}, {}function instanceMeta:__index(key)
     -- the shared method table, so per-instance overrides are observable.
     local own = self._props[key]
     if own ~= nil then return own end
+    -- A real Instance resolves a child by NAME through the same index path
+    -- (`LP.Data.Level`). Model that so features that read a child this way
+    -- (the ESP reads LP.Data.<Field>.Value) behave as they do in game -- but
+    -- ONLY for keys that are not properties. A key the code has explicitly
+    -- written (even to nil, e.g. `Player.Character = nil`) is a property, and a
+    -- stale child of the same name must not resurface through it.
+    if type(key) == "string" and methods[key] == nil and not (rawget(self, "_setKeys") and rawget(self, "_setKeys")[key]) then
+        for _, child in ipairs(self._children) do
+            if child.Name == key then return child end
+        end
+    end
     -- Position mirrors CFrame on a real BasePart; deriving it here keeps code
     -- that reads one after setting the other from seeing nil in the double.
     if key == "Position" then
@@ -165,6 +176,11 @@ function instanceMeta:__newindex(key, value)
             error(string.format("%s is not a valid member of %s", tostring(key), tostring(class)), 2)
         end
         self._props[key] = value
+        -- Record the explicit write so __index does not let a stale child of the
+        -- same name resurface through a property the code set (even to nil).
+        local setKeys = rawget(self, "_setKeys")
+        if not setKeys then setKeys = {}; rawset(self, "_setKeys", setKeys) end
+        setKeys[key] = true
         -- On a Value object (NumberValue/...) the engine raises Changed whenever
         -- Value is written. Firing it here lets a feature that watches a value
         -- (the Player tab keeps Stun at 0) react exactly as it does in game.
@@ -433,9 +449,32 @@ local function NewWindow()
     -- not an index: a single-select dropdown's Value is the chosen option string.
     -- An unknown/nil default falls back to the first option, like the library.
     function library:AddDropdown(_, label, options, default, callback, multi)
+        -- The real library's multi-select `Default` is an ARRAY of the pre-selected
+        -- names (`for i = 1, #Default`). Handed a set `{F=true}` it loops zero
+        -- times and selects nothing -- the dropdown then shows its "..." placeholder
+        -- and looks unselectable. Model that, and expose the resulting label, so a
+        -- bad default is caught here instead of in game.
         local initial = default
-        if multi ~= true and type(initial) ~= "string" then initial = options[1] end
+        if multi == true then
+            local set = {}
+            if type(default) == "table" then
+                -- Only a proper array (ipairs) counts, exactly like the library.
+                for _, name in ipairs(default) do set[tostring(name)] = true end
+            end
+            initial = set
+        elseif type(initial) ~= "string" then
+            initial = options[1]
+        end
         local handle = {Kind = "dropdown", Value = initial, Options = options, MultiSelect = multi == true, Callback = callback}
+        -- `Label` is what the field renders: for multi, the selected names joined;
+        -- empty means the "..." placeholder (the bug).
+        if multi == true then
+            local names = {}
+            for _, name in ipairs(options) do if initial[name] then names[#names + 1] = name end end
+            handle.Text = #names > 0 and table.concat(names, ", ") or "..."
+        else
+            handle.Text = tostring(initial)
+        end
         library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback, MultiSelect = multi == true, Handle = handle}
         -- Single-select: :SetValue moves the chosen option and fires the callback,
         -- the way RedzLib's dropdown does when a saved config restores a choice.
@@ -443,6 +482,7 @@ local function NewWindow()
             if multi == true then return nil end
             if self.Value == value then return nil end
             self.Value = value
+            self.Text = tostring(value)
             if self.Callback then self.Callback(self.Value) end
             return self.Value
         end
@@ -456,11 +496,30 @@ local function NewWindow()
         function handle:Select(name, isSelected)
             if multi ~= true then return nil end
             selected[tostring(name)] = isSelected ~= false
+            local names = {}
+            for _, option in ipairs(options) do if selected[option] then names[#names + 1] = option end end
+            handle.Text = #names > 0 and table.concat(names, ", ") or "..."
             if self.Callback then
                 local snapshot = {}
                 for option, on in pairs(selected) do if on then snapshot[option] = true end end
                 self.Callback(snapshot)
             end
+            return selected
+        end
+        -- The real library's restore path: Clear removes every option, Add re-adds
+        -- one (which is how a saved multi selection is put back). Model both so the
+        -- adapter's handle.Set("clear then re-add") is exercised.
+        function handle:Clear()
+            if multi ~= true then return nil end
+            selected = {}
+            handle.Text = "..."
+        end
+        function handle:Add(name)
+            if multi ~= true then return nil end
+            selected[tostring(name)] = true
+            local names = {}
+            for _, option in ipairs(options) do if selected[option] then names[#names + 1] = option end end
+            handle.Text = #names > 0 and table.concat(names, ", ") or "..."
             return selected
         end
         return handle
@@ -822,14 +881,39 @@ local function sandbox(placeId, gameId)
         local target = Instance.new("Player")
         target.Name = name
         target.CharacterAdded, target.CharacterRemoving = signal(), signal()
-        local character = Instance.new("Model"); character.Name, character.Parent = "Character", target
+        local character = Instance.new("Model"); character.Name, character.Parent = name, target
         local hrp = Instance.new("Part"); hrp.Name, hrp.Parent = "HumanoidRootPart", character
         hrp.Position = position or Vector3.new(0, 0, 0)
         local humanoid = Instance.new("Humanoid"); humanoid.Parent = character
         humanoid.Health = 100
+        humanoid.MaxHealth = 100
         target.Character = character
+        -- O ESP e a captura de infos leem player.Data.<Nome>.Value (o caminho
+        -- do jogo). A fixtura cria o Data com Level/Beli/Fragments/Race/Fruit
+        -- como Value objects, pra a feature os achar de verdade -- um teste
+        -- ajusta os .Value pra exercitar o que quiser. O Data e um FILHO (nao um
+        -- campo): o __index do double resolve filho por nome, como o jogo.
+        local data = Instance.new("Folder"); data.Name = "Data"; data.Parent = target
+        for _, field in ipairs({ "Level", "Beli", "Fragments", "Race", "DevilFruit" }) do
+            local value = Instance.new("NumberValue"); value.Name = field; value.Parent = data
+        end
         context.Services.Players.Extra[#context.Services.Players.Extra + 1] = target
         return target, character
+    end
+    -- Instala os Values de Data no LOCAL player (Level/Beli/Fragments/Race/
+    -- Fruit), pra a captura das MINHAS infos achar de verdade. Devolve a pasta
+    -- Data pra o teste mexer nos .Value.
+    function context:AddLocalData(values)
+        local data = Instance.new("Folder"); data.Name = "Data"; data.Parent = context.Player
+        for _, field in ipairs({ "Level", "Beli", "Fragments", "Race", "DevilFruit" }) do
+            local value = Instance.new("NumberValue"); value.Name = field; value.Parent = data
+        end
+        if type(values) == "table" then
+            for field, value in pairs(values) do
+                if data:FindFirstChild(field) then data:FindFirstChild(field).Value = value end
+            end
+        end
+        return data
     end
     function context:RemovePlayers()
         context.Services.Players.Extra = {}

@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "silentaim", "fruit", "islands", "player"}
+local FEATURES = {"bladhits", "silentaim", "fruit", "islands", "player", "esp"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -290,7 +290,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "net-hook" or name == "fruit" or name == "islands" or name == "player", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "net-hook" or name == "fruit" or name == "islands" or name == "player" or name == "esp", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -377,6 +377,16 @@ do
     check(rangeSlider.Min == 500 and rangeSlider.Max == 1000, "o slider vai de 500 a 1000")
     check(rangeSlider.Value == 500, "o padrao do slider e 500")
     check(labels["toggle:Debug logs"] == nil, "o toggle Debug logs saiu do painel")
+
+    -- O dropdown MULTI nao pode abrir mostrando o placeholder "...": o padrao "F"
+    -- tem que estar de fato selecionado, senao o campo parecia nao-selecionavel
+    -- (era o "nao aparece as selecoes" do usuario). A causa era mandar o Default
+    -- como SET {F=true}; a lib espera ARRAY {"F"} e com o set o campo fica vazio.
+    check(exceptionDown.Handle.Text ~= "...", "o dropdown de excecoes abre com a selecao visivel, nao com o placeholder")
+    check(exceptionDown.Handle.Text:find("F", 1, true) ~= nil, "e a selecao visivel inclui o padrao (F)")
+    -- Selecionar de verdade marca a tecla e re-renderiza o campo.
+    exceptionDown.Handle:Select("Z", true)
+    check(exceptionDown.Handle.Text:find("Z", 1, true) ~= nil, "marcar Z aparece no campo")
 
     -- O toggle do painel liga a feature pelo mesmo caminho do backend.
     aimToggle.Handle:SetValue(true)
@@ -764,6 +774,74 @@ do
     -- Desligar o ESP limpa tudo, beam incluso.
     feature:SetEsp(false)
     check(next(feature.EspMap) == nil, "desligar o ESP limpa o mapa de entradas")
+    feature:Destroy()
+end
+
+-- Player ESP: captura as MINHAS infos (level/Beli/Fragments/Race/fruta/armas) e
+-- destaca os OUTROS jogadores com nome + level + vida (+ distancia no locator).
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Esp = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "esp.lua"])()
+    local feature = Esp.new()
+
+    -- Minhas infos: um Data no LocalPlayer com os Values + duas armas equipadas
+    -- (uma espada no character, uma arma na mochila) pra provar o equipped().
+    local data = ctx:AddLocalData({ Level = 1500, Beli = 1234567, Fragments = 4200 })
+    data:FindFirstChild("Race").Value = 3
+    data:FindFirstChild("DevilFruit").Value = 1
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local sword = Instance.new("Tool"); sword.Name = "Saber"; sword.ToolTip = "Sword"; sword.Parent = char
+    local backpack = Instance.new("Backpack"); backpack.Name, backpack.Parent = "Backpack", ctx.Player
+    local gun = Instance.new("Tool"); gun.Name = "Kabucha"; gun.ToolTip = "Gun"; gun.Parent = backpack
+
+    feature:SampleStats()
+    local stats = feature:GetStats()
+    check(stats.Level == "1500", "captura o meu level (LP.Data.Level.Value)")
+    check(stats.Beli == "1,234,567", "captura o Beli com separador de milhar")
+    check(stats.Fragments == "4,200", "captura os Fragments")
+    check(stats.Race == "3", "captura a Race")
+    check(stats.Sword == "Saber", "captura a arma equipada (ToolTip Sword)")
+    check(stats.Gun == "Kabucha", "captura a arma na mochila (ToolTip Gun)")
+    check(stats.Melee == "-", "sem arma do tipo, mostra o sentinela")
+
+    -- ESP dos outros: um jogador com Humanoid (Health/MaxHealth) e Data.Level.
+    local target, tchar = ctx:AddPlayer("Rival", Vector3.new(30, 0, 40))
+    target.Data.Level.Value = 900
+    local targetHum = tchar:FindFirstChildOfClass("Humanoid")
+    targetHum.Health = 70
+    targetHum.MaxHealth = 100
+
+    check(feature.EspOn == false, "o ESP comeca desligado")
+    feature:SetEsp(true)
+    check(feature.EspOn == true, "SetEsp liga o ESP")
+    feature:EspStep()
+    local entry = feature.EspMap[target]
+    check(entry ~= nil, "o ESP monta o adorno do outro jogador")
+    check(entry.highlight ~= nil and entry.billboard ~= nil, "o adorno tem Highlight e Billboard")
+    check(entry.label.Text:find("Rival", 1, true) ~= nil, "o rotulo mostra o nome")
+    check(entry.label.Text:find("Lv 900", 1, true) ~= nil, "o rotulo mostra o level do alvo")
+    check(entry.label.Text:find("HP 70/100", 1, true) ~= nil, "o rotulo mostra a vida do alvo")
+    check(entry.label.Text:find("50", 1, true) == nil, "sem o locator, nao mostra a distancia")
+
+    -- Locator: acrescenta a distancia ao rotulo (3-4-5: 30,40 -> 50).
+    feature:SetLocator(true)
+    feature:EspStep()
+    check(entry.label.Text:find("50m", 1, true) ~= nil, "o locator mostra a distancia exata")
+
+    -- O alvo sai: o adorno e derrubado na proxima passada.
+    ctx:RemovePlayers()
+    feature:EspStep()
+    check(feature.EspMap[target] == nil, "jogador que saiu perde o adorno (sem residuo)")
+
+    -- Desligar o ESP limpa o mapa todo.
+    ctx:AddPlayer("Outro", Vector3.new(10, 0, 10))
+    feature:EspStep()
+    check(next(feature.EspMap) ~= nil, "com um jogador vivo o mapa tem entrada")
+    feature:SetEsp(false)
+    check(next(feature.EspMap) == nil and feature.EspOn == false, "desligar o ESP limpa tudo")
     feature:Destroy()
 end
 

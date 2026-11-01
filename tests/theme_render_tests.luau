@@ -26,6 +26,14 @@ do
         function signal:Fire(...)
             for _, fn in ipairs(connections) do pcall(fn, ...) end
         end
+        -- Debug: dispara propagando erro (pra ver onde o handler quebra).
+        function signal:FireRaw(...)
+            for _, fn in ipairs(connections) do fn(...) end
+        end
+        -- O popup de dropdown da lib chama Completed:Wait() ao abrir/fechar. Sem o
+        -- Wait o tween "trava" e a flag de fechamento fica presa true -- o dropdown
+        -- nunca mais abre. Modelar aqui mantem o double fiel ao Roblox.
+        function signal:Wait() return nil end
         return signal
     end
 
@@ -33,6 +41,15 @@ do
     -- library connects, and accept any property write.
     local function renderInstance(class)
         local raw = {ClassName = class, Name = "", _kids = {}, _attrs = {}, Visible = true, Text = ""}
+        -- A lib le AbsoluteSize/AbsolutePosition dos frames (posicionamento do popup,
+        -- escala). Sem eles, a matematica do popup estoura. Valores plausiveis.
+        if class == "ScreenGui" then
+            raw.AbsoluteSize = {X = 1920, Y = 1080}
+            raw.AbsolutePosition = {X = 0, Y = 0}
+        else
+            raw.AbsoluteSize = {X = 200, Y = 21}
+            raw.AbsolutePosition = {X = 100, Y = 100}
+        end
         function raw:IsA(c)
             return c == class or c == "Instance" or c == "GuiObject" or c == "Frame"
         end
@@ -78,6 +95,13 @@ do
                 if value ~= nil then return value end
                 for _, kid in ipairs(raw._kids) do
                     if kid.Name == key then return kid end
+                end
+                -- A lib procura filhos sem nome pela CLASSE (ex.: option.TextLabel,
+                -- option.Frame). O Instance real da lib expoe esses atalhos; aqui
+                -- derivamos do ClassName do filho pra o double ser fiel.
+                for _, kid in ipairs(raw._kids) do
+                    local kc = kid.ClassName
+                    if type(kc) == "string" and kc == key then return kid end
                 end
                 return nil
             end,
@@ -340,6 +364,59 @@ do
     local multi = tab:AddDropdown({Name = "My multi", Options = {"Dragon", "Leopard"}, Default = {"Dragon"}, MultiSelect = true})
     check(type(multi) == "table", "AddDropdown with MultiSelect returns a handle")
     check(multi.Kind == "Dropdown", "the multi-select dropdown is tagged as a Dropdown")
+
+    -- O default de um dropdown MULTI tem que ser ARRAY: a lib varre `for i=1,#Default`.
+    -- Um SET {Dragon=true} faz o loop rodar zero vezes, nada fica selecionado e o
+    -- campo renderiza o placeholder "..." -- o dropdown que parecia nao-selecionavel
+    -- no painel. Aqui provamos que o array default seleciona de verdade e que o
+    -- campo renderiza o nome escolhido.
+    do
+        local selectedCount = 0
+        local dragonSelected = false
+        for _, option in ipairs(multi.DROPDOWN_OPTIONS) do
+            if option.Selected then
+                selectedCount = selectedCount + 1
+                if option.Name == "Dragon" then dragonSelected = true end
+            end
+        end
+        check(selectedCount == 1 and dragonSelected,
+            "com Default array o dropdown multi ja nasce com 'Dragon' selecionado")
+    end
+
+    -- ABRIR: clicar no campo abre o popup e marca Opened; clicar de novo fecha.
+    -- Era o "nao abre pra selecionar" do usuario.
+    do
+        local holder = multi.VISIBLE_ELEMENT
+        check(type(holder) == "table", "o dropdown expoe o campo clicavel (VISIBLE_ELEMENT)")
+
+        -- ANTES de abrir, o popup NAO pode estar visivel em lugar nenhum -- era o
+        -- "box escuro com a lupa" preso sobre o conteudo que o usuario viu.
+        local dropdownsFolder = window:GetElements().Dropdowns
+        if type(dropdownsFolder) == "table" then
+            local strayVisible = false
+            for _, kid in ipairs(dropdownsFolder:GetChildren()) do
+                if kid.Visible then strayVisible = true end
+            end
+            check(not strayVisible, "com o dropdown fechado o popup nao fica visivel (sem box solto)")
+        end
+
+        check(multi.Opened ~= true, "o dropdown nasce fechado")
+        -- O click abre. Se `aC` (flag de fechamento) ficar preso true, o OpenDropdown
+        -- recusa -- diagnostico primeiro.
+        holder.Activated:Fire()
+        check(multi.Opened == true, "clicar no campo ABRE o dropdown (Opened=true) [Opened="
+            .. tostring(multi.Opened) .. " type=" .. type(holder.Activated) .. "]")
+        -- O popup tem que ganhar pai (a pasta Dropdowns) pra renderizar.
+        if type(dropdownsFolder) == "table" then
+            local found = false
+            for _, kid in ipairs(dropdownsFolder:GetChildren()) do
+                if kid.Visible then found = true end
+            end
+            check(found, "o popup do dropdown aparece com um filho visivel ao abrir")
+        end
+        holder.Activated:Fire()
+        check(multi.Opened == false, "clicar de novo FECHA o dropdown (Opened=false)")
+    end
 
     -- Icons are catalogue names now: a known name resolves to an asset id. An
     -- unknown name (or an emoji) resolves to nothing and the tab is built with no

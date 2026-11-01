@@ -181,15 +181,21 @@ local function makeSection(adapter, tabHandle, title)
         end
 
         local initialSet = {}
+        local initialList = {}
         for _, name in ipairs(type(initial) == "table" and initial or {}) do
             initialSet[tostring(name)] = true
+            initialList[#initialList + 1] = tostring(name)
             selected[tostring(name)] = true
         end
 
         local handle = tabHandle:AddDropdown({
             Name = tostring(label),
             Options = list,
-            Default = initialSet,
+            -- RedzLib's multi-select default is an ARRAY of the pre-selected names
+            -- (`for i = 1, #Default`), not a set: handed a set `{F=true}` the
+            -- library loops zero times, selects nothing, and the field renders its
+            -- empty placeholder, "..." -- the dropdown that looked unselectable.
+            Default = initialList,
             MultiSelect = true,
             Callback = function(value)
                 -- RedzLib passes the selected set; rebuild the ordered array from

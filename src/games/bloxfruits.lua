@@ -65,6 +65,7 @@ local FEATURE_MODULES = {
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
     {name = "player", page = "Player", section = "PLAYER", toggle = "Speed multiplier"},
+    {name = "esp", page = "Player", section = "PLAYER ESP", toggle = "Player ESP"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -972,6 +973,44 @@ local PANELS = {
             State:RegisterConfig("autobuso", applyBuso, busoToggle)
 
             section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, Flashstep cooldown (0 = ready), and Autoken/Autobuso to keep Observation and Armament Haki on. Stun is kept at 0.")
+        end,
+    },
+    esp = {
+        page = "Player",
+        section = "PLAYER ESP",
+        category = "Player",
+        icon = "eye",
+        tabIcon = "user",
+        -- ESP dos OUTROS jogadores (level + vida) e o locator (distancia ate
+        -- cada um). A feature tambem captura as MINHAS infos (level, Beli,
+        -- Fragments, Race, fruta, armas) num loop -- sem UI ainda, so guardadas
+        -- pra o usuario construir em cima.
+        build = function(section, instance)
+            local factory = State.Features.esp
+
+            local function applyEsp(value)
+                State:SetFeature("esp", value)
+                if State.Instances.esp then State.Instances.esp:SetEsp(value) end
+            end
+            local espToggle = section:CreateToggle("Player ESP", State.Config.esp == true, function(value)
+                applyEsp(value)
+                State.Config.esp = value == true
+            end)
+            State:RegisterConfig("esp", applyEsp, espToggle)
+
+            -- Locator: acrescenta a distancia ao rotulo -- acha ONDE cada
+            -- jogador esta. Depende do ESP pros adornos existirem.
+            local function applyLocator(value)
+                State:SetFeature("esp", true)
+                if State.Instances.esp then State.Instances.esp:SetLocator(value) end
+            end
+            local locatorToggle = section:CreateToggle("Player locator", State.Config.esplocator == true, function(value)
+                applyLocator(value)
+                State.Config.esplocator = value == true
+            end)
+            State:RegisterConfig("esplocator", applyLocator, locatorToggle)
+
+            section:CreateParagraph("Player ESP", "Highlights every other player with their name, level and health, and a locator with the exact distance to each one. Your own stats (level, Beli, Fragments, race, fruit and equipped weapons) are captured in the background and kept ready.")
         end,
     },
     -- CONFIG: os botoes de salvar/carregar. Nao e uma feature (nao tem toggle
