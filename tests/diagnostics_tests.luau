@@ -210,6 +210,75 @@ do
     diag:Destroy()
 end
 
+-- Diagnostics.Notes tem teto, como o buffer de logs: uma sessao longa nao pode
+-- crescer Notes sem limite.
+do
+    local ctx = sandbox()
+    local Diag = ctx:Run("src/core/diagnostics.lua")
+    local diag = Diag.new()
+    for i = 1, 500 do diag:Note("n" .. i) end
+    check(#diag.Notes <= 200, "Notes e limitado (nao cresce sem teto)")
+    check(diag.Notes[#diag.Notes] == "n500", "as notas mais recentes ficam")
+    check(diag.Notes[1] ~= "n1", "as notas mais antigas saem do buffer")
+    diag:Destroy()
+end
+
+-- SniffRemote: com hookfunction mas SEM restorefunction, nao ha caminho de
+-- restauracao -- nao instala o hook (deixaria instrumentacao viva depois do
+-- Uninstall) e reporta "unsupported".
+do
+    local ctx = sandbox()
+    local Diag = ctx:Run("src/core/diagnostics.lua")
+    local diag = Diag.new()
+    diag.SniffEnabled = true  -- logs de remote so aparecem com o sniff ligado
+
+    -- Executor com hookfunction e SEM restorefunction.
+    local hookInstalled = false
+    ctx.State.hookfunction = function(target, replacement) hookInstalled = true; return target end
+    ctx.State.restorefunction = nil
+
+    -- RemoteEvent real: o metodo mora na metatable compartilhada, entao
+    -- rawget(remote, "FireServer") e nil e um field patch nem se aplica.
+    local eventMeta = {__index = function(self, key)
+        if key == "FireServer" then return rawget(self, "_fire") end
+        error(key .. " is not a valid member of RemoteEvent")
+    end}
+    local remote = setmetatable({_fire = function() return "fired" end}, eventMeta)
+
+    diag:SniffRemote(remote, "NoRestore.POST")
+    check(hookInstalled == false, "sem restorefunction nao instala hook de executor")
+    check(diag:LogText():find("unsupported", 1, true) ~= nil, "reporta unsupported quando nao ha caminho de restauracao")
+    -- O remote continua respondendo pelo metodo original (nada foi aplicado).
+    check(rawget(remote, "FireServer") == nil, "o remote sem restore path nao ganhou field patch")
+    check(remote:FireServer() == "fired", "o remote sem restore path continua intacto")
+    ctx.State.hookfunction = nil
+
+    diag:Destroy()
+end
+
+-- _removeLogHooks: so restaura o warn/print se o valor atual ainda for o NOSSO
+-- wrapper -- se outro script instalou uma camada depois, nao apagamos a dele.
+do
+    local ctx = sandbox()
+    local Diag = ctx:Run("src/core/diagnostics.lua")
+    local diag = Diag.new()
+    diag:_installLogHooks()  -- instala os hooks de warn/print
+
+    local hook = diag.Hooks.warn
+    check(hook ~= nil and hook.Holders and #hook.Holders >= 1, "os hooks de warn sao instalados")
+
+    -- Simula outro script sobrescrevendo a MESMA holder com a propria camada.
+    local holder = hook.Holders[1]
+    local foreign = function() end
+    holder.warn = foreign
+
+    diag:_removeLogHooks()
+    check(holder.warn == foreign, "nao sobrescreve a camada de outro script (deixa o foreign no lugar)")
+    check(diag:LogText():find("another script", 1, true) ~= nil, "registra o conflito de hook")
+
+    diag:Destroy()
+end
+
 -- The Debug tab is opt-in: with env.__DEPHUB_ENABLE_DEBUG the loader installs
 -- the shared tab for the game, and the AOT:R backend reports its own structure
 -- into it.

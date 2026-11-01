@@ -1778,16 +1778,19 @@ function DemonUI.new(options)
     -- Visible), so the adapter exposes it.
     function library:Toggle()
         if self.Destroyed then return false end
-        window:Minimize()
-        return true
+        local ok = pcall(function() window:Minimize() end)
+        return ok
     end
 
     local env = type(getgenv) == "function" and getgenv() or _G
-    env.__DEPHUB_TOGGLE = function()
+    -- Guarda a closure publicada em self: no Destroy so removemos a chave global
+    -- se ela AINDA for esta funcao (senao outra sessao a sobrescreveu e a dela
+    -- ficaria orfa). Devolve o resultado REAL do toggle, nao um true de fachada.
+    self.ToggleCallback = function()
         if self.Destroyed or not self.Library then return false end
-        pcall(function() self.Library:Toggle() end)
-        return true
+        return self.Library:Toggle() == true
     end
+    env.__DEPHUB_TOGGLE = self.ToggleCallback
 
     -- Open/close key (N by default), bound through the LIBRARY'S OWN toggle: the
     -- RedzLib window exposes NewMinimizer(keyCode), which connects the key and
@@ -1963,6 +1966,13 @@ function DemonUI:Destroy()
         self._metricsConnection = nil
     end
     pcall(function() self.Library:Destroy() end)
+    -- Remove a sonda global SO se ela ainda for a desta sessao. Se outra sessao a
+    -- sobrescreveu, nao apagamos a dela.
+    local env = type(getgenv) == "function" and getgenv() or _G
+    if self.ToggleCallback and env.__DEPHUB_TOGGLE == self.ToggleCallback then
+        env.__DEPHUB_TOGGLE = nil
+    end
+    self.ToggleCallback = nil
     table.clear(self.Tabs)
     table.clear(self.Categories)
     table.clear(self._tabByName)
@@ -2004,6 +2014,7 @@ local Diagnostics = {}
 Diagnostics.__index = Diagnostics
 
 local MAX_LOG = 400
+local MAX_NOTES = 200
 local REFRESH = 0.5
 
 local function envTable()
@@ -2112,7 +2123,10 @@ function Diagnostics:Watch(label, reader)
 end
 
 function Diagnostics:Note(text)
+    -- Limitado como o buffer de logs: uma sessao longa (ou um modulo que repetia
+    -- notas) nao pode crescer sem teto. Descarta as mais antigas.
     self.Notes[#self.Notes + 1] = tostring(text)
+    while #self.Notes > MAX_NOTES do table.remove(self.Notes, 1) end
 end
 
 function Diagnostics:Command(name, handler)
@@ -2207,7 +2221,14 @@ function Diagnostics:_removeLogHooks()
             pcall(function() hook:Disconnect() end)
         elseif type(hook) == "table" and hook.Holders then
             for _, holder in ipairs(hook.Holders) do
-                pcall(function() holder[name] = hook.Original end)
+                -- Restaura SO se o valor atual ainda for o NOSSO wrapper. Se
+                -- outro script instalou uma camada depois do DepHub, sobrescrever
+                -- aqui apagaria a dele -- conflito registrado, nao resolvido a forca.
+                if holder[name] == hook.Wrapped then
+                    pcall(function() holder[name] = hook.Original end)
+                elseif holder[name] ~= hook.Original then
+                    self:_addLog("console", "warn/print hook of another script left in place (" .. tostring(name) .. ")")
+                end
             end
         elseif type(hook) == "table" then
             -- Remote sniffer record: undo executor hooks and field patches.
@@ -2239,6 +2260,12 @@ function Diagnostics:SniffRemote(remote, label)
     local env = envTable()
     local hook = env.hookfunction or _G.hookfunction
     local restore = env.restorefunction or _G.restorefunction
+    -- Um hook de executor SO e instalado se houver como desfaze-lo. Com
+    -- hookfunction e sem restorefunction a instrumentacao ficaria ativa depois
+    -- do Uninstall -- nao ha restauracao verificavel, entao nao instala: loga
+    -- "unsupported" e deixa o remote em paz. (Field patch de double Lua e
+    -- reversivel por conta propria e nao depende disso.)
+    local canHook = type(hook) == "function" and type(restore) == "function"
     local record = {Restores = {}, Fields = {}}
     self.Hooks[key] = record
 
@@ -2254,7 +2281,7 @@ function Diagnostics:SniffRemote(remote, label)
                 self:_addLog("remote", verb .. label .. "(" .. self:_fmtArgs(...) .. ")")
                 return method(instance, ...)
             end
-            if type(hook) == "function" then
+            if canHook then
                 -- Executor hooking: swap the closure and keep the handle for
                 -- restorefunction on teardown.
                 local handle
@@ -2264,6 +2291,15 @@ function Diagnostics:SniffRemote(remote, label)
                 else
                     self:_addLog("remote", "could not hook " .. name .. " of " .. label)
                 end
+            elseif type(hook) == "function" then
+                -- Ha hookfunction mas nao ha restorefunction: nao da pra instalar
+                -- com seguranca (o hook ficaria vivo apos o Uninstall). Reporta e
+                -- nao instrumenta -- mas o field patch de um double Lua ainda vale.
+                self:_addLog("remote", "unsupported: no restore path for " .. name .. " of " .. label)
+                if rawget(remote, name) == method then
+                    record.Fields[#record.Fields + 1] = {Remote = remote, Name = name, Original = method}
+                    pcall(function() rawset(remote, name, wrapped) end)
+                end
             elseif rawget(remote, name) == method then
                 -- Plain-function double: patch the own field only, and only
                 -- when no metatable shadows it.
@@ -2272,7 +2308,6 @@ function Diagnostics:SniffRemote(remote, label)
             end
         end
     end
-    if type(restore) ~= "function" then record.Restores = nil end
 end
 
 function Diagnostics:_fmtArgs(...)
@@ -8346,7 +8381,10 @@ local ax=setmetatable({
 KeyCode=aw
 },aj)
 
-u(UserInputService.InputBegan,function(ay)
+u(UserInputService.InputBegan,function(ay,az)
+-- Ignora entrada ja processada (digitacao no chat/TextBox): sem isso a tecla
+-- de abrir/fechar dispara enquanto o usuario escreve. Somente teclado.
+if az or ay.UserInputType~=Enum.UserInputType.Keyboard then return end
 if ay.KeyCode==ax.KeyCode then
 ag:Minimize()
 end

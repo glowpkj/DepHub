@@ -30,6 +30,7 @@ local Diagnostics = {}
 Diagnostics.__index = Diagnostics
 
 local MAX_LOG = 400
+local MAX_NOTES = 200
 local REFRESH = 0.5
 
 local function envTable()
@@ -138,7 +139,10 @@ function Diagnostics:Watch(label, reader)
 end
 
 function Diagnostics:Note(text)
+    -- Limitado como o buffer de logs: uma sessao longa (ou um modulo que repetia
+    -- notas) nao pode crescer sem teto. Descarta as mais antigas.
     self.Notes[#self.Notes + 1] = tostring(text)
+    while #self.Notes > MAX_NOTES do table.remove(self.Notes, 1) end
 end
 
 function Diagnostics:Command(name, handler)
@@ -233,7 +237,14 @@ function Diagnostics:_removeLogHooks()
             pcall(function() hook:Disconnect() end)
         elseif type(hook) == "table" and hook.Holders then
             for _, holder in ipairs(hook.Holders) do
-                pcall(function() holder[name] = hook.Original end)
+                -- Restaura SO se o valor atual ainda for o NOSSO wrapper. Se
+                -- outro script instalou uma camada depois do DepHub, sobrescrever
+                -- aqui apagaria a dele -- conflito registrado, nao resolvido a forca.
+                if holder[name] == hook.Wrapped then
+                    pcall(function() holder[name] = hook.Original end)
+                elseif holder[name] ~= hook.Original then
+                    self:_addLog("console", "warn/print hook of another script left in place (" .. tostring(name) .. ")")
+                end
             end
         elseif type(hook) == "table" then
             -- Remote sniffer record: undo executor hooks and field patches.
@@ -265,6 +276,12 @@ function Diagnostics:SniffRemote(remote, label)
     local env = envTable()
     local hook = env.hookfunction or _G.hookfunction
     local restore = env.restorefunction or _G.restorefunction
+    -- Um hook de executor SO e instalado se houver como desfaze-lo. Com
+    -- hookfunction e sem restorefunction a instrumentacao ficaria ativa depois
+    -- do Uninstall -- nao ha restauracao verificavel, entao nao instala: loga
+    -- "unsupported" e deixa o remote em paz. (Field patch de double Lua e
+    -- reversivel por conta propria e nao depende disso.)
+    local canHook = type(hook) == "function" and type(restore) == "function"
     local record = {Restores = {}, Fields = {}}
     self.Hooks[key] = record
 
@@ -280,7 +297,7 @@ function Diagnostics:SniffRemote(remote, label)
                 self:_addLog("remote", verb .. label .. "(" .. self:_fmtArgs(...) .. ")")
                 return method(instance, ...)
             end
-            if type(hook) == "function" then
+            if canHook then
                 -- Executor hooking: swap the closure and keep the handle for
                 -- restorefunction on teardown.
                 local handle
@@ -290,6 +307,15 @@ function Diagnostics:SniffRemote(remote, label)
                 else
                     self:_addLog("remote", "could not hook " .. name .. " of " .. label)
                 end
+            elseif type(hook) == "function" then
+                -- Ha hookfunction mas nao ha restorefunction: nao da pra instalar
+                -- com seguranca (o hook ficaria vivo apos o Uninstall). Reporta e
+                -- nao instrumenta -- mas o field patch de um double Lua ainda vale.
+                self:_addLog("remote", "unsupported: no restore path for " .. name .. " of " .. label)
+                if rawget(remote, name) == method then
+                    record.Fields[#record.Fields + 1] = {Remote = remote, Name = name, Original = method}
+                    pcall(function() rawset(remote, name, wrapped) end)
+                end
             elseif rawget(remote, name) == method then
                 -- Plain-function double: patch the own field only, and only
                 -- when no metatable shadows it.
@@ -298,7 +324,6 @@ function Diagnostics:SniffRemote(remote, label)
             end
         end
     end
-    if type(restore) ~= "function" then record.Restores = nil end
 end
 
 function Diagnostics:_fmtArgs(...)

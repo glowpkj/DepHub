@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-01T07:38:44.969276+00:00",
-  "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+  "generatedAt": "2026-11-01T14:40:07.391Z",
+  "commit": "local",
   "version": "0.1.27",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "cb2d44766e06c4fb32a85f96d999d0b30a53890856669e7a1f9b742bff059bc1",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "a98d173212e3e5022daf14d01163984420faa0cb14514e57915b5b68f3f111d4",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "edaa4278e0ffbdc8b08a2179c79cde20a7191b16c4adf855f4d744712f31718e",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "128726ad960cb6ffef25ff428fae70a52f669e70e5389d95f06d489b2f861ebc",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -54,8 +54,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "24025ecb3bcbef027fbb2a39a586a26d9b381e6b3888ef27d94b94508e4ae630",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "a1ef0cc9e11b64b2b6ab87d3655e65164579029ac7c2d01e8605c2fb5f1eea4c",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -74,8 +74,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "e5ce39903a21bdb34488f9e122076e5db9a34b437838c6332467de8561e7293a",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "4ccfde1e0f86bc4c81d7bf9eacc78721db7173b9c616c9f5e3cecb0eeb422f71",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -96,8 +96,8 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "de4ea62b8ee14f4a9cbeeba6132fe59d76664e116b3f6873afd10e8f06fcec24",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "156ab7112f9368587d9c421ac5f006741dbd68924bef819d2b800010702f6af2",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -114,8 +114,8 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "fa9f1bd97505571f4af86b766adb672a22825758086d4720f2464d1facc752cc",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "44e0b9ecab7b544f8e599f31b985ad17ef38fd8cc744dafceb8fe4855272fc2e",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -132,8 +132,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "91a5e2b1796ea92c2e8f5a3f4f0e388087f3d989ff3d84338b5860929c2dbd72",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "effa84e5e3ea6f7a22918ec2174e896ed9fbbbf75327604fd9067aff408dad13",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "4472e898387193328e871447b861c8b40962aefaebdd8c11019075ce9a6f5451",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "bb737785396b4d35123ed9472fd0a040447569b4f29c4ffd9b1f605f652e1fc7",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -183,8 +183,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "15a437e933f529eccac0d122c4d2bf4fd83ad496b3d1a8f7b81a3958095891b5",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "bdb86cc1cc41bbee5d5928827de2527520895a571fc0b9751fec77859ea6f60c",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -213,8 +213,8 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "7fe64f19057e2a9033ac40a366367b73cd1faf4af13877f277eca36df63d7273",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "eacd09f4fdd3201076f2d11c23a5d8b91f2b8ee98cc0353857cc5176b5b233ac",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -231,8 +231,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "9718fc7b08e5144f39cbc3b84eb056c781572d55d314d3542aa74b98fe001986",
-      "commit": "c4a9fcb410f7cd2de929bf4860c7d4d0f424818a",
+      "version": "795affb6ba95c11c77bcb17447db6fbb6bd9a3c2fcce0b478314f5f4783f38da",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -253,41 +253,5 @@
       ]
     }
   },
-  "recentUpdates": [
-    {
-      "Version": "c4a9fcb",
-      "Date": "2026-11-01T04:38:25-03:00",
-      "Changes": [
-        "fix(core+bloxfruits): correct the seven P0 state bugs"
-      ]
-    },
-    {
-      "Version": "b953ae3",
-      "Date": "2026-11-01T04:08:31-03:00",
-      "Changes": [
-        "\ufefffix(redzlib): dropdown popup nao fica mais preso no painel"
-      ]
-    },
-    {
-      "Version": "6c58368",
-      "Date": "2026-11-01T03:59:18-03:00",
-      "Changes": [
-        "Save everything and reactivate it on join; shared config core; fix Auto execute"
-      ]
-    },
-    {
-      "Version": "09bfff5",
-      "Date": "2026-11-01T03:41:47-03:00",
-      "Changes": [
-        "bloxfruits: FPS boost feature; lighter silent aim per-frame cost"
-      ]
-    },
-    {
-      "Version": "4e713e7",
-      "Date": "2026-11-01T03:32:18-03:00",
-      "Changes": [
-        "bloxfruits: teleport stops when toggled off; lighter flight loop; save fix"
-      ]
-    }
-  ]
+  "recentUpdates": []
 }

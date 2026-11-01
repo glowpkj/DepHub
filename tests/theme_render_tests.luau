@@ -14,7 +14,19 @@
 -- claims the modules compile, load and build.
 do
     local function renderSignal()
-        return {Connect = function() return {Disconnect = function() end} end}
+        local connections = {}
+        local signal = {}
+        function signal:Connect(fn)
+            local connection = {fn = fn, Disconnect = function() end}
+            connections[#connections + 1] = fn
+            return connection
+        end
+        -- Alguns testes precisam disparar o evento (ex.: o minimizador filtra
+        -- InputBegan processado). O stub antigo so aceitava Connect.
+        function signal:Fire(...)
+            for _, fn in ipairs(connections) do pcall(fn, ...) end
+        end
+        return signal
     end
 
     -- A permissive GUI double: instances parent by name, expose the events the
@@ -116,13 +128,43 @@ do
     renderServices.Workspace = renderInstance("Workspace")
     renderServices.Workspace.CurrentCamera = {ViewportSize = {X = 1920, Y = 1080}}
 
+    -- EnumItem double: value+Name+EnumType, flagged so typeof() reports it as an
+    -- EnumItem (RedzLib's KeyCode validator runs an EnumItem type check).
+    local ENUMITEM = {}
+    local function renderEnumItem(enumType, name, value)
+        local item = setmetatable({
+            Name = name, Value = value or 0, EnumType = enumType, _isEnumItem = true,
+        }, {__index = function(_, key)
+            if key == "IsA" then return function(self, c) return c == "EnumItem" end end
+            return nil
+        end})
+        return item
+    end
+    local function renderEnumType(enumName, names)
+        local et = {_items = {}, GetEnumItems = function(self) return self._items end}
+        local byName = {}
+        for i, n in ipairs(names) do
+            local item = renderEnumItem(et, n, i)
+            et._items[i] = item
+            byName[n] = item
+        end
+        et.__index = function(_, key) return byName[key] end
+        return setmetatable(et, et)
+    end
+
     local renderEnum = setmetatable({}, {
         __index = function()
             return setmetatable({}, {__index = function() return 0 end})
         end,
     })
-    renderEnum.KeyCode = setmetatable({GetEnumItems = function() return {} end}, {__index = function() return 0 end})
-    renderEnum.UserInputType = {MouseButton1 = 1, Touch = 2, MouseMovement = 3}
+    local renderKeyCode = renderEnumType("KeyCode", {"N", "M", "Unknown"})
+    renderEnum.KeyCode = renderKeyCode
+    renderEnum.UserInputType = {
+        MouseButton1 = renderEnumItem("UserInputType", "MouseButton1", 1),
+        Touch = renderEnumItem("UserInputType", "Touch", 2),
+        MouseMovement = renderEnumItem("UserInputType", "MouseMovement", 3),
+        Keyboard = renderEnumItem("UserInputType", "Keyboard", 4),
+    }
     renderEnum.UserInputState = {End = 1}
     renderEnum.PlaybackState = {Playing = 1}
 
@@ -159,7 +201,10 @@ do
         Random = {new = function() return {NextNumber = function() return 0.5 end, NextInteger = function(a) return a end} end},
         tick = function() return 0 end,
         os = os,
-        typeof = function(v) return type(v) end,
+        typeof = function(v)
+            if type(v) == "table" and v._isEnumItem then return "EnumItem" end
+            return type(v)
+        end,
         gethui = function() return renderServices.CoreGui end,
         cloneref = function(v) return v end,
         hookfunction = function() end,
@@ -227,6 +272,37 @@ do
     check(type(window.MakeTab) == "function", "the window exposes MakeTab")
     check(type(window.Notify) == "function", "the window exposes Notify")
     check(type(window.SelectTab) == "function", "the window exposes SelectTab")
+
+    -- NewMinimizer (RedzLib): a tecla N alterna o frame principal. Bug: o handler
+    -- nao filtrava gameProcessed, entao a tecla disparava enquanto o usuario
+    -- digitava (chat/TextBox). Prova: input processado NAO minimiza; input de
+    -- teclado nao-processado NAO; toque/mouse NAO.
+    do
+        local input = renderServices.UserInputService
+        local mainFrame = window:GetElements().MainFrame
+        check(type(mainFrame) == "table", "o window expoe MainFrame via GetElements")
+        local shownBefore = mainFrame.Visible
+
+        local minimizer = window:NewMinimizer(renderEnum.KeyCode.N)
+        check(type(minimizer) == "table" and minimizer.KeyCode == renderEnum.KeyCode.N, "NewMinimizer devolve um handle com o KeyCode")
+
+        -- Tecla N, mas com gameProcessed=true (usuario digitando): ignora.
+        input.InputBegan:Fire({KeyCode = renderEnum.KeyCode.N, UserInputType = renderEnum.UserInputType.Keyboard}, true)
+        check(mainFrame.Visible == shownBefore, "input processado NAO minimiza (nao dispara digitando)")
+
+        -- Toque no mesmo KeyCode: ignora (so teclado).
+        input.InputBegan:Fire({KeyCode = renderEnum.KeyCode.N, UserInputType = renderEnum.UserInputType.Touch}, false)
+        check(mainFrame.Visible == shownBefore, "input nao-teclado NAO minimiza")
+
+        -- Tecla N limpa: alterna.
+        input.InputBegan:Fire({KeyCode = renderEnum.KeyCode.N, UserInputType = renderEnum.UserInputType.Keyboard}, false)
+        check(mainFrame.Visible ~= shownBefore, "tecla N nao-processada alterna o frame")
+
+        -- Outra tecla limpa: nao alterna.
+        local shownAfter = mainFrame.Visible
+        input.InputBegan:Fire({KeyCode = renderEnum.KeyCode.M, UserInputType = renderEnum.UserInputType.Keyboard}, false)
+        check(mainFrame.Visible == shownAfter, "outra tecla NAO minimiza")
+    end
 
     -- The library reads its starting size from Default.UISize. Prove the value
     -- the shell writes is a well-formed UDim2 the library can offset from (a
@@ -339,6 +415,7 @@ do
 
         check(type(renderEnv.__DEPHUB_TOGGLE) == "function", "the shell publishes __DEPHUB_TOGGLE")
         check(renderEnv.__DEPHUB_TOGGLE() == true, "the toggle global reports success")
+        check(ui.ToggleCallback == renderEnv.__DEPHUB_TOGGLE, "a shell guarda a closure publicada em ToggleCallback")
 
         ui:SetCurrentSea("Sea2")
         shellTab.Sea = "Sea1"
@@ -350,5 +427,34 @@ do
 
         ui:Destroy()
         check(ui.Destroyed == true, "Destroy flags the shell")
+        check(renderEnv.__DEPHUB_TOGGLE == nil, "Destroy remove a sonda global __DEPHUB_TOGGLE da sessao")
+
+        -- A guarda do Destroy em si: remove a sonda SO se ela ainda for a desta
+        -- sessao. Testada direto no metodo (a library so deixa criar 1 Window, o
+        -- que impede um segundo shell real no processo).
+        local function fakeShell(toggleGlobal)
+            return {
+                Destroyed = false, Tabs = {}, Categories = {}, _tabByName = {},
+                Library = {Destroy = function() end},
+                ToggleCallback = toggleGlobal,
+            }
+        end
+
+        -- Caso 1: o global ainda e o nosso -> limpa.
+        local own = function() return true end
+        renderEnv.__DEPHUB_TOGGLE = own
+        local shellA = fakeShell(own)
+        adapter.Destroy(shellA)
+        check(renderEnv.__DEPHUB_TOGGLE == nil, "Destroy limpa a sonda quando ela ainda e a da sessao")
+        check(shellA.ToggleCallback == nil, "Destroy zera o ToggleCallback")
+
+        -- Caso 2: outra sessao sobrescreveu o global -> nao apaga a dela.
+        local foreign = function() return "foreign" end
+        renderEnv.__DEPHUB_TOGGLE = foreign
+        local shellB = fakeShell(own)
+        adapter.Destroy(shellB)
+        check(renderEnv.__DEPHUB_TOGGLE == foreign, "Destroy nao apaga a sonda de outra sessao")
+        check(shellB.ToggleCallback == nil, "Destroy zera o ToggleCallback mesmo sem limpar o global alheio")
+        renderEnv.__DEPHUB_TOGGLE = nil
     end
 end

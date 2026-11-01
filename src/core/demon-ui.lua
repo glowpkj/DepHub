@@ -398,16 +398,19 @@ function DemonUI.new(options)
     -- Visible), so the adapter exposes it.
     function library:Toggle()
         if self.Destroyed then return false end
-        window:Minimize()
-        return true
+        local ok = pcall(function() window:Minimize() end)
+        return ok
     end
 
     local env = type(getgenv) == "function" and getgenv() or _G
-    env.__DEPHUB_TOGGLE = function()
+    -- Guarda a closure publicada em self: no Destroy so removemos a chave global
+    -- se ela AINDA for esta funcao (senao outra sessao a sobrescreveu e a dela
+    -- ficaria orfa). Devolve o resultado REAL do toggle, nao um true de fachada.
+    self.ToggleCallback = function()
         if self.Destroyed or not self.Library then return false end
-        pcall(function() self.Library:Toggle() end)
-        return true
+        return self.Library:Toggle() == true
     end
+    env.__DEPHUB_TOGGLE = self.ToggleCallback
 
     -- Open/close key (N by default), bound through the LIBRARY'S OWN toggle: the
     -- RedzLib window exposes NewMinimizer(keyCode), which connects the key and
@@ -583,6 +586,13 @@ function DemonUI:Destroy()
         self._metricsConnection = nil
     end
     pcall(function() self.Library:Destroy() end)
+    -- Remove a sonda global SO se ela ainda for a desta sessao. Se outra sessao a
+    -- sobrescreveu, nao apagamos a dela.
+    local env = type(getgenv) == "function" and getgenv() or _G
+    if self.ToggleCallback and env.__DEPHUB_TOGGLE == self.ToggleCallback then
+        env.__DEPHUB_TOGGLE = nil
+    end
+    self.ToggleCallback = nil
     table.clear(self.Tabs)
     table.clear(self.Categories)
     table.clear(self._tabByName)

@@ -3342,7 +3342,10 @@ local ax=setmetatable({
 KeyCode=aw
 },aj)
 
-u(UserInputService.InputBegan,function(ay)
+u(UserInputService.InputBegan,function(ay,az)
+-- Ignora entrada ja processada (digitacao no chat/TextBox): sem isso a tecla
+-- de abrir/fechar dispara enquanto o usuario escreve. Somente teclado.
+if az or ay.UserInputType~=Enum.UserInputType.Keyboard then return end
 if ay.KeyCode==ax.KeyCode then
 ag:Minimize()
 end
