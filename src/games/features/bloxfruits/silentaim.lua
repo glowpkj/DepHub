@@ -60,10 +60,17 @@ local EXCEPTION_KEYS = {
 -- original (ExceptionGrace = 1.0).
 local EXCEPTION_GRACE = 1.0
 
--- O fator de "grude": uma vez escolhido um alvo, so troca quando aparece um
--- mais perto por esta margem (do script original, StickyFactor = 0.2). Evita a
--- mira pular entre dois jogadores de distancia parecida.
-local STICKY_FACTOR = 0.2
+-- Grude FORTE (pedido do usuario: "nao pode parar de ficar no player"). Uma vez
+-- travado, so troca de alvo se o novo estiver a menos desta FRACAO da distancia
+-- do atual (0.6 = o novo tem que ser 40% mais perto pra valer a troca). Enquanto
+-- o alvo atual estiver vivo, a mira nao pisca entre dois players.
+local LOCK_MARGIN = 0.6
+
+-- Quanto tempo segurar o alvo quando o Character dele desaparece por um frame
+-- (morte/respawn/dash que recarrega o Character). Dentro desse tempo a mira
+-- continua "dele" em vez de soltar e reescolher -- era isso que fazia o aim
+-- parar de ficar no player no PvP.
+local TARGET_GRACE = 0.75
 
 -- A cor do beam (do script original, Color3.fromRGB(120, 50, 200) -- roxo escuro).
 local BEAM_COLOR = Color3.fromRGB(120, 50, 200)
@@ -105,6 +112,7 @@ function Feature.new(options)
     self.TargetName = nil
     self.TargetPosition = nil    -- Vector3 do alvo no ultimo frame
     self.TargetDistance = nil
+    self.TargetLostAt = nil      -- os.clock() do instante em que o alvo sumiu
     -- Estado da excecao (tecla segurada / grace).
     self.ExceptionHeld = false
     self.ExceptionTime = 0
@@ -136,6 +144,12 @@ local function playerPosition(player)
     local hrp = root(player.Character)
     if not hrp then return nil end
     return hrp.Position
+end
+
+-- A MINHA posicao (HumanoidRootPart), ou a origem se eu ainda nao tenho uma.
+function Feature:_MyPosition()
+    local hrp = root(LocalPlayer and LocalPlayer.Character)
+    return hrp and hrp.Position or Vector3.new(0, 0, 0)
 end
 
 -- O jogador mais proximo dentro do alcance. nil se nao ha ninguem (ou sem
@@ -303,39 +317,84 @@ end
 
 -- --- Selecao de alvo --------------------------------------------------------
 
+-- Solta o alvo de vez (limpa tudo, inclusive o timer de persistencia).
 function Feature:_ClearTarget()
     self.Target = nil
     self.TargetName = nil
     self.TargetPosition = nil
     self.TargetDistance = nil
+    self.TargetLostAt = nil
 end
 
--- Um passo da selecao (roda no Heartbeat). Escolhe o mais proximo; uma vez com
--- alvo, so troca se aparecer outro mais perto pela margem de grude.
+-- Um passo da selecao (roda no Heartbeat a cada frame -- a mira e o ponto mais
+-- sensivel do aim, entao ela refina todo frame e nao uma vez por intervalo).
+--
+-- Grude FORTE (o que o usuario pediu):
+--   * Com alvo vivo: CONTINUA nele. So troca se o alvo morreu/saiu, ou se outro
+--     ficou MUITO mais perto (LOCK_MARGIN). Nenhum piscar entre dois alvos de
+--     distancia parecida.
+--   * O alvo "desaparece" por um frame (morte, respawn, dash que recarrega o
+--     Character): em vez de soltar na hora, segura o alvo por TARGET_GRACE
+--     segundos. Se ele voltar nesse tempo, a mira nunca saiu dele -- e o que
+--     fazia o aim "parar de ficar no player" no PvP.
+--   * Sem NENHUM alvo muito mais perto e sem alvo proprio: cai no mais proximo
+--     dentro do alcance.
 function Feature:_SelectStep()
+    local now = os.clock()
+
+    -- 1) O alvo atual ainda vale? Recalcula a posicao e mantem se der.
+    if self.TargetName then
+        local current = Players:FindFirstChild(self.TargetName)
+        local pos = playerPosition(current)
+        if pos then
+            -- Grudado: so troca se aparecer alguem MUITO mais perto.
+            local nearest, nearestDist = self:FindNearest()
+            if nearest and nearest.Name ~= self.TargetName
+                and nearestDist < (self.TargetDistance or math.huge) * LOCK_MARGIN then
+                self.Target = nearest
+                self.TargetName = nearest.Name
+                self.TargetDistance = nearestDist
+                self.TargetPosition = playerPosition(nearest)
+                self.TargetLostAt = nil
+            else
+                self.Target = current
+                self.TargetPosition = pos
+                self.TargetDistance = (pos - self:_MyPosition()).Magnitude
+                self.TargetLostAt = nil
+            end
+            return
+        end
+    end
+
+    -- 2) O alvo sumiu neste frame. Segura por um instante antes de soltar: o
+    -- Character do alvo pode estar recarregando (morte/respawn/dash) e volta
+    -- logo -- soltar aqui era o que tirava a mira do player no PvP. Na PRIMEIRA
+    -- vez que ele some, marca o instante; enquanto o grace nao estourar, mantem
+    -- o alvo (e nao reescolhe outro no meio).
+    if self.TargetName then
+        if not self.TargetLostAt then
+            self.TargetLostAt = now
+            return
+        end
+        if (now - self.TargetLostAt) < TARGET_GRACE then
+            return
+        end
+    end
+
+    -- 3) Passou o grace (ou nunca teve alvo): escolhe o mais proximo do zero.
     local target, distance = self:FindNearest()
     if not target then
         self:_ClearTarget()
         return
     end
-    if self.TargetName ~= target.Name then
-        -- Sem alvo ainda: pega o mais proximo. Com alvo: so troca se o novo
-        -- estiver bem mais perto (sticky).
-        if self.TargetDistance == nil or distance < (self.TargetDistance * (1 - STICKY_FACTOR)) then
-            self.Target = target
-            self.TargetName = target.Name
-            self.TargetDistance = distance
-        end
+    self.Target = target
+    self.TargetName = target.Name
+    self.TargetDistance = distance
+    self.TargetPosition = playerPosition(target)
+    if self.TargetPosition then
+        self.TargetLostAt = nil
     else
-        self.Target = target
-        self.TargetDistance = distance
-    end
-    -- Atualiza a posicao do alvo a cada passo (e o que o hook reescreve).
-    local current = Players:FindFirstChild(self.TargetName)
-    self.TargetPosition = playerPosition(current)
-    if not self.TargetPosition then
-        -- Alvo morreu/saiu: solta pra reescolher no proximo passo.
-        self:_ClearTarget()
+        self.TargetLostAt = now
     end
 end
 

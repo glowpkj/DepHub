@@ -725,7 +725,12 @@ do
     -- ainda sai normal (o hook nao trava quando nao ha alvo).
     ctx:RemovePlayers()
     feature:_SelectStep()
-    check(feature.TargetName == nil, "sem jogadores nao ha alvo")
+    -- Com o grude forte, o alvo e segurado por um instante (o grace) antes de
+    -- soltar. Passado o grace, o alvo sai de verdade.
+    check(feature.TargetName == nil or feature.TargetLostAt ~= nil, "sem jogadores o alvo e segurado so pelo grace")
+    feature.TargetLostAt = os.clock() - 100
+    feature:_SelectStep()
+    check(feature.TargetName == nil, "sem jogadores e passado o grace nao ha alvo")
     ctx:FireRemote(attack, "FireServer", "sem-alvo")
     check(attack.Fired[#attack.Fired][1] == "sem-alvo", "sem alvo o remote sai intacto (hook nao trava a skill)")
 
@@ -741,6 +746,58 @@ do
     ctx:FireRemote(attack, "FireServer", "depois-do-disable")
     check(attack.Fired[#attack.Fired][1] == "depois-do-disable", "depois do Disable o remote sai normal de novo")
 
+    feature:Destroy()
+    ctx:RemovePlayers()
+end
+
+-- Silent aim grude FORTE: uma vez travado, a mira NAO pisca entre players. O
+-- que o usuario pediu no PvP ("nao pode parar de ficar no player").
+do
+    local ctx = bfContext(994732206, 994732206)
+    local sources2 = sources
+    local feature = ctx.Env.loadstring(sources2[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000 })
+    -- O meu character (a origem).
+    local myChar = Instance.new("Model"); myChar.Name, myChar.Parent = "Character", ctx.Player
+    local myHrp = Instance.new("Part"); myHrp.Name, myHrp.Parent = "HumanoidRootPart", myChar
+    myHrp.Position = Vector3.new(0, 0, 0)
+    ctx.Player.Character = myChar
+    feature:Enable()
+
+    -- Alvo A a 100, alvo B a 120 (bem perto de A). Escolhe A.
+    local a = ctx:AddPlayer("TargetA", Vector3.new(100, 0, 0))
+    local b = ctx:AddPlayer("TargetB", Vector3.new(120, 0, 0))
+    feature:_SelectStep()
+    check(feature.TargetName == "TargetA", "escolhe o mais proximo (A)")
+
+    -- B chega bem mais perto, mas NAO o suficiente pra arrancar A (grude forte).
+    b.Character:FindFirstChild("HumanoidRootPart").Position = Vector3.new(80, 0, 0)
+    feature:_SelectStep()
+    check(feature.TargetName == "TargetA", "um alvo um pouco mais perto NAO arranca o alvo travado")
+
+    -- B fica MUITO mais perto (dentro da margem de lock): ai sim troca.
+    b.Character:FindFirstChild("HumanoidRootPart").Position = Vector3.new(10, 0, 0)
+    feature:_SelectStep()
+    check(feature.TargetName == "TargetB", "so troca quando o novo fica muito mais perto")
+
+    -- O character do alvo some por um frame (morte/respawn/dash): a mira SEGURA
+    -- o alvo por um instante em vez de soltar na hora.
+    local bChar = b.Character
+    b.Character = nil
+    feature:_SelectStep()
+    check(feature.TargetName == "TargetB", "um frame sem character nao solta o alvo (grace)")
+
+    -- O character volta: a mira nunca saiu dele.
+    b.Character = bChar
+    feature:_SelectStep()
+    check(feature.TargetName == "TargetB", "o alvo volta intacto depois do frame perdido")
+
+    -- O alvo sumiu DE VEZ (grace estourado) e nao ha outro: solta.
+    b.Character = nil
+    feature.TargetLostAt = os.clock() - 100
+    feature:_SelectStep()
+    check(feature.TargetName == nil or feature.TargetName ~= "TargetB", "passado o grace, um alvo que sumiu de vez e solto")
+
+    feature:Disable()
     feature:Destroy()
     ctx:RemovePlayers()
 end
