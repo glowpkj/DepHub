@@ -77,6 +77,99 @@ do
     check(instance.LastHitId == 4242, "SetHitId ignora nil e nao apaga o id")
 end
 
+-- Combat portado do OpenSource: a blade hit le o hitId capturado pelo gancho
+-- COMPARTILHADO, faz o LOS (nao hita atras de parede) e solta a vara de pesca
+-- antes de atacar -- o mesmo cuidado do script original.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Hook = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "net-hook.lua"])()
+    local BladeHits = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "bladhits.lua"])()
+
+    -- Os remotes de ataque que o bfContext ja montou em Modules.Net.
+    local net = ctx.Services.ReplicatedStorage:FindFirstChild("Modules"):FindFirstChild("Net")
+    local attack = net:FindFirstChild("RE/RegisterAttack")
+    local hit = net:FindFirstChild("RE/RegisterHit")
+
+    -- O dono: um character com HRP na origem e uma pasta Enemies com um mob.
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    local myRoot = Instance.new("Part"); myRoot.Name, myRoot.Position, myRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local myHumanoid = Instance.new("Humanoid"); myHumanoid.Parent = char
+    ctx.Player.Character = char
+    local enemies = Instance.new("Folder"); enemies.Name, enemies.Parent = "Enemies", ctx.Services.Workspace
+    local mob = Instance.new("Model"); mob.Name, mob.Parent = "Bandit", enemies
+    local mobHead = Instance.new("Part"); mobHead.Name, mobHead.Position, mobHead.Parent = "Head", Vector3.new(10, 0, 0), mob
+    local mobHumanoid = Instance.new("Humanoid"); mobHumanoid.Parent = mob
+    mobHumanoid.Health = 100
+
+    -- O gancho captura o hitId do RegisterHit do jogo; a blade hit le de la.
+    local feature = BladeHits.new({ hook = Hook })
+    check(feature.Hook == Hook, "a blade hit guarda o gancho compartilhado")
+    check(feature:ResolveRemotes() == true, "resolve os remotes pelo gancho/Modules.Net")
+    check(feature.RegisterHit == hit and feature.RegisterAttack == attack, "os remotes certos foram resolvidos")
+
+    -- A blade hit assina o gancho (subscriber no-op): so com ela ligada, o
+    -- __namecall ja esta instalado e capturando o hitId -- sem o silent aim.
+    check(feature:_SubscribeHook() == true, "a blade hit se inscreve no gancho compartilhado")
+    check(Hook:IsInstalled() == true and Hook:Count() == 1, "o gancho sobe pela blade hit")
+
+    -- O gancho captura o 4. argumento do RegisterHit; _HitId prefere ele.
+    local fake = ctx:AddPlayer("HitSource", Vector3.new(0, 0, 0))
+    ctx:FireRemote(hit, "FireServer", mobHead, {}, nil, "captured-id")
+    check(Hook.LastHitId == "captured-id", "o gancho capturou o hitId do RegisterHit")
+    check(feature:_HitId() == "captured-id", "a blade hit usa o hitId do gancho")
+
+    -- Sem captura, cai no SetHitId manual; sem nada, devolve nil.
+    Hook.LastHitId = nil
+    check(feature:_HitId() == nil, "sem captura e sem id manual, _HitId devolve nil")
+    feature:SetHitId("manual-id")
+    check(feature:_HitId() == "manual-id", "sem captura, _HitId cai no id manual")
+
+    -- LOS: com raio livre hita; com parede no caminho, pula o alvo.
+    feature.AttackRange = 300
+    check(feature:SetLos(true) == true and feature.LosCheck == true, "SetLos liga o LOS")
+    check(#feature:CollectEnemies() == 1, "com raio livre o alvo entra na lista")
+    ctx.Services.Workspace.Raycast = function()
+        return { Instance = Instance.new("Part"), Position = Vector3.new(5, 0, 0) }
+    end
+    check(#feature:CollectEnemies() == 0, "com parede no caminho o alvo e pulado (LOS)")
+    check(feature:SetLos(false) == true and #feature:CollectEnemies() == 1, "SetLos desligado volta a enxergar o alvo")
+
+    -- Atacar: dispara RegisterAttack + RegisterHit no alvo; um hit conta.
+    ctx.Services.Workspace.Raycast = function() return nil end
+    Hook.LastHitId = nil
+    local firedBefore = #(hit.Fired or {})
+    check(feature:AttackNearest() == true, "AttackNearest dispara nos alvos no alcance")
+    check(feature.hits == 1, "o contador de hits sobe")
+    local attackFired = attack.Fired[#attack.Fired]
+    check(attackFired[1] == 0.4 and attackFired[2] == 1, "RegisterAttack sai com (0.4, combo)")
+    local hitFired = hit.Fired[#hit.Fired]
+    check(hitFired[1] == mobHead, "RegisterHit manda a part do alvo")
+
+    -- Sem alvo, AttackNearest nao dispara.
+    mobHumanoid.Health = 0
+    check(feature:AttackNearest() == false, "sem alvo vivo, AttackNearest nao dispara")
+    mobHumanoid.Health = 100
+
+    -- _EnsureNotRod: com a vara de pesca equipada, ela e desequipada antes.
+    local rod = Instance.new("Tool"); rod.Name, rod.Parent = "Fishing Rod", char
+    rod.ToolTip = "Rod used for fishing"
+    local unequipped = false
+    ctx:SetMethod(myHumanoid, "UnequipTools", function() unequipped = true end)
+    feature:_EnsureNotRod()
+    check(unequipped == true, "com a vara equipada, _EnsureNotRod desequipa")
+
+    -- Sem vara equipada, nao mexe em nada.
+    rod.Parent = nil
+    unequipped = false
+    feature:_EnsureNotRod()
+    check(unequipped == false, "sem vara equipada, _EnsureNotRod nao chama UnequipTools")
+
+    -- Destroy sai do gancho: sem assinantes, ele sai da metatable.
+    feature:Destroy()
+    check(Hook:Count() == 0 and Hook:IsInstalled() == false, "o Destroy da blade hit libera o gancho compartilhado")
+    ctx:RemovePlayers()
+end
+
 -- O caminho ativo: a blade hit carrega, instancia pelo toggle e sai no Destroy.
 -- Este e o contrato que importa para o script do usuario.
 do
@@ -197,7 +290,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "fruit" or name == "islands" or name == "player", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "net-hook" or name == "fruit" or name == "islands" or name == "player", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -1088,16 +1181,21 @@ do
     check(SilentAim.MIN_RANGE == 500 and SilentAim.DEFAULT_RANGE == 500 and SilentAim.MAX_RANGE == 1000, "o alcance e 500 (min e padrao) a 1000 (max)")
 
     -- O alcance e preso a [500, 1000], mesmo se pedirem fora.
-    local feature = SilentAim.new({ range = 99999 })
+    local Hook = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "net-hook.lua"])()
+    local feature = SilentAim.new({ range = 99999, hook = Hook })
     check(feature.MaxRange == 1000, "o alcance acima do maximo e preso em 1000")
     feature:SetRange(10)
     check(feature.MaxRange == 500, "o alcance abaixo do minimo e preso em 500")
     feature:SetRange(750)
     check(feature.MaxRange == 750, "o alcance no meio e aceito")
 
-    -- Sem getrawmetatable/newcclosure o Enable recusa (nao liga um no-op). O
-    -- harness expoe as duas, entao aqui ele LIGA -- e o gancho e de verdade.
-    check(feature:Enable() == true, "o Enable instala o gancho de __namecall")
+    -- Sem o gancho compartilhado o Enable recusa (nao liga um no-op). Com ele
+    -- injetado, o Enable INSCREVE no gancho -- e o gancho e de verdade (o
+    -- harness expoe getrawmetatable/newcclosure).
+    local noHook = SilentAim.new({ range = 500 })
+    check(noHook:Enable() == false, "sem gancho compartilhado o Enable recusa")
+    check(feature:Enable() == true, "o Enable se inscreve no gancho de __namecall")
+    check(Hook:IsInstalled() == true and Hook:Count() == 1, "o gancho compartilhado esta instalado com um assinante")
 
     -- Dois alvos: um a 100 studs, outro a 300. O mais proximo vence.
     local near = ctx:AddPlayer("NearTarget", Vector3.new(100, 0, 0))
@@ -1183,24 +1281,28 @@ do
     ctx:FireRemote(remotes, "GetChildren")
     check(true, "um metodo que nao e Fire/Invoke passa pelo hook sem erro")
 
-    -- Disable devolve o __namecall original: o game nao fica com o gancho.
+    -- Disable cancela a inscricao; o gancho sai quando o ULTIMO assinante sai.
     check(feature:Disable() == true, "o Disable desliga")
-    check(feature.Hooked == false, "o gancho foi removido")
+    check(feature.HookId == nil, "a inscricao no gancho foi cancelada")
+    check(Hook:Count() == 0 and Hook:IsInstalled() == false, "sem assinantes o gancho compartilhado sai da metatable")
     -- O beam tambem morre no Disable: nada fica pendurado no workspace.
     check(feature.Beam == nil, "o Disable destroi o beam")
     ctx:FireRemote(attack, "FireServer", "depois-do-disable")
     check(attack.Fired[#attack.Fired][1] == "depois-do-disable", "depois do Disable o remote sai normal de novo")
 
+    noHook:Destroy()
     feature:Destroy()
     ctx:RemovePlayers()
 end
 
--- Cleanup do gancho do silent aim: o Disable so devolve o __namecall se o valor
--- atual ainda for o NOSSO gancho. Se outro script instalou uma camada depois, a
--- dele fica -- apagar aqui destruiria a de outro.
+-- O gancho COMPARTILHADO (net-hook): UM __namecall so, sob ref-count. O cleanup
+-- tem que ser honesto -- quando o ultimo assinante sai o original volta; e se
+-- outro script instala uma camada depois, a dele fica (nao sobrescrevemos).
 do
     local ctx = bfContext(994732206, 994732206)
+    local Hook = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "net-hook.lua"])()
     local SilentAim = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])()
+
     local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
     ctx.Player.Character = char
     local myRoot = Instance.new("Part"); myRoot.Name, myRoot.Position, myRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
@@ -1208,29 +1310,47 @@ do
     local mt = ctx.Env.getrawmetatable(ctx.State.__DEPHUB_OSS_RUNTIME.game)
     local baseNamecall = mt.__namecall
 
-    -- Caso normal: instala e desliga -> volta ao __namecall original.
-    local feature = SilentAim.new({ range = 1000 })
-    check(feature:Enable() == true, "o Enable instala o gancho (cleanup)")
-    local installed = feature.InstalledNamecall
-    check(type(installed) == "function" and installed ~= baseNamecall, "o gancho instalado e guardado em InstalledNamecall")
+    -- Instalar, depois soltar: o original volta. A closure instalada e guardada
+    -- em Hook:Installed().
+    check(Hook:IsInstalled() == false and Hook:Count() == 0, "o gancho comeca desinstalado e vazio")
+    local id = Hook:Add(function() end)
+    check(type(id) == "number", "o Add devolve um id de inscricao")
+    local installed = Hook:Installed()
+    check(type(installed) == "function" and installed ~= baseNamecall, "o gancho instalado e guardado")
     check(mt.__namecall == installed, "o __namecall da metatable e o nosso gancho instalado")
-    feature:Disable()
-    check(mt.__namecall == baseNamecall, "com o valor ainda nosso, o Disable devolve o __namecall original")
+    check(Hook:Count() == 1, "ha um assinante")
+
+    -- ref-count: um segundo assinante NAO reinstala (mesma camada); o gancho so
+    -- sai quando o ULTIMO sai.
+    local id2 = Hook:Add(function() end)
+    check(Hook:Count() == 2 and Hook:Installed() == installed, "o segundo assinante reusa a MESMA camada (ref-count)")
+    Hook:Remove(id)
+    check(Hook:IsInstalled() == true and Hook:Count() == 1, "sai um, o gancho fica (ainda ha um assinante)")
+    Hook:Remove(id2)
+    check(Hook:IsInstalled() == false and mt.__namecall == baseNamecall, "sai o ultimo, o Disable devolve o __namecall original")
 
     -- Caso de conflito: instala, OUTRO script sobrescreve, depois desliga.
-    local feature2 = SilentAim.new({ range = 1000 })
-    check(feature2:Enable() == true, "o Enable instala o gancho de novo")
-    local ours = feature2.InstalledNamecall
+    local conflictId = Hook:Add(function() end)
+    local ours = Hook:Installed()
     local foreign = function() return "foreign" end
     mt.__namecall = foreign  -- simula outra camada assumindo o __namecall
-    feature2:Disable()
+    Hook:Remove(conflictId)
+    -- Remove(id) cancelou o assinante (a lista fica vazia -> _Uninstall), mas o
+    -- __namecall atual nao e mais o nosso: a camada alheia FICA.
     check(mt.__namecall == foreign, "nao sobrescreve a camada de outro script (deixa o foreign)")
     check(ours ~= foreign, "sanity: a camada alheia nao e a nossa")
 
     -- Restaura o estado da metatable pro resto da suite.
     mt.__namecall = baseNamecall
+
+    -- O silent aim usa o MESMO gancho: se inscreve no Enable e cancela no Disable.
+    local feature = SilentAim.new({ range = 1000, hook = Hook })
+    check(feature:Enable() == true, "o silent aim se inscreve no gancho compartilhado")
+    check(Hook:Count() == 1 and Hook:IsInstalled() == true, "o gancho sobe pelo silent aim")
+    feature:Disable()
+    check(Hook:Count() == 0 and Hook:IsInstalled() == false, "o Disable do silent aim cancela a inscricao")
+
     feature:Destroy()
-    feature2:Destroy()
 end
 
 -- Silent aim grude FORTE: uma vez travado, a mira NAO pisca entre players. O
@@ -1238,7 +1358,8 @@ end
 do
     local ctx = bfContext(994732206, 994732206)
     local sources2 = sources
-    local feature = ctx.Env.loadstring(sources2[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000 })
+    local Hook = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "net-hook.lua"])()
+    local feature = ctx.Env.loadstring(sources2[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000, hook = Hook })
     -- O meu character (a origem).
     local myChar = Instance.new("Model"); myChar.Name, myChar.Parent = "Character", ctx.Player
     local myHrp = Instance.new("Part"); myHrp.Name, myHrp.Parent = "HumanoidRootPart", myChar
@@ -1290,7 +1411,8 @@ end
 -- alvo travado, sem tocar nos outros slots (o hitId do slot 4 continua o do jogo).
 do
     local ctx = bfContext(994732206, 994732206)
-    local feature = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000 })
+    local Hook = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "net-hook.lua"])()
+    local feature = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000, hook = Hook })
     local myChar = Instance.new("Model"); myChar.Name, myChar.Parent = "Character", ctx.Player
     local myHrp = Instance.new("Part"); myHrp.Name, myHrp.Parent = "HumanoidRootPart", myChar
     myHrp.Position = Vector3.new(0, 0, 0)
@@ -1334,7 +1456,8 @@ end
 -- remotes sozinha nao garante o acerto em PvP; o RegisterHit garante.
 do
     local ctx = bfContext(994732206, 994732206)
-    local feature = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000 })
+    local Hook = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "net-hook.lua"])()
+    local feature = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000, hook = Hook })
     local myChar = Instance.new("Model"); myChar.Name, myChar.Parent = "Character", ctx.Player
     local myHrp = Instance.new("Part"); myHrp.Name, myHrp.Parent = "HumanoidRootPart", myChar
     myHrp.Position = Vector3.new(0, 0, 0)
@@ -1391,9 +1514,13 @@ do
         if hide[key] then return nil end
         return ctx.Env[key]
     end})
+    -- O gancho compartilhado carregado no env SEM primitivos: o _Install dele
+    -- falha, o Add devolve nil, e o silent aim entao recusa -- o caminho real.
+    local bareHook = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "net-hook.lua"])
+    setfenv(bareHook, bare)
     local chunk = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])
     setfenv(chunk, bare)
-    local feature = chunk().new({})
+    local feature = chunk().new({ hook = bareHook() })
     check(feature:Enable() == false, "sem getrawmetatable o Enable recusa")
     check(feature:IsEnabled() == false, "a feature fica desligada quando recusa")
 end
@@ -1809,7 +1936,7 @@ do
     -- As chaves que o painel precisa salvar. Se um controle novo nascer sem
     -- registro, este conjunto fica menor do que a tela e o teste acusa.
     local expectedKeys = {
-        bladhits = true, silentaim = true, exceptionKeys = true, range = true,
+        bladhits = true, bladhitsLos = true, silentaim = true, exceptionKeys = true, range = true,
         fruitEsp = true, fruitTrace = true, fruitGrab = true, fruitStore = true,
         fruitSkip = true, fruitKeep = true, island = true, islandOn = true,
         speed = true, unbreakable = true, waterwalk = true, flashstep = true,
@@ -1854,6 +1981,16 @@ do
     island.Handle:SetValue(true)
     check(state.Config.islandOn == true, "ligar Island teleport grava no Config (antes nao salvava)")
 
+    -- O toggle "Line of sight" existe e liga o LOS na blade hit de verdade.
+    local los
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Line of sight" then los = control end
+    end
+    check(los ~= nil, "o painel monta o toggle Line of sight")
+    los.Handle:SetValue(true)
+    check(state.Config.bladhitsLos == true, "ligar Line of sight grava no Config")
+    check(state.Instances.bladhits.LosCheck == true, "o LOS chega no modulo da blade hit")
+
     ctx.Env.writefile("DepHub_BloxFruits_config.json", state:EncodeConfig())
 
     state:Destroy()
@@ -1862,11 +1999,13 @@ end
 do
     local ctx = bfContext(994732206, 994732206)
     local ui = ctx:MountUI()
-    ctx.Files["DepHub_BloxFruits_config.json"] = '{"bladhits":true,"islandOn":true}'
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"bladhits":true,"bladhitsLos":true,"islandOn":true}'
     local state = ctx:Run("src/games/bloxfruits.lua")
 
     -- Blade hits salvo ligado: a feature existe e esta habilitada de verdade.
     check(state.Instances.bladhits ~= nil and state.Instances.bladhits:IsEnabled() == true, "Blade hits salvo reativa a feature no load")
+    -- Line of sight salvo ligado: chega no modulo da blade hit no load.
+    check(state.Instances.bladhits.LosCheck == true, "Line of sight salvo reativa no load")
     -- Island teleport salvo ligado: a feature existe e o toggle da tela esta ligado.
     check(state.Instances.islands ~= nil, "Island teleport salvo instancia a feature no load")
     local islandControl

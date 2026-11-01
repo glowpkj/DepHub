@@ -10305,6 +10305,7 @@ local FEATURE_MODULES = {
 }
 local INFRA_MODULES = {
     {name = "teleport"},
+    {name = "net-hook"},
 }
 
 local previous = type(env.__DEPHUB_BLOXFRUITS) == "table" and env.__DEPHUB_BLOXFRUITS or nil
@@ -10638,6 +10639,11 @@ function State:SetFeature(name, enabled)
             local context = {
                 teleport = self.Infra.teleport,
                 combat = self.Instances.bladhits,
+                -- O gancho de __namecall COMPARTILHADO: o silent aim e a blade hit
+                -- usam a MESMA camada (um gancho, nao dois) via Add/Remove. O
+                -- silent aim depende dele pra instalar; a blade hit so le o hitId
+                -- capturado (Hook.LastHitId).
+                hook = self.Infra["net-hook"],
                 state = self,
                 -- O mar atual: a feature de ilhas escolhe a lista de destinos
                 -- daqui (Sea 1 / 2 / 3 tem ilhas e pontos fixos diferentes).
@@ -10650,6 +10656,9 @@ function State:SetFeature(name, enabled)
                 -- A aba Player nasce com o multiplicador de velocidade que o
                 -- painel ja marcou (o slider aplica mesmo sem reabrir o painel).
                 speed = self.PendingPlayerSpeed,
+                -- A blade hit nasce com o LOS que o painel ja marcou (o toggle
+                -- aplica mesmo sem reabrir o painel).
+                losCheck = self.PendingBladeLos,
             }
             local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
@@ -10737,6 +10746,7 @@ function State:Destroy()
     self.PendingSilentAimRange = nil
     self.PendingSilentAimExceptions = nil
     self.PendingPlayerSpeed = nil
+    self.PendingBladeLos = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruitsOwn == self then env.__DEPHUB.BloxFruitsOwn = nil end
@@ -10778,6 +10788,24 @@ local PANELS = {
                 State.Config.bladhits = value == true
             end)
             State:RegisterConfig("bladhits", applyBlade, bladeToggle)
+
+            -- LOS: nao hitar alvo atras de parede (raycast). Menos "cobertura
+            -- impossivel" pro anti-cheat, ao custo de perder alvos ocluidos.
+            -- Aplica na hora se a feature ja estiver instanciada; senao guarda a
+            -- escolha pro Enable (mesmo caminho do range do silent aim).
+            local function applyLos(value)
+                if State.Instances.bladhits then
+                    State.Instances.bladhits:SetLos(value)
+                else
+                    State.PendingBladeLos = value
+                end
+            end
+            local losToggle = section:CreateToggle("Line of sight", State.Config.bladhitsLos == true, function(value)
+                applyLos(value)
+                State.Config.bladhitsLos = value == true
+            end)
+            State:RegisterConfig("bladhitsLos", applyLos, losToggle)
+
             section:CreateParagraph("Blade hits", "Auto-swing at every enemy in range using the game's attack remotes.")
         end,
     },
@@ -11971,6 +11999,17 @@ local LocalPlayer = Players.LocalPlayer
 -- farm/mastery funcionar de verdade -- o golpe chega no inimigo mesmo quando a
 -- animacao do swing nao alcancaria.
 --
+-- O hitId (4. argumento do RegisterHit) e o token que o servidor valida: sem ele
+-- um hit e ignorado em conta nova. Em vez de exigir SetHitId, a feature le o
+-- ultimo hitId capturado pelo gancho COMPARTILHADO (options.hook, a infra
+-- net-hook) -- o mesmo gancho que o silent aim usa. Se ninguem capturou ainda,
+-- cai no SetHitId (manual) e, sem nada, manda sem id (o servidor recusa, mas nao
+-- explode).
+--
+-- O LOS (line of sight, opcional) e o freio de "cobertura impossivel": antes de
+-- hitar, faz um raycast ate o alvo e pula o que estiver atras de parede -- e o
+-- que mais entrega um auto-hit pro anti-cheat (ninguem acerta o que nao ve).
+--
 -- Self-contained de proposito: nada do DepHub, nada do adapter OSS. Faz o
 -- proprio game:GetService e publica um modulo com new()/Enable()/Disable().
 -- Assim ele pode ser colado em qualquer lugar, ou carregado por um backend
@@ -11991,6 +12030,15 @@ local function alive(character)
     return humanoid ~= nil and humanoid.Health > 0
 end
 
+-- A vara de pesca sequestra o gancho do RegisterAttack (os hits param de cair):
+-- se ela estiver equipada, tira antes de atacar. Mesmo cuidado do OpenSource.
+local function isFishingRod(tool)
+    if not tool then return false end
+    local tip = tool.ToolTip
+    if tip and (tostring(tip):find("Fishing") or tostring(tip):find("Rod")) then return true end
+    return tool.Name:find("Rod") ~= nil
+end
+
 function Feature.new(options)
     options = options or {}
     local self = setmetatable({}, Feature)
@@ -12009,14 +12057,36 @@ function Feature.new(options)
     self.EnemiesFolder = options.enemiesFolder ~= false
     self.CharactersFolder = options.charactersFolder ~= false
     self.LastHitId = options.hitId or nil
+    -- O gancho COMPARTILHADO de __namecall (injetado por options.hook, a infra
+    -- net-hook). De la vem o hitId capturado. Sem ele, a feature ainda funciona
+    -- (usa SetHitId ou manda sem id).
+    self.Hook = options.hook or nil
+    -- O id da inscricao no gancho compartilhado (pra sair no Disable). A blade
+    -- hit assina so pra garantir a captura do hitId; o subscriber e no-op.
+    self.HookId = nil
+    -- LOS: quando ligado, nao hita alvo sem linha de visao (raycast). E o pedido
+    -- do usuario pra reduzir a assinatura de "aura atravessando parede".
+    self.LosCheck = options.losCheck == true
     self.RegisterAttack = nil
     self.RegisterHit = nil
     return self
 end
 
 -- Resolve os remotes. Tenta Modules.Net (caminho atual do jogo) e cai pro Net
--- solto em ReplicatedStorage, que e o caminho de builds mais antigas.
+-- solto em ReplicatedStorage, que e o caminho de builds mais antigas. Se o gancho
+-- compartilhado ja os resolveu, usa de la (o mesmo remote que o silent aim ve).
 function Feature:ResolveRemotes()
+    -- Resolve os remotes no gancho COMPARTILHADO primeiro: e ele que captura o
+    -- hitId (so captura se souber qual remote e o RegisterHit). Assim, mesmo com
+    -- so a blade hit ligada, o gancho ja sabe onde olhar.
+    if self.Hook and type(self.Hook.Resolve) == "function" then
+        pcall(self.Hook.Resolve, self.Hook)
+    end
+    if self.Hook and self.Hook.RegisterHit ~= nil then
+        self.RegisterAttack = self.Hook.RegisterAttack
+        self.RegisterHit = self.Hook.RegisterHit
+        return true
+    end
     local modules = ReplicatedStorage:FindFirstChild("Modules")
     local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
     if not net then return false end
@@ -12026,6 +12096,39 @@ function Feature:ResolveRemotes()
     self.RegisterAttack = attack
     self.RegisterHit = hit
     return true
+end
+
+-- O hitId pro RegisterHit. Prefere o ultimo capturado pelo gancho COMPARTILHADO
+-- (o 4. argumento que o jogo mandou no ultimo M1 real); cai no SetHitId manual;
+-- sem nada, devolve nil (manda sem id -- o servidor recusa, mas nao explode).
+function Feature:_HitId()
+    local hook = self.Hook
+    if hook and hook.LastHitId ~= nil then return hook.LastHitId end
+    return self.LastHitId
+end
+
+-- Tira a vara de pesca do character, se estiver equipada: ela sequestra o gancho
+-- do RegisterAttack e os hits param de cair. So age quando ha vara equipada.
+function Feature:_EnsureNotRod()
+    local character = LocalPlayer and LocalPlayer.Character
+    if not character then return end
+    local equipped = character:FindFirstChildOfClass("Tool")
+    if equipped and isFishingRod(equipped) then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then pcall(function() humanoid:UnequipTools() end) end
+    end
+end
+
+-- Ha linha de visao clara do meu root ate a part do alvo? Raycast excluindo o
+-- meu character e o proprio alvo. Sem params (executor limitado) devolve true --
+-- nao bloquear o hit por nao conseguir checar.
+local function losClear(fromPosition, part, ignore)
+    if not part then return false end
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = { LocalPlayer.Character, ignore }
+    local result = workspace:Raycast(fromPosition, part.Position - fromPosition, params)
+    return result == nil
 end
 
 function Feature:_root()
@@ -12049,7 +12152,11 @@ function Feature:CollectEnemies(range)
                 if humanoid and humanoid.Health > 0 and part then
                     local distance = (part.Position - root.Position).Magnitude
                     if distance <= range then
-                        list[#list + 1] = {model = enemy, part = part, distance = distance}
+                        -- LOS: pula o alvo atras de parede (menos "cobertura
+                        -- impossivel" pro anti-cheat).
+                        if not self.LosCheck or losClear(root.Position, part, enemy) then
+                            list[#list + 1] = {model = enemy, part = part, distance = distance}
+                        end
                     end
                 end
             end
@@ -12065,7 +12172,9 @@ function Feature:CollectEnemies(range)
             if part and humanoid and humanoid.Health > 0 then
                 local distance = (part.Position - root.Position).Magnitude
                 if distance <= self.PlayerRange then
-                    list[#list + 1] = {model = character, part = part, distance = distance}
+                    if not self.LosCheck or losClear(root.Position, part, character) then
+                        list[#list + 1] = {model = character, part = part, distance = distance}
+                    end
                 end
             end
         end
@@ -12076,16 +12185,20 @@ end
 
 -- Dispara os remotes em todos os alvos no alcance. O combo cicla 1..4 pra as
 -- chaves de animacao alternarem do jeito que o jogo espera. O 4. argumento do
--- RegisterHit e o hitId validado no servidor: sem ele um hit forjado e ignorado
--- em conta nova, por isso ele vem de LastHitId (ver SetHitId).
+-- RegisterHit e o hitId validado no servidor: vem do gancho compartilhado (ou do
+-- SetHitId), porque um hit sem id e ignorado em conta nova.
 function Feature:AttackNearest(range)
     if not (self.RegisterAttack and self.RegisterHit) then return false end
+    -- Solta a vara de pesca antes: com ela equipada o RegisterAttack e
+    -- sequestrado e nenhum hit cai.
+    self:_EnsureNotRod()
     local targets = self:CollectEnemies(range)
     if #targets == 0 then return false end
+    local hitId = self:_HitId()
     self._combo = ((self._combo or 0) % 4) + 1
     pcall(function() self.RegisterAttack:FireServer(0.4, self._combo) end)
     for _, target in ipairs(targets) do
-        pcall(function() self.RegisterHit:FireServer(target.part, {}, nil, self.LastHitId) end)
+        pcall(function() self.RegisterHit:FireServer(target.part, {}, nil, hitId) end)
     end
     self.hits = self.hits + 1
     return true
@@ -12095,9 +12208,21 @@ function Feature:SetHitId(value)
     if value ~= nil then self.LastHitId = value end
 end
 
+-- Liga/desliga o LOS (nao hitar sem linha de visao). Liga ja aplica no proximo
+-- tick do loop.
+function Feature:SetLos(on)
+    self.LosCheck = on == true
+    return true
+end
+
 function Feature:Enable()
     if self.Enabled then return true end
     if not self:ResolveRemotes() then return false end
+    -- Entra como assinante do gancho COMPARTILHADO. A blade hit nao REESCREVE
+    -- nada (o subscriber e no-op) -- ela assina pra garantir que o gancho esteja
+    -- instalado e capturando o hitId do jogo, mesmo sem o silent aim ligado.
+    -- Sem isso, so com a blade hit ligada, ninguem estaria olhando o __namecall.
+    self:_SubscribeHook()
     self.Enabled = true
     self.Thread = task.spawn(function()
         while self.Enabled do
@@ -12109,9 +12234,28 @@ function Feature:Enable()
     return true
 end
 
+-- Assina o gancho compartilhado (se injetado). Assinante no-op: o trabalho de
+-- captura do hitId e do proprio gancho. Devolve true se ha gancho (instalado ou
+-- ja instalado por outra feature).
+function Feature:_SubscribeHook()
+    if self.HookId ~= nil then return true end
+    local hook = self.Hook
+    if not hook or type(hook.Add) ~= "function" then return false end
+    local id = hook:Add(function() end)
+    if id == nil then return false end
+    self.HookId = id
+    return true
+end
+
 function Feature:Disable()
     self.Enabled = false
     if self.Thread then pcall(task.cancel, self.Thread); self.Thread = nil end
+    -- Sai do gancho: se o silent aim tambem estiver ligado, o gancho fica pra ele
+    -- (ref-count); se for o ultimo, sai da metatable.
+    if self.HookId ~= nil and self.Hook and type(self.Hook.Remove) == "function" then
+        pcall(self.Hook.Remove, self.Hook, self.HookId)
+    end
+    self.HookId = nil
     return true
 end
 
@@ -12135,6 +12279,7 @@ function Feature:Destroy()
     self:Disable()
     self.RegisterAttack = nil
     self.RegisterHit = nil
+    self.HookId = nil
 end
 
 return Feature
@@ -13121,6 +13266,215 @@ end
 return Feature
 
 ]],
+    ["src/games/features/bloxfruits/net-hook.lua"] = [[
+local game = game
+local type = type
+local pcall = pcall
+local tostring = tostring
+local unpack = unpack or table.unpack
+
+-- Net hook -- UM gancho de __namecall compartilhado pelas features de combate.
+--
+-- O problema que isto resolve: cada feature que precisa ver os remotes de saida
+-- do jogo (o silent aim reescrevendo a posicao; a blade hit querendo um hitId
+-- valido) acabava instalando o PROPRIO gancho de __namecall. Dois ganchos
+-- empilhados na mesma metatable sao duas superficies pro anti-cheat e uma ordem
+-- de chamada fragil (quem instalou por ultimo envolve o primeiro). Aqui existe
+-- UM gancho so, com varios assinantes: quem instala primeiro e quem instala por
+-- ultimo usam a mesma camada, e ela e removida quando o ULTIMO assinante sai
+-- (ref-count).
+--
+-- O gancho faz o trabalho que e de TODOS: detecta Fire/Invoke de remote e captura
+-- o hitId do RegisterHit do jogo (o 4. argumento do FireServer) num campo
+-- compartilhado. Cada assinante recebe uma callback pra fazer o que e SUA
+-- responsabilidade (ex.: reescrever a posicao, forjar um hit) -- e pode reescrever
+-- os args ou deixar passar.
+--
+-- Sem getrawmetatable/newcclosure (executor que nao expoe) o Add recusa e devolve
+-- false -- quem chama decide o que fazer (o silent aim recusa o Enable, a blade
+-- hit segue sem captura automatica).
+
+local Hook = {}
+
+local mt = nil                 -- a metatable do game (so depois do install)
+local original = nil           -- o __namecall original, pra restaurar
+local installed = nil          -- a closure QUE INSTALAMOS (pra saber se ainda e a nossa)
+local wasReadonly = false
+local active = false
+local subscribers = {}          -- lista ordenada de {id = n, fn = function}
+local nextId = 0
+
+-- O hitId mais recente visto no RegisterHit do jogo (o 4. argumento). Compartilhado
+-- entre as features: a blade hit le daqui em vez de esperar alguem chamar SetHitId.
+Hook.LastHitId = nil
+-- O remote RegisterHit resolvido (pra saber quando um FireServer e o RegisterHit).
+Hook.RegisterHit = nil
+-- O remote RegisterAttack resolvido.
+Hook.RegisterAttack = nil
+
+-- Resolve os remotes de ataque no mesmo caminho do jogo (Modules.Net, com
+-- fallback pro Net solto). Devolve true se achou pelo menos o RegisterHit.
+function Hook:Resolve()
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
+    if not net then return false end
+    local hit = net:FindFirstChild("RE/RegisterHit")
+    if hit then
+        Hook.RegisterHit = hit
+        Hook.RegisterAttack = net:FindFirstChild("RE/RegisterAttack")
+        return true
+    end
+    return false
+end
+
+-- Ha um gancho instalado agora?
+function Hook:IsInstalled()
+    return active
+end
+
+-- A closure que instalamos (os testes de cleanup olham isso). nil se nao ha gancho.
+function Hook:Installed()
+    return installed
+end
+
+-- O __namecall original guardado (pra restaurar).
+function Hook:Original()
+    return original
+end
+
+-- O corpo do gancho: captura o hitId (trabalho comum) e delega a reescrita pros
+-- assinantes. Sem pcall em volta (mudaria o caminho da chamada do executor); a
+-- delegacao usa pcall por assinante pra um erro deles nao derrubar a chamada.
+local function hookBody(...)
+    local method = getnamecallmethod()
+    local args = { ... }
+
+    local isFire = tostring(method) == "FireServer"
+    local isInvoke = tostring(method) == "InvokeServer"
+
+    if isFire or isInvoke then
+        local arg1Str = tostring(args[1])
+        local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
+
+        if isRemote then
+            -- Captura do hitId (trabalho COMUM). O __namecall recebe o proprio
+            -- remote como 1. vararg, entao os argumentos reais comecam em args[2]:
+            -- o RegisterHit do jogo manda (part, {}, nil, hitId) -> args[2..5], e
+            -- o hitId e args[5]. Fica aqui, entao qualquer feature le sem gancho
+            -- proprio.
+            if Hook.RegisterHit ~= nil and args[1] == Hook.RegisterHit then
+                if args[5] ~= nil then Hook.LastHitId = args[5] end
+            end
+
+            -- Delega a reescrita pros assinantes, na ordem de inscricao. Cada um
+            -- recebe `args` e pode mexer na tabela (a chamada original e feita uma
+            -- vez, no fim, com o que sair daqui).
+            local snapshot = subscribers
+            for i = 1, #snapshot do
+                local entry = snapshot[i]
+                if entry and type(entry.fn) == "function" then
+                    pcall(entry.fn, args)
+                end
+            end
+        end
+    end
+
+    return original(unpack(args))
+end
+
+-- Instala o gancho, se ainda nao estiver instalado. Devolve true se ha um gancho
+-- ativo ao final (instalado agora ou ja antes).
+function Hook:_Install()
+    if active then return true end
+    if type(getrawmetatable) ~= "function" or type(newcclosure) ~= "function" then
+        return false
+    end
+    local metatable = getrawmetatable(game)
+    if not metatable then return false end
+    local previous = metatable.__namecall
+    if type(previous) ~= "function" then return false end
+
+    mt = metatable
+    original = previous
+    wasReadonly = false
+    if type(isreadonly) == "function" then
+        wasReadonly = pcall(isreadonly, metatable) and isreadonly(metatable) == true
+    end
+    if type(setreadonly) == "function" then pcall(setreadonly, metatable, false) end
+
+    mt.__namecall = newcclosure(hookBody)
+    installed = mt.__namecall
+    active = true
+    return true
+end
+
+-- Tira o gancho. So restaura o __namecall original se o valor ATUAL ainda for o
+-- nosso gancho -- se outro script instalou uma camada depois, a dele fica (apagar
+-- aqui destruiria a de outro). Devolve true se removeu.
+function Hook:_Uninstall()
+    if not active then return false end
+    local ourClosure = installed
+    active = false
+    local metatable, previous = mt, original
+    installed, mt, original = nil, nil, nil
+    if metatable and previous then
+        local restoreReadonly = wasReadonly
+        pcall(function()
+            if type(setreadonly) == "function" then pcall(setreadonly, metatable, false) end
+            -- So restaura se o atual ainda for o NOSSO gancho. Guardamos a
+            -- reference ANTES de zerar `installed`, entao a comparacao e honesta.
+            if ourClosure == nil or metatable.__namecall == ourClosure then
+                metatable.__namecall = previous
+            end
+            if restoreReadonly and type(setreadonly) == "function" then
+                pcall(setreadonly, metatable, true)
+            end
+        end)
+    end
+    wasReadonly = false
+    return true
+end
+
+-- Inscreve um assinante. Instala o gancho se for o primeiro; devolve um id pra
+-- cancelar depois, ou nil se nao deu pra instalar.
+function Hook:Add(fn)
+    if type(fn) ~= "function" then return nil end
+    if not self:_Install() then return nil end
+    nextId = nextId + 1
+    subscribers[#subscribers + 1] = { id = nextId, fn = fn }
+    return nextId
+end
+
+-- Cancela um assinante pelo id. Quando o ULTIMO sai, o gancho e removido (ref-
+-- count): nao fica uma camada pendurada na metatable sem ninguem usando.
+function Hook:Remove(id)
+    if id == nil then return false end
+    for i = #subscribers, 1, -1 do
+        if subscribers[i].id == id then
+            table.remove(subscribers, i)
+            break
+        end
+    end
+    if #subscribers == 0 then self:_Uninstall() end
+    return true
+end
+
+-- Quantos assinantes ha agora (o ref-count observavel).
+function Hook:Count()
+    return #subscribers
+end
+
+-- O singleton: e UM gancho no processo, entao "instanciar" devolve sempre a
+-- mesma tabela. Isto deixa o carregador de infra (que chama factory.new) tratar
+-- o net-hook como as outras pecas compartilhadas, sem caso especial.
+function Hook.new()
+    return Hook
+end
+
+return Hook
+
+]],
     ["src/games/features/bloxfruits/player.lua"] = [[
 local game = game
 local task = task
@@ -13629,12 +13983,15 @@ local LocalPlayer = Players.LocalPlayer
 -- InvokeServer) e troca o segundo argumento (a posicao) pela posicao do alvo.
 -- Assim o servidor acha que voce mirou nele, sem a mira visual mudar.
 --
--- O olho do silent aim e o __namecall da metatable do game (getrawmetatable +
--- newcclosure) -- o mesmo mecanismo do script original. Sem isso nao ha silent
--- aim de verdade; e por ser gancho de metatable, o Disable PRECISA devolver o
--- __namecall original, senao o game fica com o gancho pendurado (a regra do
--- repo: ligar tem que desligar de verdade). Por isso o hook e instalado no
--- Enable e removido no Disable/Destroy.
+-- O olho do silent aim e o __namecall da metatable do game -- o mesmo mecanismo
+-- do script original. Mas aqui ele NAO instala o proprio gancho: usa o gancho
+-- COMPARTILHADO (options.hook, a infra net-hook), onde se INSCREVE. Isso deixa
+-- silent aim e blade hit dividindo UMA camada de __namecall em vez de empilhar
+-- dois. Sem o gancho compartilhado (executor sem getrawmetatable/newcclosure) ou
+-- sem hook injetado, o Enable recusa em vez de fingir que liga. O RemoveHook
+-- cancela a inscricao; o gancho so sai da metatable quando o ULTIMO assinante
+-- sai (ref-count no net-hook) -- a regra do repo: ligar tem que desligar de
+-- verdade.
 --
 -- O BEAM e o indicador visual: um Beam ligando o teu HumanoidRootPart ao do alvo
 -- atual, atualizado a cada frame -- sem ele o usuario nao sabe em quem o aim
@@ -13647,9 +14004,8 @@ local LocalPlayer = Players.LocalPlayer
 -- Sem UI e sem toggle proprio: quem monta o painel e o backend (o toggle "Silent
 -- aim", o dropdown de excecoes e o slider de alcance). Aqui so vive a logica.
 --
--- Self-contained: faz os proprios game:GetService e nao depende do DepHub. O
--- hook e opcional -- se o executor nao expoe getrawmetatable/newcclosure, o
--- Enable recusa em vez de fingir que liga.
+-- Self-contained: faz os proprios game:GetService e nao depende do DepHub. So
+-- pede o gancho compartilhado por injecao (options.hook) -- se faltar, recusa.
 
 local Feature = {}
 Feature.__index = Feature
@@ -13733,10 +14089,12 @@ function Feature.new(options)
     self.ExceptionTime = 0
     -- Conexoes (Heartbeat do alvo + InputBegan/Ended das teclas).
     self.Connections = {}
-    -- O gancho da metatable: guarda o __namecall original pra restaurar.
-    self.OriginalNamecall = nil
-    self.Metatable = nil
-    self.Hooked = false
+    -- O gancho COMPARTILHADO de __namecall (injetado por options.hook, a infra
+    -- net-hook). O silent aim se INSCREVE nele; nao instala gancho proprio.
+    self.Hook = options.hook or nil
+    -- O id da nossa inscricao no gancho (pra cancelar no RemoveHook). O gancho
+    -- so sai da metatable quando o ultimo assinante sai.
+    self.HookId = nil
     -- O remote do CLIQUE (M1/ar): RegisterHit. Redirecionado pro alvo no slot 1.
     self.RegisterHit = nil
     -- O remote que abre o golpe (RegisterAttack): quando ele sai, o aim dispara
@@ -13792,36 +14150,35 @@ function Feature:_TargetRoot()
     return root(target.Character)
 end
 
--- O hitId pro RegisterHit forjado. Prefere o ultimo capturado de um RegisterHit
--- real do jogo (o formato que o servidor ja aceitou); sem nenhum ainda, gera um
--- no mesmo formato que o script antigo usava quando nao tinha captura
--- (UserId + algo unico) -- o hitId do BF e um nonce do CLIENTE, nao um token do
--- servidor, entao um gerado aqui e valido.
+-- O hitId pro RegisterHit forjado. Prefere o ultimo capturado pelo gancho
+-- COMPARTILHADO (a infra net-hook le o 4. argumento do RegisterHit do jogo e
+-- guarda em Hook.LastHitId); senao, o que a propria feature guardou; sem nenhum
+-- ainda, gera um no mesmo formato do script antigo (UserId + algo unico) -- o
+-- hitId do BF e um nonce do CLIENTE, nao um token do servidor, entao um gerado
+-- aqui e valido.
 function Feature:_HitId()
+    local hook = self.Hook
+    if hook and hook.LastHitId ~= nil then return hook.LastHitId end
     if self.HitId ~= nil then return self.HitId end
     local me = LocalPlayer
     local userId = me and tostring(me.UserId) or "0"
     return userId:sub(2, 4) .. tostring(os.clock()):gsub("%D", ""):sub(-4)
 end
 
--- Resolve os remotes de ataque do BF. O CLIQUE (M1/ar) e o RegisterHit: ele
--- manda (part, {}, nil, hitId). As SKILLS mandam a posicao no slot 2 de outros
--- remotes. Sem achar o RegisterHit, o aim das skills continua funcionando e so
--- o clique nao e redirecionado -- nao e fatal.
+-- Resolve os remotes de ataque do BF a partir do gancho COMPARTILHADO. O CLIQUE
+-- (M1/ar) e o RegisterHit: ele manda (part, {}, nil, hitId). As SKILLS mandam a
+-- posicao no slot 2 de outros remotes. Sem achar o RegisterHit, o aim das skills
+-- continua funcionando e so o clique nao e redirecionado -- nao e fatal.
 --
 -- RegisterAttack tambem e resolvido: e o "comeco do golpe" (FireServer(0.4,
--- combo)). E o gatilho pra RE-REGISTRAR o hit no alvo (ver InstallHook): quando
--- o golpe comeca, o aim dispara um RegisterHit no alvo travado -- o caminho que
--- de fato registra dano no BF (o mesmo que a blade hit usa).
+-- combo)). E o gatilho pra RE-REGISTRAR o hit no alvo (ver _OnRemote).
 function Feature:ResolveRemotes()
-    local modules = ReplicatedStorage:FindFirstChild("Modules")
-    local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
-    if not net then return false end
-    local hit = net:FindFirstChild("RE/RegisterHit")
-    if not hit then return false end
-    self.RegisterHit = hit
-    self.RegisterAttack = net:FindFirstChild("RE/RegisterAttack")
-    return true
+    local hook = self.Hook
+    if not hook then return false end
+    if type(hook.Resolve) == "function" then pcall(hook.Resolve, hook) end
+    self.RegisterHit = hook.RegisterHit
+    self.RegisterAttack = hook.RegisterAttack
+    return self.RegisterHit ~= nil
 end
 
 -- O jogador mais proximo dentro do alcance. nil se nao ha ninguem (ou sem
@@ -13914,146 +14271,97 @@ end
 
 -- --- O gancho (o olho do silent aim) ----------------------------------------
 
--- Instala o gancho de __namecall. Guarda o original pra restaurar depois.
--- Devolve true se instalou. Sem getrawmetatable/newcclosure (executor que nao
--- expoe) devolve false -- o Enable entao recusa, em vez de ligar um no-op.
+-- A NOSSA parte do gancho compartilhado: chamada pelo net-hook a cada remote que
+-- sai (FireServer/InvokeServer), com a tabela `args` que sera enviada. Aqui vive
+-- a logica do silent aim -- o net-hook ja cuidou da deteccao de remote e da
+-- captura do hitId; esta callback so REESCREVE.
 --
--- O corpo do gancho e IDENTICO ao script original do usuario (v3.4), que e o
--- que funcionava sem bugar nada:
---   * `local args = {...}` e `old(unpack(args))` -- a tabela de varargs e
---     remontada e reenviada inteira, exatamente como no original.
---   * deteccao de remote pelo tostring de args[1] ("RemoteEvent"/"RemoteFunction").
---   * SO reescreve quando ha alvo (TargetPosition ~= nil) e o aim nao esta em
---     excecao. Sem alvo, a chamada sai intacta pelo caminho normal.
---   * SEM pcall: o original nao tinha, e um pcall em volta do corpo muda o
---     caminho da chamada (o executor entrega de outro jeito) e era o que saia do
---     personagem so por ligar o toggle. O corpo aqui nao deve levantar: so le
---     campos do proprio modulo e chama o original.
-function Feature:InstallHook()
-    if self.Hooked then return true end
-    if type(getrawmetatable) ~= "function" or type(newcclosure) ~= "function" then
-        return false
+-- O corpo e IDENTICO ao script original do usuario (v3.4), que funcionava sem
+-- bugar nada:
+--   * o RegisterHit do clique manda (part, {}, nil, hitId) -- reescrevemos a
+--     PART (args[2]) pela HumanoidRootPart do alvo travado, sem tocar nos outros.
+--   * o RegisterAttack (FireServer(0.4, combo)) e o gatilho pra forjar um
+--     RegisterHit no alvo -- o caminho que de fato registra dano no BF.
+--   * as SKILLS mandam a POSICAO no slot 2; reescrevemos quando ha alvo e o aim
+--     nao esta em excecao (e o slot 2 nao e booleano).
+function Feature:_OnRemote(args)
+    local RegisterHit = self.RegisterHit
+    local RegisterAttack = self.RegisterAttack
+
+    -- O CLIQUE (M1/ar): (part, {}, nil, hitId) -- args[1] e o proprio RegisterHit.
+    if RegisterHit ~= nil and args[1] == RegisterHit then
+        local targetRoot = self:_TargetRoot()
+        if targetRoot ~= nil then args[2] = targetRoot end
+        return
     end
-    local mt = getrawmetatable(game)
-    if not mt then return false end
-    local original = mt.__namecall
-    if type(original) ~= "function" then return false end
 
-    self.Metatable = mt
-    self.OriginalNamecall = original
-    -- A metatable e protegida (readonly); liberar antes de escrever. Guardamos o
-    -- estado pra reativar no RemoveHook (nao deixar a metatable destravada).
-    if type(isreadonly) == "function" then
-        self.MetatableWasReadonly = pcall(isreadonly, mt) and isreadonly(mt) == true
-    end
-    if type(setreadonly) == "function" then pcall(setreadonly, mt, false) end
-
-    local self_ = self
-    mt.__namecall = newcclosure(function(...)
-        local method = getnamecallmethod()
-        local args = { ... }
-
-        local isFire = tostring(method) == "FireServer"
-        local isInvoke = tostring(method) == "InvokeServer"
-
-        if isFire or isInvoke then
-            -- Deteccao de remote IDENTICA ao script original do usuario.
-            local arg1Str = tostring(args[1])
-            local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
-
-            if isRemote then
-                -- O CLIQUE (M1/ar) sai pelo RegisterHit com a PART do alvo no
-                -- slot 2: (part, {}, nil, hitId) -- args[1] e o proprio remote.
-                -- Aqui o aim redireciona essa part pra HumanoidRootPart do alvo
-                -- travado, sem encostar nos outros slots (o hitId continua o do
-                -- jogo). So o proprio RegisterHit e tocado.
-                if self_.RegisterHit ~= nil and args[1] == self_.RegisterHit then
-                    -- Guarda o hitId (4. argumento) -- e o token que o servidor
-                    -- validou no golpe; o RegisterHit forjado abaixo reusa ele.
-                    if args[4] ~= nil then self_.HitId = args[4] end
-                    local targetRoot = self_:_TargetRoot()
-                    if targetRoot ~= nil then
-                        args[2] = targetRoot
-                    end
-                    return original(unpack(args))
-                end
-
-                -- O GOLPE ABRIU (RegisterAttack:FireServer(0.4, combo)). Este e
-                -- o ponto em que o aim REGISTRA o dano no alvo: dispara um
-                -- RegisterHit no HumanoidRootPart do alvo travado, que e o
-                -- caminho que de fato acerta no BF (o mesmo da blade hit). A
-                -- POSICAO reescrita nos outros remotes sozinha nao garante o
-                -- acerto -- o RegisterHit garante.
-                if self_.RegisterAttack ~= nil and args[1] == self_.RegisterAttack then
-                    local root = original(unpack(args))
-                    local self2 = self_
-                    -- Fora do __namecall (task.spawn): disparar o FireServer
-                    -- aqui dentro re-entraria no proprio gancho de forma
-                    -- sincrona logo apos o original. Spawnado, ele sai pelo
-                    -- caminho normal no proximo passo do scheduler.
-                    if not self2:IsExceptionActive() then
-                        local now = os.clock()
-                        -- No maximo um RegisterHit forjado a cada 20ms (o golpe
-                        -- abre uma vez; RegisterAttack pode repetir rapido).
-                        if (now - self2.LastAttackAt) > 0.02 then
-                            local targetRoot = self2:_TargetRoot()
-                            if targetRoot ~= nil then
-                                self2.LastAttackAt = now
-                                local hitRemote, hitId = self2.RegisterHit, self2:_HitId()
-                                task.spawn(function()
-                                    pcall(function() hitRemote:FireServer(targetRoot, {}, nil, hitId) end)
-                                end)
-                            end
-                        end
-                    end
-                    return root
-                end
-
-                -- As SKILLS de teclado mandam a POSICAO no slot 2. Reescrito
-                -- como no script original.
-                local arg2Str = tostring(args[2])
-                local isBool = (arg2Str == "true" or arg2Str == "false")
-
-                if not isBool and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
-                    args[2] = self_.TargetPosition
+    -- O GOLPE ABRIU (RegisterAttack): forja um RegisterHit no alvo travado. Fora
+    -- do __namecall (task.spawn) -- disparar aqui dentro re-entraria no gancho.
+    if RegisterAttack ~= nil and args[1] == RegisterAttack then
+        if not self:IsExceptionActive() then
+            local now = os.clock()
+            -- No maximo um RegisterHit forjado a cada 20ms (o golpe abre uma vez;
+            -- RegisterAttack pode repetir rapido).
+            if (now - self.LastAttackAt) > 0.02 then
+                local targetRoot = self:_TargetRoot()
+                if targetRoot ~= nil then
+                    self.LastAttackAt = now
+                    local hitRemote, hitId = RegisterHit, self:_HitId()
+                    task.spawn(function()
+                        pcall(function() hitRemote:FireServer(targetRoot, {}, nil, hitId) end)
+                    end)
                 end
             end
         end
+        return
+    end
 
-        return original(unpack(args))
+    -- As SKILLS de teclado mandam a POSICAO no slot 2. Reescrita como no original.
+    if self.TargetPosition ~= nil and not self:IsExceptionActive() then
+        local arg2Str = tostring(args[2])
+        local isBool = (arg2Str == "true" or arg2Str == "false")
+        if not isBool then args[2] = self.TargetPosition end
+    end
+end
+
+-- Inscreve o silent aim no gancho COMPARTILHADO (options.hook, a infra net-hook).
+-- Devolve true se inscreveu. Sem gancho injetado ou sem getrawmetatable/newcclosure
+-- (executor que nao expoe) devolve false -- o Enable entao recusa, em vez de ligar
+-- um no-op. Tambem resolve os remotes no gancho.
+function Feature:InstallHook()
+    if self.HookId ~= nil then return true end
+    local hook = self.Hook
+    if not hook or type(hook.Add) ~= "function" then
+        self.LastError = "sem gancho compartilhado"
+        return false
+    end
+    -- Os remotes de ataque sao resolvidos no proprio gancho compartilhado (ele
+    -- captura o hitId e sabe o RegisterHit); aqui pegamos as referencias pra
+    -- comparar nos args.
+    if type(hook.Resolve) == "function" then pcall(hook.Resolve, hook) end
+    self.RegisterHit = hook.RegisterHit
+    self.RegisterAttack = hook.RegisterAttack
+    local id = hook:Add(function(args)
+        pcall(self._OnRemote, self, args)
     end)
-    -- Guarda a closure INSTALADA: o RemoveHook so restaura se o __namecall atual
-    -- ainda for esta -- se outro script (ou outra instancia) instalou uma camada
-    -- depois, nao sobrescrevemos a dele com o nosso original obsoleto.
-    self.InstalledNamecall = mt.__namecall
-    self.Hooked = true
+    if id == nil then
+        self.LastError = "sem getrawmetatable/newcclosure"
+        return false
+    end
+    self.HookId = id
     return true
 end
 
--- Restaura o __namecall original. Sem isso o game ficaria com o gancho pendurado.
--- Restaura SO se o valor atual ainda for o NOSSO gancho (senao outra camada
--- assumiu o __namecall e apagar aqui destruiria a dela).
+-- Cancela a nossa inscricao. O gancho so sai da metatable quando o ULTIMO
+-- assinante sai (ref-count no net-hook) -- entao desligar o silent aim nao derruba
+-- o gancho debaixo da blade hit, e vice-versa.
 function Feature:RemoveHook()
-    if not self.Hooked then return end
-    self.Hooked = false
-    local mt = self.Metatable
-    if mt and self.OriginalNamecall then
-        pcall(function()
-            if type(setreadonly) == "function" then pcall(setreadonly, mt, false) end
-            -- So restaura se ainda for o nosso gancho. Se mudou, so reativa a
-            -- readonly (deixamos a metatable como estava) e nao mexemos no valor.
-            if self.InstalledNamecall == nil or mt.__namecall == self.InstalledNamecall then
-                mt.__namecall = self.OriginalNamecall
-            end
-            if self.MetatableWasReadonly and type(setreadonly) == "function" then
-                pcall(setreadonly, mt, true)
-            end
-        end)
+    if self.HookId == nil then return end
+    local hook = self.Hook
+    if hook and type(hook.Remove) == "function" then
+        pcall(hook.Remove, hook, self.HookId)
     end
-    self.Metatable = nil
-    self.OriginalNamecall = nil
-    self.InstalledNamecall = nil
-    self.MetatableWasReadonly = nil
+    self.HookId = nil
 end
 
 -- --- Selecao de alvo --------------------------------------------------------
@@ -25270,7 +25578,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/85211729168715.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. The Travel island list is per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with type(x) == "table", but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. And the panel now saves and reloads everything: two controls that were built with a hardcoded off and never registered (Blade hits and the Island teleport toggle) are now saved and applied like the rest, so a config written from the panel actually carries them. On top of that, the saved state reactivates itself for real on join -- a toggle saved on no longer just shows as on in the panel, it drives the feature (the fruit ESP saved on comes up with its draw loop running, the blade hit enabled, and so on), because the auto-load replays the same setter every control already uses on click. Auto execute is fixed too: the reload line could not find the executor's queue_on_teleport when it was only published on getgenv() (it read the bare global only, so the toggle silently did nothing on those executors), and the reload now always targets the same branch you launched instead of guessing. Under the hood the file-API, JSON and save/reload logic was pulled out of the Blox Fruits backend into one shared core module (src/core/config-store.lua) so the other games adopt the same persistence without copying it. The dropdown popup can no longer get stuck on the panel: the library reuses one dropdown popup for every dropdown in every tab, and its parent was left unbound by the library refactor, so it was created loose and framed at a fixed corner -- once anything attached it, it showed as a small dark box with a magnifier over the content (the box the user saw in the Combat tab under Blade hits). It is now born hidden inside the library's own overlay, only shown while a dropdown is actually open, and closed on every tab change, so it can never render outside its own dropdown. And the underlying state is now corrected across the board: the shared config store reads its file with a single guarded isfile call (the old code checked it twice and the second call ran outside the pcall, so an executor that throws there broke the whole Load), a Save now reads the file back and only reports success when the bytes match exactly what it wrote (a stale or partial file no longer counts as saved), and a Load now reports which settings actually applied versus which failed -- it no longer runs the same effect twice (the toggle callback fired once via the control and again via the direct setter) and no longer claims success when a feature refused the value. Teleport restores each part's original CanCollide instead of forcing everything collidable, so an accessory or decoration that was already non-collidable stays that way after a flight. The Player tab restores your character's original attribute values (and removes the ones that did not exist before) and destroys the Stun NumberValue only when the feature itself created it, instead of writing defaults over what the game had. Island teleport now checks whether the flight actually started -- a motor that returns nothing without error no longer leaves the toggle armed and reporting 'flying' with no movement -- and reports a real failure instead. The remote sniff toggle really stops capturing when switched off, even with the hooks already installed. And the auto-execute reload line now always targets the current session's ref (never a stale one left in shared state) and validates the ref and source URL before building the reload code, so a value another script wrote into the shared environment cannot shape the queued script. And the panel's small annoyances are cleaned up: the open/close key no longer fires while you are typing in chat or a text box (it only reacts to a real keyboard press that the game has not already handled), the remote sniffer only installs a hook when the executor gives it a way to remove it (otherwise it reports 'unsupported' and leaves the remote untouched, instead of leaving a hook it can never undo), removing the hub's own log hooks no longer overwrites a warn/print layer another script installed on top, the notes the hub keeps are now capped like its log buffer so a long session cannot grow them without limit, and the __DEPHUB_TOGGLE helper is removed when the panel closes if - and only if - it is still this session's, so a helper another session published is never wiped. And the lifecycle is now honest about failure: a feature whose Enable throws is turned back off and, when that call had just created it, dropped from the registry so the next toggle does not reuse it half-initialised; the runtime only marks itself started once every component has actually started, and a component that throws leaves it not-started with the reason recorded so a retry really runs instead of reporting a success that never happened; and disabling the silent aim only puts the __namecall hook back when the current hook is still its own, so a layer another script installed on top is never wiped -- it re-arms the metatable readonly state it had loosened and clears its own state either way. The saved config is now a real document, not a bare bag of keys: it carries a schema version, the game id and a timestamp, so a future format change has a number to migrate from and a config written by another game can never be applied here (it is refused, with the reason recorded). An older file -- saved before this format, with the values at the top level -- still loads exactly as before. The JSON is now read and written by the game own HttpService instead of a hand-rolled subset parser, so escaped quotes, backslashes, line breaks and accented characters survive a save/load round-trip instead of being silently mangled; the small built-in codec stays only as a fallback for an executor that does not expose HttpService. And a text input now exposes the same Set/SetValue the other controls do, so a saved value is pushed back into the field on screen as well as re-applied to the feature -- the handle drives the underlying textbox and updates its own value without firing the callback twice. The fruit tab also gains Auto random fruit: a toggle that rolls the fruit gacha for you and a Gacha cooldown slider for how long to wait between rolls. It calls the same remote the game does (the RF/GachaNetworkRF function, with a Purchase/ ZiolesGacha payload) and honors the cooldown the server returns when it sends one, falling back to the slider value otherwise; the roll stops the moment you turn the toggle off or close the panel.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. The Travel island list is per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with type(x) == "table", but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. And the panel now saves and reloads everything: two controls that were built with a hardcoded off and never registered (Blade hits and the Island teleport toggle) are now saved and applied like the rest, so a config written from the panel actually carries them. On top of that, the saved state reactivates itself for real on join -- a toggle saved on no longer just shows as on in the panel, it drives the feature (the fruit ESP saved on comes up with its draw loop running, the blade hit enabled, and so on), because the auto-load replays the same setter every control already uses on click. Auto execute is fixed too: the reload line could not find the executor's queue_on_teleport when it was only published on getgenv() (it read the bare global only, so the toggle silently did nothing on those executors), and the reload now always targets the same branch you launched instead of guessing. Under the hood the file-API, JSON and save/reload logic was pulled out of the Blox Fruits backend into one shared core module (src/core/config-store.lua) so the other games adopt the same persistence without copying it. The dropdown popup can no longer get stuck on the panel: the library reuses one dropdown popup for every dropdown in every tab, and its parent was left unbound by the library refactor, so it was created loose and framed at a fixed corner -- once anything attached it, it showed as a small dark box with a magnifier over the content (the box the user saw in the Combat tab under Blade hits). It is now born hidden inside the library's own overlay, only shown while a dropdown is actually open, and closed on every tab change, so it can never render outside its own dropdown. And the underlying state is now corrected across the board: the shared config store reads its file with a single guarded isfile call (the old code checked it twice and the second call ran outside the pcall, so an executor that throws there broke the whole Load), a Save now reads the file back and only reports success when the bytes match exactly what it wrote (a stale or partial file no longer counts as saved), and a Load now reports which settings actually applied versus which failed -- it no longer runs the same effect twice (the toggle callback fired once via the control and again via the direct setter) and no longer claims success when a feature refused the value. Teleport restores each part's original CanCollide instead of forcing everything collidable, so an accessory or decoration that was already non-collidable stays that way after a flight. The Player tab restores your character's original attribute values (and removes the ones that did not exist before) and destroys the Stun NumberValue only when the feature itself created it, instead of writing defaults over what the game had. Island teleport now checks whether the flight actually started -- a motor that returns nothing without error no longer leaves the toggle armed and reporting 'flying' with no movement -- and reports a real failure instead. The remote sniff toggle really stops capturing when switched off, even with the hooks already installed. And the auto-execute reload line now always targets the current session's ref (never a stale one left in shared state) and validates the ref and source URL before building the reload code, so a value another script wrote into the shared environment cannot shape the queued script. And the panel's small annoyances are cleaned up: the open/close key no longer fires while you are typing in chat or a text box (it only reacts to a real keyboard press that the game has not already handled), the remote sniffer only installs a hook when the executor gives it a way to remove it (otherwise it reports 'unsupported' and leaves the remote untouched, instead of leaving a hook it can never undo), removing the hub's own log hooks no longer overwrites a warn/print layer another script installed on top, the notes the hub keeps are now capped like its log buffer so a long session cannot grow them without limit, and the __DEPHUB_TOGGLE helper is removed when the panel closes if - and only if - it is still this session's, so a helper another session published is never wiped. And the lifecycle is now honest about failure: a feature whose Enable throws is turned back off and, when that call had just created it, dropped from the registry so the next toggle does not reuse it half-initialised; the runtime only marks itself started once every component has actually started, and a component that throws leaves it not-started with the reason recorded so a retry really runs instead of reporting a success that never happened; and disabling the silent aim only puts the __namecall hook back when the current hook is still its own, so a layer another script installed on top is never wiped -- it re-arms the metatable readonly state it had loosened and clears its own state either way. The saved config is now a real document, not a bare bag of keys: it carries a schema version, the game id and a timestamp, so a future format change has a number to migrate from and a config written by another game can never be applied here (it is refused, with the reason recorded). An older file -- saved before this format, with the values at the top level -- still loads exactly as before. The JSON is now read and written by the game own HttpService instead of a hand-rolled subset parser, so escaped quotes, backslashes, line breaks and accented characters survive a save/load round-trip instead of being silently mangled; the small built-in codec stays only as a fallback for an executor that does not expose HttpService. And a text input now exposes the same Set/SetValue the other controls do, so a saved value is pushed back into the field on screen as well as re-applied to the feature -- the handle drives the underlying textbox and updates its own value without firing the callback twice. The fruit tab also gains Auto random fruit: a toggle that rolls the fruit gacha for you and a Gacha cooldown slider for how long to wait between rolls. It calls the same remote the game does (the RF/GachaNetworkRF function, with a Purchase/ ZiolesGacha payload) and honors the cooldown the server returns when it sends one, falling back to the slider value otherwise; the roll stops the moment you turn the toggle off or close the panel. The Travel tab now lists the full island set for every sea, using the exact positions from the OpenSource script (16 islands on Sea 1, 14 on Sea 2, 15 on Sea 3, each sea showing only its own); the island teleport flies straight to those points and no longer depends on a map instance existing. The Player tab also gains Autoken and Autobuso: Autoken keeps Observation Haki on and Autobuso keeps Armament Haki on, both by watching the game flags (KenActive and BusoEnabled) and firing the haki remote only when the haki is actually off, instead of blindly spamming a key. The Blade hits section absorbs the auto-attack upgrades from the OpenSource script: it now takes the hit id automatically from a shared hook instead of needing it set by hand, it drops a fishing rod from your hand before swinging (equipped, the rod hijacks the attack and no hit lands), and it gains a Line of sight toggle that checks a raycast before hitting so it no longer hits enemies through walls -- the tell that gives an auto-hit away. Silent aim and Blade hits now share ONE __namecall hook (a single ref-counted layer that both subscribe to, installed by whichever needs it first and removed by the last) instead of each stacking its own, so there is one hook surface on the metatable, not two.
 0.1.01 | Shared UI (every game): sections now hug their content. A section's height is the measured content of its body, and since that measurement already includes the body's own padding the old size added an extra 24px of dead space under the last control -- the empty band that showed up at the bottom of a section. Removed. Also added real VStack/HStack grouping: related controls sit side by side on one line (a toggle next to the slider that drives it, the switches of one feature together) across Volleyball 4.2, Universal, Violence District, TSB, MM2, Noob Piece, AOT:R, Blood Strike, Steal An Egg, Restaurant Tycoon 3 and Blox Fruits, so tabs are shorter and less cluttered. New shell primitives AddHStack/AddVStack, exposed as Kit.Row/Kit.Stack, with tests.
 0.1.00 | Shared UI (every game) + Debug: full English pass. Every player-visible string -- tab names, section titles, toggle/slider labels, paragraphs, notifications, status reads and the Debug console vocabulary ([FAIL], module/probe details, command replies) -- is now English (was Portuguese). Docs and code comments stay in Portuguese. Also the default open/close key is now N. The Debug tab, loader notes and backend diagnostics all read in English.
 0.0.99 | Blox Fruits: the shared UI kit is now loaded alongside the backend; tab organisation is unchanged (tabs are already purpose-named, and the sea category is kept on purpose because it scopes features to the sea the player is in).
@@ -25308,7 +25616,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known. The island teleport toggle now really stops the teleport: turning it off (or anything tied to it) cancels the flight in progress -- the motor's tween is cancelled so the character stops being dragged, the arrival watcher is disarmed, and collision is restored -- instead of only refusing to start new flights and letting the current one finish. The teleport motor is lighter per frame: the noclip pass no longer walks Character:GetDescendants() every Heartbeat (the heavy part of the flight loop); the BasePart list is cached and rebuilt only when the character changes (respawn), so the normal frame just zeroes velocity and flips CanCollide on a short cached array. Saving the panel config is also hardened: the file API is read from both the chunk globals and getgenv() (an executor that publishes only one used to fall back to memory in silence, which is the "it does not save" the user hit), the Save reads the file back after writing and only reports success when the bytes are really there, and a failed Save now names the real reason (no file API, writefile refused, or the file did not come back) instead of a generic "session only". Also, the script's own per-frame cost is lighter when the aim is on: the silent aim no longer allocates two closures every frame in its Heartbeat/RenderStepped handlers, and its retry to find the game's attack remotes is now bounded instead of running sixty times a second forever if a remote never shows up. And the panel now saves and reloads everything: two controls that were built with a hardcoded off and never registered (Blade hits and the Island teleport toggle) are now saved and applied like the rest, so a config written from the panel actually carries them. On top of that, the saved state reactivates itself for real on join -- a toggle saved on no longer just shows as on in the panel, it drives the feature (the fruit ESP saved on comes up with its draw loop running, the blade hit enabled, and so on), because the auto-load replays the same setter every control already uses on click. Auto execute is fixed too: the reload line could not find the executor's queue_on_teleport when it was only published on getgenv() (it read the bare global only, so the toggle silently did nothing on those executors), and the reload now always targets the same branch you launched instead of guessing. Under the hood the file-API, JSON and save/reload logic was pulled out of the Blox Fruits backend into one shared core module (src/core/config-store.lua) so the other games adopt the same persistence without copying it. The dropdown popup can no longer get stuck on the panel: the library reuses one dropdown popup for every dropdown in every tab, and its parent was left unbound by the library refactor, so it was created loose and framed at a fixed corner -- once anything attached it, it showed as a small dark box with a magnifier over the content (the box the user saw in the Combat tab under Blade hits). It is now born hidden inside the library's own overlay, only shown while a dropdown is actually open, and closed on every tab change, so it can never render outside its own dropdown. And the underlying state is now corrected across the board: the shared config store reads its file with a single guarded isfile call (the old code checked it twice and the second call ran outside the pcall, so an executor that throws there broke the whole Load), a Save now reads the file back and only reports success when the bytes match exactly what it wrote (a stale or partial file no longer counts as saved), and a Load now reports which settings actually applied versus which failed -- it no longer runs the same effect twice (the toggle callback fired once via the control and again via the direct setter) and no longer claims success when a feature refused the value. Teleport restores each part's original CanCollide instead of forcing everything collidable, so an accessory or decoration that was already non-collidable stays that way after a flight. The Player tab restores your character's original attribute values (and removes the ones that did not exist before) and destroys the Stun NumberValue only when the feature itself created it, instead of writing defaults over what the game had. Island teleport now checks whether the flight actually started -- a motor that returns nothing without error no longer leaves the toggle armed and reporting 'flying' with no movement -- and reports a real failure instead. The remote sniff toggle really stops capturing when switched off, even with the hooks already installed. And the auto-execute reload line now always targets the current session's ref (never a stale one left in shared state) and validates the ref and source URL before building the reload code, so a value another script wrote into the shared environment cannot shape the queued script. And the panel's small annoyances are cleaned up: the open/close key no longer fires while you are typing in chat or a text box (it only reacts to a real keyboard press that the game has not already handled), the remote sniffer only installs a hook when the executor gives it a way to remove it (otherwise it reports 'unsupported' and leaves the remote untouched, instead of leaving a hook it can never undo), removing the hub's own log hooks no longer overwrites a warn/print layer another script installed on top, the notes the hub keeps are now capped like its log buffer so a long session cannot grow them without limit, and the __DEPHUB_TOGGLE helper is removed when the panel closes if - and only if - it is still this session's, so a helper another session published is never wiped. And the lifecycle is now honest about failure: a feature whose Enable throws is turned back off and, when that call had just created it, dropped from the registry so the next toggle does not reuse it half-initialised; the runtime only marks itself started once every component has actually started, and a component that throws leaves it not-started with the reason recorded so a retry really runs instead of reporting a success that never happened; and disabling the silent aim only puts the __namecall hook back when the current hook is still its own, so a layer another script installed on top is never wiped -- it re-arms the metatable readonly state it had loosened and clears its own state either way. The saved config is now a real document, not a bare bag of keys: it carries a schema version, the game id and a timestamp, so a future format change has a number to migrate from and a config written by another game can never be applied here (it is refused, with the reason recorded). An older file -- saved before this format, with the values at the top level -- still loads exactly as before. The JSON is now read and written by the game own HttpService instead of a hand-rolled subset parser, so escaped quotes, backslashes, line breaks and accented characters survive a save/load round-trip instead of being silently mangled; the small built-in codec stays only as a fallback for an executor that does not expose HttpService. And a text input now exposes the same Set/SetValue the other controls do, so a saved value is pushed back into the field on screen as well as re-applied to the feature -- the handle drives the underlying textbox and updates its own value without firing the callback twice. The fruit tab also gains Auto random fruit: a toggle that rolls the fruit gacha for you and a Gacha cooldown slider for how long to wait between rolls. It calls the same remote the game does (the RF/GachaNetworkRF function, with a Purchase/ ZiolesGacha payload) and honors the cooldown the server returns when it sends one, falling back to the slider value otherwise; the roll stops the moment you turn the toggle off or close the panel.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known. The island teleport toggle now really stops the teleport: turning it off (or anything tied to it) cancels the flight in progress -- the motor's tween is cancelled so the character stops being dragged, the arrival watcher is disarmed, and collision is restored -- instead of only refusing to start new flights and letting the current one finish. The teleport motor is lighter per frame: the noclip pass no longer walks Character:GetDescendants() every Heartbeat (the heavy part of the flight loop); the BasePart list is cached and rebuilt only when the character changes (respawn), so the normal frame just zeroes velocity and flips CanCollide on a short cached array. Saving the panel config is also hardened: the file API is read from both the chunk globals and getgenv() (an executor that publishes only one used to fall back to memory in silence, which is the "it does not save" the user hit), the Save reads the file back after writing and only reports success when the bytes are really there, and a failed Save now names the real reason (no file API, writefile refused, or the file did not come back) instead of a generic "session only". Also, the script's own per-frame cost is lighter when the aim is on: the silent aim no longer allocates two closures every frame in its Heartbeat/RenderStepped handlers, and its retry to find the game's attack remotes is now bounded instead of running sixty times a second forever if a remote never shows up. And the panel now saves and reloads everything: two controls that were built with a hardcoded off and never registered (Blade hits and the Island teleport toggle) are now saved and applied like the rest, so a config written from the panel actually carries them. On top of that, the saved state reactivates itself for real on join -- a toggle saved on no longer just shows as on in the panel, it drives the feature (the fruit ESP saved on comes up with its draw loop running, the blade hit enabled, and so on), because the auto-load replays the same setter every control already uses on click. Auto execute is fixed too: the reload line could not find the executor's queue_on_teleport when it was only published on getgenv() (it read the bare global only, so the toggle silently did nothing on those executors), and the reload now always targets the same branch you launched instead of guessing. Under the hood the file-API, JSON and save/reload logic was pulled out of the Blox Fruits backend into one shared core module (src/core/config-store.lua) so the other games adopt the same persistence without copying it. The dropdown popup can no longer get stuck on the panel: the library reuses one dropdown popup for every dropdown in every tab, and its parent was left unbound by the library refactor, so it was created loose and framed at a fixed corner -- once anything attached it, it showed as a small dark box with a magnifier over the content (the box the user saw in the Combat tab under Blade hits). It is now born hidden inside the library's own overlay, only shown while a dropdown is actually open, and closed on every tab change, so it can never render outside its own dropdown. And the underlying state is now corrected across the board: the shared config store reads its file with a single guarded isfile call (the old code checked it twice and the second call ran outside the pcall, so an executor that throws there broke the whole Load), a Save now reads the file back and only reports success when the bytes match exactly what it wrote (a stale or partial file no longer counts as saved), and a Load now reports which settings actually applied versus which failed -- it no longer runs the same effect twice (the toggle callback fired once via the control and again via the direct setter) and no longer claims success when a feature refused the value. Teleport restores each part's original CanCollide instead of forcing everything collidable, so an accessory or decoration that was already non-collidable stays that way after a flight. The Player tab restores your character's original attribute values (and removes the ones that did not exist before) and destroys the Stun NumberValue only when the feature itself created it, instead of writing defaults over what the game had. Island teleport now checks whether the flight actually started -- a motor that returns nothing without error no longer leaves the toggle armed and reporting 'flying' with no movement -- and reports a real failure instead. The remote sniff toggle really stops capturing when switched off, even with the hooks already installed. And the auto-execute reload line now always targets the current session's ref (never a stale one left in shared state) and validates the ref and source URL before building the reload code, so a value another script wrote into the shared environment cannot shape the queued script. And the panel's small annoyances are cleaned up: the open/close key no longer fires while you are typing in chat or a text box (it only reacts to a real keyboard press that the game has not already handled), the remote sniffer only installs a hook when the executor gives it a way to remove it (otherwise it reports 'unsupported' and leaves the remote untouched, instead of leaving a hook it can never undo), removing the hub's own log hooks no longer overwrites a warn/print layer another script installed on top, the notes the hub keeps are now capped like its log buffer so a long session cannot grow them without limit, and the __DEPHUB_TOGGLE helper is removed when the panel closes if - and only if - it is still this session's, so a helper another session published is never wiped. And the lifecycle is now honest about failure: a feature whose Enable throws is turned back off and, when that call had just created it, dropped from the registry so the next toggle does not reuse it half-initialised; the runtime only marks itself started once every component has actually started, and a component that throws leaves it not-started with the reason recorded so a retry really runs instead of reporting a success that never happened; and disabling the silent aim only puts the __namecall hook back when the current hook is still its own, so a layer another script installed on top is never wiped -- it re-arms the metatable readonly state it had loosened and clears its own state either way. The saved config is now a real document, not a bare bag of keys: it carries a schema version, the game id and a timestamp, so a future format change has a number to migrate from and a config written by another game can never be applied here (it is refused, with the reason recorded). An older file -- saved before this format, with the values at the top level -- still loads exactly as before. The JSON is now read and written by the game own HttpService instead of a hand-rolled subset parser, so escaped quotes, backslashes, line breaks and accented characters survive a save/load round-trip instead of being silently mangled; the small built-in codec stays only as a fallback for an executor that does not expose HttpService. And a text input now exposes the same Set/SetValue the other controls do, so a saved value is pushed back into the field on screen as well as re-applied to the feature -- the handle drives the underlying textbox and updates its own value without firing the callback twice. The fruit tab also gains Auto random fruit: a toggle that rolls the fruit gacha for you and a Gacha cooldown slider for how long to wait between rolls. It calls the same remote the game does (the RF/GachaNetworkRF function, with a Purchase/ ZiolesGacha payload) and honors the cooldown the server returns when it sends one, falling back to the slider value otherwise; the roll stops the moment you turn the toggle off or close the panel. The Travel tab now lists the full island set for every sea, using the exact positions from the OpenSource script (16 islands on Sea 1, 14 on Sea 2, 15 on Sea 3, each sea showing only its own); the island teleport flies straight to those points and no longer depends on a map instance existing. The Player tab also gains Autoken and Autobuso: Autoken keeps Observation Haki on and Autobuso keeps Armament Haki on, both by watching the game flags (KenActive and BusoEnabled) and firing the haki remote only when the haki is actually off, instead of blindly spamming a key. The Blade hits section absorbs the auto-attack upgrades from the OpenSource script: it now takes the hit id automatically from a shared hook instead of needing it set by hand, it drops a fishing rod from your hand before swinging (equipped, the rod hijacks the attack and no hit lands), and it gains a Line of sight toggle that checks a raycast before hitting so it no longer hits enemies through walls -- the tell that gives an auto-hit away. Silent aim and Blade hits now share ONE __namecall hook (a single ref-counted layer that both subscribe to, installed by whichever needs it first and removed by the last) instead of each stacking its own, so there is one hook surface on the metatable, not two.
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.

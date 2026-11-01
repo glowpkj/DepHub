@@ -20,12 +20,15 @@ local LocalPlayer = Players.LocalPlayer
 -- InvokeServer) e troca o segundo argumento (a posicao) pela posicao do alvo.
 -- Assim o servidor acha que voce mirou nele, sem a mira visual mudar.
 --
--- O olho do silent aim e o __namecall da metatable do game (getrawmetatable +
--- newcclosure) -- o mesmo mecanismo do script original. Sem isso nao ha silent
--- aim de verdade; e por ser gancho de metatable, o Disable PRECISA devolver o
--- __namecall original, senao o game fica com o gancho pendurado (a regra do
--- repo: ligar tem que desligar de verdade). Por isso o hook e instalado no
--- Enable e removido no Disable/Destroy.
+-- O olho do silent aim e o __namecall da metatable do game -- o mesmo mecanismo
+-- do script original. Mas aqui ele NAO instala o proprio gancho: usa o gancho
+-- COMPARTILHADO (options.hook, a infra net-hook), onde se INSCREVE. Isso deixa
+-- silent aim e blade hit dividindo UMA camada de __namecall em vez de empilhar
+-- dois. Sem o gancho compartilhado (executor sem getrawmetatable/newcclosure) ou
+-- sem hook injetado, o Enable recusa em vez de fingir que liga. O RemoveHook
+-- cancela a inscricao; o gancho so sai da metatable quando o ULTIMO assinante
+-- sai (ref-count no net-hook) -- a regra do repo: ligar tem que desligar de
+-- verdade.
 --
 -- O BEAM e o indicador visual: um Beam ligando o teu HumanoidRootPart ao do alvo
 -- atual, atualizado a cada frame -- sem ele o usuario nao sabe em quem o aim
@@ -38,9 +41,8 @@ local LocalPlayer = Players.LocalPlayer
 -- Sem UI e sem toggle proprio: quem monta o painel e o backend (o toggle "Silent
 -- aim", o dropdown de excecoes e o slider de alcance). Aqui so vive a logica.
 --
--- Self-contained: faz os proprios game:GetService e nao depende do DepHub. O
--- hook e opcional -- se o executor nao expoe getrawmetatable/newcclosure, o
--- Enable recusa em vez de fingir que liga.
+-- Self-contained: faz os proprios game:GetService e nao depende do DepHub. So
+-- pede o gancho compartilhado por injecao (options.hook) -- se faltar, recusa.
 
 local Feature = {}
 Feature.__index = Feature
@@ -124,10 +126,12 @@ function Feature.new(options)
     self.ExceptionTime = 0
     -- Conexoes (Heartbeat do alvo + InputBegan/Ended das teclas).
     self.Connections = {}
-    -- O gancho da metatable: guarda o __namecall original pra restaurar.
-    self.OriginalNamecall = nil
-    self.Metatable = nil
-    self.Hooked = false
+    -- O gancho COMPARTILHADO de __namecall (injetado por options.hook, a infra
+    -- net-hook). O silent aim se INSCREVE nele; nao instala gancho proprio.
+    self.Hook = options.hook or nil
+    -- O id da nossa inscricao no gancho (pra cancelar no RemoveHook). O gancho
+    -- so sai da metatable quando o ultimo assinante sai.
+    self.HookId = nil
     -- O remote do CLIQUE (M1/ar): RegisterHit. Redirecionado pro alvo no slot 1.
     self.RegisterHit = nil
     -- O remote que abre o golpe (RegisterAttack): quando ele sai, o aim dispara
@@ -183,36 +187,35 @@ function Feature:_TargetRoot()
     return root(target.Character)
 end
 
--- O hitId pro RegisterHit forjado. Prefere o ultimo capturado de um RegisterHit
--- real do jogo (o formato que o servidor ja aceitou); sem nenhum ainda, gera um
--- no mesmo formato que o script antigo usava quando nao tinha captura
--- (UserId + algo unico) -- o hitId do BF e um nonce do CLIENTE, nao um token do
--- servidor, entao um gerado aqui e valido.
+-- O hitId pro RegisterHit forjado. Prefere o ultimo capturado pelo gancho
+-- COMPARTILHADO (a infra net-hook le o 4. argumento do RegisterHit do jogo e
+-- guarda em Hook.LastHitId); senao, o que a propria feature guardou; sem nenhum
+-- ainda, gera um no mesmo formato do script antigo (UserId + algo unico) -- o
+-- hitId do BF e um nonce do CLIENTE, nao um token do servidor, entao um gerado
+-- aqui e valido.
 function Feature:_HitId()
+    local hook = self.Hook
+    if hook and hook.LastHitId ~= nil then return hook.LastHitId end
     if self.HitId ~= nil then return self.HitId end
     local me = LocalPlayer
     local userId = me and tostring(me.UserId) or "0"
     return userId:sub(2, 4) .. tostring(os.clock()):gsub("%D", ""):sub(-4)
 end
 
--- Resolve os remotes de ataque do BF. O CLIQUE (M1/ar) e o RegisterHit: ele
--- manda (part, {}, nil, hitId). As SKILLS mandam a posicao no slot 2 de outros
--- remotes. Sem achar o RegisterHit, o aim das skills continua funcionando e so
--- o clique nao e redirecionado -- nao e fatal.
+-- Resolve os remotes de ataque do BF a partir do gancho COMPARTILHADO. O CLIQUE
+-- (M1/ar) e o RegisterHit: ele manda (part, {}, nil, hitId). As SKILLS mandam a
+-- posicao no slot 2 de outros remotes. Sem achar o RegisterHit, o aim das skills
+-- continua funcionando e so o clique nao e redirecionado -- nao e fatal.
 --
 -- RegisterAttack tambem e resolvido: e o "comeco do golpe" (FireServer(0.4,
--- combo)). E o gatilho pra RE-REGISTRAR o hit no alvo (ver InstallHook): quando
--- o golpe comeca, o aim dispara um RegisterHit no alvo travado -- o caminho que
--- de fato registra dano no BF (o mesmo que a blade hit usa).
+-- combo)). E o gatilho pra RE-REGISTRAR o hit no alvo (ver _OnRemote).
 function Feature:ResolveRemotes()
-    local modules = ReplicatedStorage:FindFirstChild("Modules")
-    local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
-    if not net then return false end
-    local hit = net:FindFirstChild("RE/RegisterHit")
-    if not hit then return false end
-    self.RegisterHit = hit
-    self.RegisterAttack = net:FindFirstChild("RE/RegisterAttack")
-    return true
+    local hook = self.Hook
+    if not hook then return false end
+    if type(hook.Resolve) == "function" then pcall(hook.Resolve, hook) end
+    self.RegisterHit = hook.RegisterHit
+    self.RegisterAttack = hook.RegisterAttack
+    return self.RegisterHit ~= nil
 end
 
 -- O jogador mais proximo dentro do alcance. nil se nao ha ninguem (ou sem
@@ -305,146 +308,97 @@ end
 
 -- --- O gancho (o olho do silent aim) ----------------------------------------
 
--- Instala o gancho de __namecall. Guarda o original pra restaurar depois.
--- Devolve true se instalou. Sem getrawmetatable/newcclosure (executor que nao
--- expoe) devolve false -- o Enable entao recusa, em vez de ligar um no-op.
+-- A NOSSA parte do gancho compartilhado: chamada pelo net-hook a cada remote que
+-- sai (FireServer/InvokeServer), com a tabela `args` que sera enviada. Aqui vive
+-- a logica do silent aim -- o net-hook ja cuidou da deteccao de remote e da
+-- captura do hitId; esta callback so REESCREVE.
 --
--- O corpo do gancho e IDENTICO ao script original do usuario (v3.4), que e o
--- que funcionava sem bugar nada:
---   * `local args = {...}` e `old(unpack(args))` -- a tabela de varargs e
---     remontada e reenviada inteira, exatamente como no original.
---   * deteccao de remote pelo tostring de args[1] ("RemoteEvent"/"RemoteFunction").
---   * SO reescreve quando ha alvo (TargetPosition ~= nil) e o aim nao esta em
---     excecao. Sem alvo, a chamada sai intacta pelo caminho normal.
---   * SEM pcall: o original nao tinha, e um pcall em volta do corpo muda o
---     caminho da chamada (o executor entrega de outro jeito) e era o que saia do
---     personagem so por ligar o toggle. O corpo aqui nao deve levantar: so le
---     campos do proprio modulo e chama o original.
-function Feature:InstallHook()
-    if self.Hooked then return true end
-    if type(getrawmetatable) ~= "function" or type(newcclosure) ~= "function" then
-        return false
+-- O corpo e IDENTICO ao script original do usuario (v3.4), que funcionava sem
+-- bugar nada:
+--   * o RegisterHit do clique manda (part, {}, nil, hitId) -- reescrevemos a
+--     PART (args[2]) pela HumanoidRootPart do alvo travado, sem tocar nos outros.
+--   * o RegisterAttack (FireServer(0.4, combo)) e o gatilho pra forjar um
+--     RegisterHit no alvo -- o caminho que de fato registra dano no BF.
+--   * as SKILLS mandam a POSICAO no slot 2; reescrevemos quando ha alvo e o aim
+--     nao esta em excecao (e o slot 2 nao e booleano).
+function Feature:_OnRemote(args)
+    local RegisterHit = self.RegisterHit
+    local RegisterAttack = self.RegisterAttack
+
+    -- O CLIQUE (M1/ar): (part, {}, nil, hitId) -- args[1] e o proprio RegisterHit.
+    if RegisterHit ~= nil and args[1] == RegisterHit then
+        local targetRoot = self:_TargetRoot()
+        if targetRoot ~= nil then args[2] = targetRoot end
+        return
     end
-    local mt = getrawmetatable(game)
-    if not mt then return false end
-    local original = mt.__namecall
-    if type(original) ~= "function" then return false end
 
-    self.Metatable = mt
-    self.OriginalNamecall = original
-    -- A metatable e protegida (readonly); liberar antes de escrever. Guardamos o
-    -- estado pra reativar no RemoveHook (nao deixar a metatable destravada).
-    if type(isreadonly) == "function" then
-        self.MetatableWasReadonly = pcall(isreadonly, mt) and isreadonly(mt) == true
-    end
-    if type(setreadonly) == "function" then pcall(setreadonly, mt, false) end
-
-    local self_ = self
-    mt.__namecall = newcclosure(function(...)
-        local method = getnamecallmethod()
-        local args = { ... }
-
-        local isFire = tostring(method) == "FireServer"
-        local isInvoke = tostring(method) == "InvokeServer"
-
-        if isFire or isInvoke then
-            -- Deteccao de remote IDENTICA ao script original do usuario.
-            local arg1Str = tostring(args[1])
-            local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
-
-            if isRemote then
-                -- O CLIQUE (M1/ar) sai pelo RegisterHit com a PART do alvo no
-                -- slot 2: (part, {}, nil, hitId) -- args[1] e o proprio remote.
-                -- Aqui o aim redireciona essa part pra HumanoidRootPart do alvo
-                -- travado, sem encostar nos outros slots (o hitId continua o do
-                -- jogo). So o proprio RegisterHit e tocado.
-                if self_.RegisterHit ~= nil and args[1] == self_.RegisterHit then
-                    -- Guarda o hitId (4. argumento) -- e o token que o servidor
-                    -- validou no golpe; o RegisterHit forjado abaixo reusa ele.
-                    if args[4] ~= nil then self_.HitId = args[4] end
-                    local targetRoot = self_:_TargetRoot()
-                    if targetRoot ~= nil then
-                        args[2] = targetRoot
-                    end
-                    return original(unpack(args))
-                end
-
-                -- O GOLPE ABRIU (RegisterAttack:FireServer(0.4, combo)). Este e
-                -- o ponto em que o aim REGISTRA o dano no alvo: dispara um
-                -- RegisterHit no HumanoidRootPart do alvo travado, que e o
-                -- caminho que de fato acerta no BF (o mesmo da blade hit). A
-                -- POSICAO reescrita nos outros remotes sozinha nao garante o
-                -- acerto -- o RegisterHit garante.
-                if self_.RegisterAttack ~= nil and args[1] == self_.RegisterAttack then
-                    local root = original(unpack(args))
-                    local self2 = self_
-                    -- Fora do __namecall (task.spawn): disparar o FireServer
-                    -- aqui dentro re-entraria no proprio gancho de forma
-                    -- sincrona logo apos o original. Spawnado, ele sai pelo
-                    -- caminho normal no proximo passo do scheduler.
-                    if not self2:IsExceptionActive() then
-                        local now = os.clock()
-                        -- No maximo um RegisterHit forjado a cada 20ms (o golpe
-                        -- abre uma vez; RegisterAttack pode repetir rapido).
-                        if (now - self2.LastAttackAt) > 0.02 then
-                            local targetRoot = self2:_TargetRoot()
-                            if targetRoot ~= nil then
-                                self2.LastAttackAt = now
-                                local hitRemote, hitId = self2.RegisterHit, self2:_HitId()
-                                task.spawn(function()
-                                    pcall(function() hitRemote:FireServer(targetRoot, {}, nil, hitId) end)
-                                end)
-                            end
-                        end
-                    end
-                    return root
-                end
-
-                -- As SKILLS de teclado mandam a POSICAO no slot 2. Reescrito
-                -- como no script original.
-                local arg2Str = tostring(args[2])
-                local isBool = (arg2Str == "true" or arg2Str == "false")
-
-                if not isBool and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
-                    args[2] = self_.TargetPosition
+    -- O GOLPE ABRIU (RegisterAttack): forja um RegisterHit no alvo travado. Fora
+    -- do __namecall (task.spawn) -- disparar aqui dentro re-entraria no gancho.
+    if RegisterAttack ~= nil and args[1] == RegisterAttack then
+        if not self:IsExceptionActive() then
+            local now = os.clock()
+            -- No maximo um RegisterHit forjado a cada 20ms (o golpe abre uma vez;
+            -- RegisterAttack pode repetir rapido).
+            if (now - self.LastAttackAt) > 0.02 then
+                local targetRoot = self:_TargetRoot()
+                if targetRoot ~= nil then
+                    self.LastAttackAt = now
+                    local hitRemote, hitId = RegisterHit, self:_HitId()
+                    task.spawn(function()
+                        pcall(function() hitRemote:FireServer(targetRoot, {}, nil, hitId) end)
+                    end)
                 end
             end
         end
+        return
+    end
 
-        return original(unpack(args))
+    -- As SKILLS de teclado mandam a POSICAO no slot 2. Reescrita como no original.
+    if self.TargetPosition ~= nil and not self:IsExceptionActive() then
+        local arg2Str = tostring(args[2])
+        local isBool = (arg2Str == "true" or arg2Str == "false")
+        if not isBool then args[2] = self.TargetPosition end
+    end
+end
+
+-- Inscreve o silent aim no gancho COMPARTILHADO (options.hook, a infra net-hook).
+-- Devolve true se inscreveu. Sem gancho injetado ou sem getrawmetatable/newcclosure
+-- (executor que nao expoe) devolve false -- o Enable entao recusa, em vez de ligar
+-- um no-op. Tambem resolve os remotes no gancho.
+function Feature:InstallHook()
+    if self.HookId ~= nil then return true end
+    local hook = self.Hook
+    if not hook or type(hook.Add) ~= "function" then
+        self.LastError = "sem gancho compartilhado"
+        return false
+    end
+    -- Os remotes de ataque sao resolvidos no proprio gancho compartilhado (ele
+    -- captura o hitId e sabe o RegisterHit); aqui pegamos as referencias pra
+    -- comparar nos args.
+    if type(hook.Resolve) == "function" then pcall(hook.Resolve, hook) end
+    self.RegisterHit = hook.RegisterHit
+    self.RegisterAttack = hook.RegisterAttack
+    local id = hook:Add(function(args)
+        pcall(self._OnRemote, self, args)
     end)
-    -- Guarda a closure INSTALADA: o RemoveHook so restaura se o __namecall atual
-    -- ainda for esta -- se outro script (ou outra instancia) instalou uma camada
-    -- depois, nao sobrescrevemos a dele com o nosso original obsoleto.
-    self.InstalledNamecall = mt.__namecall
-    self.Hooked = true
+    if id == nil then
+        self.LastError = "sem getrawmetatable/newcclosure"
+        return false
+    end
+    self.HookId = id
     return true
 end
 
--- Restaura o __namecall original. Sem isso o game ficaria com o gancho pendurado.
--- Restaura SO se o valor atual ainda for o NOSSO gancho (senao outra camada
--- assumiu o __namecall e apagar aqui destruiria a dela).
+-- Cancela a nossa inscricao. O gancho so sai da metatable quando o ULTIMO
+-- assinante sai (ref-count no net-hook) -- entao desligar o silent aim nao derruba
+-- o gancho debaixo da blade hit, e vice-versa.
 function Feature:RemoveHook()
-    if not self.Hooked then return end
-    self.Hooked = false
-    local mt = self.Metatable
-    if mt and self.OriginalNamecall then
-        pcall(function()
-            if type(setreadonly) == "function" then pcall(setreadonly, mt, false) end
-            -- So restaura se ainda for o nosso gancho. Se mudou, so reativa a
-            -- readonly (deixamos a metatable como estava) e nao mexemos no valor.
-            if self.InstalledNamecall == nil or mt.__namecall == self.InstalledNamecall then
-                mt.__namecall = self.OriginalNamecall
-            end
-            if self.MetatableWasReadonly and type(setreadonly) == "function" then
-                pcall(setreadonly, mt, true)
-            end
-        end)
+    if self.HookId == nil then return end
+    local hook = self.Hook
+    if hook and type(hook.Remove) == "function" then
+        pcall(hook.Remove, hook, self.HookId)
     end
-    self.Metatable = nil
-    self.OriginalNamecall = nil
-    self.InstalledNamecall = nil
-    self.MetatableWasReadonly = nil
+    self.HookId = nil
 end
 
 -- --- Selecao de alvo --------------------------------------------------------

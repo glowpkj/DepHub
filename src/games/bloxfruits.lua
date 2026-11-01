@@ -68,6 +68,7 @@ local FEATURE_MODULES = {
 }
 local INFRA_MODULES = {
     {name = "teleport"},
+    {name = "net-hook"},
 }
 
 local previous = type(env.__DEPHUB_BLOXFRUITS) == "table" and env.__DEPHUB_BLOXFRUITS or nil
@@ -401,6 +402,11 @@ function State:SetFeature(name, enabled)
             local context = {
                 teleport = self.Infra.teleport,
                 combat = self.Instances.bladhits,
+                -- O gancho de __namecall COMPARTILHADO: o silent aim e a blade hit
+                -- usam a MESMA camada (um gancho, nao dois) via Add/Remove. O
+                -- silent aim depende dele pra instalar; a blade hit so le o hitId
+                -- capturado (Hook.LastHitId).
+                hook = self.Infra["net-hook"],
                 state = self,
                 -- O mar atual: a feature de ilhas escolhe a lista de destinos
                 -- daqui (Sea 1 / 2 / 3 tem ilhas e pontos fixos diferentes).
@@ -413,6 +419,9 @@ function State:SetFeature(name, enabled)
                 -- A aba Player nasce com o multiplicador de velocidade que o
                 -- painel ja marcou (o slider aplica mesmo sem reabrir o painel).
                 speed = self.PendingPlayerSpeed,
+                -- A blade hit nasce com o LOS que o painel ja marcou (o toggle
+                -- aplica mesmo sem reabrir o painel).
+                losCheck = self.PendingBladeLos,
             }
             local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
@@ -500,6 +509,7 @@ function State:Destroy()
     self.PendingSilentAimRange = nil
     self.PendingSilentAimExceptions = nil
     self.PendingPlayerSpeed = nil
+    self.PendingBladeLos = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruitsOwn == self then env.__DEPHUB.BloxFruitsOwn = nil end
@@ -541,6 +551,24 @@ local PANELS = {
                 State.Config.bladhits = value == true
             end)
             State:RegisterConfig("bladhits", applyBlade, bladeToggle)
+
+            -- LOS: nao hitar alvo atras de parede (raycast). Menos "cobertura
+            -- impossivel" pro anti-cheat, ao custo de perder alvos ocluidos.
+            -- Aplica na hora se a feature ja estiver instanciada; senao guarda a
+            -- escolha pro Enable (mesmo caminho do range do silent aim).
+            local function applyLos(value)
+                if State.Instances.bladhits then
+                    State.Instances.bladhits:SetLos(value)
+                else
+                    State.PendingBladeLos = value
+                end
+            end
+            local losToggle = section:CreateToggle("Line of sight", State.Config.bladhitsLos == true, function(value)
+                applyLos(value)
+                State.Config.bladhitsLos = value == true
+            end)
+            State:RegisterConfig("bladhitsLos", applyLos, losToggle)
+
             section:CreateParagraph("Blade hits", "Auto-swing at every enemy in range using the game's attack remotes.")
         end,
     },
