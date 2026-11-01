@@ -58,6 +58,11 @@ function Teleport.new(options)
     self.ArrivalOffset = options.arrivalOffset or Vector3.new(0, 5, 0)
     self.Tween = nil
     self._heartbeat = nil
+    -- Cache do noclip por character: a lista de BaseParts so e reconstruida
+    -- quando o character muda (respawn). Ver Enable() para o porque.
+    self._noclipParts = nil
+    self._root = nil
+    self._character = nil
     return self
 end
 
@@ -70,13 +75,29 @@ function Teleport:IsFlying()
     return self.Tween ~= nil
 end
 
+-- Devolve a colisao que o voo tirou: recompoe CanCollide nos BaseParts do
+-- character em cache. Chamado quando o voo termina (Completed) ou e cancelado,
+-- para o personagem nao ficar "atravessando" o chao depois de pousar.
+function Teleport:_RestoreCollision()
+    local parts = self._noclipParts
+    if parts then
+        for index = 1, #parts do
+            local part = parts[index]
+            if part.Parent and not part.CanCollide then pcall(function() part.CanCollide = true end) end
+        end
+    end
+end
+
 -- Cancela o voo corrente, se houver. Chamado antes de todo Go novo (um so
--- tween por vez) e no Disable/Destroy.
+-- tween por vez) e no Disable/Destroy. Tambem para o arrasto na hora: o
+-- personagem para de seguir o tween e a colisao volta -- e o que faz "desligar
+-- o toggle parar de teleportar de verdade".
 function Teleport:Cancel()
     if self.Tween then
         pcall(function() self.Tween:Cancel() end)
         self.Tween = nil
     end
+    self:_RestoreCollision()
     return true
 end
 
@@ -108,6 +129,8 @@ function Teleport:Go(position, offset)
     self.Tween = tween
     tween.Completed:Connect(function()
         if self.Tween == tween then self.Tween = nil end
+        -- Chegou: devolve a colisao (o voo a tinha tirado).
+        self:_RestoreCollision()
     end)
     tween:Play()
     return tween
@@ -265,14 +288,44 @@ function Teleport:Enable()
     self.Enabled = true
     -- Durante o voo: velocidade zero + noclip. Nao ancora o character -- o BF
     -- rejeita todo hit num HRP ancorado, entao so zera a velocidade mesmo.
+    --
+    -- PERFORMANCE: o handler do Heartbeat roda a 60/s. Varrer
+    -- character:GetDescendants() TODO frame era o custo pesado e desnecessario --
+    -- a lista de BaseParts so muda quando o character muda (respawn) ou quando
+    -- alguem entra/sai dela. Entao ela e cacheada e reconstruida apenas quando
+    -- necessario; no caso normal o frame so percorre um array curto e seta
+    -- CanCollide/velocidade. O cache tambem guarda a propria HRP pra evitar
+    -- FindFirstChild por frame.
+    self._noclipParts = nil
+    self._root = nil
+    self._character = nil
     self._heartbeat = RunService.Heartbeat:Connect(function()
         if not self.Tween then return end
         local character = LocalPlayer and LocalPlayer.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-        if root then root.AssemblyLinearVelocity = Vector3.zero end
-        if character then
+        if not character then return end
+        -- Character novo (respawn) -> invalida o cache uma unica vez.
+        if character ~= self._character then
+            self._character = character
+            self._root = character:FindFirstChild("HumanoidRootPart")
+            self._noclipParts = {}
+            -- GetDescendants so aqui (mudanca de character), nao por frame.
             for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
+                if part:IsA("BasePart") then
+                    self._noclipParts[#self._noclipParts + 1] = part
+                end
+            end
+        end
+        local root = self._root
+        if root and root.Parent == character then
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+        local parts = self._noclipParts
+        if parts then
+            for index = 1, #parts do
+                local part = parts[index]
+                -- So escreve quando muda: CanCollide=true e o padrao, entao
+                -- pular a escrita evita a maior parte dos sets por frame.
+                if part.CanCollide then part.CanCollide = false end
             end
         end
     end)
@@ -286,6 +339,9 @@ function Teleport:Disable()
         pcall(function() self._heartbeat:Disconnect() end)
         self._heartbeat = nil
     end
+    self._noclipParts = nil
+    self._root = nil
+    self._character = nil
     return true
 end
 

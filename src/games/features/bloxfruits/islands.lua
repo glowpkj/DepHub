@@ -340,9 +340,11 @@ function Feature:Select(label)
     return true
 end
 
--- O toggle. Ligar voa pra ilha ja selecionada; desligar so para de agir (nao
--- cancela um voo em andamento -- o voo e pontual e termina sozinho; cancelar no
--- meio deixaria o personagem no ar no caminho).
+-- O toggle. Ligar voa pra ilha ja selecionada; desligar PARA de teleportar de
+-- verdade -- cancela o voo em andamento (o motor para o tween) e desliga a
+-- vigia de chegada. Era o pedido do usuario: desligar o toggle (ou qualquer
+-- coisa ligada a ele) tem que estancar o teleporte na hora, nao so "parar de
+-- comecar voos novos" e deixar o personagem seguindo ate o fim.
 --
 -- Devolve true se ARMOU (tem motor). Se a ilha escolhida nao estiver no mapa
 -- agora, continua armado e reporta em LastStatus -- assim o usuario pode so
@@ -351,8 +353,12 @@ function Feature:SetEnabled(on)
     self.ToggleOn = on == true
     if not self.ToggleOn then
         self.LastStatus = "idle"
-        -- Desligar na mao cancela a vigia: sem voo rastreado, nao ha chegada
-        -- para detectar.
+        -- Para o voo corrente: cancela o tween do motor (o personagem parou de
+        -- ser arrastado) e desarma a vigia de chegada. Sem isto o voo continuava
+        -- ate o fim mesmo com o toggle desligado.
+        if self.Teleport and type(self.Teleport.Cancel) == "function" then
+            pcall(self.Teleport.Cancel, self.Teleport)
+        end
         self:_StopWatching()
         return true
     end
@@ -375,7 +381,10 @@ end
 
 function Feature:Disable()
     self.Enabled = false
-    self.ToggleOn = false
+    -- Passa pelo SetEnabled(false) para reaproveitar o cancelamento do voo (o
+    -- mesmo caminho do toggle) -- desligar a feature tambem tem que parar o
+    -- teleporte, nao so a vigia.
+    self:SetEnabled(false)
     self.LastStatus = "idle"
     self:_StopWatching()
     return true

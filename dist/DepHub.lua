@@ -8972,6 +8972,14 @@ local game = game
 local type = type
 local tostring = tostring
 
+-- A API de arquivo do executor, pega pelos NOMES livres (como o chunk resolve):
+-- e o mesmo caminho que ja funcionava. Guardar os valores agora, no load, evita
+-- a resolucao depender de _G/getfenv depois. O getter ainda tenta getgenv()
+-- como fallback (alguns executores so publicam la).
+local fileWrite = writefile
+local fileRead = readfile
+local fileIsFile = isfile
+
 local env = type(getgenv) == "function" and getgenv() or _G
 local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env.__DEPHUB.Log or function() end
 
@@ -9109,6 +9117,9 @@ local State = {
     -- O JSON cru lido do disco (ou nil). Enquanto o painel nao terminou de
     -- montar, o Load so guarda aqui e aplica quando os controles existirem.
     SavedConfig = nil,
+    -- O motivo da ultima falha do Save (sem API, writefile recusou, arquivo nao
+    -- voltou). O botao mostra isto em vez de um "so na memoria" generico.
+    LastConfigError = nil,
 }
 
 -- Persistencia das configs. Usa a API de arquivo do executor (writefile/
@@ -9117,8 +9128,20 @@ local State = {
 -- valores do painel de Blox Fruits.
 local CONFIG_FILE = "DepHub_BloxFruits_config.json"
 
+-- A API de arquivo do executor. Os nomes livres (writefile/readfile/isfile) sao
+-- o caminho normal -- foram capturados no load; getgenv() e o fallback de quem
+-- so publica la. Sem os tres, nao ha persistencia em disco (cai pra memoria) e o
+-- Save diz isso.
+function State:FileApi()
+    local write = type(fileWrite) == "function" and fileWrite or env.writefile
+    local read = type(fileRead) == "function" and fileRead or env.readfile
+    local isf = type(fileIsFile) == "function" and fileIsFile or env.isfile
+    if type(write) ~= "function" or type(read) ~= "function" or type(isf) ~= "function" then return nil end
+    return { write = write, read = read, isfile = isf }
+end
+
 function State:CanPersist()
-    return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+    return self:FileApi() ~= nil
 end
 
 -- Serializa uma tabela plana (string/number/boolean) pro nosso JSON. E um
@@ -9948,20 +9971,39 @@ function State:SaveConfig()
         end
     end
     self.SavedConfig = snapshot
-    if not self:CanPersist() then return false end
-    local ok = pcall(writefile, CONFIG_FILE, self:EncodeConfig())
-    return ok == true
+    local api = self:FileApi()
+    if not api then
+        self.LastConfigError = "executor sem API de arquivo (writefile/readfile/isfile)"
+        return false
+    end
+    local text = self:EncodeConfig()
+    local ok = pcall(api.write, CONFIG_FILE, text)
+    if not ok then
+        self.LastConfigError = "writefile recusou a gravacao"
+        return false
+    end
+    -- Confirma lendo de volta: alguns executores aceitam writefile e nao
+    -- persistem (ou gravam noutro lugar); sem esta checagem o Save diria "ok" e
+    -- o proximo start abriria vazio -- o "nao salva" que o usuario viu.
+    local readOk, back = pcall(api.read, CONFIG_FILE)
+    if not readOk or type(back) ~= "string" or #back == 0 then
+        self.LastConfigError = "o arquivo nao voltou depois de gravar"
+        return false
+    end
+    self.LastConfigError = nil
+    return true
 end
 
 -- Le as configs do disco (ou da memoria) e devolve a tabela, sem aplicar nada.
 -- Devolve nil quando nao ha arquivo nem config guardada.
 function State:ReadConfig()
-    if not self:CanPersist() then
+    local api = self:FileApi()
+    if not api then
         return self.SavedConfig
     end
-    local has = pcall(isfile, CONFIG_FILE)
-    if not (has and isfile(CONFIG_FILE)) then return self.SavedConfig end
-    local ok, text = pcall(readfile, CONFIG_FILE)
+    local has = pcall(api.isfile, CONFIG_FILE)
+    if not (has and api.isfile(CONFIG_FILE)) then return self.SavedConfig end
+    local ok, text = pcall(api.read, CONFIG_FILE)
     if not ok then return nil end
     local parsed = decodeConfig(text)
     self.SavedConfig = parsed
@@ -10600,7 +10642,10 @@ local PANELS = {
                 if ok then
                     instance.Notify("Config", "Saved.")
                 else
-                    instance.Notify("Config", "Saved for this session only (no file API).")
+                    -- Reporta o MOTIVO real (sem API de arquivo, writefile
+                    -- recusou, ou o arquivo nao voltou): "so na memoria" sozinho
+                    -- nao dizia o que deu errado.
+                    instance.Notify("Config", State.LastConfigError or "Saved for this session only.")
                 end
             end)
             section:CreateButton("Load config", function()
@@ -12388,9 +12433,11 @@ function Feature:Select(label)
     return true
 end
 
--- O toggle. Ligar voa pra ilha ja selecionada; desligar so para de agir (nao
--- cancela um voo em andamento -- o voo e pontual e termina sozinho; cancelar no
--- meio deixaria o personagem no ar no caminho).
+-- O toggle. Ligar voa pra ilha ja selecionada; desligar PARA de teleportar de
+-- verdade -- cancela o voo em andamento (o motor para o tween) e desliga a
+-- vigia de chegada. Era o pedido do usuario: desligar o toggle (ou qualquer
+-- coisa ligada a ele) tem que estancar o teleporte na hora, nao so "parar de
+-- comecar voos novos" e deixar o personagem seguindo ate o fim.
 --
 -- Devolve true se ARMOU (tem motor). Se a ilha escolhida nao estiver no mapa
 -- agora, continua armado e reporta em LastStatus -- assim o usuario pode so
@@ -12399,8 +12446,12 @@ function Feature:SetEnabled(on)
     self.ToggleOn = on == true
     if not self.ToggleOn then
         self.LastStatus = "idle"
-        -- Desligar na mao cancela a vigia: sem voo rastreado, nao ha chegada
-        -- para detectar.
+        -- Para o voo corrente: cancela o tween do motor (o personagem parou de
+        -- ser arrastado) e desarma a vigia de chegada. Sem isto o voo continuava
+        -- ate o fim mesmo com o toggle desligado.
+        if self.Teleport and type(self.Teleport.Cancel) == "function" then
+            pcall(self.Teleport.Cancel, self.Teleport)
+        end
         self:_StopWatching()
         return true
     end
@@ -12423,7 +12474,10 @@ end
 
 function Feature:Disable()
     self.Enabled = false
-    self.ToggleOn = false
+    -- Passa pelo SetEnabled(false) para reaproveitar o cancelamento do voo (o
+    -- mesmo caminho do toggle) -- desligar a feature tambem tem que parar o
+    -- teleporte, nao so a vigia.
+    self:SetEnabled(false)
     self.LastStatus = "idle"
     self:_StopWatching()
     return true
@@ -13385,6 +13439,11 @@ function Teleport.new(options)
     self.ArrivalOffset = options.arrivalOffset or Vector3.new(0, 5, 0)
     self.Tween = nil
     self._heartbeat = nil
+    -- Cache do noclip por character: a lista de BaseParts so e reconstruida
+    -- quando o character muda (respawn). Ver Enable() para o porque.
+    self._noclipParts = nil
+    self._root = nil
+    self._character = nil
     return self
 end
 
@@ -13397,13 +13456,29 @@ function Teleport:IsFlying()
     return self.Tween ~= nil
 end
 
+-- Devolve a colisao que o voo tirou: recompoe CanCollide nos BaseParts do
+-- character em cache. Chamado quando o voo termina (Completed) ou e cancelado,
+-- para o personagem nao ficar "atravessando" o chao depois de pousar.
+function Teleport:_RestoreCollision()
+    local parts = self._noclipParts
+    if parts then
+        for index = 1, #parts do
+            local part = parts[index]
+            if part.Parent and not part.CanCollide then pcall(function() part.CanCollide = true end) end
+        end
+    end
+end
+
 -- Cancela o voo corrente, se houver. Chamado antes de todo Go novo (um so
--- tween por vez) e no Disable/Destroy.
+-- tween por vez) e no Disable/Destroy. Tambem para o arrasto na hora: o
+-- personagem para de seguir o tween e a colisao volta -- e o que faz "desligar
+-- o toggle parar de teleportar de verdade".
 function Teleport:Cancel()
     if self.Tween then
         pcall(function() self.Tween:Cancel() end)
         self.Tween = nil
     end
+    self:_RestoreCollision()
     return true
 end
 
@@ -13435,6 +13510,8 @@ function Teleport:Go(position, offset)
     self.Tween = tween
     tween.Completed:Connect(function()
         if self.Tween == tween then self.Tween = nil end
+        -- Chegou: devolve a colisao (o voo a tinha tirado).
+        self:_RestoreCollision()
     end)
     tween:Play()
     return tween
@@ -13592,14 +13669,44 @@ function Teleport:Enable()
     self.Enabled = true
     -- Durante o voo: velocidade zero + noclip. Nao ancora o character -- o BF
     -- rejeita todo hit num HRP ancorado, entao so zera a velocidade mesmo.
+    --
+    -- PERFORMANCE: o handler do Heartbeat roda a 60/s. Varrer
+    -- character:GetDescendants() TODO frame era o custo pesado e desnecessario --
+    -- a lista de BaseParts so muda quando o character muda (respawn) ou quando
+    -- alguem entra/sai dela. Entao ela e cacheada e reconstruida apenas quando
+    -- necessario; no caso normal o frame so percorre um array curto e seta
+    -- CanCollide/velocidade. O cache tambem guarda a propria HRP pra evitar
+    -- FindFirstChild por frame.
+    self._noclipParts = nil
+    self._root = nil
+    self._character = nil
     self._heartbeat = RunService.Heartbeat:Connect(function()
         if not self.Tween then return end
         local character = LocalPlayer and LocalPlayer.Character
-        local root = character and character:FindFirstChild("HumanoidRootPart")
-        if root then root.AssemblyLinearVelocity = Vector3.zero end
-        if character then
+        if not character then return end
+        -- Character novo (respawn) -> invalida o cache uma unica vez.
+        if character ~= self._character then
+            self._character = character
+            self._root = character:FindFirstChild("HumanoidRootPart")
+            self._noclipParts = {}
+            -- GetDescendants so aqui (mudanca de character), nao por frame.
             for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then part.CanCollide = false end
+                if part:IsA("BasePart") then
+                    self._noclipParts[#self._noclipParts + 1] = part
+                end
+            end
+        end
+        local root = self._root
+        if root and root.Parent == character then
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+        local parts = self._noclipParts
+        if parts then
+            for index = 1, #parts do
+                local part = parts[index]
+                -- So escreve quando muda: CanCollide=true e o padrao, entao
+                -- pular a escrita evita a maior parte dos sets por frame.
+                if part.CanCollide then part.CanCollide = false end
             end
         end
     end)
@@ -13613,6 +13720,9 @@ function Teleport:Disable()
         pcall(function() self._heartbeat:Disconnect() end)
         self._heartbeat = nil
     end
+    self._noclipParts = nil
+    self._root = nil
+    self._character = nil
     return true
 end
 
@@ -24306,7 +24416,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known. The island teleport toggle now really stops the teleport: turning it off (or anything tied to it) cancels the flight in progress -- the motor's tween is cancelled so the character stops being dragged, the arrival watcher is disarmed, and collision is restored -- instead of only refusing to start new flights and letting the current one finish. The teleport motor is lighter per frame: the noclip pass no longer walks Character:GetDescendants() every Heartbeat (the heavy part of the flight loop); the BasePart list is cached and rebuilt only when the character changes (respawn), so the normal frame just zeroes velocity and flips CanCollide on a short cached array. Saving the panel config is also hardened: the file API is read from both the chunk globals and getgenv() (an executor that publishes only one used to fall back to memory in silence, which is the "it does not save" the user hit), the Save reads the file back after writing and only reports success when the bytes are really there, and a failed Save now names the real reason (no file API, writefile refused, or the file did not come back) instead of a generic "session only".
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.

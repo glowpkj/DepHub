@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-01T06:26:21.646Z",
+  "generatedAt": "2026-11-01T06:32:07.693Z",
   "commit": "local",
   "version": "0.1.27",
   "games": {
@@ -29,7 +29,7 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "4e28bccf7c938eebfb871c18c9527b220d4b96acae5b91e404841206ae1e9deb",
+      "version": "f647f9110ace037e01560531c4ac344c13868206c4774c4638a9cfba55910ddd",
       "commit": "local",
       "files": [
         "DepHub.lua",
@@ -152,7 +152,7 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "edc9a56e46271e3bc610a318d133a17d99fffd48e6172816880b74ab595952f2",
+      "version": "b5a9ae6c80e906d05f24ba87b7fc675957d832c6eebf2f526b3e9aa31b8d2d50",
       "commit": "local",
       "files": [
         "DepHub.lua",

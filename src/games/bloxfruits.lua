@@ -2,6 +2,14 @@ local game = game
 local type = type
 local tostring = tostring
 
+-- A API de arquivo do executor, pega pelos NOMES livres (como o chunk resolve):
+-- e o mesmo caminho que ja funcionava. Guardar os valores agora, no load, evita
+-- a resolucao depender de _G/getfenv depois. O getter ainda tenta getgenv()
+-- como fallback (alguns executores so publicam la).
+local fileWrite = writefile
+local fileRead = readfile
+local fileIsFile = isfile
+
 local env = type(getgenv) == "function" and getgenv() or _G
 local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env.__DEPHUB.Log or function() end
 
@@ -139,6 +147,9 @@ local State = {
     -- O JSON cru lido do disco (ou nil). Enquanto o painel nao terminou de
     -- montar, o Load so guarda aqui e aplica quando os controles existirem.
     SavedConfig = nil,
+    -- O motivo da ultima falha do Save (sem API, writefile recusou, arquivo nao
+    -- voltou). O botao mostra isto em vez de um "so na memoria" generico.
+    LastConfigError = nil,
 }
 
 -- Persistencia das configs. Usa a API de arquivo do executor (writefile/
@@ -147,8 +158,20 @@ local State = {
 -- valores do painel de Blox Fruits.
 local CONFIG_FILE = "DepHub_BloxFruits_config.json"
 
+-- A API de arquivo do executor. Os nomes livres (writefile/readfile/isfile) sao
+-- o caminho normal -- foram capturados no load; getgenv() e o fallback de quem
+-- so publica la. Sem os tres, nao ha persistencia em disco (cai pra memoria) e o
+-- Save diz isso.
+function State:FileApi()
+    local write = type(fileWrite) == "function" and fileWrite or env.writefile
+    local read = type(fileRead) == "function" and fileRead or env.readfile
+    local isf = type(fileIsFile) == "function" and fileIsFile or env.isfile
+    if type(write) ~= "function" or type(read) ~= "function" or type(isf) ~= "function" then return nil end
+    return { write = write, read = read, isfile = isf }
+end
+
 function State:CanPersist()
-    return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+    return self:FileApi() ~= nil
 end
 
 -- Serializa uma tabela plana (string/number/boolean) pro nosso JSON. E um
@@ -228,20 +251,39 @@ function State:SaveConfig()
         end
     end
     self.SavedConfig = snapshot
-    if not self:CanPersist() then return false end
-    local ok = pcall(writefile, CONFIG_FILE, self:EncodeConfig())
-    return ok == true
+    local api = self:FileApi()
+    if not api then
+        self.LastConfigError = "executor sem API de arquivo (writefile/readfile/isfile)"
+        return false
+    end
+    local text = self:EncodeConfig()
+    local ok = pcall(api.write, CONFIG_FILE, text)
+    if not ok then
+        self.LastConfigError = "writefile recusou a gravacao"
+        return false
+    end
+    -- Confirma lendo de volta: alguns executores aceitam writefile e nao
+    -- persistem (ou gravam noutro lugar); sem esta checagem o Save diria "ok" e
+    -- o proximo start abriria vazio -- o "nao salva" que o usuario viu.
+    local readOk, back = pcall(api.read, CONFIG_FILE)
+    if not readOk or type(back) ~= "string" or #back == 0 then
+        self.LastConfigError = "o arquivo nao voltou depois de gravar"
+        return false
+    end
+    self.LastConfigError = nil
+    return true
 end
 
 -- Le as configs do disco (ou da memoria) e devolve a tabela, sem aplicar nada.
 -- Devolve nil quando nao ha arquivo nem config guardada.
 function State:ReadConfig()
-    if not self:CanPersist() then
+    local api = self:FileApi()
+    if not api then
         return self.SavedConfig
     end
-    local has = pcall(isfile, CONFIG_FILE)
-    if not (has and isfile(CONFIG_FILE)) then return self.SavedConfig end
-    local ok, text = pcall(readfile, CONFIG_FILE)
+    local has = pcall(api.isfile, CONFIG_FILE)
+    if not (has and api.isfile(CONFIG_FILE)) then return self.SavedConfig end
+    local ok, text = pcall(api.read, CONFIG_FILE)
     if not ok then return nil end
     local parsed = decodeConfig(text)
     self.SavedConfig = parsed
@@ -880,7 +922,10 @@ local PANELS = {
                 if ok then
                     instance.Notify("Config", "Saved.")
                 else
-                    instance.Notify("Config", "Saved for this session only (no file API).")
+                    -- Reporta o MOTIVO real (sem API de arquivo, writefile
+                    -- recusou, ou o arquivo nao voltou): "so na memoria" sozinho
+                    -- nao dizia o que deu errado.
+                    instance.Notify("Config", State.LastConfigError or "Saved for this session only.")
                 end
             end)
             section:CreateButton("Load config", function()

@@ -308,6 +308,43 @@ do
     check(state.Instances.silentaim ~= nil and state.Instances.silentaim.MaxRange == 777, "o Load aplica o range na feature instanciada")
 end
 
+-- Round-trip COMPLETO: a config real tem escalares, booleanos E listas de
+-- string (exceptionKeys, fruitSkip, fruitKeep). O teste de cima so exercita
+-- escalares; aqui passa a config inteira pelo arquivo, como o Save real grava,
+-- e le de volta numa sessao NOVA (filesystem em memoria compartilhado).
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    -- Uma config realista, com todas as formas de valor que o painel grava.
+    state.Config = {
+        range = 640,
+        speed = 4,
+        silentaim = true,
+        fruitEsp = true,
+        fruitTrace = true,
+        unbreakable = true,
+        island = "Snow Mountain",
+        exceptionKeys = { "Z", "F" },
+        fruitSkip = { "Dragon", "Leopard" },
+        fruitKeep = { "Kitsune" },
+    }
+    ctx.Env.writefile("DepHub_BloxFruits_config.json", state:EncodeConfig())
+
+    -- Le de volta pelo parser: TODA forma de valor tem que voltar.
+    local parsed = state:ReadConfig()
+    check(parsed.range == 640, "round-trip: numero volta")
+    check(parsed.speed == 4, "round-trip: segundo numero volta")
+    check(parsed.silentaim == true, "round-trip: booleano true volta")
+    check(parsed.unbreakable == true, "round-trip: outro booleano volta")
+    check(parsed.island == "Snow Mountain", "round-trip: string com espaco volta")
+    check(type(parsed.exceptionKeys) == "table" and #parsed.exceptionKeys == 2, "round-trip: lista de 2 itens volta")
+    check(parsed.exceptionKeys[1] == "Z" and parsed.exceptionKeys[2] == "F", "round-trip: ordem da lista preservada")
+    check(type(parsed.fruitSkip) == "table" and #parsed.fruitSkip == 2, "round-trip: segunda lista volta")
+    check(type(parsed.fruitKeep) == "table" and #parsed.fruitKeep == 1 and parsed.fruitKeep[1] == "Kitsune", "round-trip: lista de 1 item volta")
+end
+
 -- Auto execute: um toggle que faz o DepHub se re-executar sozinho depois do
 -- proximo teleporte (queue_on_teleport). Ligado, entrega a linha de reload ao
 -- executor; desligado, limpa. Sem o executor expor a API, recusa honestamente.
@@ -370,19 +407,22 @@ do
 end
 
 -- Fallback em memoria: sem writefile/readfile/isfile, o Save nao quebra -- so
--- fica na sessao. O Load devolve o que ficou guardado.
+-- fica na sessao. O Load devolve o que ficou guardado. A API e removida ANTES
+-- do load, como um executor que de fato nao a tem (o backend a captura no load;
+-- nil depois nao muda o que ja foi capturado).
 do
     local ctx = bfContext(994732206, 994732206)
     local ui = ctx:MountUI()
-    local state = ctx:Run("src/games/bloxfruits.lua")
 
     ctx.Env.writefile = nil
     ctx.Env.readfile = nil
     ctx.Env.isfile = nil
 
+    local state = ctx:Run("src/games/bloxfruits.lua")
     check(state:CanPersist() == false, "sem a API de arquivo CanPersist e false")
     state.Config.range = 640
     check(state:SaveConfig() == false, "sem arquivo o Save so guarda em memoria")
+    check(type(state.LastConfigError) == "string", "o Save sem API explica o motivo")
     state.Config.range = nil
     check(state:LoadConfig() == 1 and state.Config.range == 640, "o Load devolve a config em memoria")
 end
@@ -698,6 +738,16 @@ do
     check(islands.ToggleOn == false, "desligar o toggle desarma")
     check(islands:Select("Snow Mountain") == true, "com o toggle desligado, selecionar de novo e aceito")
     check(motor:IsFlying() == false, "com o toggle desligado, de novo NAO voa")
+
+    -- O pedido do usuario: desligar o toggle no MEIO de um voo tem que PARAR o
+    -- teleporte na hora -- nao so impedir voos novos. O motor para de arrastar
+    -- (Cancel zera o tween) e a vigia de chegada e desarmada.
+    check(islands:SetEnabled(true) == true, "religa o toggle")
+    check(motor:IsFlying() == true, "com o toggle ligado ha voo em andamento")
+    check(islands._arrivalConnection ~= nil, "a vigia de chegada esta armada durante o voo")
+    islands:SetEnabled(false)
+    check(motor:IsFlying() == false, "desligar o toggle CANCELA o voo em andamento (para de teleportar)")
+    check(islands._arrivalConnection == nil, "desligar o toggle desarma a vigia de chegada")
 
     -- Rotulo desconhecido nao entra.
     check(islands:Select("Nao Existe") == false, "ilha desconhecida e recusada")
@@ -1261,6 +1311,25 @@ do
     -- O offset padrao soma 5 studs no Y (sair 5 acima evita spawnar no chao).
     local off = tp.ArrivalOffset
     check(off.Y == 5, "o offset de chegada padrao sobe 5 studs")
+
+    -- Durante o voo: o Heartbeat zera a velocidade e tira o noclip (CanCollide
+    -- false). O cache e montado uma vez (ao ver o character) e reusado -- nao
+    -- varre GetDescendants por frame.
+    check(tp:IsEnabled() == true, "o motor esta ligado (loop do Heartbeat ativo)")
+    root.CanCollide = true
+    local tween2 = tp:Go(Vector3.new(0, 0, 100))
+    check(tween2 ~= nil, "novo voo criado para testar o Heartbeat")
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(tp._noclipParts ~= nil and #tp._noclipParts >= 1, "o Heartbeat monta o cache de noclip uma vez")
+    check(root.CanCollide == false, "durante o voo o Heartbeat tira a colisao (noclip)")
+    local cachedCount = #tp._noclipParts
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(#tp._noclipParts == cachedCount, "o cache nao e reconstruido por frame (so quando o character muda)")
+
+    -- Cancelar (o que o desligar do toggle faz) devolve a colisao: o personagem
+    -- nao fica atravessando o chao depois.
+    check(tp:Cancel() == true, "Cancel no meio do voo")
+    check(root.CanCollide == true, "Cancel devolve a colisao (o personagem volta a pisar)")
 
     check(tp:SetSpeed(150) and tp.Speed == 150, "SetSpeed aplica uma velocidade valida")
     check(tp:SetSpeed(0) == false, "SetSpeed rejeita zero")
