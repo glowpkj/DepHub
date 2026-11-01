@@ -50,9 +50,41 @@ local function resolveFileApi()
     return { write = write, read = read, isfile = isf }
 end
 
--- Serializa uma tabela plana (string/number/boolean + array de string) pro nosso
--- JSON. E um subconjunto JSON de proposito: o repo nao tem um codec JSON no
--- cliente, e o que uma config guarda e so escalares + listas de string.
+-- O codec JSON. Antes era um parser/escritor caseiro (subconjunto tolerante) --
+-- funcionava pra escalares + arrays de string, mas reimplementava o que o
+-- proprio executor ja entrega: HttpService:JSONEncode/JSONDecode. Usar o do
+-- jogo e uma fonte so de verdade (escapes, unicode, numeros, aninhamento) e
+-- nunca diverge do resto do hub, que ja le JSON por ele.
+--
+-- Resolvido no load, com o mesmo cuidado da API de arquivo: alguns executores
+-- so publicam HttpService pelo game, outros pelo env. Sem ele, cai no codec
+-- minimo embutido (o antigo), pra o store nunca deixar de funcionar.
+local jsonEncode = nil
+local jsonDecode = nil
+do
+    -- `game` e o game do chunk (o harness serve o mesmo objeto). Tentamos o
+    -- GetService nele; se nao houver, procuramos no getgenv()/_G e no env.
+    local gameRef = game
+    if type(gameRef) ~= "table" then gameRef = env and env.game end
+    if type(gameRef) ~= "table" then gameRef = (type(getgenv) == "function" and getgenv() or _G).game end
+    local httpService = nil
+    if type(gameRef) == "table" and type(gameRef.GetService) == "function" then
+        local ok, service = pcall(gameRef.GetService, gameRef, "HttpService")
+        if ok and type(service) == "table" then httpService = service end
+    end
+    if httpService == nil and env and type(env.HttpService) == "table" then httpService = env.HttpService end
+    if httpService then
+        if type(httpService.JSONEncode) == "function" then
+            jsonEncode = function(value) return httpService:JSONEncode(value) end
+        end
+        if type(httpService.JSONDecode) == "function" then
+            jsonDecode = function(text) return httpService:JSONDecode(text) end
+        end
+    end
+end
+
+-- Fallback minimo (o codec antigo), so usado quando nao ha HttpService. Cobre
+-- escalares + arrays de string, que e o que uma config guarda.
 local function encodeValue(value)
     local valueType = type(value)
     if valueType == "string" then
@@ -69,8 +101,6 @@ local function encodeValue(value)
     return "null"
 end
 
--- Le um objeto JSON raso (so escalares + arrays de string). Um parser minimo e
--- tolerante: o que nao casar e simplesmente ignorado.
 local function decodeConfig(text)
     local out = {}
     if type(text) ~= "string" then return out end
@@ -97,20 +127,50 @@ local function decodeConfig(text)
     return out
 end
 
+local function encodeJson(value)
+    if jsonEncode then
+        local ok, text = pcall(jsonEncode, value)
+        if ok and type(text) == "string" then return text end
+    end
+    local parts = {}
+    local keys = {}
+    for key in pairs(value) do keys[#keys + 1] = key end
+    table.sort(keys)
+    for _, key in ipairs(keys) do parts[#parts + 1] = '"' .. key .. '":' .. encodeValue(value[key]) end
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
+local function decodeJson(text)
+    if jsonDecode then
+        local ok, parsed = pcall(jsonDecode, text)
+        if ok and type(parsed) == "table" then return parsed end
+    end
+    return decodeConfig(text)
+end
+
+-- A versao do formato do arquivo. Guardada no proprio arquivo (schemaVersion);
+-- quando o layout dos valores mudar de forma incompativel, sobe aqui e o
+-- migrate() ensina o load a trazer o arquivo velho.
+local SCHEMA_VERSION = 2
+
 local Store = {}
 Store.__index = Store
 
 -- opts.file        -- o nome do arquivo no executor (obrigatorio).
--- opts.decoder     -- (opcional) decodificador proprio; default o JSON raso acima.
+-- opts.gameId      -- (opcional) o id do jogo; carimbado no arquivo e usado pra
+--                     detectar config de outro jogo guardada no mesmo arquivo.
+-- opts.decoder     -- (opcional) decodificador proprio; default o JSON do jogo.
 function Store.new(opts)
     opts = opts or {}
     return setmetatable({
         file = opts.file,
+        gameId = opts.gameId,
         decoder = opts.decoder,
         Values = {},        -- o que o painel/escreveu: chave -> valor
         Entries = {},       -- { {key, apply, handle}, ... } na ordem de registro
         Saved = nil,        -- o snapshot em memoria (fallback sem disco)
         LastError = nil,
+        SchemaVersion = SCHEMA_VERSION,
     }, Store)
 end
 
@@ -138,15 +198,43 @@ function Store:Register(key, apply, handle)
     return apply
 end
 
+-- O arquivo agora e um ENVELOPE, nao os valores soltos: { schemaVersion, gameId,
+-- updatedAt, values = { ... } }. Isso da tres coisas que faltavam: (a) um numero
+-- de versao pra uma migracao futura saber o que esta lendo, (b) o gameId pra
+-- detectar config de OUTRO jogo guardada no mesmo arquivo, (c) um carimbo de
+-- quando foi salvo (util pro suporte e pra debug). Um arquivo VELHO (sem
+-- envelope) continua valendo -- o Unwrap trata o objeto inteiro como values.
 function Store:Encode()
-    local parts = {}
-    local keys = {}
-    for key in pairs(self.Values) do keys[#keys + 1] = key end
-    table.sort(keys)
-    for _, key in ipairs(keys) do
-        parts[#parts + 1] = '"' .. key .. '":' .. encodeValue(self.Values[key])
+    local valuesJson = encodeJson(self.Values)
+    local envelope = {
+        schemaVersion = SCHEMA_VERSION,
+        gameId = self.gameId,
+        updatedAt = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+        values = self.Values,
+    }
+    -- Se o codec do jogo esta disponivel, ele serializa o envelope inteiro de uma
+    -- vez. Sem ele, o fallback so cobre o objeto de values (o envelope vira um
+    -- objeto com values como string) -- mas isso so acontece sem HttpService.
+    if jsonEncode then
+        local ok, text = pcall(jsonEncode, envelope)
+        if ok and type(text) == "string" then return text end
     end
-    return "{" .. table.concat(parts, ",") .. "}"
+    return '{"schemaVersion":' .. SCHEMA_VERSION
+        .. ',"gameId":' .. encodeValue(self.gameId)
+        .. ',"updatedAt":' .. encodeValue(envelope.updatedAt)
+        .. ',"values":' .. valuesJson .. '}'
+end
+
+-- Traz o que foi lido pro formato atual, seja o envelope novo ou um arquivo
+-- antigo. Devolve os VALUES (o dicionario chave->valor) e, se veio envelope, a
+-- versao lida. Um arquivo sem schemaVersion e tratado como v1 (os valores soltos)
+-- -- entao uma config gravada antes deste schema continua carregando.
+local function unwrap(parsed)
+    if type(parsed) ~= "table" then return nil, nil end
+    if parsed.schemaVersion ~= nil and type(parsed.values) == "table" then
+        return parsed.values, parsed.schemaVersion
+    end
+    return parsed, 1
 end
 
 -- Grava as configs atuais. Devolve true se gravou em disco, false se so deu pra
@@ -212,9 +300,23 @@ function Store:Read()
     if exists ~= true then return self.Saved end
     local readOk, text = pcall(api.read, self.file)
     if not readOk or type(text) ~= "string" then return nil end
-    local parsed = (self.decoder or decodeConfig)(text)
-    self.Saved = parsed
-    return parsed
+    local parsed = (self.decoder or decodeJson)(text)
+    -- Desembrulha o envelope (ou aceita um arquivo antigo, v1 = valores soltos) e
+    -- devolve os values. `Read` sempre devolve o dicionario de valores, nunca o
+    -- envelope -- quem chama nao precisa saber que o formato mudou.
+    local values, schemaVersion = unwrap(parsed)
+    if type(values) ~= "table" then return nil end
+    self.LoadedSchema = schemaVersion
+    -- Config de OUTRO jogo no mesmo arquivo (gameId carimbado e diferente): nao
+    -- aplica. Avisa e devolve o que houver em memoria, pra nao vazar um preset de
+    -- um jogo pra outro. Arquivo sem gameId (antigo) passa -- nao da pra saber.
+    if type(parsed) == "table" and parsed.gameId ~= nil and self.gameId ~= nil
+        and tostring(parsed.gameId) ~= tostring(self.gameId) then
+        self.LastError = "config de outro jogo (" .. tostring(parsed.gameId) .. ")"
+        return self.Saved
+    end
+    self.Saved = values
+    return values
 end
 
 -- Le do disco so pra encher os Values, sem aplicar (o Apply precisa dos

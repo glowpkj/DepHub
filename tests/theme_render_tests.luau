@@ -404,6 +404,15 @@ do
         check(type(shellSection:CreateParagraph("Info", "Body")) == "table", "section CreateParagraph works")
         local input = shellSection:CreateInput("Command", "placeholder", "")
         check(type(input) == "table" and type(input.Control) == "table", "section CreateInput returns a control record")
+        -- O handle de input expoe Set/SetValue proprios (o contrato que o
+        -- config-store procura em todo handle): sem isso, um valor salvo num
+        -- campo de texto nao voltava pra tela.
+        check(type(input.Set) == "function", "o handle de input expoe Set")
+        check(type(input.SetValue) == "function", "o handle de input expoe SetValue")
+        input:Set("novo comando")
+        check(input.Value == "novo comando", "Set atualiza o Value do handle")
+        local textboxText = input.Control.TEXTBOX and input.Control.TEXTBOX.Text
+        check(textboxText == "novo comando", "Set empurra o texto pro textbox real do controle")
         check(type(shellSection:CreateRow()) == "table", "section CreateRow returns a handle")
         check(type(shellSection:CreateStack()) == "table", "section CreateStack returns a handle")
 

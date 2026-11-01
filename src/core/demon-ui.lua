@@ -229,7 +229,11 @@ local function makeSection(adapter, tabHandle, title)
     -- DepHub's input handle is a small record: `.Value` holds the current text
     -- and `.Control` is the underlying object (diagnostics clears it with
     -- `.Control:Set("")`). RedzLib's textbox exposes `Set`/`SetText`, so the
-    -- handle simply forwards.
+    -- handle forwards. O handle tambem expoe `Set`/`SetValue` proprios, que e o
+    -- contrato que o config-store procura em todo handle (Apply): sem isso, um
+    -- valor salvo num campo de texto nao voltava pra tela, so o efeito rodava.
+    -- `Set` move o texto SEM re-disparar o callback -- o Apply ja roda o efeito;
+    -- a RedzLib so dispara o callback no FocusLost, nao no SetText.
     function section:CreateInput(label, placeholder, initial, callback)
         local handle = { Value = tostring(initial or "") }
         handle.Control = tabHandle:AddTextBox({
@@ -241,6 +245,17 @@ local function makeSection(adapter, tabHandle, title)
                 if callback then callback(value) end
             end
         })
+        handle.Set = function(_, value)
+            local text = tostring(value or "")
+            handle.Value = text
+            local control = handle.Control
+            if control then
+                if type(control.Set) == "function" then pcall(control.Set, control, text)
+                elseif type(control.SetText) == "function" then pcall(control.SetText, control, text) end
+            end
+            return text
+        end
+        handle.SetValue = handle.Set
         return handle
     end
 

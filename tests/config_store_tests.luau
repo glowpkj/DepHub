@@ -153,3 +153,64 @@ do
     check(mixed.count == 1 and mixed.applied[1] == "good", "o resultado separa a chave boa")
     check(#mixed.failed == 1 and mixed.failed[1] == "bad", "o resultado lista a chave ruim")
 end
+
+-- Schema v2: o arquivo e um ENVELOPE (schemaVersion/gameId/updatedAt/values), e
+-- um arquivo ANTIGO (valores soltos, sem envelope) ainda carrega. Tambem: uma
+-- config de OUTRO gameId no mesmo arquivo nao e aplicada.
+do
+    local ctx = sandbox()
+    local factory = ctx:Run("src/core/config-store.lua")
+    local file = "DepHub_cfg_schema.json"
+
+    local store = factory.new({ file = file, gameId = "abc123" })
+    store:Set("range", 640)
+    store:Set("fruitTrace", true)
+    store:Set("skip", { "Dragon", "Leopard" })
+    check(store:Save() == true, "Save grava o arquivo no formato novo")
+
+    -- O texto gravado tem o envelope E os valores, e e JSON valido (o jogo le).
+    local written = ctx.Files[file]
+    check(type(written) == "string", "o arquivo foi gravado")
+    local http = ctx.Services.HttpService
+    local envelope = http:JSONDecode(written)
+    check(type(envelope) == "table", "o arquivo gravado e JSON valido")
+    check(envelope.schemaVersion == 2, "o arquivo carrega schemaVersion = 2")
+    check(envelope.gameId == "abc123", "o arquivo carrega o gameId")
+    check(type(envelope.updatedAt) == "string" and #envelope.updatedAt > 0, "o arquivo carrega um updatedAt")
+    check(type(envelope.values) == "table" and envelope.values.range == 640, "os valores ficam sob .values")
+
+    -- Reler o proprio arquivo devolve os VALORES (nao o envelope) e migra limpo.
+    local back = store:Read()
+    check(type(back) == "table" and back.range == 640 and back.fruitTrace == true, "Read desembrulha os values do envelope")
+    check(back.skip[1] == "Dragon" and back.skip[2] == "Leopard", "arrays de string sobrevivem ao round-trip")
+
+    -- Arquivo ANTIGO: valores soltos, sem schemaVersion. Tem que carregar igual
+    -- (v1), sem perder nada -- a migracao e "trata o objeto inteiro como values".
+    local oldFile = "DepHub_cfg_old.json"
+    ctx.Env.writefile(oldFile, '{"range":777,"autoexec":true}')
+    local oldStore = factory.new({ file = oldFile, gameId = "abc123" })
+    local old = oldStore:Read()
+    check(type(old) == "table" and old.range == 777 and old.autoexec == true, "um arquivo v1 (sem envelope) continua carregando")
+    check(oldStore.LoadedSchema == 1, "o store registra que leu um schema v1")
+
+    -- gameId DIFERENTE no mesmo arquivo: nao aplica (nao vaza preset de outro jogo).
+    local storeOther = factory.new({ file = file, gameId = "outroJogo" })
+    local refused = storeOther:Read()
+    check(storeOther.LastError and storeOther.LastError:find("outro jogo"), "config de outro gameId e recusada com motivo")
+    check(refused == nil or refused.range ~= 640, "a config de outro jogo nao e devolvida como se fosse deste")
+end
+
+-- Codec: agora passa pelo HttpService do jogo, nao pelo parser caseiro. Prova
+-- que uma string com escape/unicode sobrevive (o caso que o parser antigo comia).
+do
+    local ctx = sandbox()
+    local factory = ctx:Run("src/core/config-store.lua")
+    local file = "DepHub_cfg_codec.json"
+    local store = factory.new({ file = file, gameId = "g1" })
+    local tricky = 'aspa " e barra \\ e quebra\n e acento ' .. string.char(233)
+    store:Set("texto", tricky)
+    check(store:Save() == true, "Save grava uma string com escapes pelo codec do jogo")
+    local back = store:Read()
+    check(back.texto == tricky, "string com aspas/barra/quebra/unicode volta identica (codec do jogo)")
+end
+

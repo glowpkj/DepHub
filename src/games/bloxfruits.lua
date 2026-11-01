@@ -109,9 +109,13 @@ end
 -- JSON raso, gravar + reler, cair pra memoria, reaplicar re-disparando os
 -- callbacks) mora la -- os outros jogos adotam o MESMO modulo sem copiar codigo.
 local CONFIG_FILE = "DepHub_BloxFruits_config.json"
+-- O gameId entra no arquivo (schema v2) pra uma config de outro jogo guardada no
+-- mesmo arquivo nao ser aplicada aqui. `game` e o mesmo objeto que o backend ja
+-- usa em todo lugar.
+local CONFIG_GAME_ID = tostring(game.GameId or "")
 local okStore, ConfigStore = loadFactory("src/core/config-store.lua")
 local configStore = (okStore and type(ConfigStore) == "table" and type(ConfigStore.new) == "function")
-    and ConfigStore.new({ file = CONFIG_FILE }) or nil
+    and ConfigStore.new({ file = CONFIG_FILE, gameId = CONFIG_GAME_ID }) or nil
 if not configStore then report("BloxFruits: config-store nao carregou (" .. tostring(ConfigStore) .. ")") end
 
 local LocalPlayer = game:GetService("Players").LocalPlayer
