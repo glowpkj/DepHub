@@ -274,10 +274,20 @@ function Feature:InstallHook()
             local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
 
             if isRemote then
-                local arg2Str = tostring(args[2])
-                local isBool = (arg2Str == "true" or arg2Str == "false")
-
-                if not isBool and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
+                local arg2 = args[2]
+                -- Nao mexe quando ha alvo nulo, quando o aim esta em excecao, ou
+                -- quando o slot 2 nao e uma POSICAO (Vector3) nem booleano.
+                --
+                -- Aqui esta a correcao do bug da camera: o __namecall ve TODAS
+                -- as chamadas do jogo, nao so as skills. Quando a camera encosta
+                -- numa part, o jogo faz outras chamadas de saida cujo arg2 NAO e
+                -- uma posicao de ataque; reescrever essas tirava o jogador do
+                -- character. So reescreve se args[2] for Vector3 (a posicao que
+                -- os ataques mandam) -- qualquer outra coisa passa intacta.
+                local isBool = (arg2 == true or arg2 == false)
+                local arg2Type = typeof(arg2)
+                local isPosition = (arg2Type == "Vector3" or arg2Type == "CFrame")
+                if not isBool and isPosition and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
                     args[2] = self_.TargetPosition
                 end
             end

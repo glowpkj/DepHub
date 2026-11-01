@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "silentaim", "fruit", "islands"}
+local FEATURES = {"bladhits", "silentaim", "fruit", "islands", "player"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -160,7 +160,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "fruit" or name == "islands", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "fruit" or name == "islands" or name == "player", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -664,11 +664,19 @@ do
     check(feature.TargetName == "NearTarget", "escolhe o jogador mais proximo")
 
     -- COM alvo: o remote sai com a posicao do alvo no slot 2, em vez da que o
-    -- jogo mandou. E o coracao do silent aim.
-    ctx:FireRemote(attack, "FireServer", "some-position")
+    -- jogo mandou. E o coracao do silent aim. O slot 2 e uma POSICAO (Vector3),
+    -- como uma skill real manda -- so assim o hook reescreve.
+    local skillPosition = Vector3.new(5, 0, 5)
+    ctx:FireRemote(attack, "FireServer", skillPosition)
     check(tostring(attack) == "RemoteEvent", "tostring de um remote devolve o nome da classe")
     check(attack.Fired ~= nil and #attack.Fired == 1, "o remote registrou um disparo")
     check(attack.Fired[1][1] == near.Character:FindFirstChild("HumanoidRootPart").Position, "a posicao enviada foi trocada pela do alvo")
+
+    -- BLINDAGEM DA CAMERA: uma chamada com o slot 2 que NAO e posicao (ex.: o
+    -- que a camera manda quando encosta numa part) passa intacta -- nao tira o
+    -- jogador do character.
+    ctx:FireRemote(attack, "FireServer", "nao-e-posicao")
+    check(attack.Fired[#attack.Fired][1] == "nao-e-posicao", "um slot 2 que nao e posicao passa intacto (camera/character nao quebram)")
 
     -- O alvo se move: o proximo passo le a posicao nova.
     near.Character:FindFirstChild("HumanoidRootPart").Position = Vector3.new(120, 5, 0)
@@ -685,14 +693,15 @@ do
     check(feature.Beam.Attachment0 == feature.LocalAttachment and feature.Beam.Attachment1 == feature.TargetAttachment, "o beam liga as duas attachments")
     check(feature.LocalAttachment.Parent ~= nil and feature.TargetAttachment.Parent ~= nil, "as attachments estao penduradas nos HumanoidRootParts")
 
-    -- Segurar a tecla de excecao (F) larga o aim: o remote sai com a posicao
-    -- ORIGINAL, sem reescrita.
+    -- Segurar a tecla de excecao (F) larga o aim: mesmo com uma POSICAO no slot
+    -- 2 (que normalmente seria reescrita), ela passa intacta.
     ctx.Services.UserInputService.InputBegan:Fire({KeyCode = Enum.KeyCode.F})
     check(feature:IsExceptionActive() == true, "segurar a tecla de excecao ativa a supressao")
     feature:_UpdateBeam()
     check(feature.Beam.Enabled == false, "com a excecao ativa o beam se esconde")
-    ctx:FireRemote(attack, "FireServer", "original-position")
-    check(attack.Fired[2][1] == "original-position", "com a excecao ativa o remote sai intacto")
+    local exceptionPosition = Vector3.new(9, 9, 9)
+    ctx:FireRemote(attack, "FireServer", exceptionPosition)
+    check(attack.Fired[#attack.Fired][1] == exceptionPosition, "com a excecao ativa o remote sai intacto")
 
     -- Soltar conta o grace: ainda largado por um instante.
     ctx.Services.UserInputService.InputEnded:Fire({KeyCode = Enum.KeyCode.F})
@@ -749,6 +758,78 @@ do
     local feature = chunk().new({})
     check(feature:Enable() == false, "sem getrawmetatable o Enable recusa")
     check(feature:IsEnabled() == false, "a feature fica desligada quando recusa")
+end
+
+-- Player: a aba SO do local player. Os atributos do character (SpeedMultiplier,
+-- UnbreakableAll, WaterWalking, FlashstepCooldown) e o Stun (NumberValue filho)
+-- mantido em 0. Nao mexe nos cooldowns de skill do jogo.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Player = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "player.lua"])()
+
+    -- O character do local player, com o Stun NumberValue (como no jogo).
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local stun = Instance.new("NumberValue"); stun.Name, stun.Parent = "Stun", char
+    stun.Value = 0
+
+    check(Player.DEFAULT_SPEED == 2.3, "o padrao do multiplicador de velocidade e 2.3 (do jogo)")
+    check(Player.DEFAULT_FLASHSTEP == 0, "o padrao do flashstep e 0 (pronto)")
+
+    local feature = Player.new({ speed = 3 })
+    check(feature.Speed == 3, "a feature nasce com a velocidade passada")
+    check(feature:Enable() == true, "a aba Player liga com o character no lugar")
+
+    -- Speed multiplier: escreve o atributo e prende ao [min,max].
+    feature:SetSpeed(5)
+    check(char:GetAttribute("SpeedMultiplier") == 5, "SetSpeed escreve o atributo SpeedMultiplier")
+    feature:SetSpeed(9999)
+    check(char:GetAttribute("SpeedMultiplier") == Player.MAX_SPEED, "a velocidade acima do maximo e presa")
+    feature:SetSpeed(-5)
+    check(char:GetAttribute("SpeedMultiplier") == 0, "a velocidade abaixo do minimo e presa em 0")
+
+    -- UnbreakableAll: seta true e MANTEM true -- se o jogo tentar voltar pra
+    -- false, a feature re-aplica.
+    feature:SetUnbreakable(true)
+    check(char:GetAttribute("UnbreakableAll") == true, "Unbreakable liga o atributo")
+    char:SetAttribute("UnbreakableAll", false)
+    check(char:GetAttribute("UnbreakableAll") == true, "o Unbreakable se re-aplica quando o jogo tenta desligar")
+
+    -- WaterWalking: igual.
+    feature:SetWaterWalking(true)
+    check(char:GetAttribute("WaterWalking") == true, "Water walk liga o atributo")
+    char:SetAttribute("WaterWalking", false)
+    check(char:GetAttribute("WaterWalking") == true, "o Water walk se re-aplica quando o jogo tenta desligar")
+
+    -- FlashstepCooldown: 0 = pronto.
+    feature:SetFlashstep(1)
+    check(char:GetAttribute("FlashstepCooldown") == 1, "o Flashstep cooldown vai pra 1 (com cooldown)")
+    feature:SetFlashstep(0)
+    check(char:GetAttribute("FlashstepCooldown") == 0, "o Flashstep cooldown volta pra 0 (pronto)")
+
+    -- Stun: o NumberValue fica SEMPRE em 0. Se o jogo escrever 1, a feature
+    -- devolve pra 0 (o "1" e o que te deixa stunado).
+    check(stun.Value == 0, "o Stun comeca em 0")
+    stun.Value = 1
+    check(stun.Value == 0, "o Stun volta pra 0 quando o jogo tenta stunar")
+
+    -- Respawn: um character novo ganha os atributos de novo (re-bind).
+    local char2 = Instance.new("Model"); char2.Name, char2.Parent = "Character2", ctx.Player
+    ctx.Player.Character = char2
+    local stun2 = Instance.new("NumberValue"); stun2.Name, stun2.Parent = "Stun", char2
+    stun2.Value = 0
+    ctx.Player.CharacterAdded:Fire(char2)
+    check(char2:GetAttribute("SpeedMultiplier") ~= nil, "no respawn os atributos sao re-aplicados no character novo")
+    stun2.Value = 1
+    check(stun2.Value == 0, "o Stun do character novo tambem fica em 0")
+
+    -- Disable devolve o character ao neutro: o que a feature ligou e limpo.
+    feature:Disable()
+    check(char2:GetAttribute("UnbreakableAll") ~= true and char2:GetAttribute("WaterWalking") ~= true, "o Disable limpa o que a feature ligou")
+    check(char2:GetAttribute("SpeedMultiplier") == Player.DEFAULT_SPEED, "o Disable devolve a velocidade ao padrao do jogo")
+    check(char2:GetAttribute("FlashstepCooldown") == Player.DEFAULT_FLASHSTEP, "o Disable devolve o flashstep ao padrao (pronto)")
+
+    feature:Destroy()
 end
 
 -- O motor de teleporte e infraestrutura: carrega e instancia sozinho (sem

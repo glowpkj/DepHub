@@ -9017,6 +9017,7 @@ local FEATURE_MODULES = {
     {name = "silentaim", page = "Combat", section = "SILENT AIM", toggle = "Silent aim"},
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
+    {name = "player", page = "Player", section = "PLAYER", toggle = "Speed multiplier"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -9182,6 +9183,9 @@ function State:SetFeature(name, enabled)
                 -- o toggle ainda desligado; a escolha nao se perde).
                 range = self.PendingSilentAimRange,
                 exceptions = self.PendingSilentAimExceptions,
+                -- A aba Player nasce com o multiplicador de velocidade que o
+                -- painel ja marcou (o slider aplica mesmo sem reabrir o painel).
+                speed = self.PendingPlayerSpeed,
             }
             local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
@@ -9256,6 +9260,7 @@ function State:Destroy()
     -- A escolha do painel guardada antes de ligar nao sobrevive ao unload.
     self.PendingSilentAimRange = nil
     self.PendingSilentAimExceptions = nil
+    self.PendingPlayerSpeed = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruitsOwn == self then env.__DEPHUB.BloxFruitsOwn = nil end
@@ -9445,6 +9450,52 @@ local PANELS = {
                 end
             end)
             section:CreateParagraph("Island teleport", "Pick an island and fly there. Only travels while the toggle is on.")
+        end,
+    },
+    player = {
+        page = "Player",
+        section = "PLAYER",
+        category = "Player",
+        icon = "user",
+        tabIcon = "user",
+        -- Aba local player: so o proprio character. O toggle da feature (Speed
+        -- multiplier) e um slider, nao um on/off -- por isso o bloco monta os
+        -- controles direto e usa SetFeature para instanciar a feature.
+        build = function(section, instance)
+            local factory = State.Features.player
+            local minSpeed = (factory and factory.MIN_SPEED) or 0
+            local maxSpeed = (factory and factory.MAX_SPEED) or 10
+            local defaultSpeed = (factory and factory.DEFAULT_SPEED) or 2.3
+
+            -- O Speed multiplier: o atributo SpeedMultiplier do character. O
+            -- padrao do jogo e 2.3 -- mexer no slider ja aplica (a feature sobe
+            -- sozinha) e o valor vale sempre que o slider mexer.
+            section:CreateSlider("Speed multiplier", minSpeed, maxSpeed, defaultSpeed, function(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetSpeed(value) end
+                State.PendingPlayerSpeed = value
+            end)
+
+            -- UnbreakableAll: toggle que seta true e MANTEM true (re-aplica se o
+            -- jogo tentar voltar). Ligar ja sobe a feature.
+            section:CreateToggle("Unbreakable", false, function(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetUnbreakable(value) end
+            end)
+
+            -- WaterWalking: o atributo de andar sobre a agua.
+            section:CreateToggle("Water walk", false, function(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetWaterWalking(value) end
+            end)
+
+            -- FlashstepCooldown: 0 = pronto (sem cooldown), 1 = com cooldown.
+            section:CreateSlider("Flashstep cooldown", 0, 1, 0, function(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetFlashstep(value) end
+            end)
+
+            section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, and Flashstep cooldown (0 = ready). Stun is kept at 0.")
         end,
     },
     -- RAID: parked. O Auto raid e o Auto complete nao estavam do jeito que o
@@ -11178,6 +11229,280 @@ end
 return Feature
 
 ]],
+    ["src/games/features/bloxfruits/player.lua"] = [[
+local game = game
+local pcall = pcall
+local tonumber = tonumber
+
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Player -- a aba so do LOCAL PLAYER. Nada de ESP de outros, nada de mexer no
+-- mundo: sao os atributos do proprio character que o jogador controla.
+--
+-- Tudo aqui vive em ATRIBUTOS do character (o jogo guarda assim):
+--   * SpeedMultiplier -- o multiplicador de velocidade (padrao do jogo: 2.3).
+--   * UnbreakableAll -- o toggle que fica ligado (o jogo pode tentar voltar pra
+--     false; a feature re-aplica, como o flashstep fazia).
+--   * WaterWalking   -- andar sobre a agua.
+--   * FlashstepCooldown -- 0 = o flashstep esta pronto; 1 = com cooldown.
+-- E o Stun nao e atributo: e um NumberValue filho do character. O jogador quer
+-- ele SEMPRE em 0 -- no 1 ele fica stunado. A feature re-escreve pra 0 quando o
+-- jogo mexer (Changed), e re-cria se o character novo vier sem.
+--
+-- NAO mexe nos cooldowns de skill do jogo (MeleeZ/Sword/SwordV/X/Z) -- o usuario
+-- deixou claro que aquilo e padrao do jogo e nao deve ser tocado.
+--
+-- Gate de verdade: cada controle liga/desliga o proprio efeito, e o Disable
+-- devolve o character ao estado neutro (attributos que a feature setou sao
+-- limpos). O SpeedMultiplier e o FlashstepCooldown sao SLIDERS: o valor vale
+-- sempre que o slider mexer, e o delete limpa.
+--
+-- Self-contained: faz os proprios game:GetService e publica new()/Enable()/
+-- Disable()/Destroy(). Sem UI: quem monta o painel e o backend.
+
+local Feature = {}
+Feature.__index = Feature
+
+-- Os limites dos sliders, como o usuario pediu.
+--   * SpeedMultiplier: padrao do jogo 2.3. O slider vai de 0 a 10 (o jogo aceita
+--     fracionario; 2.3 e o normal, 1.0 seria o passo base).
+--   * FlashstepCooldown: 0 = pronto (sem cooldown), 1 = com cooldown. So esses
+--     dois estados importam, entao o slider e 0..1.
+Feature.MIN_SPEED = 0
+Feature.MAX_SPEED = 10
+Feature.DEFAULT_SPEED = 2.3
+Feature.MIN_FLASHSTEP = 0
+Feature.MAX_FLASHSTEP = 1
+Feature.DEFAULT_FLASHSTEP = 0
+
+-- O nome do NumberValue do stun, filho do character.
+local STUN_NAME = "Stun"
+
+function Feature.new(options)
+    options = options or {}
+    local self = setmetatable({}, Feature)
+    self.Enabled = false
+    -- O que cada controle quer. Desligado, o valor nao e tocado (o jogo decide).
+    self.SpeedOn = false
+    self.Speed = tonumber(options.speed) or Feature.DEFAULT_SPEED
+    self.UnbreakableOn = false
+    self.WaterWalkingOn = false
+    -- O FlashstepCooldown so e aplicado quando o usuario mexe no slider; ate la
+    -- fica desligado e nao toca em nada (nao zera o do jogo so por abrir o painel).
+    self.FlashstepOn = false
+    self.FlashstepCooldown = tonumber(options.flashstep) or Feature.DEFAULT_FLASHSTEP
+    -- O stun sempre 0: enquanto ligado, a feature re-escreve o NumberValue.
+    self.StunOn = true
+    -- Levantado enquanto a PROPRIE feature escreve um atributo/value: os vigias
+    -- de "manter ligado" so re-aplicam quando o JOGO tenta desfazer a escolha.
+    self._SelfWrite = false
+    -- O character atual + as conexoes dele (re-bind no respawn).
+    self.Character = nil
+    self.Connections = {}
+    self.RespawnConnection = nil
+    self.LastStatus = "idle"
+    return self
+end
+
+-- O character vivo do local player, ou nil.
+local function myCharacter()
+    return LocalPlayer and LocalPlayer.Character
+end
+
+-- --- Aplicacao dos valores no character -------------------------------------
+
+-- Escreve os atributos no character conforme o estado dos controles. O que esta
+-- desligado NAO e tocado -- o valor do jogo fica como esta.
+function Feature:_Apply(character)
+    if not character or not character.Parent then return end
+    -- Guarda levantado durante toda a escrita: os vigias de manter-ligado (e o
+    -- do Stun) nao devem re-agir as escritas da propria feature, so as do jogo.
+    self._SelfWrite = true
+    pcall(function()
+        if self.SpeedOn then
+            character:SetAttribute("SpeedMultiplier", self.Speed)
+        end
+        if self.UnbreakableOn then
+            character:SetAttribute("UnbreakableAll", true)
+        end
+        if self.WaterWalkingOn then
+            character:SetAttribute("WaterWalking", true)
+        end
+        if self.FlashstepOn then
+            character:SetAttribute("FlashstepCooldown", self.FlashstepCooldown)
+        end
+    end)
+    self:_ApplyStun(character)
+    self._SelfWrite = false
+end
+
+-- O Stun e um NumberValue filho do character: mantem em 0. Se o character veio
+-- sem o Value (ou o jogo o removeu), cria um.
+function Feature:_ApplyStun(character)
+    if not self.StunOn or not character then return end
+    local stun = character:FindFirstChild(STUN_NAME)
+    if not stun then
+        local ok, created = pcall(function()
+            local value = Instance.new("NumberValue")
+            value.Name = STUN_NAME
+            value.Value = 0
+            value.Parent = character
+            return value
+        end)
+        if ok and created then self:_WatchStun(created) end
+        return
+    end
+    if stun:IsA("NumberValue") and stun.Value ~= 0 then
+        pcall(function() stun.Value = 0 end)
+    end
+    self:_WatchStun(stun)
+end
+
+-- Reconecta o Changed do Stun uma vez por instance (marca com StunWatched).
+function Feature:_WatchStun(stun)
+    if stun.StunWatched then return end
+    stun.StunWatched = true
+    self.Connections[#self.Connections + 1] = stun.Changed:Connect(function()
+        -- O guarda corta o eco da propria escrita (que dispara Changed de novo);
+        -- so a escrita do jogo (que nao vem com o guarda) e corrigida pra 0.
+        if self._SelfWrite then return end
+        if self.StunOn and stun.Parent and stun.Value ~= 0 then
+            self._SelfWrite = true
+            pcall(function() stun.Value = 0 end)
+            self._SelfWrite = false
+        end
+    end)
+end
+
+-- Remove o que a feature setou, devolvendo o character ao estado do jogo. So
+-- limpa o que ESTA feature ligou (nao mexe no que o usuario/jogo tinha).
+-- Escreve com o guarda levantado: o vigia de "manter ligado" nao pode re-agir a
+-- escrita de limpeza da propria feature, senao ela desfaz o desligamento.
+function Feature:_Clear(character)
+    if not character then return end
+    self._SelfWrite = true
+    pcall(function()
+        if self.SpeedOn then character:SetAttribute("SpeedMultiplier", Feature.DEFAULT_SPEED) end
+        if self.FlashstepOn then character:SetAttribute("FlashstepCooldown", Feature.DEFAULT_FLASHSTEP) end
+        if self.UnbreakableOn then character:SetAttribute("UnbreakableAll", false) end
+        if self.WaterWalkingOn then character:SetAttribute("WaterWalking", false) end
+    end)
+    self._SelfWrite = false
+end
+
+-- --- Re-bind no respawn -----------------------------------------------------
+
+function Feature:_Bind(character)
+    self:_Unbind()
+    self.Character = character
+    if not character then return end
+    -- Re-aplica assim que o character novo aparece. Espera o Humanoid existir
+    -- nao e necessario: os atributos e o Stun podem ser setados de imediato.
+    self:_Apply(character)
+    self.Connections[#self.Connections + 1] = character:GetAttributeChangedSignal("UnbreakableAll"):Connect(function()
+        if self._SelfWrite then return end
+        if self.UnbreakableOn and character:GetAttribute("UnbreakableAll") ~= true then
+            pcall(function() character:SetAttribute("UnbreakableAll", true) end)
+        end
+    end)
+    self.Connections[#self.Connections + 1] = character:GetAttributeChangedSignal("WaterWalking"):Connect(function()
+        if self._SelfWrite then return end
+        if self.WaterWalkingOn and character:GetAttribute("WaterWalking") ~= true then
+            pcall(function() character:SetAttribute("WaterWalking", true) end)
+        end
+    end)
+end
+
+function Feature:_Unbind()
+    for _, connection in ipairs(self.Connections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    self.Connections = {}
+    self.Character = nil
+end
+
+-- --- Controles (chamados pelo backend) --------------------------------------
+
+function Feature:SetSpeed(value)
+    value = tonumber(value)
+    if not value then return false end
+    self.Speed = math.clamp(value, Feature.MIN_SPEED, Feature.MAX_SPEED)
+    self.SpeedOn = true
+    self:_Apply(self.Character or myCharacter())
+    return true
+end
+
+function Feature:SetUnbreakable(on)
+    self.UnbreakableOn = on == true
+    local character = self.Character or myCharacter()
+    if not character then return true end
+    -- Guarda levantado: se for pra DESLIGAR, a escrita nao pode ser vista pelo
+    -- vigia de manter-ligado e re-aplicada.
+    self._SelfWrite = true
+    pcall(function() character:SetAttribute("UnbreakableAll", self.UnbreakableOn) end)
+    self._SelfWrite = false
+    return true
+end
+
+function Feature:SetWaterWalking(on)
+    self.WaterWalkingOn = on == true
+    local character = self.Character or myCharacter()
+    if not character then return true end
+    self._SelfWrite = true
+    pcall(function() character:SetAttribute("WaterWalking", self.WaterWalkingOn) end)
+    self._SelfWrite = false
+    return true
+end
+
+function Feature:SetFlashstep(value)
+    value = tonumber(value)
+    if not value then return false end
+    self.FlashstepCooldown = math.clamp(value, Feature.MIN_FLASHSTEP, Feature.MAX_FLASHSTEP)
+    self.FlashstepOn = true
+    self:_Apply(self.Character or myCharacter())
+    return true
+end
+
+-- --- Ciclo de vida ----------------------------------------------------------
+
+function Feature:Enable()
+    if self.Enabled then return true end
+    self.Enabled = true
+    self.LastStatus = "idle"
+
+    self:_Bind(myCharacter())
+
+    -- Re-bind no respawn: o character novo nao tem os atributos da sessao antiga.
+    self.RespawnConnection = LocalPlayer.CharacterAdded:Connect(function(character)
+        if self.Enabled then self:_Bind(character) end
+    end)
+
+    return true
+end
+
+function Feature:Disable()
+    self.Enabled = false
+    self:_Clear(self.Character or myCharacter())
+    self:_Unbind()
+    if self.RespawnConnection then
+        pcall(function() self.RespawnConnection:Disconnect() end)
+        self.RespawnConnection = nil
+    end
+    return true
+end
+
+function Feature:IsEnabled()
+    return self.Enabled == true
+end
+
+function Feature:Destroy()
+    self:Disable()
+end
+
+return Feature
+
+]],
     ["src/games/features/bloxfruits/silentaim.lua"] = [[
 local game = game
 local type = type
@@ -11455,10 +11780,20 @@ function Feature:InstallHook()
             local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
 
             if isRemote then
-                local arg2Str = tostring(args[2])
-                local isBool = (arg2Str == "true" or arg2Str == "false")
-
-                if not isBool and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
+                local arg2 = args[2]
+                -- Nao mexe quando ha alvo nulo, quando o aim esta em excecao, ou
+                -- quando o slot 2 nao e uma POSICAO (Vector3) nem booleano.
+                --
+                -- Aqui esta a correcao do bug da camera: o __namecall ve TODAS
+                -- as chamadas do jogo, nao so as skills. Quando a camera encosta
+                -- numa part, o jogo faz outras chamadas de saida cujo arg2 NAO e
+                -- uma posicao de ataque; reescrever essas tirava o jogador do
+                -- character. So reescreve se args[2] for Vector3 (a posicao que
+                -- os ataques mandam) -- qualquer outra coisa passa intacta.
+                local isBool = (arg2 == true or arg2 == false)
+                local arg2Type = typeof(arg2)
+                local isPosition = (arg2Type == "Vector3" or arg2Type == "CFrame")
+                if not isBool and isPosition and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
                     args[2] = self_.TargetPosition
                 end
             end
@@ -22595,7 +22930,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects.
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.

@@ -165,6 +165,12 @@ function instanceMeta:__newindex(key, value)
             error(string.format("%s is not a valid member of %s", tostring(key), tostring(class)), 2)
         end
         self._props[key] = value
+        -- On a Value object (NumberValue/...) the engine raises Changed whenever
+        -- Value is written. Firing it here lets a feature that watches a value
+        -- (the Player tab keeps Stun at 0) react exactly as it does in game.
+        if key == "Value" and self._isValueObject and self.Changed then
+            self.Changed:Fire(value)
+        end
     end
 end
 function instanceMeta:__tostring() return self._props.ClassName end
@@ -195,10 +201,21 @@ function methods:IsDescendantOf(ancestor)
 end
 function methods:GetAttributes() if self.FailRead then error("Simulated read failure") end; return table.clone(self._attributes) end
 function methods:GetAttribute(key) return self._attributes[key] end
+-- Per-key attribute-changed signals, so a feature that re-applies an attribute
+-- when the game writes it back (e.g. keeping UnbreakableAll true) is testable:
+-- SetAttribute fires the signal for that key, exactly like Roblox.
+function methods:GetAttributeChangedSignal(key)
+    self._attrSignals = self._attrSignals or {}
+    local attrSignal = self._attrSignals[key]
+    if not attrSignal then attrSignal = signal(); self._attrSignals[key] = attrSignal end
+    return attrSignal
+end
 function methods:SetAttribute(key, value)
     if self.FailKey == key then self.FailKey = nil; error("Simulated attribute failure") end
     self._attributes[key] = value
     self.WriteCount = (self.WriteCount or 0) + 1
+    local signal = self._attrSignals and self._attrSignals[key]
+    if signal then signal:Fire() end
 end
 function methods:Destroy()
     for _, child in ipairs(self:GetChildren()) do child:Destroy() end
@@ -244,6 +261,16 @@ function Instance.new(class)
     object.ChildRemoved = signal()
     object.DescendantAdded = signal()
     object.DescendantRemoving = signal()
+    -- Value objects (NumberValue/StringValue/...) and every double expose a
+    -- Changed signal. On a real Value object the engine fires it when Value
+    -- changes; here the __newindex metamethod below keeps `Value` in sync and
+    -- fires the same signal, so a feature that watches a NumberValue (e.g.
+    -- keeping Stun at 0) binds and re-applies exactly like it does in game.
+    object.Changed = signal()
+    if class == "NumberValue" or class == "IntValue" or class == "StringValue" or class == "BoolValue" or class == "ObjectValue" then
+        object._props.Value = 0
+    end
+    object._isValueObject = (class == "NumberValue" or class == "IntValue" or class == "StringValue" or class == "BoolValue" or class == "ObjectValue")
     -- Remote event doubles expose the client/server signals features connect to.
     -- Each remote also gets its OWN FireServer/InvokeServer closure (not the
     -- shared table method) so an executor-style hook can be routed back to the

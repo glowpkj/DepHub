@@ -47,6 +47,7 @@ local FEATURE_MODULES = {
     {name = "silentaim", page = "Combat", section = "SILENT AIM", toggle = "Silent aim"},
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
+    {name = "player", page = "Player", section = "PLAYER", toggle = "Speed multiplier"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -212,6 +213,9 @@ function State:SetFeature(name, enabled)
                 -- o toggle ainda desligado; a escolha nao se perde).
                 range = self.PendingSilentAimRange,
                 exceptions = self.PendingSilentAimExceptions,
+                -- A aba Player nasce com o multiplicador de velocidade que o
+                -- painel ja marcou (o slider aplica mesmo sem reabrir o painel).
+                speed = self.PendingPlayerSpeed,
             }
             local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
@@ -286,6 +290,7 @@ function State:Destroy()
     -- A escolha do painel guardada antes de ligar nao sobrevive ao unload.
     self.PendingSilentAimRange = nil
     self.PendingSilentAimExceptions = nil
+    self.PendingPlayerSpeed = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruitsOwn == self then env.__DEPHUB.BloxFruitsOwn = nil end
@@ -475,6 +480,52 @@ local PANELS = {
                 end
             end)
             section:CreateParagraph("Island teleport", "Pick an island and fly there. Only travels while the toggle is on.")
+        end,
+    },
+    player = {
+        page = "Player",
+        section = "PLAYER",
+        category = "Player",
+        icon = "user",
+        tabIcon = "user",
+        -- Aba local player: so o proprio character. O toggle da feature (Speed
+        -- multiplier) e um slider, nao um on/off -- por isso o bloco monta os
+        -- controles direto e usa SetFeature para instanciar a feature.
+        build = function(section, instance)
+            local factory = State.Features.player
+            local minSpeed = (factory and factory.MIN_SPEED) or 0
+            local maxSpeed = (factory and factory.MAX_SPEED) or 10
+            local defaultSpeed = (factory and factory.DEFAULT_SPEED) or 2.3
+
+            -- O Speed multiplier: o atributo SpeedMultiplier do character. O
+            -- padrao do jogo e 2.3 -- mexer no slider ja aplica (a feature sobe
+            -- sozinha) e o valor vale sempre que o slider mexer.
+            section:CreateSlider("Speed multiplier", minSpeed, maxSpeed, defaultSpeed, function(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetSpeed(value) end
+                State.PendingPlayerSpeed = value
+            end)
+
+            -- UnbreakableAll: toggle que seta true e MANTEM true (re-aplica se o
+            -- jogo tentar voltar). Ligar ja sobe a feature.
+            section:CreateToggle("Unbreakable", false, function(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetUnbreakable(value) end
+            end)
+
+            -- WaterWalking: o atributo de andar sobre a agua.
+            section:CreateToggle("Water walk", false, function(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetWaterWalking(value) end
+            end)
+
+            -- FlashstepCooldown: 0 = pronto (sem cooldown), 1 = com cooldown.
+            section:CreateSlider("Flashstep cooldown", 0, 1, 0, function(value)
+                State:SetFeature("player", true)
+                if State.Instances.player then State.Instances.player:SetFlashstep(value) end
+            end)
+
+            section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, and Flashstep cooldown (0 = ready). Stun is kept at 0.")
         end,
     },
     -- RAID: parked. O Auto raid e o Auto complete nao estavam do jeito que o
