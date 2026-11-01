@@ -78,6 +78,10 @@ function Feature.new(options)
     self.InRaid = false
     self.AutoComplete = false
     self.AttackEnabled = false
+    -- Estado do auto complete: em qual ilha ele esta (por numero) e se ele ja
+    -- concluiu que a rodada acabou (sem proxima ilha e sem mob vivo).
+    self.IslandNumber = 1
+    self.RoundOver = false
     self.Threads = {}
     self.ChipBought = false
     self.Thread = nil
@@ -291,13 +295,17 @@ end
 
 -- --- Auto complete raid ---------------------------------------------------
 -- O SEGUNDO toggle. Nao compra, nao cria, nao aperta botao: so TERMINA uma raid
--- que ja esta rolando. Acha as ilhas em workspace.Map.RaidMap, vai na mais perto
--- dele agora, mata os bixos e recalcula -- proxima mais perto, e assim por
--- diante. Nao filtra por dono: o filtro e distancia pura. (Se a raid de outro
--- jogador aparecer no SEU RaidMap, ela entra como qualquer outra -- se isso
--- virar problema, o filtro entra depois.)
-
-local RAID_MAP_PATH = { "Map", "RaidMap" }
+-- que ja esta rolando.
+--
+-- A sequencia e por NUMERO, nao por distancia: RaidIsland1, depois RaidIsland2,
+-- RaidIsland3... Confirmei a estrutura com o usuario (Dex): a primeira ilha e
+-- workspace.Map.RaidMap.RaidIsland1, e as seguintes so mudam o numero. Por isso
+-- o nome manda aqui, e nao "a mais perto" -- a ordem da raid E a ordem dos
+-- numeros.
+--
+-- FIM DA RODADA: quando nao existe a PROXIMA ilha E nao ha mais mob nenhum pra
+-- matar, ele para de agir e so espera -- o jogo fecha a rodada sozinho (o
+-- contador/timer da raid segue). Ele nao tenta reiniciar nada.
 
 -- A pasta das ilhas da raid, se a raid estiver rolando. workspace.Map.RaidMap.
 function Feature:RaidMap()
@@ -306,78 +314,127 @@ function Feature:RaidMap()
     return map:FindFirstChild("RaidMap")
 end
 
--- As ilhas da raid: os Models dentro do RaidMap. A ilha onde o jogador esta
--- tambem conta (ele escolhe a mais perto, sem excluir a atual).
-function Feature:RaidIslands()
+-- A ilha de numero `n`: "RaidIsland" .. n. Aqui esta o coracao da sequencia --
+-- o nome carrega a ordem.
+function Feature:IslandByNumber(n)
     local raidMap = self:RaidMap()
-    if not raidMap then return {} end
-    local islands = {}
-    for _, child in ipairs(raidMap:GetChildren()) do
-        if child:IsA("Model") or child:IsA("BasePart") then
-            islands[#islands + 1] = child
-        end
+    if not raidMap then return nil end
+    return raidMap:FindFirstChild("RaidIsland" .. tostring(n))
+end
+
+-- A ilha mais alta que existe: RaidIsland1, 2, 3... ate acabar. Usado pra saber
+-- se ainda ha proxima ilha e pra achar onde a raid esta.
+function Feature:HighestIslandNumber(maxCheck)
+    maxCheck = maxCheck or 20
+    local highest = 0
+    for n = 1, maxCheck do
+        if self:IslandByNumber(n) then highest = n else break end
     end
-    return islands
+    return highest
 end
 
 -- Posicao de uma ilha. Model usa o pivot (funciona mesmo sem PrimaryPart);
 -- BasePart usa .Position direto.
 local function islandPosition(island)
+    if not island then return nil end
     if island:IsA("BasePart") then return island.Position end
     local ok, pivot = pcall(function() return island:GetPivot().Position end)
     if ok and pivot then return pivot end
     return island.PrimaryPart and island.PrimaryPart.Position or nil
 end
 
--- A ilha mais perto do jogador AGORA. E o coracao do "inteligente": ele nao
--- guarda ordem, recalcula cada passo a partir de onde o personagem esta --
--- terminou uma, a proxima passa a ser a mais perto.
-function Feature:NearestIsland()
-    local root = self:_hrp()
-    if not root then return nil end
-    local best, bestDistance
-    for _, island in ipairs(self:RaidIslands()) do
-        local position = islandPosition(island)
-        if position then
-            local distance = (position - root.Position).Magnitude
-            if not bestDistance or distance < bestDistance then
-                best, bestDistance = island, distance
-            end
+-- Ha algum mob vivo pra matar? Olha Workspace.Enemies (o que a blade hit usa) e
+-- tambem dentro da propria ilha, porque a raid pode spawnar os bixos por la.
+-- Sem mob e sem proxima ilha = a rodada terminou.
+function Feature:HasLiveEnemy()
+    local function hasVivos(container)
+        if not container then return false end
+        for _, child in ipairs(container:GetChildren()) do
+            local humanoid = child:FindFirstChildOfClass("Humanoid")
+            if humanoid and humanoid.Health > 0 then return true end
+        end
+        return false
+    end
+    if hasVivos(workspace:FindFirstChild("Enemies")) then return true end
+    if hasVivos(workspace:FindFirstChild("Characters")) then return true end
+    -- E os mobs dentro da propria ilha atual, se a raid spawnar la.
+    local island = self:IslandByNumber(self.IslandNumber or 1)
+    if island then
+        for _, descendant in ipairs(island:GetDescendants()) do
+            if descendant:IsA("Humanoid") and descendant.Health > 0 then return true end
         end
     end
-    return best, bestDistance
+    return false
 end
 
--- Um passo do auto complete: acha a ilha mais perto, voa pra la e garante o
--- ataque ligado. Nao espera o voo terminar aqui -- o loop chama de novo e o
--- NearestIsland recalcula; como o Go cancela o voo anterior, chamar em passo
--- curto so reinicia o mesmo destino, que fica a cada vez mais perto.
+-- A ilha que ele deve atacar agora. Anda pelos numeros: comeca na 1, e so passa
+-- pra n+1 quando a n nao tem mais mob vivo (senao ele abandonaria bixos vivos).
+function Feature:CurrentIsland()
+    local number = self.IslandNumber or 1
+    local island = self:IslandByNumber(number)
+    if not island then return nil, nil end
+    return island, number
+end
+
+-- Um passo do auto complete. Ordem dos numeros:
+--   1. se a ilha atual ainda tem mob vivo -> fica nela (o ataque cuida)
+--   2. se limpou -> procura a proxima; se existe, avanca e vai pra ela
+--   3. se NAO existe proxima e NAO ha mob -> rodada acabou: para e espera
 function Feature:CompleteStep()
     local motor = self.Teleport
     if not motor then
         self.LastStatus = "no teleport motor"
         return false
     end
-    local island, distance = self:NearestIsland()
-    if not island then
+    if not self:RaidMap() then
         self.LastStatus = "no raid map (not in a raid?)"
         return false
     end
+
     self.AttackEnabled = self.AttackEnabled or false
     local combat = self.Combat
     if combat and not combat:IsEnabled() then
         if combat:Enable() then self.AttackEnabled = true end
     end
-    -- So voa se ainda estiver longe: perto da ilha, o voo a cada passo brigaria
-    -- com a fisica e travaria o personagem vibrando no lugar.
-    local root = self:_hrp()
-    if root and distance and distance > 40 then
-        pcall(function()
-            local position = islandPosition(island)
-            if position then motor:Go(position + Vector3.new(0, 8, 0)) end
-        end)
+
+    local island, number = self:CurrentIsland()
+    if not island then
+        self.LastStatus = "no raid islands"
+        return false
     end
-    self.LastStatus = ("raid: %s (%dm)"):format(tostring(island.Name), math.floor(distance or 0))
+    self.IslandNumber = number
+
+    -- A ilha atual ainda tem bixos: fica nela. Voa so se estiver longe (perto, o
+    -- voo a cada passo brigaria com a fisica e travaria o personagem vibrando).
+    if self:HasLiveEnemy() then
+        local root = self:_hrp()
+        local position = islandPosition(island)
+        if root and position then
+            local distance = (position - root.Position).Magnitude
+            if distance > 40 then
+                pcall(function() motor:Go(position + Vector3.new(0, 8, 0)) end)
+            end
+        end
+        self.LastStatus = ("raid: island %d -- killing mobs"):format(number)
+        return true
+    end
+
+    -- Ilha atual limpa: existe a proxima?
+    local nextIsland = self:IslandByNumber(number + 1)
+    if nextIsland then
+        self.IslandNumber = number + 1
+        local position = islandPosition(nextIsland)
+        if position then
+            pcall(function() motor:Go(position + Vector3.new(0, 8, 0)) end)
+        end
+        self.LastStatus = ("raid: island %d cleared -> moving to %d"):format(number, number + 1)
+        return true
+    end
+
+    -- Sem proxima ilha e sem mob vivo: acabou. Para de agir e deixa o jogo
+    -- fechar a rodada (o timer da raid segue sozinho -- nao mexemos nele).
+    self.LastStatus = ("raid: island %d cleared -- round over, waiting"):format(number)
+    self.RoundOver = true
     return true
 end
 
@@ -398,6 +455,9 @@ function Feature:SetAutoComplete(on)
         self.AutoComplete = false
         return false
     end
+    -- Comeca da ilha 1 (a raid sempre abre na primeira).
+    self.IslandNumber = 1
+    self.RoundOver = false
     self:_spawn("complete", function()
         while self.AutoComplete do
             pcall(function() self:CompleteStep() end)

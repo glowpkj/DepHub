@@ -266,10 +266,12 @@ do
 
     local raid = Raid.new({ teleport = motor })
     check(raid.AutoComplete == false, "o auto complete comeca desligado")
+    check(raid.IslandNumber == 1, "o auto complete comeca apontando pra ilha 1")
 
     -- Sem RaidMap no workspace: nao ha ilha nenhuma, e ele reporta isso.
     check(raid:RaidMap() == nil, "sem raid rolando nao ha RaidMap")
-    check(raid:NearestIsland() == nil, "sem RaidMap nao ha ilha mais perto")
+    check(raid:IslandByNumber(1) == nil, "sem RaidMap nao ha ilha 1")
+    check(raid:HighestIslandNumber() == 0, "sem RaidMap nao ha ilha nenhuma")
     check(raid:CompleteStep() == false, "sem RaidMap o passo de completar recusa")
 
     -- A raid comeca: workspace.Map.RaidMap aparece com as ilhas.
@@ -277,7 +279,9 @@ do
     local raidMap = Instance.new("Folder"); raidMap.Name, raidMap.Parent = "RaidMap", map
     check(raid:RaidMap() == raidMap, "acha o RaidMap em workspace.Map")
 
-    -- Tres ilhas em distancias diferentes da origem.
+    -- Tres ilhas, nomeadas por numero -- a ORDEM e o nome, nao a distancia.
+    -- Propositalmente a 3 esta mais perto que a 2, pra provar que a sequencia e
+    -- por numero e nao por proximidade.
     local i1 = Instance.new("Model"); i1.Name, i1.Parent = "RaidIsland1", raidMap
     local i1p = Instance.new("Part"); i1p.Name, i1p.Position, i1p.Parent = "Floor", Vector3.new(0, 0, 50), i1
     local i2 = Instance.new("Model"); i2.Name, i2.Parent = "RaidIsland2", raidMap
@@ -285,37 +289,63 @@ do
     local i3 = Instance.new("Model"); i3.Name, i3.Parent = "RaidIsland3", raidMap
     local i3p = Instance.new("Part"); i3p.Name, i3p.Position, i3p.Parent = "Floor", Vector3.new(0, 0, 200), i3
 
-    check(#raid:RaidIslands() == 3, "as ilhas da raid sao os Models dentro do RaidMap")
+    check(raid:IslandByNumber(1) == i1, "a ilha 1 e RaidIsland1")
+    check(raid:IslandByNumber(2) == i2, "a ilha 2 e RaidIsland2")
+    check(raid:IslandByNumber(3) == i3, "a ilha 3 e RaidIsland3")
+    check(raid:IslandByNumber(4) == nil, "nao existe ilha 4")
+    check(raid:HighestIslandNumber() == 3, "a ultima ilha e a 3")
 
-    -- A mais perto da origem e a ilha 1 (50 studs).
-    local nearest = raid:NearestIsland()
-    check(nearest == i1, "a ilha mais perto e escolhida (distancia)")
+    -- A sequencia comeca na 1, mesmo com a 3 estando mais perto.
+    local island, number = raid:CurrentIsland()
+    check(island == i1 and number == 1, "a ilha atual comeca na 1, nao na mais perto")
 
-    -- Terminou a ilha 1: movendo o jogador pra perto da ilha 3, ela passa a ser
-    -- a mais perto -- o recalculo e o ponto do "vai pra proxima".
-    root.Position = Vector3.new(0, 0, 180)
-    check(raid:NearestIsland() == i3, "o recalculo escolhe a ilha mais perto da posicao ATUAL")
-
-    -- Dentro do RaidMap, o passo de completar acha a ilha e voa pra la. O jogador
-    -- volta pra origem pra a distancia (200 studs) valer o voo.
-    root.Position = Vector3.new(0, 0, 0)
+    -- O passo de completar acha a ilha 1 e voa pra la (o jogador esta na origem,
+    -- ilha 1 a 50 studs -- acima do limite de 40, entao voa). Sem mob nenhum no
+    -- workspace, a ilha ja conta como limpa -- mas ele so avanca no proximo
+    -- passo; aqui ele ainda registra onde estava.
     check(raid:CompleteStep() == true, "com RaidMap o passo de completar acha a ilha")
     check(motor:IsFlying() == true, "o passo de completar voa ate a ilha")
+    check(raid.RoundOver == false, "ha proxima ilha: a rodada nao acabou")
     motor:Cancel()
 
     -- Perto da ilha (menos de 40 studs) ele NAO reinicia o voo -- so fica
     -- batendo. Reiniciar de perto travaria o personagem vibrando no lugar.
-    root.Position = Vector3.new(0, 0, 190)
+    -- (Com mob vivo ele fica na ilha; o mob prova o caso "perto".)
+    root.Position = Vector3.new(0, 0, 20)
+    raid.IslandNumber = 1
     motor:Cancel()
+    local enemies = Instance.new("Folder"); enemies.Name, enemies.Parent = "Enemies", ctx.Services.Workspace
+    local mob = Instance.new("Model"); mob.Name, mob.Parent = "Bandit", enemies
+    local mobHumanoid = Instance.new("Humanoid"); mobHumanoid.Health = 100; mobHumanoid.Parent = mob
     check(raid:CompleteStep() == true, "perto da ilha o passo de completar ainda roda")
+    check(raid.IslandNumber == 1, "com mob vivo ele fica na ilha 1")
     check(motor:IsFlying() == false, "perto da ilha nao reinicia o voo")
+
+    -- A ilha 1 limpa (sem mob vivo -- o mob morreu): ele AVANCA pro proximo
+    -- numero, nao pra mais perto.
+    root.Position = Vector3.new(0, 0, 0)
+    motor:Cancel()
+    mobHumanoid.Health = 0
+    check(raid:CompleteStep() == true, "ilha limpa: o passo de completar roda")
+    check(raid.IslandNumber == 2, "ilha 1 limpa -> avanca pra ilha 2 (numero, nao distancia)")
+    check(motor:IsFlying() == true, "avancou e voou pra ilha 2")
+
+    -- Ilha 3 tambem limpa: agora e a ultima -- sem proxima e sem mob = acabou.
+    motor:Cancel()
+    raid.IslandNumber = 3
+    check(raid:CompleteStep() == true, "ilha 3 limpa: o passo de completar roda")
+    check(raid.RoundOver == true, "sem proxima ilha e sem mob a rodada acaba")
+    check(motor:IsFlying() == false, "rodada acabou: ele nao voa mais pra lugar nenhum")
 
     -- Auto complete sem motor de teleporte recusa.
     local bare = Raid.new()
     check(bare:SetAutoComplete(true) == false and bare.AutoComplete == false, "sem teleporte o auto complete recusa")
 
-    -- O toggle liga e desliga a thread sem explodir.
+    -- O toggle liga, reinicia a sequencia na ilha 1, e desliga sem explodir.
+    raid.IslandNumber = 5
+    raid.RoundOver = true
     check(raid:SetAutoComplete(true) == true, "com teleporte o auto complete liga")
+    check(raid.IslandNumber == 1 and raid.RoundOver == false, "ligar reinicia a sequencia na ilha 1")
     check(raid:SetAutoComplete(false) == true, "o auto complete desliga")
     check(raid.AutoComplete == false, "depois de desligar nao esta mais ativo")
 
