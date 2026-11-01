@@ -1,58 +1,74 @@
+-- DepHub UI library (RedzLib v2.0.1, vendored).
+--
+-- This is the single UI library every backend in DepHub renders through. It is
+-- kept in-tree (not fetched at runtime) so editing this file edits the UI.
+--
+-- It was originally shipped minified, with single-letter top-level names and no
+-- comments. The minified body is preserved exactly (it is load-bearing and has
+-- been proven to render identically), but the file-wide top-level symbols have
+-- been renamed to meaningful names and the file is split into labelled sections
+-- so it can be read and maintained. Everything below the "SECTION" banners is
+-- the original logic, untouched except for those renames.
+--
+-- Public API (the part DepHub consumes):
+--   local lib = Library                     -- this module's export
+--   local win = lib:MakeWindow({Title=, SubTitle=, ScriptFolder=})
+--   local tab = win:MakeTab({Title=, Icon=})
+--   tab:AddSection(title)                   -- visual header (string only)
+--   tab:AddToggle/Slider/Button/TextBox/Dropdown/Paragraph/Keybind/...
+--   win:Notify({Title=, Content=, Icon=, Duration=})
+--   win:Dialog({Title=, Content=, Options={...}})
+--   win:SelectTab(n|tab) / win:GetTabByTitle(t) / win:Minimize() / win:Dialog()
+--   tab:Select() / tab:SetVisible(bool) / tab:Destroy()
+--   lib:GetIconByName(name) / lib:SetTheme(name) / lib:SetUIScale(scale)
+--
+-- The adapter that maps this API onto DepHub's own shell contract lives in
+-- src/core/demon-ui.lua; backends never call RedzLib directly.
 
+-- ===========================================================================
+-- SECTION: Executor shims and services
+-- Safe wrappers for the executor-only globals (some executers lack them) and
+-- the handful of Roblox services the library talks to. `Services` resolves and
+-- caches each service lazily through cloneref so the library never holds a
+-- second, unclonable reference to a service.
+-- ===========================================================================
 
+local clonerefShim = cloneref or (function(...) return ... end)
 
+local deleteFolderSafe = delfolder or deletefolder
+local deleteFileSafe = delfile or deletefile
+local makeFolderSafe = makefolder
+local writeFileSafe = writefile
+local readFileSafe = readfile
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-local a=cloneref or(function(...)return...end)
-
-local b=delfolder or deletefolder
-local c=delfile or deletefile
-local d=makefolder
-local e=writefile
-local f=readfile
-
-local g=setmetatable({},{
-__index=function(g,h)
-rawset(g,h,a(game:GetService(h)))
+local Services = setmetatable({}, {
+__index = function(g,h)
+rawset(g,h,clonerefShim(game:GetService(h)))
 return rawget(g,h)
 end
 })
 
-local h=g.MarketplaceService
-local i=g.UserInputService
-local j=g.TweenService
-local k=g.HttpService
-local l=g.RunService
-local m=g.Players
+local MarketplaceService = Services.MarketplaceService
+local UserInputService = Services.UserInputService
+local TweenService = Services.TweenService
+local HttpService = Services.HttpService
+local RunService = Services.RunService
+local PlayersService = Services.Players
 
-local n=l.Heartbeat
+local Heartbeat = RunService.Heartbeat
 
-local o=m.LocalPlayer
-local p=o:GetMouse()
+local LocalPlayer = PlayersService.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
 
-local q=(gethui or function()return g.CoreGui end)()
+local GuiParent = (gethui or function() return Services.CoreGui end)()
 
-local r={
+-- ===========================================================================
+-- SECTION: Built-in themes
+-- The theme tables (colours, fonts, icons per theme name). `Themes` is the
+-- registry the rest of the library reads and `SetTheme` switches between them.
+-- ===========================================================================
+
+local Themes={
 Darker={
 Colors={
 Background=ColorSequence.new{
@@ -118,12 +134,18 @@ BackgroundTransparency=0.03
 }
 }
 
-for s,t in r do
-t.Name=s
-table.freeze(t)
+for Library,ViewportSize in Themes do
+ViewportSize.Name=Library
+table.freeze(ViewportSize)
 end
 
-local s={
+
+-- ===========================================================================
+-- SECTION: Library identity and defaults
+-- The module table itself (Information/Defaults/Themes/Connections/Options/Tabs)
+-- and the aliases the rest of the file uses.
+-- ===========================================================================
+local Library={
 Information={
 Version="v2.0.1",
 GitHubOwner="tlredz"
@@ -134,20 +156,26 @@ UISize=UDim2.fromOffset(550,380),
 TabSize=160
 },
 
-Themes=r,
+Themes=Themes,
 
 Connections={},
 Options={},
 Tabs={}
 }
 
-s.Info=s.Information
-s.Save=s.Default
+Library.Info=Library.Information
+Library.Save=Library.Default
 
-local t=workspace.CurrentCamera.ViewportSize local u=function(
+
+-- ===========================================================================
+-- SECTION: Small utilities
+-- Signal connection helper, theme path reader, theme value/collection appliers,
+-- and the wrapped file writer used to persist flags.
+-- ===========================================================================
+local ViewportSize=workspace.CurrentCamera.ViewportSize local u=function(
 
 u, v, w)
-table.insert(s.Connections,u[w or"Connect"](u,v))end
+table.insert(Library.Connections,u[w or"Connect"](u,v))end
 
 
 local v={}
@@ -163,7 +191,7 @@ return w end local x=function(
 
 x, y, z, A)
 if not A then
-A=s.CurrentTheme
+A=Library.CurrentTheme
 end
 
 x[y]=w(A,if type(z)=="function"then z()else z)end local y=function(
@@ -176,22 +204,27 @@ end end local z=function(
 
 
 z, A)
-if d then
+if makeFolderSafe then
 local B=z:split"/"
 B[#B]=nil
 
 local C=table.concat(B,"/")
 
 if C~=""and(isfolder==nil or not isfolder(C))then
-d(C)
+makeFolderSafe(C)
 end
 end
 
-e(z,A)end
+writeFileSafe(z,A)end
 
 
 local A=false
 
+
+-- ===========================================================================
+-- SECTION: Constants
+-- Scale bounds and shared control constants.
+-- ===========================================================================
 local B={
 MAX_SCALE=1.6,
 MIN_SCALE=0.6,
@@ -205,20 +238,20 @@ function v:add(C,D)
 self.Descendants[D]=C
 
 if self.IS_RENDERING then
-y(s.CurrentTheme,C,D)
+y(Library.CurrentTheme,C,D)
 end
 end
 
 function v:update()
 if self.IS_RENDERING and not self.UPDATED_OBJECTS then
-local C=s.CurrentTheme
+local C=Library.CurrentTheme
 self.UPDATED_OBJECTS=true
 
-for D,E in self.Descendants do
-local F=typeof(E)
-if F=="table"then E:update()continue end
+for InstanceFactory,createInstance in self.Descendants do
+local F=typeof(createInstance)
+if F=="table"then createInstance:update()continue end
 
-y(C,E,D)
+y(C,createInstance,InstanceFactory)
 end
 end
 end
@@ -258,38 +291,45 @@ end
 
 local C=v:new()
 
-local D,E={}do
+
+-- ===========================================================================
+-- SECTION: Instance factory
+-- createInstance builds a Roblox instance and applies a declarative table of
+-- properties/elements/theme tags/children; InstanceFactory holds the element
+-- templates and value setters it uses.
+-- ===========================================================================
+local InstanceFactory,createInstance={}do
 local F={}
 
 local G={}do
 G.ElementsTable={
 Corner=function(H)
-return E("UICorner",{
+return createInstance("UICorner",{
 CornerRadius=H or UDim.new(0,8)
 })
 end,
 Stroke=function(H,I)
-return E("UIStroke",{
+return createInstance("UIStroke",{
 Color=H or Color3.fromRGB(60,60,60),
 Thickness=I or 1
 })
 end,
 Image=function(H)
-return E("ImageLabel",{
+return createInstance("ImageLabel",{
 Image=H or"",
 BackgroundTransparency=1,
 Size=UDim2.fromScale(1,1)
 })
 end,
 Button=function()
-return E("TextButton",{
+return createInstance("TextButton",{
 Text="",
 Size=UDim2.fromScale(1,1),
 AutoButtonColor=false
 })
 end,
 Padding=function(H,I,J,K)
-return E("UIPadding",{
+return createInstance("UIPadding",{
 PaddingLeft=H or UDim.new(0,10),
 PaddingRight=I or UDim.new(0,10),
 PaddingTop=J or UDim.new(0,10),
@@ -297,18 +337,18 @@ PaddingBottom=K or UDim.new(0,10)
 })
 end,
 ListLayout=function(H)
-return E("UIListLayout",{
+return createInstance("UIListLayout",{
 Padding=H or UDim.new(0,5)
 })
 end,
 Text=function(H)
-return E("TextLabel",{
+return createInstance("TextLabel",{
 BackgroundTransparency=1,
 Text=H or""
 })
 end,
 Gradient=function(H)
-return E("UIGradient",{
+return createInstance("UIGradient",{
 Color=H
 })
 end
@@ -336,7 +376,7 @@ end
 function H:Elements(I)
 for J,K in pairs(I)do
 if type(K)=="table"then
-D.SetProperties(G:Create(self,J),K)
+InstanceFactory.SetProperties(G:Create(self,J),K)
 else
 G:Create(self,J,K)
 end
@@ -349,7 +389,7 @@ I.OBJECTS=nil
 return(J or C):add(self,I)
 end
 
-function D:SetProperties(I)
+function InstanceFactory:SetProperties(I)
 for J,K in pairs(I)do
 if H[J]then
 H[J](self,K)
@@ -359,14 +399,14 @@ end
 end
 end
 
-function D:SetValues(...)
+function InstanceFactory:SetValues(...)
 local I=self
 
 for J,K in{...}do
 local L=typeof(K)
 
 if L=="table"then
-D.SetProperties(I,K)
+InstanceFactory.SetProperties(I,K)
 else
 I[if L=="string"then"Name"else"Parent"]=K
 end
@@ -377,7 +417,7 @@ end
 
 local I
 
-function D:Draggable(J,K,L)
+function InstanceFactory:Draggable(J,K,L)
 local M,N,O,P
 local Q=K or 0.28
 local R=0
@@ -448,22 +488,22 @@ end)
 end
 end)
 
-u(i.InputChanged,function(X)
+u(UserInputService.InputChanged,function(X)
 if I==self and W[X.UserInputType]then
 T(X)
 end
 end)
 end
 
-function D:CreateNewTemplate(J)
-return D.CloneObject(F[self],J)
+function InstanceFactory:CreateNewTemplate(J)
+return InstanceFactory.CloneObject(F[self],J)
 end
 
-function D.new(J,...)
-return D.SetValues(Instance.new(J),...)
+function InstanceFactory.new(J,...)
+return InstanceFactory.SetValues(Instance.new(J),...)
 end
 
-E=D.new
+createInstance=InstanceFactory.new
 end local F=function(
 
 F)
@@ -494,10 +534,10 @@ end end
 
 
 local H="redz-library-v5"
-local I=q:FindFirstChild(H)
+local I=GuiParent:FindFirstChild(H)
 
 if not I then
-I=E("ScreenGui",H,q,{
+I=createInstance("ScreenGui",H,GuiParent,{
 IgnoreGuiInset=true
 })
 end local J=function(
@@ -505,7 +545,7 @@ end local J=function(
 J, K, L, M, ...)
 local N=TweenInfo.new(M,EasingStyle or Enum.EasingStyle.Quint,...)
 
-return j:Create(J,N,{
+return TweenService:Create(J,N,{
 [K]=L
 })end local K=function(
 
@@ -547,7 +587,7 @@ return O:sub(1,#P)==P end local P=function(
 
 
 P)
-return(t.Y/450)*P end local Q=function(
+return(ViewportSize.Y/450)*P end local Q=function(
 
 
 Q)
@@ -565,6 +605,12 @@ return tostring(Q)
 end end
 
 
+
+-- ===========================================================================
+-- SECTION: Internal registries
+-- Per-window state: the tab registry, per-tab control lists, tab transitions and
+-- containers, and the Window/Tab/Option prototype tables the library exposes.
+-- ===========================================================================
 local R={}do
 local S={}
 local T={}
@@ -647,7 +693,7 @@ table.insert(aw,at)
 
 assert(type(av)=="string",`"Dialog.NewOption.Name". 'string' expected, got {typeof(av)}`)
 
-local ax=E("TextButton",{
+local ax=createInstance("TextButton",{
 AutoButtonColor=false,
 Size=UDim2.fromScale(0.2,1),
 BackgroundTransparency=1,
@@ -868,7 +914,7 @@ ao.Set=ao.SetValue
 end local al=function(
 
 al, am, an)
-local ao=E("TextButton","Button",an,{
+local ao=createInstance("TextButton","Button",an,{
 Size=UDim2.new(1,0,0,24),
 AutoButtonColor=false,
 Text="",
@@ -879,7 +925,7 @@ ThemeTag={
 BackgroundColor3="Colors.Buttons.Default"
 },
 Childs={
-E("TextLabel","Title",{
+createInstance("TextLabel","Title",{
 BackgroundTransparency=1,
 Font=Enum.Font.GothamMedium,
 Text=am.Title,
@@ -894,7 +940,7 @@ TextColor3="Colors.Text.Default"
 }
 })
 
-local ap=E("Frame",ao,{
+local ap=createInstance("Frame",ao,{
 Position=UDim2.new(0,1,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
 Size=UDim2.fromOffset(4,4),
@@ -907,7 +953,7 @@ Corner=UDim.new(0.5,0)
 }
 })
 
-local aq=E("ScrollingFrame","Container",{
+local aq=createInstance("ScrollingFrame","Container",{
 Size=UDim2.new(1,0,1,0),
 Position=UDim2.new(0,0,1),
 AnchorPoint=Vector2.new(0,1),
@@ -934,7 +980,7 @@ Padding=UDim.new(0,5)
 }
 })
 
-local ar=E("ImageLabel",ao,{
+local ar=createInstance("ImageLabel",ao,{
 Position=UDim2.new(0,8,0.5),
 Size=UDim2.new(0,13,0,13),
 AnchorPoint=Vector2.new(0,0.5),
@@ -958,7 +1004,7 @@ return ao,aq,ap,ar end local am=function(
 
 
 am, an, ao, ap)
-local aq=E("TextLabel",{
+local aq=createInstance("TextLabel",{
 TextXAlignment=Enum.TextXAlignment.Left,
 TextTruncate=Enum.TextTruncate.AtEnd,
 AutomaticSize=Enum.AutomaticSize.Y,
@@ -977,7 +1023,7 @@ Font="Font.Medium"
 local ar=V[am]
 local as=T[am].Container
 
-local at=E("TextLabel",{
+local at=createInstance("TextLabel",{
 TextXAlignment=Enum.TextXAlignment.Left,
 AutomaticSize=Enum.AutomaticSize.Y,
 Size=UDim2.new(1,-20),
@@ -998,7 +1044,7 @@ OBJECTS=ar,
 BackgroundColor3="Colors.Buttons.Default"
 }
 
-local av=E("TextButton","Option",{
+local av=createInstance("TextButton","Option",{
 AutomaticSize=Enum.AutomaticSize.Y,
 Size=UDim2.new(1,0,0,25),
 AutoButtonColor=false,
@@ -1008,7 +1054,7 @@ Elements={
 Corner=UDim.new(0,6)
 },
 Childs={
-E("Frame","Holder",{
+createInstance("Frame","Holder",{
 AutomaticSize=Enum.AutomaticSize.Y,
 BackgroundTransparency=1,
 Size=ap,
@@ -1033,7 +1079,7 @@ local aw=av.Holder local ax=function(
 ax, ay)
 if ay then
 if _ then
-local az=w(s.CurrentTheme,"Colors.Buttons.Default")
+local az=w(Library.CurrentTheme,"Colors.Buttons.Default")
 _.Theme.BackgroundColor3="Colors.Buttons.Default"
 J(_.Button,"BackgroundColor3",az,0.2):Play()
 end
@@ -1045,7 +1091,7 @@ Theme=au
 end
 
 au.BackgroundColor3=ax
-J(av,"BackgroundColor3",w(s.CurrentTheme,ax),0.2):Play()end
+J(av,"BackgroundColor3",w(Library.CurrentTheme,ax),0.2):Play()end
 
 
 u(av.MouseLeave,function()ax("Colors.Buttons.Default",false)end)
@@ -1113,14 +1159,14 @@ Color="Colors.Background"
 }
 }
 
-local ar=E("TextButton",OutBox,{
+local ar=createInstance("TextButton",OutBox,{
 Size=UDim2.fromScale(1,1),
 BackgroundTransparency=1,
 Active=true,
 Text=""
 })
 
-local as=E("Frame","Dropdown",ar,{
+local as=createInstance("Frame","Dropdown",ar,{
 Size=UDim2.fromOffset(ap,100),
 Position=UDim2.fromOffset(50,50),
 Elements=aq,
@@ -1130,7 +1176,7 @@ BackgroundTransparency="BackgroundTransparency"
 }
 })
 
-local at=E("TextButton","Search",as,{
+local at=createInstance("TextButton","Search",as,{
 Position=UDim2.new(1,5,0,5),
 Size=UDim2.new(0,25,0,25),
 AutomaticSize=Enum.AutomaticSize.X,
@@ -1141,17 +1187,17 @@ ThemeTag={
 BackgroundTransparency="BackgroundTransparency"
 },
 Childs={
-E("UIPadding",{
+createInstance("UIPadding",{
 PaddingLeft=UDim.new(0,5),
 PaddingRight=UDim.new(0,5),
 PaddingBottom=UDim.new(0,5),
 PaddingTop=UDim.new(0,5)
 }),
-E("UIListLayout",{
+createInstance("UIListLayout",{
 Padding=UDim.new(0,5),
 FillDirection=Enum.FillDirection.Horizontal
 }),
-E("TextBox","SearchBox",{
+createInstance("TextBox","SearchBox",{
 Size=UDim2.fromScale(0,1),
 Position=UDim2.fromScale(0.5,0.5),
 AnchorPoint=Vector2.new(0.5,0.5),
@@ -1168,7 +1214,7 @@ TextColor3="Colors.Text.Default",
 Font="Font.ExtraBold"
 }
 }),
-E("ImageLabel","SearchIcon",{
+createInstance("ImageLabel","SearchIcon",{
 Size=UDim2.fromScale(1,1),
 SizeConstraint=Enum.SizeConstraint.RelativeYY,
 Position=UDim2.fromScale(0.5,0.5),
@@ -1183,7 +1229,7 @@ Image="Icons.Search"
 }
 })
 
-local au=E("ScrollingFrame",as,{
+local au=createInstance("ScrollingFrame",as,{
 Size=UDim2.new(1,-6,1,-6),
 Position=UDim2.fromScale(0.5,0.5),
 AnchorPoint=Vector2.new(0.5,0.5),
@@ -1244,7 +1290,7 @@ return math.min((aK*math.max(aN,0.5))+10,aL,aO/1.75)end local aO=function()
 local aO=as.AbsolutePosition
 local aP=as.AbsoluteSize
 
-local aQ=Vector2.new(p.X,p.Y)
+local aQ=Vector2.new(Mouse.X,Mouse.Y)
 
 local aR=aQ.X>=aO.X and aQ.X<=(aO.X+aP.X)
 local aS=aQ.Y>=aO.Y and aQ.Y<=(aO.Y+aP.Y)
@@ -1435,7 +1481,7 @@ return a2 and a1:find(a0,1,true)~=nil end local a_=function(
 
 
 a_, a0)
-local a1=E("TextButton",{
+local a1=createInstance("TextButton",{
 Size=UDim2.new(1,0,0,21),
 AutoButtonColor=false,
 Text="",
@@ -1446,7 +1492,7 @@ ThemeTag={
 BackgroundColor3="Colors.Buttons.Default"
 },
 Childs={
-E("Frame",{
+createInstance("Frame",{
 Position=UDim2.new(0,1,0.5),
 Size=UDim2.new(0,4,0,4),
 BackgroundTransparency=1,
@@ -1458,7 +1504,7 @@ ThemeTag={
 BackgroundColor3="Colors.Primary"
 }
 }),
-E("TextLabel",{
+createInstance("TextLabel",{
 Size=UDim2.fromScale(1,1),
 Position=UDim2.fromOffset(10,0),
 TextXAlignment=Enum.TextXAlignment.Left,
@@ -1598,18 +1644,25 @@ return aw(self,...)
 end
 end
 
+
+-- ===========================================================================
+-- SECTION: Tab options
+-- AddSection / AddToggle / AddButton / AddTextBox / AddSlider / AddParagraph /
+-- AddDropdown / AddKeybind / AddColorPicker / AddDiscordInvite and the option
+-- prototype methods (SetValue / Set / AddCallback / Destroy / ...).
+-- ===========================================================================
 function ah:AddSection(av)
 assert(av==nil or type(av)=="string",`"Tab.AddSection[param 1]". 'string', or 'nil' expected, got {typeof(av)}`)
 av=av or""
 
 local aw=V[self]
 
-local ax=E("Frame","Option",T[self].Container,{
+local ax=createInstance("Frame","Option",T[self].Container,{
 Size=UDim2.new(1,0,0,20),
 BackgroundTransparency=1
 })
 
-local ay=E("TextLabel",ax,{
+local ay=createInstance("TextLabel",ax,{
 TextXAlignment=Enum.TextXAlignment.Left,
 TextTruncate=Enum.TextTruncate.AtEnd,
 Size=UDim2.new(1,-25,1,0),
@@ -1654,7 +1707,7 @@ end
 local aB=V[self]
 local aC,aD,aE=am(self,aw,ax,UDim2.new(1,-38,0,0))
 
-local aF=E("Frame",aC,{
+local aF=createInstance("Frame",aC,{
 Size=UDim2.new(0,35,0,18),
 Position=UDim2.new(1,-10,0.5),
 AnchorPoint=Vector2.new(1,0.5),
@@ -1667,7 +1720,7 @@ BackgroundColor3="Colors.Stroke"
 }
 })
 
-local aG=E("Frame",aF,{
+local aG=createInstance("Frame",aF,{
 BackgroundTransparency=1,
 Size=UDim2.new(0.8,0,0.8,0),
 Position=UDim2.new(0.5,0,0.5,0),
@@ -1679,7 +1732,7 @@ OBJECTS=aB,
 BackgroundColor3="Colors.OnPrimary"
 }
 
-local aI=E("Frame",aG,{
+local aI=createInstance("Frame",aG,{
 Size=UDim2.new(0,12,0,12),
 Position=UDim2.new(0,0,0.5),
 AnchorPoint=Vector2.new(0,0.5),
@@ -1718,7 +1771,7 @@ G(aA,aO)
 local aP=UDim2.new(aO and 1 or 0,0,0.5,0)
 local aQ=Vector2.new(aO and 1 or 0,0.5)
 local aR=aO and"Colors.Primary"or"Colors.OnPrimary"
-local aS=w(s.CurrentTheme,aR)
+local aS=w(Library.CurrentTheme,aR)
 
 aH.BackgroundColor3=aR
 
@@ -1761,7 +1814,7 @@ local az=av.Debounce or av.Cooldown
 local aA=V[self]
 local aB,aC,aD=am(self,aw,ax,UDim2.new(1,-20,0,0))
 
-local aE=E("ImageLabel",aB,{
+local aE=createInstance("ImageLabel",aB,{
 Size=UDim2.new(0,14,0,14),
 Position=UDim2.new(1,-10,0.5),
 AnchorPoint=Vector2.new(1,0.5),
@@ -1820,7 +1873,7 @@ end
 local aD=V[self]
 local aE,aF,aG=am(self,aw,ax,UDim2.new(1,-150,0,0))
 
-local aH=E("Frame",aE,{
+local aH=createInstance("Frame",aE,{
 Size=UDim2.new(0,150,0,18),
 Position=UDim2.new(1,-10,0.5),
 AnchorPoint=Vector2.new(1,0.5),
@@ -1833,7 +1886,7 @@ Corner=UDim.new(0,4)
 }
 })
 
-local aI=E("TextBox",aH,{
+local aI=createInstance("TextBox",aH,{
 Size=UDim2.new(0.85,0,0.85,0),
 AnchorPoint=Vector2.new(0.5,0.5),
 Position=UDim2.new(0.5,0,0.5,0),
@@ -1855,7 +1908,7 @@ Image="Icons.TextBox",
 ImageColor3="Colors.Icons"
 }
 
-local aK=E("ImageLabel",aH,{
+local aK=createInstance("ImageLabel",aH,{
 Size=UDim2.new(0,12,0,12),
 Position=UDim2.new(0,-5,0.5),
 AnchorPoint=Vector2.new(1,0.5),
@@ -1879,7 +1932,7 @@ local aL=ak.TextBox.new(self,aF,aG,aE,aI,aA)local aM=function(
 
 aM)
 aJ.ImageColor3=aM
-J(aK,"ImageColor3",w(s.CurrentTheme,aM),0.5):Play()end
+J(aK,"ImageColor3",w(Library.CurrentTheme,aM),0.5):Play()end
 
 
 if ay~=nil then
@@ -1951,7 +2004,7 @@ if ay~=nil and type(ae[ay])=="number"then
 aC=ae[ay]
 end
 
-local aJ=E("TextButton",aG,{
+local aJ=createInstance("TextButton",aG,{
 Size=UDim2.new(0.45,0,1,0),
 Position=UDim2.new(1,0,0,0),
 AnchorPoint=Vector2.new(1,0),
@@ -1960,7 +2013,7 @@ BackgroundTransparency=1,
 Text=""
 })
 
-local aK=E("Frame",aJ,{
+local aK=createInstance("Frame",aJ,{
 Size=UDim2.new(1,-20,0,6),
 Position=UDim2.fromScale(0.5,0.5),
 AnchorPoint=Vector2.new(0.5,0.5),
@@ -1973,7 +2026,7 @@ Corner=UDim.new(0.5,0)
 }
 })
 
-local aL=E("Frame",aK,{
+local aL=createInstance("Frame",aK,{
 Size=UDim2.fromScale(0,1),
 BorderSizePixel=0,
 ThemeTag={
@@ -1985,7 +2038,7 @@ Corner=UDim.new(0.5,0)
 }
 })
 
-local aM=E("Frame",aK,{
+local aM=createInstance("Frame",aK,{
 Size=UDim2.new(0,6,0,12),
 BackgroundColor3=Color3.fromRGB(220,220,220),
 Position=UDim2.fromScale(0,0.5),
@@ -1996,7 +2049,7 @@ Corner=UDim.new(0,6)
 }
 })
 
-local aN=E("TextLabel",aJ,{
+local aN=createInstance("TextLabel",aJ,{
 Size=UDim2.new(0,50,0,14),
 AnchorPoint=Vector2.new(1,0.5),
 Position=UDim2.new(0,-1,0.5,0),
@@ -2010,7 +2063,7 @@ Font="Font.SliderValue"
 }
 })
 
-local aO=E("UIScale",aN)
+local aO=createInstance("UIScale",aN)
 
 local aP=ak.Slider.new(self,aG,aH,aI,aD)
 
@@ -2062,7 +2115,7 @@ aT(aV,aQ(aV))end
 aP.WHEN_VALUE_CHANGED=aU local aV=function(
 
 aV, aW)
-local aX=(p.X-aV.X)/aW.X
+local aX=(Mouse.X-aV.X)/aW.X
 local aY=math.clamp(aX,0,1)
 local aZ=aR(aY)
 local a_=aS(aZ)
@@ -2083,7 +2136,7 @@ A=true
 local aX=aK.AbsolutePosition
 local aY=aK.AbsoluteSize
 
-while i:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)do
+while UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)do
 aV(aX,aY)
 task.wait()
 end
@@ -2139,12 +2192,12 @@ end
 local aD=V[self]
 local aE=T[self].Container
 
-local aF=E("Frame","Option",aE,{
+local aF=createInstance("Frame","Option",aE,{
 BackgroundTransparency=1,
 Size=UDim2.new(1,0,0,148)
 })
 
-local aG=E("CanvasGroup",aF,{
+local aG=createInstance("CanvasGroup",aF,{
 Size=UDim2.new(0,178,1,-15),
 Position=UDim2.new(0,5,1,0),
 AnchorPoint=Vector2.new(0,1),
@@ -2163,13 +2216,13 @@ BackgroundColor3="Colors.Buttons.Default"
 }
 })
 
-local aH=E("ImageLabel",aG,{
+local aH=createInstance("ImageLabel",aG,{
 BackgroundColor3=Color3.new(1,1,1),
 Size=UDim2.fromScale(1,0.28),
 BackgroundTransparency=1
 })
 
-local aI=E("TextLabel",aF,{
+local aI=createInstance("TextLabel",aF,{
 Position=UDim2.fromOffset(5,0),
 Size=UDim2.new(1,0,0,15),
 TextColor3=Color3.fromRGB(40,150,255),
@@ -2184,7 +2237,7 @@ Font="Font.Medium"
 }
 })
 
-local aJ=E("ImageLabel",aG,{
+local aJ=createInstance("ImageLabel",aG,{
 Size=UDim2.fromOffset(33,33),
 Position=UDim2.new(0,10,0.28,0),
 AnchorPoint=Vector2.new(0,0.5),
@@ -2206,7 +2259,7 @@ Color="Colors.Buttons.Default"
 }
 })
 
-local aK=E("TextLabel",aG,{
+local aK=createInstance("TextLabel",aG,{
 Size=UDim2.new(1,-10,0,10),
 Position=UDim2.new(0,10,0.44,0),
 TextXAlignment=Enum.TextXAlignment.Left,
@@ -2223,7 +2276,7 @@ Font="Font.Bold"
 local aL
 
 if aA or aB then
-aL=E("Frame",aG,{
+aL=createInstance("Frame",aG,{
 Size=UDim2.new(1,-10,0,9),
 Position=UDim2.new(0,0,0.52,0),
 BackgroundTransparency=1,
@@ -2242,12 +2295,12 @@ Padding=UDim.new(0,4),
 })local aM=function(
 
 aM, aN)
-return E("Frame",aL,{
+return createInstance("Frame",aL,{
 Size=UDim2.fromScale(0,1),
 AutomaticSize=Enum.AutomaticSize.X,
 BackgroundTransparency=1,
 Childs={
-E("Frame",{
+createInstance("Frame",{
 Size=UDim2.fromOffset(3,3),
 Position=UDim2.new(0,5,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
@@ -2256,7 +2309,7 @@ Elements={
 Corner=UDim.new(1,0)
 }
 }),
-E("TextLabel",{
+createInstance("TextLabel",{
 Size=UDim2.new(0,0,1,0),
 Position=UDim2.new(0,12,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
@@ -2282,7 +2335,7 @@ aM(Color3.fromRGB(86,101,105),N(aB).." Members")
 end
 end
 
-local aM=E("TextLabel",aG,{
+local aM=createInstance("TextLabel",aG,{
 Size=UDim2.new(1,-50,0,8),
 Position=UDim2.new(0,10,aL and 0.6 or 0.56,0),
 TextXAlignment=Enum.TextXAlignment.Left,
@@ -2298,7 +2351,7 @@ Font="Font.Medium"
 }
 })
 
-local aN=E("Frame",aG,{
+local aN=createInstance("Frame",aG,{
 Size=UDim2.new(1,0,0.28,0),
 Position=UDim2.fromScale(0,1),
 AnchorPoint=Vector2.new(0,1),
@@ -2312,7 +2365,7 @@ BackgroundColor3="Colors.Buttons.Default"
 if#aM.Text>0 then
 aN.Size=UDim2.new(1,0,0.42,0)
 
-E("UIGradient",aN,{
+createInstance("UIGradient",aN,{
 Rotation=-90,
 Transparency=NumberSequence.new{
 NumberSequenceKeypoint.new(0.00,0.00),
@@ -2322,7 +2375,7 @@ NumberSequenceKeypoint.new(1.00,1.00)
 })
 end
 
-local aO=E("TextButton",aN,{
+local aO=createInstance("TextButton",aN,{
 Position=UDim2.new(0.5,0,1,-9),
 Size=UDim2.new(1,-18,0,18),
 AnchorPoint=Vector2.new(0.5,1),
@@ -2356,7 +2409,7 @@ aH.ScaleType=Enum.ScaleType.Crop
 aH.Image=az
 elseif typeof(az)=="Color3"then
 aH.BackgroundTransparency=0
-E("UIGradient",aH,{
+createInstance("UIGradient",aH,{
 Rotation=-15,
 Color=ColorSequence.new{
 ColorSequenceKeypoint.new(0,az),
@@ -2431,7 +2484,7 @@ end
 local aD=V[self]
 local aE,aF,aG=am(self,aw,ax,UDim2.new(1,-150,0,0))
 
-local aH=E("Frame",aE,{
+local aH=createInstance("Frame",aE,{
 Size=UDim2.new(0,150,0,18),
 Position=UDim2.new(1,-10,0.5),
 AnchorPoint=Vector2.new(1,0.5),
@@ -2444,7 +2497,7 @@ BackgroundColor3="Colors.Stroke"
 }
 })
 
-local aI=E("TextLabel",aH,{
+local aI=createInstance("TextLabel",aH,{
 Size=UDim2.new(0.85,0,0.85,0),
 AnchorPoint=Vector2.new(0.5,0.5),
 Position=UDim2.new(0.5,0,0.5,0),
@@ -2464,7 +2517,7 @@ Image="Icons.Dropdown.Open",
 ImageColor3="Colors.Icons"
 }
 
-local aK=E("ImageLabel",aH,{
+local aK=createInstance("ImageLabel",aH,{
 Size=UDim2.new(0,15,0,15),
 Position=UDim2.new(0,-5,0.5),
 AnchorPoint=Vector2.new(1,0.5),
@@ -2490,8 +2543,8 @@ aT, aU)
 aJ.ImageColor3=aT
 aJ.Image=aU
 
-J(aK,"ImageColor3",w(s.CurrentTheme,aT),0.35):Play()
-aK.Image=w(s.CurrentTheme,aU)end local aU=function(
+J(aK,"ImageColor3",w(Library.CurrentTheme,aT),0.35):Play()
+aK.Image=w(Library.CurrentTheme,aU)end local aU=function(
 
 
 aU)
@@ -2750,6 +2803,11 @@ end)
 return aL
 end
 
+
+-- ===========================================================================
+-- SECTION: Tab methods
+-- Destroy / SetVisible / Select.
+-- ===========================================================================
 function ah:Destroy()
 assert(type(self)=="table"and self.IS_A_TAB,`"Tab.Destroy". {tostring(self)} is not a tab`)
 if self.IS_DESTROYED then return end
@@ -2838,7 +2896,7 @@ ai.SetContent=ai.SetDescription
 ai.SetDesc=ai.SetDescription
 
 function aj:CreateMobileMinimizer(av)
-local aw=E("ImageButton",I,{
+local aw=createInstance("ImageButton",I,{
 Size=UDim2.fromOffset(35,35),
 Position=UDim2.fromScale(0.17,0.28),
 AnchorPoint=Vector2.new(0.5,0.5),
@@ -2864,8 +2922,8 @@ av.Elements.Stroke=av.Stroke
 av.Stroke=nil
 end
 
-D.Draggable(aw,ad,0.5)
-D.SetProperties(aw,av)
+InstanceFactory.Draggable(aw,ad,0.5)
+InstanceFactory.SetProperties(aw,av)
 
 return aw
 end
@@ -2876,6 +2934,13 @@ assert(au(av),`"Minimizer.SetKeyCode[param 1]". 'KeyCode' expected, got {typeof(
 self.KeyCode=av
 end
 
+
+-- ===========================================================================
+-- SECTION: Window methods
+-- SelectTab / Minimize / MakeTab / StartWindow / MinimizeButton / SetTitle /
+-- flags (DeleteFlags / SetFlag / GetFlag / ReadFile / WriteFile) / Dialog /
+-- Notify / NewNotifyGroup / GetTabByTitle.
+-- ===========================================================================
 function ag:SelectTab(av)
 local aw=type(av)=="number"and S[av]
 
@@ -2907,7 +2972,7 @@ assert(ax==nil or type(ax)=="string",`"Tab.Icon" 'string' expected, got {typeof(
 
 local ay=setmetatable({
 Selected=self.SelectedTab==#S+1,
-Icon=s:GetIconByName(ax),
+Icon=Library:GetIconByName(ax),
 Title=aw,
 
 Parent=self,
@@ -3047,7 +3112,7 @@ assert(#aE>0,"\"Window.SetSubTitle\". the new 'SubTitle' is too short.")
 aA.Text=aE
 end
 
-W=E("Frame",I,{
+W=createInstance("Frame",I,{
 Size=UDim2.new(0,280,1,0),
 Position=UDim2.fromScale(1,0),
 AnchorPoint=Vector2.new(1,0),
@@ -3065,7 +3130,7 @@ Padding=UDim.new(0,20)
 }
 })
 
-aa=E("TextButton","OutBox",{
+aa=createInstance("TextButton","OutBox",{
 Size=UDim2.fromScale(1,1),
 BackgroundTransparency=0.3,
 AutoButtonColor=false,
@@ -3075,7 +3140,7 @@ BackgroundColor3="Colors.Buttons.Default"
 },
 Childs={
 ax:FindFirstChildOfClass"UICorner":Clone(),
-E("Frame","Template",{
+createInstance("Frame","Template",{
 Size=UDim2.new(0.35,60,0.20,80),
 Position=UDim2.fromScale(0.5,0.5),
 AnchorPoint=Vector2.new(0.5,0.5),
@@ -3090,7 +3155,7 @@ Color="Colors.Background"
 }
 },
 Childs={
-E("TextLabel","Title",{
+createInstance("TextLabel","Title",{
 Size=UDim2.new(1,-20,0,20),
 TextTruncate=Enum.TextTruncate.AtEnd,
 TextSize=15,
@@ -3102,7 +3167,7 @@ Font="Font.ExtraBold",
 TextColor3="Colors.Text.Default"
 }
 }),
-E("TextLabel","Description",{
+createInstance("TextLabel","Description",{
 Position=UDim2.new(0.5,0,0,46),
 Size=UDim2.new(1,-20,0,0),
 AnchorPoint=Vector2.new(0.5,0),
@@ -3115,7 +3180,7 @@ TextColor3="Colors.Text.Darker",
 Font="Font.Medium"
 }
 }),
-E("Frame","Options",{
+createInstance("Frame","Options",{
 Size=UDim2.new(1,-20,0.15,18),
 Position=UDim2.new(0.5,0,1,-10),
 AnchorPoint=Vector2.new(0.5,1),
@@ -3178,8 +3243,8 @@ function ag:ReadFile(av)
 assert(type(av)=="string",`"Window.ReadFile[param 1]". 'string' expected, got {typeof(av)}`)
 av=`{self.ScriptFolder}/{av}`
 
-if f~=nil and(isfile==nil or not isfile(av))then
-return f(av)
+if readFileSafe~=nil and(isfile==nil or not isfile(av))then
+return readFileSafe(av)
 end
 end
 
@@ -3192,12 +3257,12 @@ error(`"Window.WriteFile[param 2]". 'string', or 'nil' expected, got {typeof(aw)
 end
 
 if aw==nil then
-if c~=nil then
-c(`{self.ScriptFolder}/{av}`)
+if deleteFileSafe~=nil then
+deleteFileSafe(`{self.ScriptFolder}/{av}`)
 return true
 end
 else
-if e~=nil then
+if writeFileSafe~=nil then
 z(`{self.ScriptFolder}/{av}`)
 return true
 end
@@ -3217,7 +3282,7 @@ local ax=setmetatable({
 KeyCode=aw
 },aj)
 
-u(i.InputBegan,function(ay)
+u(UserInputService.InputBegan,function(ay)
 if ay.KeyCode==ax.KeyCode then
 ag:Minimize()
 end
@@ -3313,13 +3378,13 @@ elseif az==nil then
 az=5
 end
 
-local aA=E("Frame","Notification",W,{
+local aA=createInstance("Frame","Notification",W,{
 Size=UDim2.new(0.85,0,0,60),
 BackgroundTransparency=1,
 AutomaticSize=Enum.AutomaticSize.Y
 })
 
-local aB=E("TextButton",aA,{
+local aB=createInstance("TextButton",aA,{
 AutomaticSize=Enum.AutomaticSize.Y,
 Size=UDim2.fromScale(1,1),
 AutoButtonColor=false,
@@ -3338,9 +3403,9 @@ Color="Colors.Background"
 }
 })
 
-local aC=E("UIScale",aA)
+local aC=createInstance("UIScale",aA)
 
-local aD=E("Frame","Holder",aB,{
+local aD=createInstance("Frame","Holder",aB,{
 AutomaticSize=Enum.AutomaticSize.Y,
 BackgroundTransparency=1,
 Size=UDim2.fromScale(1,1),
@@ -3358,7 +3423,7 @@ PaddingLeft=UDim.new(0,40)
 }
 })
 
-local aE=E("TextLabel",aD,{
+local aE=createInstance("TextLabel",aD,{
 Size=UDim2.new(1,0,0,20),
 TextTruncate=Enum.TextTruncate.AtEnd,
 TextXAlignment=Enum.TextXAlignment.Left,
@@ -3371,7 +3436,7 @@ Font="Font.Bold"
 }
 })
 
-local aF=E("TextLabel",aD,{
+local aF=createInstance("TextLabel",aD,{
 Size=UDim2.new(1,0,0,20),
 TextXAlignment=Enum.TextXAlignment.Left,
 TextYAlignment=Enum.TextYAlignment.Top,
@@ -3385,7 +3450,7 @@ Font="Font.Normal"
 }
 })
 
-local aG=E("ImageLabel",aB,{
+local aG=createInstance("ImageLabel",aB,{
 Size=UDim2.fromOffset(24,24),
 Position=UDim2.new(0,8,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
@@ -3395,7 +3460,7 @@ ImageColor3="Colors.Icons"
 }
 })
 
-local aH=E("TextLabel",aB,{
+local aH=createInstance("TextLabel",aB,{
 Size=UDim2.new(0,40,0,16),
 Position=UDim2.new(1,-10,0,8),
 AnchorPoint=Vector2.new(1,0),
@@ -3437,7 +3502,7 @@ aA:Destroy()
 end local aM=function()
 
 
-ay=s:GetIconByName(ay or af)
+ay=Library:GetIconByName(ay or af)
 aG.Image=ay
 
 if not O(ay)then
@@ -3523,10 +3588,10 @@ end local aa=function(
 
 aa, ab)
 local ac=ab.Size.Y.Offset
-local ad=UDim2.new(0,aa.TabSize or s.Default.TabSize,1,-ac)
+local ad=UDim2.new(0,aa.TabSize or Library.Default.TabSize,1,-ac)
 local ae=UDim2.new(1,-ad.X.Offset,1,-ac)
 
-local af=E("ScrollingFrame","TabsScroll",{
+local af=createInstance("ScrollingFrame","TabsScroll",{
 AutomaticCanvasSize=Enum.AutomaticSize.Y,
 ScrollingDirection=Enum.ScrollingDirection.Y,
 Position=UDim2.new(0,0,1,0),
@@ -3553,7 +3618,7 @@ Padding=UDim.new(0,5)
 }
 })
 
-local ag=E("Frame","Containers",{
+local ag=createInstance("Frame","Containers",{
 Size=ae,
 AnchorPoint=Vector2.new(1,1),
 Position=UDim2.new(1,0,1,0),
@@ -3564,7 +3629,13 @@ ClipsDescendants=true
 return af,ag end
 
 
-function s:GetIconByName(ab)
+
+-- ===========================================================================
+-- SECTION: Module-level API
+-- GetIconByName / IsValidTheme / GetThemes / GetTheme / SetTheme / SetUIScale /
+-- GetMaxScale / GetMinScale / GetCurrentTheme / Destroy / MakeWindow.
+-- ===========================================================================
+function Library:GetIconByName(ab)
 if ab==nil then return end
 assert(ab,`"Library.GetIconByName". 'string' expected, got {typeof(ab)}`)
 
@@ -3585,13 +3656,13 @@ end
 end
 end
 
-function s:IsValidTheme(ab)
+function Library:IsValidTheme(ab)
 assert(type(ab)=="string",`"Library.IsValidTheme". string extected, got {typeof(ab)}`)
 
 return self.Themes[ab]~=nil
 end
 
-function s:GetThemes()
+function Library:GetThemes()
 local ab={}
 for ac,ad in self.Themes do
 table.insert(ab,ac)
@@ -3599,7 +3670,7 @@ end
 return ab
 end
 
-function s:GetTheme(ab)
+function Library:GetTheme(ab)
 assert(ab==nil or type(ab)=="string",`"Library.GetTheme". 'string' expected, got {typeof(ab)}`)
 
 if ab==nil then
@@ -3611,7 +3682,7 @@ assert(ac~=nil,`"Library.GetTheme". theme not found: {ab}`)
 return ac
 end
 
-function s:SetTheme(ab)
+function Library:SetTheme(ab)
 assert(type(ab)=="string",`"Library.SetTheme". string extected, got {typeof(ab)}`)
 local ac=self.Themes[ab]
 assert(ac,`"Library.SetTheme". theme not found: {ab}`)
@@ -3622,7 +3693,7 @@ self.WindowSettings.SelectedTheme=ac.Name
 C:update()
 end
 
-function s:SetUIScale(ab)
+function Library:SetUIScale(ab)
 local ac=B.MIN_SCALE
 local ad=B.MAX_SCALE
 
@@ -3632,22 +3703,22 @@ assert(ab>=ac and ab<=ad,`"Library.SetUIScale". Min Scale: {ac}, Max Scale: {ad}
 I.Scale.Scale=P(ab)
 end
 
-function s:GetMaxScale()
+function Library:GetMaxScale()
 return B.MAX_SCALE
 end
 
-function s:GetMinScale()
+function Library:GetMinScale()
 return B.MIN_SCALE
 end
 
-function s:GetCurrentTheme()
+function Library:GetCurrentTheme()
 if not self.LOADED_UI_LIBRARY then
 return error("failed to get current theme: UI is not loaded",2)
 end
 return self.CurrentTheme
 end
 
-function s:Destroy()
+function Library:Destroy()
 for ab,ac in self.Connections do
 ac:Disconnect()
 end
@@ -3657,7 +3728,7 @@ pcall(I.Destroy,I)
 end
 end
 
-function s:MakeWindow(ab)
+function Library:MakeWindow(ab)
 if self.LOADED_UI_LIBRARY then
 return error("you can create only 1 Window",2)
 end
@@ -3667,7 +3738,7 @@ I:SetAttribute("UID",ac)
 self.SCREENGUI_UID=ac
 I:ClearAllChildren()
 
-local ad=E("UIScale","Scale",I,{
+local ad=createInstance("UIScale","Scale",I,{
 Scale=P(1)
 })
 
@@ -3693,7 +3764,7 @@ local af=ae.ScriptFolder
 local ag=false
 
 local ah,ai=pcall(function()
-return af and k:JSONDecode(f(`{af}/LibrarySettings.json`))
+return af and HttpService:JSONDecode(readFileSafe(`{af}/LibrarySettings.json`))
 end)
 
 if type(ai)~="table"then
@@ -3704,7 +3775,7 @@ end local aj=function()
 ag=false
 
 return pcall(function()
-return z(`{af}/LibrarySettings.json`,k:JSONEncode(ai))
+return z(`{af}/LibrarySettings.json`,HttpService:JSONEncode(ai))
 end)end local ak=function(
 
 
@@ -3728,7 +3799,7 @@ local ag=ae.ScriptFolder
 local ah=false
 
 local ai,aj=pcall(function()
-return ag and k:JSONDecode(f(`{ag}/ScriptFlags.json`))
+return ag and HttpService:JSONDecode(readFileSafe(`{ag}/ScriptFlags.json`))
 end)
 
 if type(aj)~="table"then
@@ -3739,7 +3810,7 @@ end local ak=function()
 ah=false
 
 return pcall(function()
-z(`{ag}/ScriptFlags.json`,k:JSONEncode(aj))
+z(`{ag}/ScriptFlags.json`,HttpService:JSONEncode(aj))
 end)end local al=function(
 
 
@@ -3755,7 +3826,7 @@ end end local am=function()
 
 table.clear(aj)
 return pcall(function()
-return ag and c(`{ag}/ScriptFlags.json`)
+return ag and deleteFileSafe(`{ag}/ScriptFlags.json`)
 end)end
 
 
@@ -3774,7 +3845,7 @@ self.Icons=(function()
 local ah=ae.ScriptFolder
 
 local ai,aj=pcall(function()
-return loadstring(f(`{ah}/Icons.lua`))()
+return loadstring(readFileSafe(`{ah}/Icons.lua`))()
 end)
 
 if ai and type(aj)=="table"then
@@ -3826,7 +3897,7 @@ ah=UDim2.fromOffset(ak,al)
 end
 end
 
-local ak=E("Frame","Window",I,{
+local ak=createInstance("Frame","Window",I,{
 Position=UDim2.new(0.5,-ah.X.Offset/2,0.5,-ah.Y.Offset/2),
 Active=true,
 Size=ah,
@@ -3853,17 +3924,17 @@ self:Destroy()
 ak:Destroy()
 end)
 
-D.Draggable(ak,ad,0.5)
+InstanceFactory.Draggable(ak,ad,0.5)
 
-local al=E("Folder","Components",ak)
-local am=E("Folder","Dropdowns",I)
+local al=createInstance("Folder","Components",ak)
+local am=createInstance("Folder","Dropdowns",I)
 
-local an=E("Frame","TopBar",al,{
+local an=createInstance("Frame","TopBar",al,{
 Size=UDim2.new(1,0,0,28),
 BackgroundTransparency=1
 })
 
-local ao=E("TextLabel","Title",an,{
+local ao=createInstance("TextLabel","Title",an,{
 TextXAlignment=Enum.TextXAlignment.Left,
 AutomaticSize=Enum.AutomaticSize.XY,
 Position=UDim2.new(0,15,0.5,0),
@@ -3876,7 +3947,7 @@ TextColor3="Colors.Text.Default",
 Font="Font.Bold"
 },
 Childs={
-E("TextLabel","SubTitle",{
+createInstance("TextLabel","SubTitle",{
 Size=UDim2.fromScale(0,1),
 AutomaticSize="X",
 AnchorPoint=Vector2.new(0,1),
@@ -3894,9 +3965,9 @@ Font="Font.Normal"
 }
 })
 
-local ap=E("Folder","Buttons",an,{
+local ap=createInstance("Folder","Buttons",an,{
 Childs={
-E("ImageButton","Close",{
+createInstance("ImageButton","Close",{
 Size=UDim2.new(0,18,0,18),
 Position=UDim2.new(1,-10,0.5),
 AnchorPoint=Vector2.new(1,0.5),
@@ -3910,7 +3981,7 @@ Elements={
 Corner=UDim.new(0.2,0)
 }
 }),
-E("ImageButton","Minimize",{
+createInstance("ImageButton","Minimize",{
 Size=UDim2.new(0,18,0,18),
 Position=UDim2.new(1,-35,0.5),
 AnchorPoint=Vector2.new(1,0.5),
@@ -3948,7 +4019,7 @@ function as:GetElements()
 return av
 end
 
-local aw=E("Frame","ControlWindowSize",ak,{
+local aw=createInstance("Frame","ControlWindowSize",ak,{
 Size=UDim2.new(0,35,0,35),
 Position=ak.Size,
 AnchorPoint=Vector2.new(0.8,0.8),
@@ -3962,7 +4033,7 @@ BackgroundColor3="Colors.OnPrimary"
 }
 })
 
-local ax=E("Frame","ControlTabsSize",ak,{
+local ax=createInstance("Frame","ControlTabsSize",ak,{
 Size=UDim2.new(0,16,0.75,-30),
 Position=UDim2.new(0,at.Size.X.Offset,0.5,15),
 AnchorPoint=Vector2.new(0.5,0.5),
@@ -4004,11 +4075,11 @@ au.Size=UDim2.new(1,-at.Size.X.Offset,1,-an.Size.Y.Offset)
 af.TabSize=az.X.Offset
 end)
 
-D.Draggable(aw,ad,0.68,function(az,aA,aB,aC)
+InstanceFactory.Draggable(aw,ad,0.68,function(az,aA,aB,aC)
 return UDim2.fromOffset(math.clamp(aA,430,1000),math.clamp(aC,200,500))
 end)
 
-D.Draggable(ax,ad,0.68,function(aA,aB)
+InstanceFactory.Draggable(ax,ad,0.68,function(aA,aB)
 return UDim2.new(0,math.clamp(aB,135,210),0.5,15)
 end)
 
@@ -4061,4 +4132,4 @@ end)
 return as
 end
 
-return s
+return Library
