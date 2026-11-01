@@ -32,6 +32,7 @@ local VERSION = "1.0.0"
 local FEATURE_MODULES = {
     {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
+    {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -294,6 +295,49 @@ local PANELS = {
             section:CreateInput("Store keep list", "never store these", "", function(text)
                 if State.Instances.fruit then State.Instances.fruit:SetKeep(text) end
             end)
+        end,
+    },
+    islands = {
+        page = "Travel",
+        section = "ISLAND TELEPORT",
+        category = "Travel",
+        icon = "map",
+        build = function(section, instance)
+            -- O dropdown lista as ilhas do Sea 2 (confirmadas pelo usuario). A
+            -- selecao NAO teleporta sozinha: e gate do toggle. Trocar a ilha com
+            -- o toggle ligado voa de novo.
+            local islands = {}
+            local factory = State.Features.islands
+            if factory and type(factory.islands) == "table" then
+                islands = factory.islands
+            end
+            local selected = islands[1] or "Snow Mountain"
+            section:CreateToggle("Island teleport", false, function(value)
+                if value then
+                    if not State:SetFeature("islands", true) then
+                        instance.Notify("Island teleport", "Teleport motor ausente.")
+                        return
+                    end
+                    if State.Instances.islands then
+                        if not State.Instances.islands:SetEnabled(true) then
+                            instance.Notify("Island teleport", State.Instances.islands.LastStatus or "falhou.")
+                        end
+                    end
+                    return
+                end
+                if State.Instances.islands then State.Instances.islands:SetEnabled(false) end
+                State:SetFeature("islands", false)
+            end)
+            section:CreateDropdown("Island", islands, selected, function(choice)
+                selected = choice
+                if State.Instances.islands then
+                    local ok = State.Instances.islands:Select(choice)
+                    if State.Instances.islands.ToggleOn and not ok then
+                        instance.Notify("Island teleport", State.Instances.islands.LastStatus or "ilha fora do mapa.")
+                    end
+                end
+            end)
+            section:CreateParagraph("Island teleport", "Pick an island and fly there. Only travels while the toggle is on.")
         end,
     },
     -- RAID: parked. O Auto raid e o Auto complete nao estavam do jeito que o

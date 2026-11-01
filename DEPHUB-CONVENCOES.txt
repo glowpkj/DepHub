@@ -406,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.24)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.25)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 772 checks):
+FEITO / FUNCIONANDO (verificado offline, 790 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -425,7 +425,7 @@ FEITO / FUNCIONANDO (verificado offline, 772 checks):
 - Blox Fruits com features PROPRIAS (v0.1.18): o backend carrega
   features/bloxfruits/<nome>.lua (uma por feature, auto-contida, molde
   new/Enable/Disable) comecando pela blade hit. Hoje as features vivas sao
-  bladhits (Combat) e fruit (Farm), alem do teleporte (infra). A raid foi
+  bladhits (Combat), fruit (Farm) e islands (Travel), alem do teleporte (infra). A raid foi
   parkeada em v0.1.23 (o usuario vai refazer por completo). As
   14 features que vieram de open source estao em features/bloxfruits/parked/
   (fora da pasta ativa, nada apagado, fora do manifest e do bundle). Nao existe
@@ -545,7 +545,7 @@ GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
 - O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
   CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
-ARQUITETURA DO BLOX FRUITS (v0.1.24) -- features proprias, uma por arquivo:
+ARQUITETURA DO BLOX FRUITS (v0.1.25) -- features proprias, uma por arquivo:
 - O usuario pegou a arvore do Blox Fruits de open source e decidiu montar o
   script dele com as features uma a uma, cada coisa no lugar certo. O molde:
   src/games/features/bloxfruits/<nome>.lua, UMA feature por arquivo.
@@ -559,7 +559,7 @@ ARQUITETURA DO BLOX FRUITS (v0.1.24) -- features proprias, uma por arquivo:
   por metodos (SetRange/SetInterval), e o backend so encaminha.
 - DUAS listas no backend, e a diferenca importa:
   * FEATURE_MODULES -- features de painel, cada uma com seu toggle. Hoje:
-    bladhits (Combat) e fruit (Farm). A raid saiu (parkeada em v0.1.23).
+    bladhits (Combat), fruit (Farm) e islands (Travel). A raid saiu (parkeada em v0.1.23).
   * INFRA_MODULES (v0.1.18) -- motores sem UI e sem toggle. Carregam e
     INSTANCIAM sempre (nao ha toggle pra ligar) e ficam em State.Infra. Hoje so
     o teleporte.
@@ -682,9 +682,33 @@ RAID -- PARKEADA (v0.1.23):
   994732206 e 1316421563). O historico do desenho anterior (sequencia por numero,
   fim de rodada, etc.) fica no git log -- a raid sera refeita, nao remendada.
 
+ISLAND TELEPORT (features/bloxfruits/islands.lua) -- teleporte entre ilhas (v0.1.25):
+- Aba Travel, secao ISLAND TELEPORT. O usuario liga o toggle, escolhe a ilha no
+  dropdown, e o personagem voa ate ela. Teleporte de botao: sem alvo movel, sem
+  loop de farm.
+- O TOGGLE E GATE DE VERDADE: selecionar no dropdown NAO teleporta. So vai com o
+  toggle ligado. Trocar a ilha com o toggle ligado voa de novo; desligado, so
+  memoriza a escolha. (Foi o que o usuario pediu.)
+- O destino e a INSTANCIA REAL no mapa -- workspace.Map.<Nome> -- nao coordenada
+  chumbada. Nao quebra quando o mapa muda e usa exatamente os nomes que o usuario
+  confirmou no Dex. Se a instancia nao estiver no mapa agora (mar errado, ilha
+  removida), ele AVISA ("not in map: workspace.Map.<Nome>") em vez de voar pro
+  vazio.
+- A lista (Sea 2, confirmada pelo usuario): Snow Mountain, Indra Island, Ice
+  Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten
+  Island, Fishmen, Dressrosa, Darkbeard Arena, Dapper Jack Arena. O rotulo bonito
+  e a instancia do mapa sao ligados numa tabela explicita (ex.: "Ghost Ship" ->
+  GhostShip), porque varios rotulos nao batem com o nome da instancia.
+- NAO tem motor proprio: usa o teleporte geral (options.teleport). Sem motor o
+  toggle RECUSA -- nao ha como voar. Um motor de voo no script, nao dois.
+- SetEnabled(true) devolve true se ARMOU. Se a ilha nao estiver no mapa, ele
+  continua armado e reporta em LastStatus -- assim da pra so trocar a ilha no
+  dropdown sem religar o toggle.
+- SEM SLIDERS -- o usuario recusou. So toggle + dropdown.
+
 PAINEL POR FEATURE (v0.1.19): o backend monta o painel de uma tabela PANELS
 (categoria, aba, secao, controles por feature) em vez de hardcodar uma feature.
-A categoria e sempre finalidade (Combat, Farm), nunca nome de jogo -- a
+A categoria e sempre finalidade (Combat, Farm, Travel), nunca nome de jogo -- a
 convencao da secao 4a continua valendo. Icone desconhecido cai no fallback do
 GetIcon, entao nao quebra. A fruta vive na aba Farm. Quando a raid voltar, ela
 compartilha a MESMA aba Farm -- a aba e a finalidade, e a secao separa FRUIT de
@@ -696,7 +720,7 @@ FEATURES PARKEADAS (v0.1.17) -- fora da pasta ativa, NADA apagado:
   -- historico preservado, zero delecao.
 - Parkeada = fora do jogo: nao carrega, nao instancia, nao aparece no painel,
   nao esta no manifest e nao entra no bundle (o walk do bundle.js pula o
-  subdiretorio). As features vivas do Blox Fruits hoje: bladhits e fruit (alem
+  subdiretorio). As features vivas do Blox Fruits hoje: bladhits, fruit e islands (alem
   do teleporte, que e infra) -- todas em features/bloxfruits/. A raid foi
   parkeada em v0.1.23 (o usuario vai refazer por completo).
 - Para trazer uma de volta: tira ela de parked/ e porta pro molde proprio

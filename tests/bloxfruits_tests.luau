@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "fruit"}
+local FEATURES = {"bladhits", "fruit", "islands"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -149,7 +149,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "teleport" or name == "fruit", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "teleport" or name == "fruit" or name == "islands", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -293,6 +293,65 @@ do
     fruit:Destroy()
 end
 
+-- Island Teleport: o usuario escolhe no dropdown, mas so voa com o toggle LIGADO
+-- (o gate que ele pediu). O destino e a instancia real workspace.Map.<Nome>; se
+-- ela nao estiver no mapa, ele avisa em vez de voar pro vazio.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Islands = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "islands.lua"])()
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+
+    -- A lista publica das ilhas (o backend monta o dropdown dela).
+    check(type(Islands.islands) == "table" and #Islands.islands == 12, "a feature publica as 12 ilhas do Sea 2")
+    check(Islands.islands[1] == "Snow Mountain", "a primeira ilha da lista e Snow Mountain")
+
+    local islands = Islands.new({ teleport = motor })
+    check(islands.ToggleOn == false, "o toggle comeca desligado")
+    check(islands.Selected == "Snow Mountain", "a selecao comeca na primeira ilha")
+
+    -- A pasta do mapa e a ilha real.
+    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
+    local snow = Instance.new("Model"); snow.Name, snow.Parent = "SnowMountain", map
+    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 0, 500), snow
+
+    -- GATE: com o toggle desligado, selecionar NAO teleporta (so memoriza).
+    check(islands:Select("Ice Castle") == true, "selecionar uma ilha e aceito")
+    check(islands.Selected == "Ice Castle", "a selecao foi memorizada")
+    check(motor:IsFlying() == false, "com o toggle desligado, selecionar NAO voa")
+
+    -- LIGAR o toggle vai pra ilha ja selecionada. Ice Castle ainda nao esta no
+    -- mapa -> ele avisa em vez de voar.
+    check(islands:SetEnabled(true) == true, "ligar o toggle e aceito")
+    check(islands.ToggleOn == true and motor:IsFlying() == false, "ilha fora do mapa nao voa e reporta")
+    check(islands.LastStatus:find("not in map"), "reporta que a ilha nao esta no mapa")
+
+    -- Escolher Snow Mountain (que ESTA no mapa) com o toggle ligado voa.
+    check(islands:Select("Snow Mountain") == true, "escolher uma ilha que existe e aceito")
+    check(motor:IsFlying() == true, "com o toggle ligado, escolher a ilha voa pra ela")
+    motor:Cancel()
+
+    -- Desligar o toggle para de agir.
+    islands:SetEnabled(false)
+    check(islands.ToggleOn == false, "desligar o toggle desarma")
+    check(islands:Select("Snow Mountain") == true, "com o toggle desligado, selecionar de novo e aceito")
+    check(motor:IsFlying() == false, "com o toggle desligado, de novo NAO voa")
+
+    -- Rotulo desconhecido nao entra.
+    check(islands:Select("Nao Existe") == false, "ilha desconhecida e recusada")
+
+    -- Sem motor de teleporte, ligar recusa.
+    local bare = Islands.new()
+    check(bare:SetEnabled(true) == false and bare.ToggleOn == false, "sem teleporte o toggle recusa")
+
+    bare:Destroy()
+    islands:Destroy()
+    motor:Destroy()
+end
 
 -- O motor de teleporte e infraestrutura: carrega e instancia sozinho (sem
 -- toggle), expoe Go/GoToIsland/GoToInstance, e recusa destino invalido sem
