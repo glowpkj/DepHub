@@ -1,0 +1,35 @@
+name: Format RedzHub source
+
+on:
+  push:
+    branches:
+      - redz-readable
+    paths-ignore:
+      - src/dephubv2lib-readable.lua
+
+permissions:
+  contents: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: redz-readable
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install StyLua with Luau support
+        run: cargo install stylua --locked --features luau
+      - name: Create readable copy
+        run: |
+          cp src/dephubv2lib.lua src/dephubv2lib-readable.lua
+          stylua --syntax Luau --column-width 100 src/dephubv2lib-readable.lua
+      - name: Commit formatted copy
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/dephubv2lib-readable.lua
+          if ! git diff --cached --quiet; then
+            git commit -m "Add formatted readable RedzHub source"
+            git push
+          fi
