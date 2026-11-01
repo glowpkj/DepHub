@@ -406,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.23)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.24)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 763 checks):
+FEITO / FUNCIONANDO (verificado offline, 772 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -545,7 +545,7 @@ GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
 - O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
   CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
-ARQUITETURA DO BLOX FRUITS (v0.1.23) -- features proprias, uma por arquivo:
+ARQUITETURA DO BLOX FRUITS (v0.1.24) -- features proprias, uma por arquivo:
 - O usuario pegou a arvore do Blox Fruits de open source e decidiu montar o
   script dele com as features uma a uma, cada coisa no lugar certo. O molde:
   src/games/features/bloxfruits/<nome>.lua, UMA feature por arquivo.
@@ -630,19 +630,32 @@ TELEPORT (features/bloxfruits/teleport.lua) -- INFRA, a peca que todas usam:
   pro lugar certo. O mock de TweenService no harness guarda Instance/Goal pra
   isso ser assertavel.
 
-FRUIT (features/bloxfruits/fruit.lua) -- Grab + ESP + Store (v0.1.19):
+FRUIT (features/bloxfruits/fruit.lua) -- Grab + ESP + Store (v0.1.19, deteccao v0.1.24):
 - Portado do parked/fruits.lua, mas SO a parte de fruta. O que estava misturado
   la (gacha, dealer, awakening, baus) fica de fora -- se for trazido, e noutra
   feature.
 - O ponto e a INTEGRACAO: a fruta NAO tem teleporte proprio. Ela recebe o motor
   geral como contexto na criacao (options.teleport, que o backend passa) e usa
-  tp:GoToInstance(handle da fruta). Era assim no original tambem (fruits chamava
+  tp:GoToInstance(parte da fruta). Era assim no original tambem (fruits chamava
   o modulo de teleporte). Sem motor, ESP e store ainda funcionam; so o grab
   recusa. A blade hit e a fruta compartilham UM teleporte, testado.
-- Grab: acha a fruta no chao mais perto (um Tool em Workspace com OriginalName
-  e Handle), voa ate ela e dispara a ProximityPrompt com fireproximityprompt.
+- DETECCAO DE FRUTA (v0.1.24) -- a fruta no chao aparece de DUAS formas, e a
+  versao ate a v0.1.23 so via UMA delas (por isso a fruta spawnada nao tinha ESP
+  nem grab, e a dropada por player funcionava -- o bug que o usuario relatou):
+    * SPAWNADA pelo jogo: um Model chamado "Fruit"/"fruit" em Workspace, SEM
+      Handle. O Handle e o ProximityPrompt so nascem quando o jogador ENCOSTA.
+      Nao tem OriginalName; o nome e literalmente "Fruit".
+    * DROPADA por jogador / ja virada item: um Tool com OriginalName
+      ("Dragon-Dragon Fruit") e Handle.
+  O detector (isGroundFruit) aceita as duas. O grab da spawnada e o proprio
+  TOQUE: voa ate ela e o encosto faz o jogo virar o Model em Tool coletavel --
+  por isso o grab NAO recusa so porque ainda nao ha prompt.
 - ESP: Highlight + BillboardGui com nome e distancia, mapa de adornos mantido
-  entre frames e limpo no disable. EspRange 0 = toda fruta.
+  entre frames e limpo no disable. EspRange 0 = toda fruta. ARMADILHA (v0.1.24):
+  a parte fisica da fruta pode MUDAR enquanto ela existe (Model re-parented); se
+  o adorno aponta pra uma parte que nao e mais a atual ele fica orfao -- o
+  "tabugado" que o usuario viu. O ESP agora re-aponta o adorno quando a parte
+  muda, em vez de reusar a entrada velha.
 - Store: guarda as frutas carregadas via CommF_ StoreFruit, respeitando a lista
   "nunca guardar". So Tool com "-" no OriginalName conta (fruta), nao espada.
 - Listas de skip/keep por prefixo, case-insensitive ("dragon" acha

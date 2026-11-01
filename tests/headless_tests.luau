@@ -517,6 +517,21 @@ do
     check(motor.Tween ~= nil and motor.Tween.Goal.CFrame.Position.Z ~= 0, "o voo vai em direcao a fruta")
 
     motor:Cancel()
+
+    -- The fruit the GAME spawns: a Model named "Fruit" with no Handle and no
+    -- prompt (Blox Fruits only creates those when a player touches it). This is
+    -- the case the old detection dropped -- it required a Tool -- so the ESP
+    -- never showed and the grab never flew. Now the grab must fly to it all the
+    -- same, and reach its inner part.
+    ground.Parent = nil
+    local spawned = Instance.new("Model"); spawned.Name, spawned.Parent = "Fruit", ctx.Services.Workspace
+    local body = Instance.new("Part"); body.Name, body.Position, body.Parent = "FruitPart", Vector3.new(0, 0, 600), spawned
+
+    check(fruit:CollectNearestOnce() == true, "a fruta pega a fruta spawnada pelo jogo")
+    check(motor:IsFlying() == true, "o motor voa ate a fruta spawnada")
+    check(motor.Tween ~= nil and motor.Tween.Goal.CFrame.Position.Z ~= 0, "o voo da fruta spawnada vai em direcao a ela")
+
+    motor:Cancel()
     fruit:Destroy()
 end
 

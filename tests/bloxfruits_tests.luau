@@ -246,6 +246,53 @@ do
     fruit:Destroy()
 end
 
+-- A fruta SPAWNADA pelo jogo: um Model chamado "Fruit"/"fruit" em Workspace, SEM
+-- Handle (o Handle/prompt so nasce quando o jogador encosta). Era o caso que a
+-- deteccao antiga jogava fora -- so aceitava Tool -- e por isso nao aparecia ESP
+-- nem ia o grab. Agora as duas formas contam.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Fruit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "fruit.lua"])()
+    local fruit = Fruit.new()
+
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    ctx.Player.Character = character
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), character
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = character
+
+    -- A fruta spawnada: Model "Fruit" com uma parte dentro, SEM Handle e SEM
+    -- OriginalName (e o que o jogo entrega antes do toque).
+    local spawned = Instance.new("Model"); spawned.Name, spawned.Parent = "Fruit", ctx.Services.Workspace
+    local body = Instance.new("Part"); body.Name, body.Position, body.Parent = "FruitPart", Vector3.new(0, 0, 40), spawned
+
+    -- Um Model qualquer do mapa (outra geometria) NAO conta -- so nome Fruit.
+    local prop = Instance.new("Model"); prop.Name, prop.Parent = "Rock", ctx.Services.Workspace
+    Instance.new("Part").Parent = prop
+
+    local found = fruit:GroundFruits()
+    check(#found == 1 and found[1] == spawned, "acha a fruta spawnada (Model Fruit) e nao um Model qualquer")
+    check(fruit:NearestGroundFruit() == spawned, "NearestGroundFruit acha a fruta spawnada")
+
+    -- A parte fisica vem de dentro do Model (nao ha Handle).
+    local nearest, part = fruit:NearestGroundFruit()
+    check(nearest == spawned and part == body, "a parte da fruta spawnada vem de dentro do Model")
+
+    -- Minusculo tambem conta ("fruit").
+    spawned.Name = "fruit"
+    check(#fruit:GroundFruits() == 1, "aceita 'fruit' minusculo tambem")
+
+    -- O grab nao recusa por falta de prompt: ele voa ate a fruta (o encosto faz
+    -- o jogo virar em Tool). O motor injetado prova o voo.
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+    fruit:SetTeleport(motor)
+    check(fruit:CollectNearestOnce() == true, "o grab aceita a fruta spawnada sem prompt")
+    check(motor:IsFlying() == true, "o grab voa ate a fruta spawnada")
+    motor:Cancel()
+
+    motor:Destroy()
+    fruit:Destroy()
+end
+
 
 -- O motor de teleporte e infraestrutura: carrega e instancia sozinho (sem
 -- toggle), expoe Go/GoToIsland/GoToInstance, e recusa destino invalido sem

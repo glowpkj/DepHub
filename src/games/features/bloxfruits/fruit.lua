@@ -29,10 +29,53 @@ local LocalPlayer = Players.LocalPlayer
 local Feature = {}
 Feature.__index = Feature
 
--- Uma fruta no chao e um Tool. O nome de verdade fica no atributo
--- "OriginalName" ("Dragon-Dragon Fruit"); o .Name pode vir localizado. As duas
--- chaves entram na comparacao, sem diferenciar maiuscula e por prefixo, pra
--- "dragon" achar "Dragon-Dragon Fruit".
+-- --- Deteccao de fruta no chao ---------------------------------------------
+-- Uma fruta no chao aparece de DUAS formas no Blox Fruits, e a versao antiga so
+-- via a segunda -- por isso a fruta SPAWNADA pelo jogo nunca ganhava ESP nem
+-- grab:
+--   1. Spawnada pelo jogo: um Model chamado "Fruit"/"fruit" em Workspace, SEM
+--      Handle (o Handle/ProximityPrompt so nasce quando o jogador encosta). Este
+--      e o caso que estava sendo jogado fora pelo filtro antigo (so aceitava
+--      Tool).
+--   2. Dropada por jogador / ja virada item: um Tool com OriginalName
+--      ("Dragon-Dragon Fruit") e Handle.
+-- A deteccao aceita as duas. Para o Tool o nome bom e o OriginalName; para o
+-- Model e o proprio .Name.
+
+-- O nome e "Fruit"-like? (spawn do jogo). Compara sem diferenciar maiuscula e
+-- aceita "fruit" e "fruits" -- substring nao pega "Fruit" maiusculo se eu so
+-- testar igualdade, entao testo prefixo no minusculo.
+local function looksLikeFruitModel(instance)
+    local name = tostring(instance.Name):lower()
+    return name == "fruit" or name == "fruits" or name:sub(1, 5) == "fruit"
+end
+
+-- A parte fisica pra adorno/teleporte. Tool -> Handle ou a primeira BasePart;
+-- Model/Part -> a primeira BasePart descendente (a fruta spawnada e um Model sem
+-- Handle, entao a parte esta la dentro).
+local function fruitPart(fruit)
+    if fruit:IsA("BasePart") then return fruit end
+    return fruit:FindFirstChild("Handle") or fruit:FindFirstChildWhichIsA("BasePart")
+end
+
+-- Uma fruta no chao e um Tool (com OriginalName/Handle) OU um Model "Fruit" que
+-- o jogo spawnou. Um Model qualquer do mapa -- com outra geometria -- nao passa:
+-- so o que tem nome Fruit-like, pra nao poluir o ESP com o mapa inteiro.
+local function isGroundFruit(instance)
+    if instance:IsA("Tool") then
+        local named = instance:GetAttribute("OriginalName") or tostring(instance.Name):find("-")
+        return named ~= nil and fruitPart(instance) ~= nil
+    end
+    if instance:IsA("Model") or instance:IsA("BasePart") then
+        return looksLikeFruitModel(instance) and fruitPart(instance) ~= nil
+    end
+    return false
+end
+
+-- As chaves de nome usadas pro skip/keep. Tool -> OriginalName + Name; Model
+-- spawnado -> o proprio Name (que pode ser so "Fruit"; o nome real da fruta
+-- aparece quando ela vira Tool). Por isso o skip/keep casa melhor em Tool --
+-- mas o ESP/grab nunca dependem disso.
 local function fruitNameKeys(fruit)
     local keys = {}
     local original = fruit:GetAttribute("OriginalName")
@@ -49,10 +92,6 @@ local function nameInSet(set, fruit)
         end
     end
     return false
-end
-
-local function fruitPart(fruit)
-    return fruit:FindFirstChild("Handle") or fruit:FindFirstChildWhichIsA("BasePart")
 end
 
 function Feature.new(options)
@@ -91,15 +130,13 @@ function Feature:_commF()
     return remotes and remotes:FindFirstChild("CommF_")
 end
 
--- Todas as frutas no chao. Uma fruta e um Tool em Workspace com um
--- OriginalName (ou um "-" no nome, que e o sufixo "-X Fruit") e um Handle.
+-- Todas as frutas no chao -- spawnada pelo jogo (Model "Fruit") e dropada
+-- (Tool com OriginalName/Handle). A deteccao e isGroundFruit; ver o cabecalho
+-- acima pro porque dos dois casos.
 function Feature:GroundFruits()
     local list = {}
     for _, child in ipairs(workspace:GetChildren()) do
-        if child:IsA("Tool") then
-            local named = child:GetAttribute("OriginalName") or tostring(child.Name):find("-")
-            if named and fruitPart(child) then list[#list + 1] = child end
-        end
+        if isGroundFruit(child) then list[#list + 1] = child end
     end
     return list
 end
@@ -152,6 +189,16 @@ function Feature:SetEsp(on)
                 if part then
                     live[fruit] = true
                     local entry = self.EspMap[fruit]
+                    -- A parte da fruta pode MUDAR: a spawnada e um Model e a
+                    -- parte viva pode ser re-parented enquanto existe. Se o
+                    -- adorno aponta pra uma parte que nao e mais a atual, ele
+                    -- fica orfao (o "tabugado" que o usuario viu): entao
+                    -- re-aponta em vez de fingir que esta tudo bem.
+                    if entry and entry.part ~= part then
+                        pcall(function() entry.highlight:Destroy(); entry.billboard:Destroy() end)
+                        self.EspMap[fruit] = nil
+                        entry = nil
+                    end
                     if not entry then
                         local highlight = Instance.new("Highlight")
                         highlight.FillColor = Color3.fromRGB(120, 220, 255)
@@ -180,7 +227,10 @@ function Feature:SetEsp(on)
                     local shown = (maxRange <= 0) or (distance <= maxRange)
                     entry.highlight.Enabled = shown
                     entry.billboard.Enabled = shown
-                    entry.label.Text = ("%s  %dm"):format(fruit.Name, distance)
+                    -- Fruta spawnada chama-se so "Fruit"; mostra o nome real se
+                    -- houver OriginalName, senao o proprio Name.
+                    local label = fruit:GetAttribute("OriginalName") or fruit.Name
+                    entry.label.Text = ("%s  %dm"):format(label, distance)
                 end
             end
             for fruit, entry in pairs(self.EspMap) do
@@ -196,9 +246,17 @@ function Feature:SetEsp(on)
 end
 
 -- --- Grab -----------------------------------------------------------------
--- Acha a fruta mais perto, voa ate ela com o motor de teleporte, e dispara a
--- ProximityPrompt da fruta (fireproximityprompt) assim que chega. Um passo por
+-- Acha a fruta mais perto, voa ate ela com o motor de teleporte, e dispara o
+-- ProximityPrompt da fruta (fireproximityprompt) quando ele existe. Um passo por
 -- vez, com o loop indo pra proxima -- igual ao collectNearestOnce do original.
+--
+-- ARMADILHA (a fruta spawnada): o Model "Fruit" do jogo NAO tem Handle nem
+-- ProximityPrompt enquanto ninguem encostou -- o prompt so nasce no toque. Entao
+-- fireproximityprompt nao acha nada pra disparar. Nesse caso o grab E o proprio
+-- TOQUE: o motor voa ATE a fruta, e encostar nela faz o jogo virar o Model em
+-- Tool (ai sim coletavel). Por isso o CollectNearestOnce dispara o prompt quando
+-- houver (fruta dropada: caminho mais rapido) e sempre garante o voo ate a
+-- fruta -- o encosto faz o resto.
 
 function Feature:_fireFruitPrompt(fruit)
     local prompt = fruit:FindFirstChildWhichIsA("ProximityPrompt")
@@ -222,8 +280,12 @@ function Feature:CollectNearestOnce()
         self.LastError = "teleport motor ausente"
         return false
     end
-    -- Voa ate a Handle da fruta, chegando um pouco acima e na frente.
+    -- Voa ate a fruta. GoToInstance chega em cima dela; encostar e o que faz o
+    -- jogo virar o Model spawnado em Tool coletavel.
     pcall(function() motor:GoToInstance(part) end)
+    -- Fruta dropada ja tem prompt: dispara (caminho mais rapido). Fruta
+    -- spawnada nao tem -- e o encosto do voo que resolve.
+    self:_fireFruitPrompt(fruit)
     return true
 end
 
