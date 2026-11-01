@@ -1185,12 +1185,25 @@ Color="Colors.Background"
 }
 }
 
-local ar=createInstance("TextButton",OutBox,{
+-- DepHub: o popup do dropdown e um singleton reaproveitado por TODOS os
+-- dropdowns. O pai original aqui era o global `OutBox`, que o refactor deixou
+-- sem binding (== nil) -- por SetValues, um argumento posicional nil vira
+-- `Parent=nil`, entao o popup nascia solto com o frame "Dropdown" preso no
+-- Position/Size literais (fromOffset(50,50) / fromOffset(160,100)). Sem dono
+-- ele nao renderiza, mas assim que algo o parenta (ar.Parent=Y) ele aparece
+-- exatamente nesse canto fixo, por cima do conteudo -- o "box escuro com a
+-- lupa" que o usuario reportou. O overlay real da biblioteca e o local `aa`
+-- (OutBox de notificacao, tela cheia e ja escalado); usar ele como pai base
+-- mantem o popup dentro do overlay correto e fora do fluxo de conteudo.
+local ar=createInstance("TextButton",aa,{
 Size=UDim2.fromScale(1,1),
 BackgroundTransparency=1,
 Active=true,
 Text=""
 })
+-- DepHub: nasce sempre fechado -- so aparece quando um dropdown e aberto de
+-- verdade (aT faz ar.Parent=Y).
+ar.Visible=false
 
 local as=createInstance("Frame","Dropdown",ar,{
 Size=UDim2.fromOffset(ap,100),
@@ -1414,6 +1427,9 @@ aT)
 if not aC then
 aE=aT
 ar.Parent=Y
+-- DepHub: abre de fato -- Visible e controlado aqui e no close (aU), nao pelo
+-- pai, para o singleton nunca ficar visivel fora de um open real.
+ar.Visible=true
 return true
 end end local aU=function()
 
@@ -1431,6 +1447,9 @@ aC=true
 ay:Play()
 ay.Completed:Wait()
 ar.Parent=nil
+-- DepHub: fecha de fato -- esconde junto com o desparent, senao o Visible=true
+-- do open ficaria grudado e o box reapareceria no proximo parent.
+ar.Visible=false
 aC=false end local aV=function()
 
 
@@ -2865,6 +2884,15 @@ end
 function ah:Select()
 if ac==self then
 return nil
+end
+
+-- DepHub: o popup de dropdown e um singleton (X) compartilhado por todos os
+-- dropdowns de todas as abas. Se uma aba for trocada com o popup aberto, ele
+-- continuaria parentado em Y (a pasta Dropdowns) e apareceria preso no canto
+-- fixo por cima da outra aba. Fechar na troca de aba garante que o proximo
+-- dropdown sempre reabra do zero, reposicionado pelo holder dele.
+if ac and X then
+X.CloseDropdown()
 end
 
 if ac then
