@@ -6,6 +6,7 @@ local tostring = tostring
 
 local Players = game:GetService("Players")
 local workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 local LocalPlayer = Players.LocalPlayer
 
 -- Island Teleport -- pular direto pra uma ilha pelo nome.
@@ -26,6 +27,13 @@ local LocalPlayer = Players.LocalPlayer
 -- estiver ligado. Trocar a ilha com o toggle ligado voa de novo; com ele
 -- desligado, so memoriza a escolha.
 --
+-- Ao CHEGAR, o toggle se desliga sozinho -- foi o pedido do usuario: o voo e
+-- pontual, nao faz sentido deixar armado depois que chegou. So a ilha daquele
+-- voo desliga (a feature tem um unico toggle; nao ha "outras" para mexer). O
+-- desligamento so dispara com o personagem perto do DESTINO daquele voo, entao
+-- nao dispara cedo nem re-dispara com um passinho depois de chegar (a vigia
+-- para no primeiro "chegou").
+--
 -- Self-contained: faz os proprios game:GetService e nao depende do DepHub. So
 -- pede o motor de teleporte, e mesmo assim de forma opcional (sem ele, o toggle
 -- recusa em vez de fingir que voa).
@@ -35,6 +43,12 @@ Feature.__index = Feature
 
 -- A pasta das ilhas: workspace.Map. De la saem as instancias por nome.
 local MAP_CONTAINER = "Map"
+
+-- A que distancia do destino o voo conta como CHEGOU. O teleporte chega a 5
+-- studs acima do alvo (ArrivalOffset), entao o limite tem que ser maior que
+-- isso, mas pequeno o bastante para nao disparar no meio do caminho. 25 studs e
+-- "do lado da ilha" sem confundir com passar por cima dela.
+local ARRIVAL_DISTANCE = 25
 
 -- As ilhas do Sea 2 (o usuario confirmou: todas as ilhas dele sao do Sea 2).
 -- A chave e o rotulo que aparece no dropdown; o valor e o NOME DA INSTANCIA em
@@ -69,6 +83,65 @@ function Feature:IslandInstance(instanceName)
     return map:FindFirstChild(instanceName)
 end
 
+-- A posicao do HumanoidRootPart agora, ou nil se nao ha character.
+function Feature:RootPosition()
+    local character = LocalPlayer and LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    return root and root.Position or nil
+end
+
+-- A posicao-mundo da instancia (Part -> Position; Model -> GetPivot). Espelha o
+-- que o motor de teleporte usa como destino, para a vigia de chegada medir a
+-- MESMA coisa que o voo persegue.
+function Feature:InstancePosition(instance)
+    if not instance then return nil end
+    if instance:IsA("BasePart") then return instance.Position end
+    if instance:IsA("Model") then
+        local pivot = instance:GetPivot()
+        return pivot and pivot.Position or nil
+    end
+    return nil
+end
+
+-- Vigia o voo ate o personagem ficar a <= ARRIVAL_DISTANCE do destino. No
+-- primeiro frame que "chegou", para a vigia e chama o hook de chegada com o
+-- rotulo da ilha. Nao dispara cedo (so e armada depois do Go), nem re-dispara
+-- (a conexao e desligada assim que chegou).
+function Feature:_WatchArrival(label, targetPosition)
+    self:_StopWatching()
+    if not targetPosition then return end
+    if not (RunService and type(RunService.Heartbeat) == "table"
+        and type(RunService.Heartbeat.Connect) == "function") then
+        return
+    end
+    self._arrivalLabel = label
+    self._arrivalTarget = targetPosition
+    self._arrivalConnection = RunService.Heartbeat:Connect(function()
+        local position = self:RootPosition()
+        if not position then return end
+        local distance = (position - self._arrivalTarget).Magnitude
+        if distance <= ARRIVAL_DISTANCE then
+            local arrived = self._arrivalLabel
+            self:_StopWatching()
+            self.LastStatus = ("arrived at %s"):format(tostring(arrived))
+            -- A feature tem UM toggle (o da aba Travel). "Desligar so a ilha
+            -- deste voo" = desligar esse toggle -- nao ha outro para tocar.
+            if type(self.OnArrive) == "function" then
+                pcall(self.OnArrive, self, arrived)
+            end
+        end
+    end)
+end
+
+function Feature:_StopWatching()
+    if self._arrivalConnection then
+        pcall(function() self._arrivalConnection:Disconnect() end)
+        self._arrivalConnection = nil
+    end
+    self._arrivalLabel = nil
+    self._arrivalTarget = nil
+end
+
 function Feature.new(options)
     options = options or {}
     local self = setmetatable({}, Feature)
@@ -83,6 +156,13 @@ function Feature.new(options)
     self.Teleport = options.teleport or nil
     self.LastStatus = "idle"
     self.LastError = nil
+    -- Hook de chegada: o backend liga isto ao toggle para que o toggle se
+    -- desligue sozinho quando o personagem chega na ilha.
+    self.OnArrive = options.onArrive or nil
+    -- Estado da vigia de chegada (conexao Heartbeat + alvo do voo corrente).
+    self._arrivalConnection = nil
+    self._arrivalLabel = nil
+    self._arrivalTarget = nil
     return self
 end
 
@@ -129,6 +209,10 @@ function Feature:Go()
         return false
     end
     self.LastStatus = ("flying to %s"):format(self.Selected)
+    -- So agora (depois do Go deu certo) a vigia de chegada e armada: assim ela
+    -- nunca dispara antes do voo comecar. O alvo e a posicao da MESMA instancia
+    -- que o motor vai perseguir.
+    self:_WatchArrival(self.Selected, self:InstancePosition(island))
     return true
 end
 
@@ -153,6 +237,9 @@ function Feature:SetEnabled(on)
     self.ToggleOn = on == true
     if not self.ToggleOn then
         self.LastStatus = "idle"
+        -- Desligar na mao cancela a vigia: sem voo rastreado, nao ha chegada
+        -- para detectar.
+        self:_StopWatching()
         return true
     end
     if not self.Teleport then
@@ -176,6 +263,7 @@ function Feature:Disable()
     self.Enabled = false
     self.ToggleOn = false
     self.LastStatus = "idle"
+    self:_StopWatching()
     return true
 end
 
@@ -186,6 +274,7 @@ end
 function Feature:Destroy()
     self:Disable()
     self.Teleport = nil
+    self.OnArrive = nil
 end
 
 return Feature

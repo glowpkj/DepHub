@@ -171,6 +171,46 @@ do
     check(names["Farm"] == true, "a aba Farm e criada para a fruta")
 end
 
+-- Chegada desliga o toggle SOZINHO, pelo caminho do backend: ligar o toggle do
+-- painel voa, encostar no destino desliga o mesmo controle (SetValue(false)),
+-- que por sua vez chama SetEnabled(false). Nada mais e tocado.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table", "o backend sobe com o painel montado")
+
+    -- Personagem + mapa com Snow Mountain (o destino do voo).
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
+    local snow = Instance.new("Model"); snow.Name, snow.Parent = "SnowMountain", map
+    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 50, 0), snow
+
+    -- Acha o toggle "Island teleport" que o backend registrou.
+    local islandToggle = nil
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Island teleport" then islandToggle = control.Handle end
+    end
+    check(islandToggle ~= nil, "o painel registra o toggle Island teleport")
+
+    -- Ligar pelo metodo real do controle (SetValue flips e dispara o callback),
+    -- exatamente como o clique faz na lib real.
+    islandToggle:SetValue(true)
+    check(islandToggle.Value == true, "ligar o toggle arma o voo")
+    check(state.Instances.islands ~= nil and state.Instances.islands.ToggleOn == true, "o backend arma a feature")
+
+    -- Perto do destino: a chegada desliga o toggle sozinho.
+    root.Position = Vector3.new(0, 50, 0)
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(islandToggle.Value == false, "chegar na ilha desliga o toggle do painel")
+    check(state.Instances.islands.ToggleOn == false, "o backend tambem desarma ao chegar")
+
+    state:Destroy()
+end
+
 -- A feature de fruta e auto-contida e usa o motor de teleporte por INJECAO:
 -- ela nao tem teleporte proprio. Sem motor ainda funciona para ESP/store; so o
 -- grab recusa. Este bloco carrega ela sozinha e exercita a API publica.
@@ -349,6 +389,54 @@ do
     check(bare:SetEnabled(true) == false and bare.ToggleOn == false, "sem teleporte o toggle recusa")
 
     bare:Destroy()
+    islands:Destroy()
+    motor:Destroy()
+end
+
+-- Chegada: quando o personagem fica perto do destino daquele voo, a feature
+-- avisa UMA vez (OnArrive) com o rotulo da ilha e para de vigiar. Nao dispara
+-- longe do alvo, nem re-dispara depois de chegar mesmo mexendo um pouco.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Islands = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "islands.lua"])()
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+
+    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
+    local snow = Instance.new("Model"); snow.Name, snow.Parent = "SnowMountain", map
+    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 50, 0), snow
+
+    local islands = Islands.new({ teleport = motor })
+    local arrivals = {}
+    islands.OnArrive = function(_, arrived) arrivals[#arrivals + 1] = arrived end
+
+    -- Voa pra Snow Mountain.
+    check(islands:SetEnabled(true) == true, "o toggle arma com o motor")
+    check(motor:IsFlying() == true, "armar com a ilha no mapa voa")
+
+    -- Longe do destino (o alvo do voo e o pivot do model, ~(0,50,0); o HRP esta
+    -- em (0,0,0) -> 50 studs): nao conta como chegada.
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(#arrivals == 0, "longe do destino ainda nao conta como chegada")
+
+    -- Encosta no destino: dispara UMA vez, com o rotulo certo.
+    root.Position = Vector3.new(0, 50, 0)
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(#arrivals == 1, "perto do destino a chegada dispara uma vez")
+    check(arrivals[1] == "Snow Mountain", "a chegada reporta a ilha do voo")
+    check(islands.LastStatus:find("arrived"), "o status passa a arrived")
+
+    -- Mexer de leve depois de chegar NAO re-dispara (a vigia ja parou).
+    root.Position = Vector3.new(0, 55, 0)
+    ctx.Services.RunService.Heartbeat:Fire()
+    root.Position = Vector3.new(0, 50, 0)
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(#arrivals == 1, "mexer depois de chegar nao re-dispara a chegada")
+
     islands:Destroy()
     motor:Destroy()
 end

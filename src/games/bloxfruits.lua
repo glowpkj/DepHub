@@ -312,12 +312,36 @@ local PANELS = {
                 islands = factory.islands
             end
             local selected = islands[1] or "Snow Mountain"
-            section:CreateToggle("Island teleport", false, function(value)
+            -- O handle do toggle: a chegada precisa desligar ESTE controle
+            -- (programaticamente), nao so a flag interna. SetValue dispara o
+            -- callback, que por sua vez chama SetEnabled(false) -- um unico
+            -- caminho de desligamento.
+            local islandToggle = nil
+            -- Ao CHEGAR na ilha, o toggle se desliga sozinho. So este toggle e
+            -- mexido (a feature tem um so); nada mais e tocado. O hook e
+            -- (re)ligado toda vez que o toggle e armado, porque a instancia da
+            -- feature so nasce no primeiro SetFeature(..., true).
+            local function wireArrivalHook()
+                local feature = State.Instances.islands
+                if not feature then return end
+                feature.OnArrive = function(_, arrived)
+                    if islandToggle and type(islandToggle.SetValue) == "function" then
+                        islandToggle:SetValue(false)
+                    elseif islandToggle and islandToggle.Value ~= nil then
+                        islandToggle.Value = false
+                    end
+                    if arrived then
+                        instance.Notify("Island teleport", ("Arrived at %s."):format(tostring(arrived)))
+                    end
+                end
+            end
+            islandToggle = section:CreateToggle("Island teleport", false, function(value)
                 if value then
                     if not State:SetFeature("islands", true) then
                         instance.Notify("Island teleport", "Teleport motor ausente.")
                         return
                     end
+                    wireArrivalHook()
                     if State.Instances.islands then
                         if not State.Instances.islands:SetEnabled(true) then
                             instance.Notify("Island teleport", State.Instances.islands.LastStatus or "falhou.")
@@ -328,6 +352,9 @@ local PANELS = {
                 if State.Instances.islands then State.Instances.islands:SetEnabled(false) end
                 State:SetFeature("islands", false)
             end)
+            -- A instancia pode ja existir (toggle reaberto nesta sessao): liga o
+            -- hook de imediato tambem.
+            wireArrivalHook()
             section:CreateDropdown("Island", islands, selected, function(choice)
                 selected = choice
                 if State.Instances.islands then

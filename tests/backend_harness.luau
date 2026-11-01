@@ -366,8 +366,18 @@ local function NewWindow()
         return section
     end
     function library:AddToggle(_, label, default, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "toggle", Label = label, Callback = callback}
-        return {Kind = "toggle", Value = default}
+        local handle = {Kind = "toggle", Value = default, Label = label, Callback = callback}
+        -- RedzLib's toggle handle exposes :SetValue, which flips the control and
+        -- fires its callback. The Island teleport backend uses it to switch the
+        -- toggle off when the flight lands, so the double models it.
+        function handle:SetValue(value)
+            if self.Value == value then return nil end
+            self.Value = value
+            if self.Callback then self.Callback(self.Value) end
+            return self.Value
+        end
+        library._Controls[#library._Controls + 1] = {Kind = "toggle", Label = label, Callback = callback, Handle = handle}
+        return handle
     end
     function library:AddSlider(_, label, min, max, default, _, callback)
         library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Callback = callback}
@@ -389,10 +399,6 @@ local function NewWindow()
     function library:AddParagraph(_, title, body)
         library._Controls[#library._Controls + 1] = {Kind = "paragraph", Title = title, Body = body}
         return {Kind = "paragraph"}
-    end
-    function library:AddToggle(_, label, default, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "toggle", Label = label, Callback = callback}
-        return {Kind = "toggle", Value = default}
     end
     function library:SetActiveCategory(category, tab) state.ActiveCategory = category; state.ActiveTab = tab end
     -- The loader builds a fixed Dashboard tab from every game: a banner
