@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-01T14:40:35.589235+00:00",
-  "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+  "generatedAt": "2026-11-01T14:41:02.823Z",
+  "commit": "local",
   "version": "0.1.27",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "a98d173212e3e5022daf14d01163984420faa0cb14514e57915b5b68f3f111d4",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "128726ad960cb6ffef25ff428fae70a52f669e70e5389d95f06d489b2f861ebc",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "version": "709002217e7d10ff62eff0d2d636d34276eb47eb41b551ab69574764dc79aa86",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -55,7 +55,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "a1ef0cc9e11b64b2b6ab87d3655e65164579029ac7c2d01e8605c2fb5f1eea4c",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,7 +75,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "4ccfde1e0f86bc4c81d7bf9eacc78721db7173b9c616c9f5e3cecb0eeb422f71",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -97,7 +97,7 @@
     "114234929420007": {
       "name": "Blood Strike",
       "version": "156ab7112f9368587d9c421ac5f006741dbd68924bef819d2b800010702f6af2",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -115,7 +115,7 @@
     "107778070777162": {
       "name": "Steal An Egg",
       "version": "44e0b9ecab7b544f8e599f31b985ad17ef38fd8cc744dafceb8fe4855272fc2e",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,7 +133,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "effa84e5e3ea6f7a22918ec2174e896ed9fbbbf75327604fd9067aff408dad13",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -159,8 +159,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "bb737785396b4d35123ed9472fd0a040447569b4f29c4ffd9b1f605f652e1fc7",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "version": "48f957e0663ba72432b5a5cd1bfdaaeda396dc40b1625e1457fd0ac48c0fd657",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -184,7 +184,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "bdb86cc1cc41bbee5d5928827de2527520895a571fc0b9751fec77859ea6f60c",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -214,7 +214,7 @@
     "93978595733734": {
       "name": "Violence District",
       "version": "eacd09f4fdd3201076f2d11c23a5d8b91f2b8ee98cc0353857cc5176b5b233ac",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -232,7 +232,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "795affb6ba95c11c77bcb17447db6fbb6bd9a3c2fcce0b478314f5f4783f38da",
-      "commit": "db61473006856c0719da537d883d764f2e2f9b50",
+      "commit": "local",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -253,41 +253,5 @@
       ]
     }
   },
-  "recentUpdates": [
-    {
-      "Version": "db61473",
-      "Date": "2026-11-01T11:40:16-03:00",
-      "Changes": [
-        "fix(core): harden diagnostics cleanup, minimizer input and toggle global (Slice A)"
-      ]
-    },
-    {
-      "Version": "c4a9fcb",
-      "Date": "2026-11-01T04:38:25-03:00",
-      "Changes": [
-        "fix(core+bloxfruits): correct the seven P0 state bugs"
-      ]
-    },
-    {
-      "Version": "b953ae3",
-      "Date": "2026-11-01T04:08:31-03:00",
-      "Changes": [
-        "\ufefffix(redzlib): dropdown popup nao fica mais preso no painel"
-      ]
-    },
-    {
-      "Version": "6c58368",
-      "Date": "2026-11-01T03:59:18-03:00",
-      "Changes": [
-        "Save everything and reactivate it on join; shared config core; fix Auto execute"
-      ]
-    },
-    {
-      "Version": "09bfff5",
-      "Date": "2026-11-01T03:41:47-03:00",
-      "Changes": [
-        "bloxfruits: FPS boost feature; lighter silent aim per-frame cost"
-      ]
-    }
-  ]
+  "recentUpdates": []
 }
