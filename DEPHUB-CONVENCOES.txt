@@ -182,6 +182,23 @@ Regras:
   nao existe.
 - Quando dois controles mudam a mesma coisa, e UM controle so.
 
+Persistencia (salvar/carregar) -- o modulo UNICO e src/core/config-store.lua:
+- Nao reimplemente writefile/readfile/isfile, JSON raso, nem o "grava e relê"
+  num backend. Use o store compartilhado. Ele ja resolve a API de arquivo pelo
+  nome livre OU por getgenv()/_G, serializa um JSON raso, grava e confere lendo
+  de volta, e cai pra memoria quando nao ha disco (dizendo o motivo).
+- Cada controle configuravel tem que ser REGISTRADO com uma chave unica e a
+  MESMA funcao que o callback do clique usa:
+      State:RegisterConfig("minhaChave", applyMinhaCoisa, handleDoControle)
+  O auto-load re-dispara essa funcao, entao um toggle salvo LIGADO liga a
+  feature de verdade -- nao so pinta o controle. Um controle que nasce com
+  `false` literal e nunca chama RegisterConfig salva NADA e nunca reativa:
+  ja foi bug duas vezes (Blade hits, Island teleport).
+- Controle que nao tem apply registrado e um controle que nao salva.
+- Ordem de registro = ordem do auto-load. Registre a SELECAO (dropdown) antes
+  do TOGGLE que a usa (ex.: island antes de islandOn), pra o load escolher o
+  destino e so depois ligar -- sem aplicar um padrao e reaplicar o salvo.
+
 
 --------------------------------------------------------------------------------
 5. SEM DUPLICACAO

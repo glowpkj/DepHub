@@ -429,15 +429,29 @@ local function NewWindow()
         library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Value = default, Callback = callback}
         return {Kind = "slider", Value = default}
     end
-    function library:AddDropdown(_, label, options, index, callback, multi)
-        local handle = {Kind = "dropdown", Value = options[index], MultiSelect = multi == true, Callback = callback}
+    -- The 4th arg is the Default VALUE (the real library's `Default = <option>`),
+    -- not an index: a single-select dropdown's Value is the chosen option string.
+    -- An unknown/nil default falls back to the first option, like the library.
+    function library:AddDropdown(_, label, options, default, callback, multi)
+        local initial = default
+        if multi ~= true and type(initial) ~= "string" then initial = options[1] end
+        local handle = {Kind = "dropdown", Value = initial, Options = options, MultiSelect = multi == true, Callback = callback}
         library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback, MultiSelect = multi == true, Handle = handle}
+        -- Single-select: :SetValue moves the chosen option and fires the callback,
+        -- the way RedzLib's dropdown does when a saved config restores a choice.
+        function handle:SetValue(value)
+            if multi == true then return nil end
+            if self.Value == value then return nil end
+            self.Value = value
+            if self.Callback then self.Callback(self.Value) end
+            return self.Value
+        end
         -- A multi-select dropdown in RedzLib hands its callback a SET table of the
         -- selected names. Model that, plus the array-ifying the adapter does, so
         -- tests can drive a selection and see the backend's array contract.
         local selected = {}
-        if multi == true and type(index) == "table" then
-            for _, name in ipairs(index) do selected[name] = true end
+        if multi == true and type(default) == "table" then
+            for _, name in ipairs(default) do selected[name] = true end
         end
         function handle:Select(name, isSelected)
             if multi ~= true then return nil end
@@ -582,18 +596,14 @@ local function sandbox(placeId, gameId)
     for _, name in ipairs({"Button1Down", "Button1Up", "MouseMove", "KeyPress", "CaptureController", "ClickButton1", "MoveMouseRel"}) do
         vuser[name] = function() end
     end
-    -- Lighting is a real Instance double (not a plain table): the FPS feature
-    -- reads/writes Lighting.GlobalShadows and walks Lighting:GetChildren() for
-    -- post-processing effects. Terrain lives as a child of Workspace (the FPS
-    -- feature finds it with FindFirstChildOfClass and lowers water reflection).
+    -- Lighting is a real Instance double, not a plain table: features read
+    -- properties off it (Brightness, GlobalShadows, ...) and a plain {} would
+    -- error on that read. Instance doubles store arbitrary props in _props.
     local lighting = Instance.new("Lighting")
     lighting.GlobalShadows = true
-    local wsInstance = Instance.new("Workspace")
-    local terrain = Instance.new("Terrain")
-    terrain.Parent = wsInstance
     local services = {Players=players, RunService=run, UserInputService=input, TeleportService=teleport,
         TweenService=tween, VirtualInputManager=vim, VirtualUser=vuser,
-        Workspace=wsInstance, Teams=Instance.new("Teams"), Lighting=lighting,
+        Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting=lighting,
         ReplicatedStorage=Instance.new("ReplicatedStorage"), TextChatService=Instance.new("TextChatService"), HttpService={}}
     -- Minimal JSON codec for config round-trips: the config is flat scalars plus
     -- at most one level of nesting (keys, bounty), which is all this needs to

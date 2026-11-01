@@ -174,6 +174,11 @@ env.__DEPHUB.SourceBaseURL = env.__DEPHUB.SourceBaseURL or BASE_URL
 -- Published so each backend can make its own module URLs unique per session and
 -- avoid an executor serving a cached older revision (see CACHE_BUST above).
 env.__DEPHUB.SourceCacheBust = CACHE_BUST
+-- The source ref the session was launched with (the branch/ref argument). A
+-- backend re-executing itself (Auto execute via queue_on_teleport) re-reads this
+-- to relaunch the SAME build, instead of guessing. Kept on __DEPHUB next to
+-- SourceBaseURL so a backend can read both from one place.
+env.__DEPHUB.SourceRef = env.__DEPHUB.SourceRef or sourceRef
 env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 

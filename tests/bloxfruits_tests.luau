@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "silentaim", "fruit", "islands", "player", "fps"}
+local FEATURES = {"bladhits", "silentaim", "fruit", "islands", "player"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -160,7 +160,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "fruit" or name == "islands" or name == "player" or name == "fps", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "fruit" or name == "islands" or name == "player", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -1394,119 +1394,174 @@ do
 end
 
 
--- FPS / Performance: a feature mexe SO no visual que o JOGO renderiza e que
--- custa quadro -- sombras, luzes/particulas, pos-processamento, reflexo da
--- agua. Tudo REVERSIVEL: guarda o valor original e devolve no desligar. Nada de
--- jogabilidade e tocado. O teste monta um mundo com esses objetos, liga o boost,
--- confere que cada alavanca agiu, e desliga conferindo a volta exata.
+-- O bug real do usuario: um toggle salvo LIGADO abre ligado no painel, mas a
+-- FEATURE nao esta rodando (o "ESP ta ativo mas nao aparece"). Aqui ele e o foco:
+-- com fruitEsp salvo, o painel abre, o toggle abre ligado E a feature tem que
+-- estar de fato habilitada com o loop de ESP no ar -- nao so a carinha do toggle.
 do
     local ctx = bfContext(994732206, 994732206)
-    local Factory = sources[FEATURE_PREFIX .. "fps.lua"]
-    local Fps = ctx.Env.loadstring(Factory)()
-    check(type(Fps) == "table" and type(Fps.new) == "function", "a feature de FPS carrega sozinha e publica new()")
+    local ui = ctx:MountUI()
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"fruitEsp":true,"fruitTrace":true,"fruitGrab":true,"silentaim":true}'
+    local state = ctx:Run("src/games/bloxfruits.lua")
 
-    local ws = ctx.Services.Workspace
-    local lighting = ctx.Services.Lighting
-    -- Sombras: o jogo liga GlobalShadows por padrao; uma part com CastShadow.
-    lighting.GlobalShadows = true
-    local part = Instance.new("Part"); part.Name, part.Parent = "MapPart", ws
-    part.CastShadow = true
-    -- Efeito decorativo: um ParticleEmitter com Enabled.
-    local emitter = Instance.new("ParticleEmitter"); emitter.Name, emitter.Parent = "Sparks", part
-    emitter.Enabled = true
-    -- Pos-processamento na Lighting.
-    local bloom = Instance.new("BloomEffect"); bloom.Name, bloom.Parent = "Bloom", lighting
-    bloom.Enabled = true
-    -- Terreno: reflexo da agua.
-    local terrain = ws:FindFirstChildOfClass("Terrain")
-    check(terrain ~= nil, "o harness expoe o Terrain do Workspace")
-    terrain.WaterReflectance = 0.8
+    -- A fruta precisa existir COMO INSTANCIA e estar habilitada.
+    check(state.Instances.fruit ~= nil, "o fruitEsp salvo instancia a feature de fruta no load")
+    check(state.Instances.fruit:IsEnabled() == true, "a feature de fruta fica habilitada pelo config salvo")
+    check(state.Instances.fruit.EspEnabled == true, "o loop de ESP fica ligado pelo config salvo")
+    check(state.Instances.fruit.Threads.esp ~= nil, "o loop de ESP esta REALMENTE rodando (nao so o toggle)")
 
-    local feature = Fps.new()
-    check(feature:Enable() == true and feature:IsEnabled() == true, "a feature liga")
-    check(feature:SetBoost(true) == true, "o boost aceita ligar")
+    -- As outras features salvas tambem tem que estar rodando, nao so marcadas.
+    check(state.Instances.silentaim ~= nil and state.Instances.silentaim:IsEnabled() == true, "o silent aim salvo liga de verdade")
 
-    -- Cada alavanca agiu.
-    check(lighting.GlobalShadows == false, "o boost desliga as sombras globais")
-    check(part.CastShadow == false, "o boost tira o CastShadow das parts")
-    check(emitter.Enabled == false, "o boost esconde o ParticleEmitter")
-    check(bloom.Enabled == false, "o boost desliga o Bloom (pos-processamento)")
-    check(terrain.WaterReflectance == 0, "o boost zera o reflexo da agua")
-
-    -- O boost escuta o que nasce depois (DescendantAdded), em vez de varrer o
-    -- mapa de tempos em tempos -- sem custo por frame.
-    check(#feature.Connections == 2, "o boost conecta DescendantAdded no Workspace e na Lighting")
-
-    -- Um efeito NOVO nasce com o boost ligado: o evento o pega na hora, sem
-    -- perder o original de quem ja estava aceso.
-    local late = Instance.new("Fire"); late.Name, late.Parent = "LateFire", part
-    late.Enabled = true
-    ws.DescendantAdded:Fire(late)
-    check(late.Enabled == false, "um efeito que nasce depois e pego pelo DescendantAdded")
-    check(feature.SavedEffects[late] == true, "o original do efeito novo e guardado")
-
-    -- Uma part NOVA tambem tem a sombra tirada pelo mesmo evento.
-    local latePart = Instance.new("Part"); latePart.Name, latePart.Parent = "LatePart", ws
-    latePart.CastShadow = true
-    ws.DescendantAdded:Fire(latePart)
-    check(latePart.CastShadow == false, "uma part nova tem o CastShadow tirado pelo evento")
-
-    -- Desligar devolve TUDO ao estado original.
-    check(feature:SetBoost(false) == true, "o boost aceita desligar")
-    check(lighting.GlobalShadows == true, "desligar devolve as sombras globais")
-    check(part.CastShadow == true, "desligar devolve o CastShadow")
-    check(emitter.Enabled == true, "desligar devolve o ParticleEmitter")
-    check(late.Enabled == true, "desligar devolve o efeito que nasceu depois")
-    check(latePart.CastShadow == true, "desligar devolve o CastShadow da part nova")
-    check(bloom.Enabled == true, "desligar devolve o Bloom")
-    check(terrain.WaterReflectance == 0.8, "desligar devolve o reflexo da agua")
-    check(#feature.Connections == 0, "desligar solta as conexoes de DescendantAdded")
-
-    -- Idempotencia: ligar de novo e uma nova passada limpa os mapas -- nada
-    -- empilha e o segundo desligar ainda devolve o original.
-    feature:SetBoost(true)
-    check(lighting.GlobalShadows == false, "religar reaplica")
-    feature:SetBoost(false)
-    check(lighting.GlobalShadows == true, "o segundo desligar ainda devolve o original")
-
-    -- Disable tambem desliga o boost (nao deixa o mundo mutilado atras).
-    feature:SetBoost(true)
-    feature:Disable()
-    check(feature:IsEnabled() == false, "o Disable desliga a feature")
-    check(lighting.GlobalShadows == true, "o Disable devolve o mundo (o boost sai junto)")
-
-    feature:Destroy()
+    state:Destroy()
 end
 
--- FPS pelo painel: o toggle "FPS boost" liga a feature e aplica o boost; a
--- escolha entra na config como fpsBoost e volta no round-trip.
+-- Mesma coisa pelos TOGGLES DA TELA: o valor salvo tem que cair no callback que
+-- liga a feature, nao apenas pintar o controle. Sem isso o usuario ve o toggle
+-- ligado e nada acontece.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"fruitEsp":true,"waterwalk":true}'
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    local espControl, waterControl
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Fruit ESP" then espControl = control end
+        if control.Kind == "toggle" and control.Label == "Water walk" then waterControl = control end
+    end
+    check(espControl ~= nil and espControl.Handle.Value == true, "o toggle Fruit ESP abre ligado")
+    check(state.Instances.fruit ~= nil and state.Instances.fruit.EspEnabled == true, "e o ESP liga de verdade no load")
+    check(waterControl ~= nil and waterControl.Handle.Value == true, "o toggle Water walk abre ligado")
+    check(state.Instances.player ~= nil, "e a feature do player sobe no load")
+
+    state:Destroy()
+end
+
+-- "Salva TUDO": TODO controle configuravel do painel (toggle, slider, dropdown)
+-- tem que estar registrado no store -- quem registra e quem faz o auto-load
+-- re-disparar o setter. Um controle que nasce com literal false e nunca chama
+-- RegisterConfig salva nada e nunca reativa: era o caso do Blade hits e do
+-- Island teleport. Aqui enumeramos os controles e conferimos o registro.
 do
     local ctx = bfContext(994732206, 994732206)
     local ui = ctx:MountUI()
     local state = ctx:Run("src/games/bloxfruits.lua")
-    local labels = {}
-    for _, control in ipairs(ui.Library._Controls) do
-        labels[control.Kind .. ":" .. tostring(control.Label)] = control
+
+    -- Os handles registrados (toggle/dropdown tem Handle; slider guarda Value).
+    local registeredHandles = {}
+    local registeredKeys = {}
+    for _, entry in ipairs(state.Store.Entries) do
+        registeredKeys[entry.key] = true
+        if entry.handle ~= nil then registeredHandles[entry.handle] = true end
     end
-    local boostToggle = labels["toggle:FPS boost"]
-    check(boostToggle ~= nil, "o painel monta o toggle FPS boost")
 
-    boostToggle.Handle:SetValue(true)
-    check(state:GetToggle("fps") == true, "o toggle do painel liga a feature de FPS")
-    check(state.Instances.fps ~= nil and state.Instances.fps:IsEnabled() == true, "a feature liga pelo toggle")
-    check(state.Instances.fps.BoostOn == true, "o toggle do painel aplica o boost")
-    check(state.Config.fpsBoost == true, "mexer no FPS boost grava no Config")
+    -- As chaves que o painel precisa salvar. Se um controle novo nascer sem
+    -- registro, este conjunto fica menor do que a tela e o teste acusa.
+    local expectedKeys = {
+        bladhits = true, silentaim = true, exceptionKeys = true, range = true,
+        fruitEsp = true, fruitTrace = true, fruitGrab = true, fruitStore = true,
+        fruitSkip = true, fruitKeep = true, island = true, islandOn = true,
+        speed = true, unbreakable = true, waterwalk = true, flashstep = true,
+        autoexec = true,
+    }
+    for key in pairs(expectedKeys) do
+        check(registeredKeys[key] == true, "o controle '" .. key .. "' esta registrado no store (salva e reativa)")
+    end
 
-    -- Desligar pelo painel devolve o mundo (o boost sai junto).
-    boostToggle.Handle:SetValue(false)
-    check(state:GetToggle("fps") == false, "o toggle do painel desliga")
-    check(state.Instances.fps.BoostOn == false, "desligar pelo painel tira o boost")
+    -- E todo controle com Handle na tela foi registrado -- nenhum ficou de fora.
+    local unregistered = {}
+    for _, control in ipairs(ui.Library._Controls) do
+        if (control.Kind == "toggle" or control.Kind == "dropdown") and control.Handle ~= nil then
+            if not registeredHandles[control.Handle] then
+                unregistered[#unregistered + 1] = control.Kind .. ":" .. tostring(control.Label)
+            end
+        end
+    end
+    check(#unregistered == 0, "nenhum controle com handle ficou sem registro: " .. table.concat(unregistered, ", "))
 
-    -- Config: a chave fpsBoost volta pelo arquivo como as outras.
-    state.Config.fpsBoost = true
+    state:Destroy()
+end
+
+-- Blade hits + Island teleport: os dois que nasciam com literal false e nunca
+-- salvavam. Aqui: (1) mexer neles grava no Config e no arquivo; (2) um arquivo
+-- com eles ligados REATIVA a feature no start (nao so pinta o toggle).
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    local blade, island
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Blade hits" then blade = control end
+        if control.Kind == "toggle" and control.Label == "Island teleport" then island = control end
+    end
+    check(blade ~= nil and island ~= nil, "o painel monta os toggles Blade hits e Island teleport")
+
+    blade.Handle:SetValue(true)
+    check(state.Config.bladhits == true, "ligar Blade hits grava no Config (antes nao salvava)")
+    island.Handle:SetValue(true)
+    check(state.Config.islandOn == true, "ligar Island teleport grava no Config (antes nao salvava)")
+
     ctx.Env.writefile("DepHub_BloxFruits_config.json", state:EncodeConfig())
-    local parsed = state:ReadConfig()
-    check(parsed.fpsBoost == true, "o fpsBoost sobrevive ao round-trip da config")
+
+    state:Destroy()
+end
+
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"bladhits":true,"islandOn":true}'
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    -- Blade hits salvo ligado: a feature existe e esta habilitada de verdade.
+    check(state.Instances.bladhits ~= nil and state.Instances.bladhits:IsEnabled() == true, "Blade hits salvo reativa a feature no load")
+    -- Island teleport salvo ligado: a feature existe e o toggle da tela esta ligado.
+    check(state.Instances.islands ~= nil, "Island teleport salvo instancia a feature no load")
+    local islandControl
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Island teleport" then islandControl = control end
+    end
+    check(islandControl ~= nil and islandControl.Handle.Value == true, "o toggle Island teleport abre ligado pelo salvo")
+
+    state:Destroy()
+end
+
+-- Auto-load de ILHA: o destino salvo (dropdown) tem que ser aplicado ANTES do
+-- toggle ligar (a ordem de registro), pra o voo sair direto pra ilha certa e nao
+-- voar pra padrao e re-voar. Aqui o dropdown abre no valor salvo e a feature
+-- desponta com a mesma selecao.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"island":"Ice Castle","islandOn":true}'
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    local islandDown
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "dropdown" and control.Label == "Island" then islandDown = control end
+    end
+    check(islandDown ~= nil and islandDown.Handle.Value == "Ice Castle", "o dropdown Island abre no destino salvo")
+    check(state.Instances.islands ~= nil and state.Instances.islands.Selected == "Ice Castle", "a feature seleciona o destino salvo (nao a ilha padrao)")
+
+    state:Destroy()
+end
+
+-- Auto execute robusto: a API pode estar SO no getgenv() (executor que nao
+-- publica o nome livre). Antes a resolucao lia so o global solto e o toggle nao
+-- fazia nada nesse caso -- o "autoexecute nao funciona" do usuario.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    -- Tira do global solto e publica SO no getgenv() (ex.: context.State).
+    ctx.Env.queue_on_teleport = nil
+    local captured = nil
+    ctx.State.queue_on_teleport = function(script) captured = script end
+
+    check(state:SetAutoExec(true) == true, "com a API so no getgenv() o auto execute liga")
+    check(type(captured) == "string" and captured:find("DepHub.lua", 1, true) ~= nil, "o reload foi enfileirado mesmo assim")
 
     state:Destroy()
 end

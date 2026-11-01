@@ -2,16 +2,25 @@ local game = game
 local type = type
 local tostring = tostring
 
--- A API de arquivo do executor, pega pelos NOMES livres (como o chunk resolve):
--- e o mesmo caminho que ja funcionava. Guardar os valores agora, no load, evita
--- a resolucao depender de _G/getfenv depois. O getter ainda tenta getgenv()
--- como fallback (alguns executores so publicam la).
-local fileWrite = writefile
-local fileRead = readfile
-local fileIsFile = isfile
-
+-- A API de arquivo do executor vive agora no store compartilhado
+-- (src/core/config-store.lua): ele resolve writefile/readfile/isfile pelos
+-- nomes livres e cai pro getgenv()/_G. Nao ha mais copia aqui.
 local env = type(getgenv) == "function" and getgenv() or _G
 local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env.__DEPHUB.Log or function() end
+
+-- O queue_on_teleport do executor. Como a API de arquivo, ele pode estar no
+-- nome livre OU so no getgenv()/_G. Resolver a cada chamada (nao no load): alguns
+-- executores so publicam o nome quando a primeira chamada acontece -- cachear no
+-- load deixaria o Auto execute "sem API" e o toggle nao faria nada, o
+-- "autoexecute nao funciona" do usuario.
+local function resolveQueueOnTeleport()
+    if type(queue_on_teleport) == "function" then return queue_on_teleport end
+    if type(env.queue_on_teleport) == "function" then return env.queue_on_teleport end
+    local genv = type(getgenv) == "function" and getgenv() or nil
+    if type(genv) == "table" and type(genv.queue_on_teleport) == "function" then return genv.queue_on_teleport end
+    if _G ~= env and type(_G.queue_on_teleport) == "function" then return _G.queue_on_teleport end
+    return nil
+end
 
 -- Backend for o script de Blox Fruits do usuario.
 --
@@ -56,7 +65,6 @@ local FEATURE_MODULES = {
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
     {name = "player", page = "Player", section = "PLAYER", toggle = "Speed multiplier"},
-    {name = "fps", page = "Player", section = "PERFORMANCE", toggle = "FPS boost"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -95,6 +103,16 @@ local function loadFactory(path)
     if not okRun or type(factory) ~= "table" then return false, "run: " .. tostring(factory) end
     return true, factory
 end
+
+-- O motor de persistencia COMPARTILHADO do hub (src/core/config-store.lua). Aqui
+-- e o unico consumidor hoje, mas o mecanismo (achar a API de arquivo do executor,
+-- JSON raso, gravar + reler, cair pra memoria, reaplicar re-disparando os
+-- callbacks) mora la -- os outros jogos adotam o MESMO modulo sem copiar codigo.
+local CONFIG_FILE = "DepHub_BloxFruits_config.json"
+local okStore, ConfigStore = loadFactory("src/core/config-store.lua")
+local configStore = (okStore and type(ConfigStore) == "table" and type(ConfigStore.new) == "function")
+    and ConfigStore.new({ file = CONFIG_FILE }) or nil
+if not configStore then report("BloxFruits: config-store nao carregou (" .. tostring(ConfigStore) .. ")") end
 
 local LocalPlayer = game:GetService("Players").LocalPlayer
 if not LocalPlayer then
@@ -136,217 +154,95 @@ local State = {
     Toggles = {},
     ToggleLabels = {},
     LastError = nil,
-    -- Os valores do painel que o Save salva e o Load devolve. Um unico lugar
-    -- (State.Config) que o painel escreve a cada mudanca de controle e le ao
-    -- carregar. Sem UI propria: quem monta os botoes e o painel.
-    Config = {},
-    -- Como re-aplicar cada chave do Config: { key, apply } na ordem em que o
-    -- painel registrou. O Load percorre esta lista e chama apply(valor) -- a
-    -- MESMA operacao que o callback do controle faz -- para o estado e a UI
-    -- voltarem juntos. Registrar aqui evita duplicar a logica de setter.
-    ConfigApply = {},
-    -- O JSON cru lido do disco (ou nil). Enquanto o painel nao terminou de
-    -- montar, o Load so guarda aqui e aplica quando os controles existirem.
-    SavedConfig = nil,
+    -- A persistencia mora no core (State.Store). Aqui so os aliases publicos que
+    -- o painel ja usa: State.Config aponta pra mesma tabela de valores do store
+    -- (entao `State.Config.x = v` grava no store sem mudar uma linha do painel),
+    -- e State.Store fica exposto pra debug/teste.
+    Store = configStore,
+    Config = configStore and configStore.Values or {},
     -- O motivo da ultima falha do Save (sem API, writefile recusou, arquivo nao
-    -- voltou). O botao mostra isto em vez de um "so na memoria" generico.
+    -- voltou). Delegado ao store, mantido aqui pra nao quebrar quem le daqui.
     LastConfigError = nil,
 }
 
--- Persistencia das configs. Usa a API de arquivo do executor (writefile/
--- readfile/isfile); sem ela, cai pra memoria (a config vive so na sessao, sem
--- erro) -- mesmo padrao do Steal An Egg. O arquivo e um JSON simples com os
--- valores do painel de Blox Fruits.
-local CONFIG_FILE = "DepHub_BloxFruits_config.json"
+-- A persistencia em si mora no core (src/core/config-store.lua). Estes metodos
+-- so delegam, mantendo a superficie que o painel e os testes ja usam. Se o core
+-- nao carregou (bundle velho), eles degradam: Save devolve false e nomeia o
+-- motivo, Load nao aplica nada -- nunca fingem sucesso.
+--
+-- `sync()` re-aponta o store pra tabela visivel em State.Config antes de agir.
+-- No caso normal sao a MESMA tabela (State.Config = Store.Values), mas um
+-- chamador pode ter trocado State.Config por outra (os testes fazem
+-- `state.Config = {...}`); sem re-apontar, o store gravaria a tabela antiga.
+function State:syncStore()
+    if self.Store then self.Store.Values = self.Config end
+    return self.Store
+end
 
--- A API de arquivo do executor. Os nomes livres (writefile/readfile/isfile) sao
--- o caminho normal -- foram capturados no load; getgenv() e o fallback de quem
--- so publica la. Sem os tres, nao ha persistencia em disco (cai pra memoria) e o
--- Save diz isso.
 function State:FileApi()
-    local write = type(fileWrite) == "function" and fileWrite or env.writefile
-    local read = type(fileRead) == "function" and fileRead or env.readfile
-    local isf = type(fileIsFile) == "function" and fileIsFile or env.isfile
-    if type(write) ~= "function" or type(read) ~= "function" or type(isf) ~= "function" then return nil end
-    return { write = write, read = read, isfile = isf }
+    return self.Store and self.Store:FileApi() or nil
 end
 
 function State:CanPersist()
-    return self:FileApi() ~= nil
-end
-
--- Serializa uma tabela plana (string/number/boolean) pro nosso JSON. E um
--- subconjunto JSON de proposito: o repo nao tem um codec JSON no cliente, e o
--- que a config guarda e so escalares + listas de string.
-local function encodeValue(value)
-    local valueType = type(value)
-    if valueType == "string" then
-        return '"' .. value:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
-    elseif valueType == "number" then
-        return tostring(value)
-    elseif valueType == "boolean" then
-        return value and "true" or "false"
-    elseif valueType == "table" then
-        local parts = {}
-        for _, item in ipairs(value) do parts[#parts + 1] = encodeValue(item) end
-        return "[" .. table.concat(parts, ",") .. "]"
-    end
-    return "null"
+    return self.Store ~= nil and self.Store:CanPersist()
 end
 
 function State:EncodeConfig()
-    local parts = {}
-    local keys = {}
-    for key in pairs(self.Config) do keys[#keys + 1] = key end
-    table.sort(keys)
-    for _, key in ipairs(keys) do
-        parts[#parts + 1] = '"' .. key .. '":' .. encodeValue(self.Config[key])
-    end
-    return "{" .. table.concat(parts, ",") .. "}"
-end
-
--- Le um objeto JSON raso (so escalares + arrays de string) pro self.Config.
--- Um parser minimo e tolerante: o que nao casar e simplesmente ignorado.
-local function decodeConfig(text)
-    local out = {}
-    if type(text) ~= "string" then return out end
-    for key, raw in text:gmatch('"([^"]+)":%s*([^,}]+)') do
-        raw = raw:gsub("%s+$", "")
-        local str = raw:match('^"(.*)"$')
-        if str then
-            out[key] = str:gsub('\\"', '"'):gsub("\\\\", "\\")
-        elseif raw == "true" then
-            out[key] = true
-        elseif raw == "false" then
-            out[key] = false
-        elseif raw:match("^%-?%d+%.?%d*$") then
-            out[key] = tonumber(raw)
-        elseif raw:match("^%[") then
-            local list = {}
-            -- Junta ate o fechamento do array (o gmatch pega so a parte sem }).
-            local arrayText = text:match('"' .. key .. '":%s*(%b[])')
-            if arrayText then
-                for item in arrayText:gmatch('"(.-)"') do list[#list + 1] = item end
-            end
-            out[key] = list
-        end
-    end
-    return out
+    if not self.Store then return "{}" end
+    -- Re-aponta o store pra tabela visivel em State.Config antes de codificar,
+    -- pra o que sai no JSON ser o que o painel escreveu.
+    self:syncStore()
+    return self.Store:Encode()
 end
 
 -- Grava as configs atuais. Devolve true se gravou em disco, false se so deu pra
--- guardar em memoria (executor sem writefile).
---
--- O snapshot em memoria e uma COPIA (nao um alias): assim mexer no painel depois
--- de salvar nao reescreve o que foi salvo -- sem isso, `Config.range = nil`
--- apagaria o valor tambem do "salvo" e o Load nao teria o que devolver.
+-- guardar em memoria (executor sem writefile). O LastConfigError reflete o motivo
+-- que o store deu.
 function State:SaveConfig()
-    local snapshot = {}
-    for key, value in pairs(self.Config) do
-        if type(value) == "table" then
-            local copy = {}
-            for index, item in ipairs(value) do copy[index] = item end
-            snapshot[key] = copy
-        else
-            snapshot[key] = value
-        end
-    end
-    self.SavedConfig = snapshot
-    local api = self:FileApi()
-    if not api then
-        self.LastConfigError = "executor sem API de arquivo (writefile/readfile/isfile)"
+    if not self.Store then
+        self.LastConfigError = "config-store nao carregou"
         return false
     end
-    local text = self:EncodeConfig()
-    local ok = pcall(api.write, CONFIG_FILE, text)
-    if not ok then
-        self.LastConfigError = "writefile recusou a gravacao"
-        return false
-    end
-    -- Confirma lendo de volta: alguns executores aceitam writefile e nao
-    -- persistem (ou gravam noutro lugar); sem esta checagem o Save diria "ok" e
-    -- o proximo start abriria vazio -- o "nao salva" que o usuario viu.
-    local readOk, back = pcall(api.read, CONFIG_FILE)
-    if not readOk or type(back) ~= "string" or #back == 0 then
-        self.LastConfigError = "o arquivo nao voltou depois de gravar"
-        return false
-    end
-    self.LastConfigError = nil
-    return true
+    self:syncStore()
+    local ok = self.Store:Save()
+    self.LastConfigError = self.Store.LastError
+    return ok
 end
 
 -- Le as configs do disco (ou da memoria) e devolve a tabela, sem aplicar nada.
--- Devolve nil quando nao ha arquivo nem config guardada.
 function State:ReadConfig()
-    local api = self:FileApi()
-    if not api then
-        return self.SavedConfig
-    end
-    local has = pcall(api.isfile, CONFIG_FILE)
-    if not (has and api.isfile(CONFIG_FILE)) then return self.SavedConfig end
-    local ok, text = pcall(api.read, CONFIG_FILE)
-    if not ok then return nil end
-    local parsed = decodeConfig(text)
-    self.SavedConfig = parsed
-    return parsed
+    if not self.Store then return nil end
+    self:syncStore()
+    return self.Store:Read()
 end
 
 -- Aplica uma config (a que veio do ReadConfig) ao estado e a UI: percorre a
--- lista que o painel registrou e chama a mesma operacao de cada callback. Sem
--- essa lista, so os valores digitados na sessao teriam efeito -- o que veio do
--- arquivo precisa re-disparar cada setter. Devolve quantas chaves aplicou.
+-- lista que o painel registrou e chama a mesma operacao de cada callback.
 function State:ApplyConfig(config)
-    config = config or self.SavedConfig
-    if type(config) ~= "table" then return 0 end
-    local applied = 0
-    for _, entry in ipairs(self.ConfigApply) do
-        local value = config[entry.key]
-        if value ~= nil then
-            pcall(entry.apply, value)
-            -- Move o controle na tela. No RedzLib o SetValue de toggle/slider
-            -- dispara o callback do controle -- ou seja, o apply pode rodar uma
-            -- segunda vez com o MESMO valor. As operacoes sao idempotentes
-            -- (SetFeature ja ligado e no-op; os setters reaplicam o mesmo valor),
-            -- entao o unico cuidado e nao repetir o Notify da ilha (feito no
-            -- applyIsland, que so avisa quando o Select falha).
-            if entry.handle ~= nil then
-                local handle = entry.handle
-                if type(handle.SetValue) == "function" then
-                    pcall(handle.SetValue, handle, value)
-                elseif type(handle.Set) == "function" then
-                    pcall(handle.Set, handle, value)
-                end
-            end
-            self.Config[entry.key] = value
-            applied = applied + 1
-        end
-    end
-    return applied
+    if not self.Store then return 0 end
+    self:syncStore()
+    return self.Store:Apply(config)
 end
 
--- Le do disco e aplica num passo: e o que o botao Load chamou. Devolve quantas
--- chaves aplicou (0 quando nao havia nada salvo).
+-- Le do disco e aplica num passo: e o que o botao Load chamou.
 function State:LoadConfig()
     local config = self:ReadConfig()
     return self:ApplyConfig(config)
 end
 
 -- Le do disco so pra preencher State.Config, sem aplicar (o Apply precisa dos
--- handles, que so existem depois do painel montar). Chamado ANTES de montar o
--- painel, pra cada controle ja nascer no valor salvo. Devolve a tabela lida.
+-- handles, que so existem depois do painel montar).
 function State:PrimeConfig()
-    local config = self:ReadConfig()
-    if type(config) == "table" then
-        for key, value in pairs(config) do self.Config[key] = value end
-    end
-    return config
+    if not self.Store then return nil end
+    self:syncStore()
+    return self.Store:Prime()
 end
 
 -- Registra como a chave volta ao vivo: a funcao de aplicar (o mesmo corpo do
 -- callback) e, opcionalmente, o handle do controle -- para o Load tambem mexer
 -- no que esta na tela, nao so o estado. Chamado pelo painel no build.
 function State:RegisterConfig(key, apply, handle)
-    self.ConfigApply[#self.ConfigApply + 1] = { key = key, apply = apply, handle = handle }
+    if self.Store then return self.Store:Register(key, apply, handle) end
     return apply
 end
 
@@ -372,15 +268,16 @@ end
 -- Devolve true se o auto-execute ficou ativo de fato.
 function State:SetAutoExec(on)
     on = on == true
+    local queue = resolveQueueOnTeleport()
     if not on then
-        if type(queue_on_teleport) == "function" then pcall(queue_on_teleport, "") end
+        if queue then pcall(queue, "") end
         return true
     end
-    if type(queue_on_teleport) ~= "function" then
+    if not queue then
         self.LastError = "executor sem queue_on_teleport"
         return false
     end
-    local ok = pcall(queue_on_teleport, self:SelfExecLine())
+    local ok = pcall(queue, self:SelfExecLine())
     if not ok then self.LastError = "queue_on_teleport recusou" end
     return ok
 end
@@ -572,12 +469,22 @@ local PANELS = {
         icon = "swords",
         tabIcon = "swords",
         build = function(section, instance)
-            section:CreateToggle("Blade hits", false, function(value)
-                if value and not instance.Backend:SetFeature("bladhits", true) then
+            -- Blade hits: o auto-swing. Tem que SALVAR e reativar como qualquer
+            -- outro toggle -- por isso o estado de ligado/desligado vai pro
+            -- Config (bladhits) e a funcao de aplicar (applyBlade) e registrada:
+            -- o auto-load reusa o mesmo caminho que o clique do usuario.
+            local function applyBlade(value)
+                if value and not State:SetFeature("bladhits", true) then
                     instance.Notify("Blade hits", "Remotes nao encontrados (Modules.Net).")
+                    return
                 end
-                if not value then instance.Backend:SetFeature("bladhits", false) end
+                if not value then State:SetFeature("bladhits", false) end
+            end
+            local bladeToggle = section:CreateToggle("Blade hits", State.Config.bladhits == true, function(value)
+                applyBlade(value)
+                State.Config.bladhits = value == true
             end)
+            State:RegisterConfig("bladhits", applyBlade, bladeToggle)
             section:CreateParagraph("Blade hits", "Auto-swing at every enemy in range using the game's attack remotes.")
         end,
     },
@@ -786,7 +693,10 @@ local PANELS = {
                     end
                 end
             end
-            islandToggle = section:CreateToggle("Island teleport", false, function(value)
+            -- Liga/desliga o teleporte de ilha. E o MESMO caminho pro clique do
+            -- usuario e pro auto-load: o config (islandOn) reusa esta funcao, e a
+            -- chegada desliga pelo SetValue do toggle, que cai aqui tambem.
+            local function applyIslandOn(value)
                 if value then
                     if not State:SetFeature("islands", true) then
                         instance.Notify("Island teleport", "Teleport motor ausente.")
@@ -794,6 +704,12 @@ local PANELS = {
                     end
                     wireArrivalHook()
                     if State.Instances.islands then
+                        -- Garante que a feature voe pro destino JA escolhido (o
+                        -- salvo, no auto-load, ou o que o dropdown mostra). Na
+                        -- primeira ligada a instancia nasce na UMA ilha padrao
+                        -- (o contexto nao carrega a escolha), entao sem isto ela
+                        -- voaria pra padrao mesmo com o dropdown no salvo.
+                        if selected then State.Instances.islands:Select(selected) end
                         if not State.Instances.islands:SetEnabled(true) then
                             instance.Notify("Island teleport", State.Instances.islands.LastStatus or "falhou.")
                         end
@@ -802,6 +718,10 @@ local PANELS = {
                 end
                 if State.Instances.islands then State.Instances.islands:SetEnabled(false) end
                 State:SetFeature("islands", false)
+            end
+            islandToggle = section:CreateToggle("Island teleport", State.Config.islandOn == true, function(value)
+                applyIslandOn(value)
+                State.Config.islandOn = value == true
             end)
             -- A instancia pode ja existir (toggle reaberto nesta sessao): liga o
             -- hook de imediato tambem.
@@ -821,7 +741,13 @@ local PANELS = {
                 applyIsland(choice)
                 State.Config.island = choice
             end)
+            -- Ordem de registro = ordem do auto-load. A ILHA e registrada antes do
+            -- toggle: no load o destino salvo e escolhido primeiro, e so entao o
+            -- toggle liga e voa direto pra ele -- sem voar pra ilha padrao e
+            -- re-voar. O clique do usuario nao depende da ordem (cada controle
+            -- chama seu proprio apply).
             State:RegisterConfig("island", applyIsland, islandDown)
+            State:RegisterConfig("islandOn", applyIslandOn, islandToggle)
             section:CreateParagraph("Island teleport", "Pick an island and fly there. Only travels while the toggle is on.")
         end,
     },
@@ -889,36 +815,6 @@ local PANELS = {
             State:RegisterConfig("flashstep", applyFlashstep, flashHandle)
 
             section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, and Flashstep cooldown (0 = ready). Stun is kept at 0.")
-        end,
-    },
-    fps = {
-        page = "Player",
-        section = "PERFORMANCE",
-        category = "Player",
-        icon = "rocket",
-        tabIcon = "user",
-        build = function(section, instance)
-            -- FPS boost: o unico controle. Ele desliga o que o JOGO renderiza e
-            -- custa quadro (sombras, luzes/particulas, pos-processamento, reflexo
-            -- da agua), guardando cada valor pra devolver no desligamento. Nao
-            -- toca em nada de jogabilidade -- so visual.
-            --
-            -- Aqui o toggle E o liga/desliga da feature (nao um knob dentro de
-            -- uma feature sempre ligada): ligar sobe a feature e aplica o boost,
-            -- desligar derruba a feature -- que no Disable devolve o mundo.
-            local function applyBoost(value)
-                State:SetFeature("fps", value == true)
-                if value == true and State.Instances.fps then
-                    State.Instances.fps:SetBoost(true)
-                end
-            end
-            local boostToggle = section:CreateToggle("FPS boost", State.Config.fpsBoost == true, function(value)
-                applyBoost(value)
-                State.Config.fpsBoost = value == true
-            end)
-            State:RegisterConfig("fpsBoost", applyBoost, boostToggle)
-
-            section:CreateParagraph("Performance", "Turns off what the game draws and costs frames -- shadows, lights, particles, post effects and water reflection -- to raise FPS. Reversible: turning it off restores everything, and it never touches gameplay (no parts, NPCs or remotes).")
         end,
     },
     -- CONFIG: os botoes de salvar/carregar. Nao e uma feature (nao tem toggle
