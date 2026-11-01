@@ -212,6 +212,11 @@ local function makeSection(adapter, tabHandle, title)
 
         -- The adapter's own restore path. The library has no SetValue for a
         -- multi-select dropdown, so restore is "clear then re-add each name".
+        -- `Set` also drives the caller's callback: the config store prefers the
+        -- handle's setter over the entry's `apply` whenever the handle can drive
+        -- (`handle.Value ~= value` is always true here, since a multi handle has
+        -- no `.Value`), so without this the restore would move the UI but never
+        -- tell the silent-aim feature its exception keys changed.
         if handle and type(handle) == "table" then
             handle.Set = function(_, names)
                 pcall(function() handle:Clear() end)
@@ -220,6 +225,7 @@ local function makeSection(adapter, tabHandle, title)
                     selected[tostring(name)] = true
                     pcall(function() handle:Add(tostring(name)) end)
                 end
+                if callback then callback(asArray()) end
             end
         end
         return handle

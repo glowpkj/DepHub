@@ -1321,7 +1321,9 @@ local aL=(aK*12)+10
 local aM=5 local aN=function(
 
 aN)
-local aO=I.AbsoluteSize.Y/ad.Scale
+-- Altura do popup, em pixels de tela crus (o popup vive fora do UIScale do
+-- painel; dividir por `ad.Scale` aqui encolhia a lista e podia zerar a altura).
+local aO=I.AbsoluteSize.Y
 return math.min((aK*math.max(aN,0.5))+10,aL,aO/1.75)end local aO=function()
 
 
@@ -1338,18 +1340,25 @@ return aR and aS end local aP=function(
 
 
 aP, aQ)
+-- DepHub: o popup e parentado na pasta `Dropdowns`, que e filha do ScreenGui --
+-- FORA do UIScale que envolve o painel. Toda a conta aqui tem que ser em
+-- coordenada de TELA crua (AbsolutePosition/AbsoluteSize ja vem em pixels de
+-- tela). A versao original dividia tudo por `ad.Scale` como se o popup vivesse
+-- dentro do conteudo escalado: com a escala de ~1.2 o popup caia em
+-- `campo.X / 1.2` -- ~193 px a esquerda do campo num campo em X=1157 -- e a
+-- altura ia para o eixo errado. O popup abria "deslocado / fora do lugar" (e
+-- sob o scissor do painel, invisivel). Aqui nao ha mais divisao por escala.
 local aR=aI.AbsolutePosition
 local aS=aI.AbsoluteSize
 local aT=I.AbsoluteSize
-local aU=ad.Scale
 local aV=aN(aP)
 
-local aW=aT.X/aU
-local aX=aT.Y/aU
-local aY=aR.X/aU
-local aZ=aR.Y/aU
-local a_=aS.X/aU
-local a0=aS.Y/aU
+local aW=aT.X
+local aX=aT.Y
+local aY=aR.X
+local aZ=aR.Y
+local a_=aS.X
+local a0=aS.Y
 
 local a1=aZ+(a0/2)
 local a2=a1-(aV/2)
@@ -1369,7 +1378,7 @@ end
 local a7=math.clamp(
 aY,
 aM,
-aW-as.Size.X.Offset-(aM*2)-(at.AbsoluteSize.X/aU)
+aW-as.Size.X.Offset-(aM*2)-at.AbsoluteSize.X
 )
 
 return Vector2.new(a7,a5),a6 end local aQ=function(...)
@@ -1405,17 +1414,18 @@ aw:CaptureFocus()
 
 local aS=as.AbsoluteSize
 local aT=I.AbsoluteSize
-local aU=ad.Scale
 local aV=as.AnchorPoint
 
-local aW=ax*aU
+-- Coordenadas cruas de tela (o popup vive fora do UIScale do painel): a
+-- largura do campo de busca ja esta em pixels reais, sem multiplicar por escala.
+local aW=ax
 
 local aX=as.AbsolutePosition.X
 
 local aY=aX+aS.X+5+aW
 
-if aY>aT.X-(aM*aU)then
-local aZ=(aT.X-aS.X-aW-5-(aM*aU))/aU
+if aY>aT.X-(aM)then
+local aZ=(aT.X-aS.X-aW-5-(aM))
 
 aZ=math.max(aZ,aM)
 
@@ -4124,6 +4134,7 @@ local av=table.freeze{
 ContainerHolder=au,
 TabsContainer=at,
 Components=al,
+Dropdowns=am,
 MainFrame=ak
 }
 

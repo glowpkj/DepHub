@@ -65,6 +65,19 @@ do
             for _, kid in ipairs(self._kids) do if kid.Name == name then return kid end end
             return nil
         end
+        -- O Instance real indexa DIRETO e tambem pelos DESCENDENTES (via
+        -- descendant lookup), nao so pelos filhos de primeiro nivel. O popup do
+        -- dropdown e uma arvore aninhada (overlay -> frame "Dropdown" -> opcoes),
+        -- entao o teste precisa da busca descendente para achar o frame do popup
+        -- e medir posicao/tamanho de verdade.
+        function raw:FindFirstChildRecursive(name)
+            for _, kid in ipairs(self._kids) do
+                if kid.Name == name then return kid end
+                local found = kid.FindFirstChildRecursive and kid:FindFirstChildRecursive(name)
+                if found then return found end
+            end
+            return nil
+        end
         function raw:FindFirstChildOfClass(c)
             for _, kid in ipairs(self._kids) do
                 if pcall(function() return kid:IsA(c) end) and kid:IsA(c) then return kid end
@@ -93,9 +106,23 @@ do
             __index = function(_, key)
                 local value = raw[key]
                 if value ~= nil then return value end
+                -- Busca por NOME nos filhos diretos (o Instance real indexa filhos
+                -- diretos pelo nome) e, se nao achar, nos DESCENDENTES.
                 for _, kid in ipairs(raw._kids) do
                     if kid.Name == key then return kid end
                 end
+                local function deep(node, name)
+                    local kids = node._kids
+                    if not kids and node.__proxy then kids = node.__proxy._kids end
+                    for _, kid in ipairs(kids or {}) do
+                        if kid.Name == name then return kid end
+                        local found = deep(kid, name)
+                        if found then return found end
+                    end
+                    return nil
+                end
+                local found = deep(raw, key)
+                if found then return found end
                 -- A lib procura filhos sem nome pela CLASSE (ex.: option.TextLabel,
                 -- option.Frame). O Instance real da lib expoe esses atalhos; aqui
                 -- derivamos do ClassName do filho pra o double ser fiel.
@@ -120,6 +147,9 @@ do
                 end
             end,
         })
+        -- Back-reference: `deep` precisa da tabela crua por tras de um proxy.
+        raw.__proxy = proxy
+        raw._isInstance = true
         return proxy
     end
 
@@ -227,6 +257,14 @@ do
         os = os,
         typeof = function(v)
             if type(v) == "table" and v._isEnumItem then return "EnumItem" end
+            -- FIDELIDADE: no Roblox real `typeof(<Instance>) == "Instance"`.
+            -- A lib decide por `typeof` se um argumento posicional e o Parent ou
+            -- uma tabela de propriedades. Reportando "table" para uma Instance, o
+            -- double montava a arvore de forma diferente do jogo -- o frame pai
+            -- virava "props" e a pasta Dropdowns ficava vazia, o que escondia o
+            -- bug de posicionamento do popup. Reportar "Instance" deixa o double
+            -- fiel e o teste de geometria mede o que o jogo mede.
+            if type(v) == "table" and v._isInstance then return "Instance" end
             return type(v)
         end,
         gethui = function() return renderServices.CoreGui end,
@@ -418,6 +456,101 @@ do
         check(multi.Opened == false, "clicar de novo FECHA o dropdown (Opened=false)")
     end
 
+    -- GEOMETRIA: com a pasta Dropdowns exposta, provamos que o popup que abriu
+    -- tem pai certo, esta visivel com altura > 0 e cai dentro da tela. Era
+    -- exatamente o que faltava: o teste antigo so olhava GetElements().Dropdowns,
+    -- que nunca existiu -- entao as assercoes de visibilidade eram puladas em
+    -- silencio e o bug do popup passou.
+    do
+        local geo = tab:AddDropdown({Name = "Geo", Options = {"Z", "X", "C", "V", "F"}, Default = {"F"}, MultiSelect = true})
+        local geoFolder = window:GetElements().Dropdowns
+        check(type(geoFolder) == "table", "a pasta Dropdowns e alcancavel por GetElements")
+
+        -- Geometria realista: o campo fica no canto inferior direito do painel.
+        -- O popup ancora no CAMPO (o frame 150x18 dentro da linha), nao na linha:
+        -- `X.SetHolder(aH)` no AddDropdown. Localiza-lo e o que o teste precisa
+        -- fazer para medir a posicao de verdade.
+        local geoRow = geo.VISIBLE_ELEMENT
+        geoRow.AbsolutePosition = {X = 1100, Y = 600}
+        geoRow.AbsoluteSize = {X = 300, Y = 24}
+        local geoHolder
+        do
+            local function findField(node)
+                for _, kid in ipairs(node._kids or {}) do
+                    if kid.ClassName == "Frame" and (kid.Size and kid.Size.X.Offset or 0) >= 100
+                        and (kid.Size and kid.Size.Y.Offset or 0) <= 24 then
+                        return kid
+                    end
+                    local found = findField(kid)
+                    if found then return found end
+                end
+                return nil
+            end
+            geoHolder = findField(geoRow)
+        end
+        check(geoHolder ~= nil, "o teste localiza o campo clicavel do dropdown")
+        geoHolder.AbsolutePosition = {X = 1157, Y = 600}
+        geoHolder.AbsoluteSize = {X = 150, Y = 18}
+        geoRow.Activated:Fire()
+        check(geo.Opened == true, "o dropdown de geometria abre")
+
+        local openChild
+        for _, kid in ipairs(geoFolder:GetChildren()) do
+            if kid.Visible then openChild = kid end
+        end
+        check(openChild ~= nil, "o popup fica parentado na pasta Dropdowns ao abrir")
+        if openChild then
+            -- O popup real e o overlay `ar`, que contem o frame "Dropdown".
+            local frame = openChild:FindFirstChildRecursive("Dropdown") or openChild
+            local sizeY = frame.Size and frame.Size.Y or nil
+            if sizeY then
+                check((sizeY.Offset or 0) > 0 or (sizeY.Scale or 0) > 0,
+                    "o popup tem altura diferente de zero (nao sai invisivel)")
+            end
+            local posX = frame.Position and frame.Position.X
+            -- O ANCHOR e o critério que o bug quebrava: o popup e parentado FORA
+            -- do UIScale do painel, entao a posicao tem que ser a do CAMPO em
+            -- pixels de tela crus. A versao antiga dividia por `ad.Scale` (>= 1)
+            -- e o popup caia a esquerda do campo -- "abre deslocado / nao aparece".
+            -- Aqui o campo esta em X=1157: a posicao tem que bater com ele (com
+            -- folga de 1 px), nao com 1157/escala.
+            if posX then
+                local x = posX.Offset or 0
+                check(math.abs(x - 1157) <= 1,
+                    "o popup abre alinhado ao campo em X cru (campo 1157, popup " .. tostring(x) .. ")")
+                check(x <= 1920, "o popup fica dentro da tela (x=" .. tostring(x) .. ")")
+            end
+        end
+
+        geoRow.Activated:Fire()
+        check(geo.Opened == false, "o dropdown de geometria fecha")
+        local stillVisible = false
+        for _, kid in ipairs(geoFolder:GetChildren()) do
+            if kid.Visible then stillVisible = true end
+        end
+        check(not stillVisible, "ao fechar nenhum popup fica visivel na pasta Dropdowns")
+    end
+
+    -- RESTORE (nivel da lib): reaplicar uma selecao salva com Clear + Add tem que
+    -- deixar o dropdown de pe e com opcoes.
+    do
+        local names = {}
+        for _, option in ipairs(multi.DROPDOWN_OPTIONS) do names[#names + 1] = option.Name end
+        check(#names >= 1, "o dropdown multi expoe as opcoes para o restore")
+        local okRestore = pcall(function()
+            if type(multi.Set) == "function" then
+                multi:Set({"Dragon"})
+            elseif type(multi.CLEAR_DROPDOWN) == "function" then
+                multi.CLEAR_DROPDOWN()
+                multi.ADD_DROPDOWN_OPTION("Dragon")
+            end
+        end)
+        check(okRestore, "reaplicar a selecao salva nao estoura")
+        local after = 0
+        for _, option in ipairs(multi.DROPDOWN_OPTIONS or {}) do after = after + 1 end
+        check(after >= 1, "depois do restore o dropdown ainda tem opcoes")
+    end
+
     -- Icons are catalogue names now: a known name resolves to an asset id. An
     -- unknown name (or an emoji) resolves to nothing and the tab is built with no
     -- icon -- both must succeed without error.
@@ -474,9 +607,21 @@ do
         check(type(shellSection:CreateToggle("Auto collect", true)) == "table", "section CreateToggle works")
         check(type(shellSection:CreateSlider("Range", 10, 200, 55)) == "table", "section CreateSlider works")
         check(type(shellSection:CreateDropdown("Island", {"One", "Two"}, "One")) == "table", "section CreateDropdown works")
-        local multiHandle = shellSection:CreateMultiDropdown("Skip list", {"Dragon", "Leopard"}, {"Dragon"}, function() end)
+        local restored = nil
+        local multiHandle = shellSection:CreateMultiDropdown("Skip list", {"Dragon", "Leopard"}, {"Dragon"}, function(sel) restored = sel end)
         check(type(multiHandle) == "table", "section CreateMultiDropdown works")
         check(type(multiHandle.Set) == "function", "the multi-dropdown handle exposes Set for restore")
+        -- O config-store prefere o `Set` do handle ao `apply` do registro sempre
+        -- que o handle "pode dirigir" -- e um handle multi nao tem `.Value`, entao
+        -- `Value ~= valor` e sempre true. Sem o callback dentro do `Set`, restaurar
+        -- uma config moveria a UI mas NUNCA avisaria a feature (as exception keys
+        -- do silent aim ficariam as antigas). Prova que o restore dispara.
+        multiHandle:Set({"Leopard"})
+        check(type(restored) == "table" and restored[1] == "Leopard" and #restored == 1,
+            "o Set do multi-dropdown dispara o callback com o array selecionado")
+        multiHandle:Set({"Dragon", "Leopard"})
+        check(type(restored) == "table" and #restored == 2,
+            "o Set devolve as duas opcoes na ordem da lista")
         check(type(shellSection:CreateButton("Go", function() end)) == "table", "section CreateButton works")
         check(type(shellSection:CreateParagraph("Info", "Body")) == "table", "section CreateParagraph works")
         local input = shellSection:CreateInput("Command", "placeholder", "")
