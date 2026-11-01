@@ -3841,6 +3841,12 @@ self.ThemesObjects=C
 self.WindowSettings=af
 self.Flags=ag
 
+-- DepHub: a biblioteca e VENDORED no repo e nao pode ir a rede em runtime (o
+-- bundle tem que ser self-contained). O redz original cai para um HttpGet no
+-- GitHub quando nao acha o Icons.lua local; aqui esse fallback foi trocado por
+-- uma tabela local no proprio repo. Sem ela o GetIconByName simplesmente nao
+-- acha o nome e o controle sai sem icone -- que e o comportamento degradado que
+-- o proprio redz ja tinha.
 self.Icons=(function()
 local ah=ae.ScriptFolder
 
@@ -3852,28 +3858,14 @@ if ai and type(aj)=="table"then
 return aj
 end
 
-local ak=`https://raw.githubusercontent.com/{self.Information.GitHubOwner}`
-local al=`{ak}/Library/refs/heads/main/redz-V5-remake/Utils/Icons.lua`
-local am local an=function()
-
-
-return z(`{ah}/Icons.lua`,am)end
-
-
-local ao,ap=pcall(function()
-am=game:HttpGet(al)
-return loadstring(am)()
-end)
-
-if ao and type(ap)=="table"then
-if type(am)=="string"then
-pcall(an)
-end
-
-return ap
-end
-
-return{}
+-- Icones usados pelo DepHub (nomes que os backends passam em CreateCategory e
+-- nos configs de painel). Asset ids do catalogo Roblox.
+return{
+layers="rbxassetid://6031091004",
+swords="rbxassetid://6549167889",
+cherry="rbxassetid://6766380907",
+map="rbxassetid://6031280882",
+}
 end)()
 
 if type(af.SelectedTheme)=="string"and self:IsValidTheme(af.SelectedTheme)then
