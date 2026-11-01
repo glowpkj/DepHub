@@ -1,659 +1,323 @@
--- Real theme smoke test.
+-- Render smoke test for the real UI stack.
 --
--- The backend harness stubs demon-theme.luau (DOD_LIBRARY_STUB) and its Instance
--- double deliberately rejects GUI classes, so nothing else in the suite ever
--- loads the real src/core/ui/demon-theme.luau. That meant a regression in the
--- theme could pass every test and only show up in-game.
+-- The backend harness stubs the shell's library (DOD_LIBRARY_STUB) and its
+-- Instance double deliberately rejects GUI classes, so nothing else in the suite
+-- ever loads the REAL src/dephubv2lib.lua or the REAL src/core/demon-ui.lua.
+-- That meant a regression in either could pass every test and only show up
+-- in-game.
 --
--- This block fills the gap: it loads the REAL theme source, compiles it, runs
--- export.new(...) against a permissive Roblox double, then creates a
--- category/tab/section and a couple of controls and destroys the window. It
--- does not claim in-game fidelity -- it claims the module loads and builds.
+-- This block fills the gap: it builds a permissive Roblox GUI double, loads the
+-- real RedzLib source (_THEME_SOURCE) and the real adapter source, then drives
+-- the whole shell contract the backends use -- categories, tabs, sections, every
+-- control, rows/stacks, the sea filter, search, the dashboard builders, the
+-- __DEPHUB_TOGGLE global and Destroy. It does not claim in-game fidelity: it
+-- claims the modules compile, load and build.
 do
-    local ThemeColor3 = {}
-    local colorMeta = {
-        __eq = function(a, b) return a.R == b.R and a.G == b.G and a.B == b.B end,
-    }
-    function ThemeColor3.new(r, g, b)
-        r, g, b = r or 0, g or 0, b or 0
-        local c = {R = r, G = g, B = b, __color = true}
-        function c:Lerp(other, t)
-            return ThemeColor3.new(r + (other.R - r) * t, g + (other.G - g) * t, b + (other.B - b) * t)
+    local function renderSignal()
+        return {Connect = function() return {Disconnect = function() end} end}
+    end
+
+    -- A permissive GUI double: instances parent by name, expose the events the
+    -- library connects, and accept any property write.
+    local function renderInstance(class)
+        local raw = {ClassName = class, Name = "", _kids = {}, _attrs = {}, Visible = true, Text = ""}
+        function raw:IsA(c)
+            return c == class or c == "Instance" or c == "GuiObject" or c == "Frame"
         end
-        function c:ToHSV()
-            local max = math.max(r, g, b)
-            local min = math.min(r, g, b)
-            local h, s = 0, max == 0 and 0 or (max - min) / max
-            if max ~= min then
-                if max == r then h = (g - b) / (max - min) % 6
-                elseif max == g then h = (b - r) / (max - min) + 2
-                else h = (r - g) / (max - min) + 4 end
-                h = h / 6
+        function raw:GetChildren() return self._kids end
+        function raw:ClearAllChildren() self._kids = {} end
+        function raw:Destroy() end
+        function raw:SetAttribute(k, v) self._attrs[k] = v end
+        function raw:GetAttribute(k) return self._attrs[k] end
+        function raw:GetAttributeChangedSignal() return renderSignal() end
+        function raw:GetPropertyChangedSignal() return renderSignal() end
+        function raw:WaitForChild() return raw end
+        function raw:FindFirstChild(name)
+            for _, kid in ipairs(self._kids) do if kid.Name == name then return kid end end
+            return nil
+        end
+        function raw:FindFirstChildOfClass(c)
+            for _, kid in ipairs(self._kids) do
+                if pcall(function() return kid:IsA(c) end) and kid:IsA(c) then return kid end
             end
-            return h, s, max
+            return nil
         end
-        function c:ToHex() return "FFFFFF" end
-        return setmetatable(c, colorMeta)
-    end
-    function ThemeColor3.fromRGB(r, g, b) return ThemeColor3.new((r or 0) / 255, (g or 0) / 255, (b or 0) / 255) end
-    function ThemeColor3.fromHSV(h, s, v)
-        return ThemeColor3.new(v or 0, v or 0, v or 0)
-    end
-
-    local ThemeUDim = {}
-    function ThemeUDim.new(scale, offset) return {Scale = scale or 0, Offset = offset or 0} end
-
-    local ThemeUDim2 = {}
-    local udim2Meta = {}
-    udim2Meta.__index = udim2Meta
-    function udim2Meta:Lerp(other, t)
-        return ThemeUDim2.new(
-            self.X.Scale + (other.X.Scale - self.X.Scale) * t,
-            self.X.Offset + (other.X.Offset - self.X.Offset) * t,
-            self.Y.Scale + (other.Y.Scale - self.Y.Scale) * t,
-            self.Y.Offset + (other.Y.Offset - self.Y.Offset) * t)
-    end
-    function ThemeUDim2.new(xs, xo, ys, yo)
-        return setmetatable({__udim2 = true, X = ThemeUDim.new(xs, xo), Y = ThemeUDim.new(ys, yo)}, udim2Meta)
-    end
-    function ThemeUDim2.fromOffset(x, y) return ThemeUDim2.new(0, x, 0, y) end
-    function ThemeUDim2.fromScale(x, y) return ThemeUDim2.new(x, 0, y, 0) end
-
-    local function themeSignal()
-        local event = {connections = {}, fired = 0}
-        function event:Connect(fn)
-            local connection = {Connected = true, fn = fn}
-            function connection:Disconnect() self.Connected = false end
-            self.connections[#self.connections + 1] = connection
-            return connection
+        function raw:FindFirstAncestorOfClass() return nil end
+        function raw:IsDescendantOf() return false end
+        function raw:GetDescendants() return self._kids end
+        function raw:GetFullName() return self.Name end
+        function raw:Clone() return renderInstance(class) end
+        function raw:CaptureFocus() end
+        for _, eventName in ipairs({
+            "Destroying", "Activated", "MouseEnter", "MouseLeave", "MouseButton1Down",
+            "MouseButton1Up", "InputBegan", "InputChanged", "Changed", "AncestryChanged",
+            "ChildAdded", "ChildRemoved", "Focused", "FocusLost", "TextChanged",
+            "SelectionGained", "SelectionLost", "TouchTap", "TouchLongPress", "TouchPan",
+            "MouseWheelForward", "MouseWheelBackward", "HoverEnter", "HoverLeave",
+            "WindowFocused", "WindowFocusReleased", "ReturnPressedFromOnScreenKeyboard",
+        }) do
+            raw[eventName] = renderSignal()
         end
-        function event:Once(fn)
-            local connection
-            connection = self:Connect(function(...) connection:Disconnect(); fn(...) end)
-            return connection
-        end
-        function event:Fire(...)
-            event.fired += 1
-            for _, connection in ipairs(table.clone(self.connections)) do
-                if connection.Connected then connection.fn(...) end
-            end
-        end
-        return event
-    end
 
-    local ThemeVector2 = {}
-    local vector2Meta = {}
-    vector2Meta.__index = vector2Meta
-    local function v2num(n) return type(n) == "number" and n or 0 end
-    vector2Meta.__add = function(a, b) return ThemeVector2.new(v2num(a.X) + v2num(b.X), v2num(a.Y) + v2num(b.Y)) end
-    vector2Meta.__sub = function(a, b) return ThemeVector2.new(v2num(a.X) - v2num(b.X), v2num(a.Y) - v2num(b.Y)) end
-    vector2Meta.__mul = function(a, b)
-        if type(a) == "number" then return ThemeVector2.new(a * v2num(b.X), a * v2num(b.Y)) end
-        if type(b) == "number" then return ThemeVector2.new(v2num(a.X) * b, v2num(a.Y) * b) end
-        return ThemeVector2.new(v2num(a.X) * v2num(b.X), v2num(a.Y) * v2num(b.Y))
-    end
-    vector2Meta.__div = function(a, b)
-        if type(b) == "number" then return ThemeVector2.new(v2num(a.X) / b, v2num(a.Y) / b) end
-        return ThemeVector2.new(0, 0)
-    end
-    vector2Meta.__eq = function(a, b) return a.X == b.X and a.Y == b.Y end
-    function ThemeVector2.new(x, y) return setmetatable({X = x or 0, Y = y or 0, Magnitude = math.sqrt((x or 0) ^ 2 + (y or 0) ^ 2)}, vector2Meta) end
-    function ThemeVector2.zero() return ThemeVector2.new(0, 0) end
-
-    local themeInstanceMeta = {}
-    local themeMethods = {}
-
-    -- A permissive wildcard for any property/method the theme touches that the
-    -- double does not model. It is callable (so `obj:SomeMethod()` works), indexable
-    -- (so `obj.Something.X` works) and does arithmetic as 0 (so `width * 0.96`
-    -- stays a number). This lets the whole GUI tree build without enumerating
-    -- every Roblox property; the test asserts the build succeeds, not pixel maths.
-    local wildcardMeta = {}
-    local wildcard = setmetatable({}, wildcardMeta)
-    wildcardMeta.__index = function() return wildcard end
-    wildcardMeta.__call = function() return wildcard end
-    wildcardMeta.__add = function(a, b) return (type(a) == "number" and a or 0) + (type(b) == "number" and b or 0) end
-    wildcardMeta.__sub = function(a, b) return (type(a) == "number" and a or 0) - (type(b) == "number" and b or 0) end
-    wildcardMeta.__mul = function(a, b) return (type(a) == "number" and a or 0) * (type(b) == "number" and b or 0) end
-    wildcardMeta.__div = function(a, b) return (type(b) == "number" and b ~= 0) and ((type(a) == "number" and a or 0) / b) or 0 end
-    wildcardMeta.__unm = function() return 0 end
-    wildcardMeta.__len = function() return 0 end
-    wildcardMeta.__eq = function() return true end
-    wildcardMeta.__lt = function() return false end
-    wildcardMeta.__le = function() return true end
-    wildcardMeta.__tostring = function() return "" end
-    wildcardMeta.__concat = function(a, b) return tostring(a) .. tostring(b) end
-
-    -- Property reads the theme compares or does arithmetic on must return the
-    -- right *kind* of value, or `wildcard <= 0` blows up (Luau will not run a
-    -- table-vs-number `__le`). Vector2-typed GUI properties yield a Vector2;
-    -- a few scalar ones yield 0. Everything else falls back to the wildcard,
-    -- which is fine for enums, Color3 and instance references.
-    local VECTOR_PROPS = {
-        AbsoluteCanvasSize = true, AbsoluteContentSize = true, AbsolutePosition = true,
-        AbsoluteSize = true, CanvasPosition = true, CanvasSize = true,
-        ViewportSize = true, WindowSize = true, TextBounds = true,
-        MaxSize = true, MinSize = true, AnchorPoint = true,
-    }
-    local NUMBER_PROPS = {
-        BackgroundTransparency = true, TextTransparency = true, TextStrokeTransparency = true,
-        ImageTransparency = true, Rotation = true, Thickness = true, ZIndex = true,
-        LayoutOrder = true, CellPadding = true, CellSize = true, ScrollBarThickness = true,
-        ScrollBarImageTransparency = true, TextSize = true, MaxTextSize = true, MinTextSize = true,
-        PaddingLeft = true, PaddingRight = true, PaddingTop = true, PaddingBottom = true,
-        PlaybackSpeed = true, Volume = true, Magnitude = true, Scale = true, Offset = true,
-    }
-
-    function themeInstanceMeta:__index(key)
-        if key == "Parent" then return self._props.Parent end
-        local own = self._props[key]
-        if own ~= nil then return own end
-        local method = themeMethods[key]
-        if method ~= nil then return method end
-        if VECTOR_PROPS[key] then return ThemeVector2.new(0, 0) end
-        if NUMBER_PROPS[key] then return 0 end
-        return wildcard
-    end
-    function themeInstanceMeta:__newindex(key, value)
-        if key == "Parent" then
-            local old = self._props.Parent
-            if old then
-                for i, child in ipairs(old._children) do
-                    if child == self then table.remove(old._children, i) break end
+        local proxy
+        proxy = setmetatable({}, {
+            __index = function(_, key)
+                local value = raw[key]
+                if value ~= nil then return value end
+                for _, kid in ipairs(raw._kids) do
+                    if kid.Name == key then return kid end
                 end
-            end
-            self._props.Parent = value
-            if value then value._children[#value._children + 1] = self end
-        else
-            self._props[key] = value
-        end
-    end
-    function themeMethods:GetChildren() return table.clone(self._children) end
-    function themeMethods:GetDescendants()
-        local result = {}
-        for _, child in ipairs(self._children) do
-            result[#result + 1] = child
-            for _, descendant in ipairs(child:GetDescendants()) do result[#result + 1] = descendant end
-        end
-        return result
-    end
-    function themeMethods:FindFirstChild(name) for _, c in ipairs(self._children) do if c._props.Name == name then return c end end end
-    function themeMethods:FindFirstChildOfClass(class) for _, c in ipairs(self._children) do if c._props.ClassName == class then return c end end end
-    function themeMethods:FindFirstChildWhichIsA(class) return self:FindFirstChildOfClass(class) end
-    function themeMethods:WaitForChild(name) return self:FindFirstChild(name) end
-    function themeMethods:IsA(class)
-        local actual = self._props.ClassName
-        if class == actual then return true end
-        if class == "GuiObject" then
-            return actual == "Frame" or actual == "TextLabel" or actual == "TextButton"
-                or actual == "ImageLabel" or actual == "ImageButton" or actual == "ScrollingFrame"
-                or actual == "TextBox" or actual == "CanvasGroup"
-        end
-        if class == "BasePart" then return actual == "Part" or actual == "MeshPart" end
-        return false
-    end
-    function themeMethods:IsDescendantOf(ancestor)
-        local parent = self._props.Parent
-        while parent do if parent == ancestor then return true end; parent = parent._props.Parent end
-        return false
-    end
-    function themeMethods:GetPropertyChangedSignal(property)
-        self._propertySignals = self._propertySignals or {}
-        self._propertySignals[property] = self._propertySignals[property] or themeSignal()
-        return self._propertySignals[property]
-    end
-    function themeMethods:GetAttribute(key) return self._attributes[key] end
-    function themeMethods:SetAttribute(key, value) self._attributes[key] = value end
-    function themeMethods:GetAttributes() return table.clone(self._attributes) end
-    function themeMethods:Destroy()
-        self.Destroyed = true
-        for _, child in ipairs(self:GetChildren()) do child:Destroy() end
-        self.Parent = nil
-    end
-    function themeMethods:ClearAllChildren() for _, child in ipairs(self:GetChildren()) do child:Destroy() end end
-    function themeMethods:Clone() return ThemeInstance.new(self._props.ClassName) end
-    function themeMethods:GetFullName() return self._props.Name or self._props.ClassName end
-    function themeMethods:Play() self.Playing = true end
-    function themeMethods:Stop() self.Playing = false end
-
-    local ThemeInstance = {}
-    local themeInstanceCount = 0
-    function ThemeInstance.new(class)
-        themeInstanceCount += 1
-        if themeInstanceCount > 20000 then
-            error("[theme-double] Instance.new called " .. themeInstanceCount .. " times -- likely an unbounded init loop (class=" .. tostring(class) .. ")", 2)
-        end
-        local object = setmetatable({
-            _props = {ClassName = class, Name = class, Visible = true, Text = "", Parent = nil, AbsoluteSize = ThemeVector2.new(900, 580)},
-            _children = {},
-            _attributes = {},
-        }, themeInstanceMeta)
-        object.ChildAdded = themeSignal()
-        object.ChildRemoved = themeSignal()
-        object.DescendantAdded = themeSignal()
-        object.DescendantRemoving = themeSignal()
-        object.Changed = themeSignal()
-        object.AncestryChanged = themeSignal()
-        object.InputBegan = themeSignal()
-        object.InputEnded = themeSignal()
-        object.InputChanged = themeSignal()
-        object.MouseButton1Click = themeSignal()
-        object.MouseEnter = themeSignal()
-        object.MouseLeave = themeSignal()
-        object.MouseMoved = themeSignal()
-        object.Activated = themeSignal()
-        object.Focused = themeSignal()
-        object.FocusLost = themeSignal()
-        object.ReturnPressedFromOnScreenKeyboard = themeSignal()
-        object.Ended = themeSignal()
-        object.Completed = themeSignal()
-        return object
+                return nil
+            end,
+            __newindex = function(_, key, value)
+                if key == "Parent" then
+                    local old = raw.Parent
+                    if old and old._kids then
+                        for i, kid in ipairs(old._kids) do
+                            if kid == proxy then table.remove(old._kids, i) break end
+                        end
+                    end
+                    raw.Parent = value
+                    if value and value._kids then value._kids[#value._kids + 1] = proxy end
+                else
+                    raw[key] = value
+                end
+            end,
+        })
+        return proxy
     end
 
-    local ThemeEnum = setmetatable({}, {__index = function(t, key)
-        local values = setmetatable({}, {__index = function(s, name)
-            local item = {Name = name, EnumType = s, Value = name, __enumItem = true}
-            rawset(s, name, item)
-            return item
-        end})
-        rawset(t, key, values)
-        return values
-    end})
-
-    -- Services are plain tables, not theme instances, so give each the
-    -- property-changed signal the theme binds (for example MouseIconEnabled).
-    local function withPropSignals(service)
-        local signals = {}
-        service.GetPropertyChangedSignal = function(_, property)
-            signals[property] = signals[property] or themeSignal()
-            return signals[property]
-        end
-        return service
-    end
-
-    local function themeTypeof(value)
-        if type(value) == "table" then
-            if value.__color then return "Color3" end
-            if value.__enumItem then return "EnumItem" end
-            if value.__udim2 then return "UDim2" end
-            if value.__udim then return "UDim" end
-            if value.__tweenInfo then return "TweenInfo" end
-            if value.ClassName then return "Instance" end
-        end
-        local builtin = typeof
-        return builtin(value)
-    end
-
-    local ThemeTweenInfo = {}
-    function ThemeTweenInfo.new(...) return {__tweenInfo = true, args = {...}} end
-
-    local themeServices = {}
-    local themePlayer = ThemeInstance.new("Player")
-    themePlayer.UserId = 1
-    themePlayer.Name = "TestPlayer"
-    themePlayer.DisplayName = "TestPlayer"
-    themePlayer.CharacterAdded = themeSignal()
-    themePlayer.CharacterRemoving = themeSignal()
-    themePlayer.Idled = themeSignal()
-    themePlayer.ChildAdded = themeSignal()
-    themePlayer.ChildRemoved = themeSignal()
-    themePlayer.CameraMaxZoomDistance = 128
-
-    local players = {LocalPlayer = themePlayer, PlayerAdded = themeSignal(), PlayerRemoving = themeSignal()}
-    function players:GetPlayers() return {themePlayer} end
-    function players:GetPlayerFromCharacter() return themePlayer end
-    function players:GetUserIdFromNameAsync() return 1 end
-    function players:GetNameFromUserIdAsync() return "TestPlayer" end
-
-    local runService = {RenderStepped = themeSignal(), Stepped = themeSignal(), Heartbeat = themeSignal(), PreRender = themeSignal(), PreSimulation = themeSignal(), PostSimulation = themeSignal()}
-    function runService:IsClient() return true end
-    function runService:IsStudio() return false end
-    function runService:IsRunning() return true end
-
-    local userInput = {
-        InputBegan = themeSignal(), InputEnded = themeSignal(), InputChanged = themeSignal(),
-        TouchEnabled = false, MouseEnabled = true, KeyboardEnabled = true, MouseBehavior = ThemeEnum.MouseBehavior.Default,
+    local renderServices = {
+        Debris = {AddItem = function() end},
+        MarketplaceService = {GetProductInfo = function() return {} end, PromptGamePassPurchase = function() end},
+        UserInputService = {
+            InputChanged = renderSignal(), InputBegan = renderSignal(), InputEnded = renderSignal(),
+            GetStringForKeyCode = function() return "" end,
+            GetKeysPressed = function() return {} end,
+        },
+        TweenService = {
+            Create = function() return {Play = function() end, Cancel = function() end, Completed = renderSignal()} end,
+        },
+        HttpService = {
+            JSONDecode = function() return {} end,
+            JSONEncode = function() return "{}" end,
+            GetAsync = function() end,
+        },
+        RunService = {Heartbeat = renderSignal(), RenderStepped = renderSignal(), Stepped = renderSignal()},
+        Players = {},
+        CoreGui = renderInstance("CoreGui"),
     }
-    function userInput:GetMouseLocation() return ThemeVector2.new(400, 300) end
-    function userInput:GetFocusedTextBox() return nil end
-    function userInput:IsKeyDown() return false end
-    function userInput:GetKeysPressed() return {} end
+    local renderPlayer = renderInstance("Player")
+    renderPlayer.UserId = 1
+    renderPlayer.DisplayName = "Tester"
+    renderPlayer.Name = "Tester"
+    function renderPlayer:GetMouse() return renderInstance("Mouse") end
+    renderServices.Players.LocalPlayer = renderPlayer
+    renderServices.Workspace = renderInstance("Workspace")
+    renderServices.Workspace.CurrentCamera = {ViewportSize = {X = 1920, Y = 1080}}
 
-    local coreGui = ThemeInstance.new("CoreGui")
-    coreGui.Name = "CoreGui"
-
-    local lighting = ThemeInstance.new("Lighting")
-    lighting.Name = "Lighting"
-    lighting.ClockTime = 14
-    lighting.Brightness = 2
-    lighting.Ambient = ThemeColor3.fromRGB(70, 70, 70)
-    lighting.OutdoorAmbient = ThemeColor3.fromRGB(70, 70, 70)
-
-    local workspaceService = ThemeInstance.new("Workspace")
-    workspaceService.Name = "Workspace"
-    workspaceService.Gravity = 196.2
-    workspaceService.CurrentCamera = ThemeInstance.new("Camera")
-    workspaceService.CurrentCamera.Name = "Camera"
-    workspaceService.CurrentCamera.CFrame = {__cframe = true}
-    function workspaceService:Raycast() return nil end
-
-    local tweenService = {}
-    function tweenService:Create(_, object, info, goal)
-        local tween = {Play = function() end, Cancel = function() end, Pause = function() end, Completed = themeSignal()}
-        return tween
-    end
-
-    local marketplace = {}
-    function marketplace:GetProductInfo() return {Name = "Test", PriceInRobux = 0} end
-
-    local textService = {}
-    function textService:GetTextSize(text, size) return ThemeVector2.new(#tostring(text) * size * 0.5, size) end
-
-    local httpService = {}
-    function httpService:JSONEncode(value) return "{}" end
-    function httpService:JSONDecode(value) return {} end
-    function httpService:GenerateGUID() return "00000000-0000-0000-0000-000000000000" end
-    function httpService:UrlEncode(value) return tostring(value) end
-
-    local statsService = {}
-    function statsService:GetTotalMemoryUsageMb() return 512 end
-    statsService.ChildAdded = themeSignal()
-
-    local soundService = ThemeInstance.new("SoundService")
-    soundService.Name = "SoundService"
-
-    local teleportService = {}
-    function teleportService:Teleport() end
-    function teleportService:TeleportToPlaceInstance() end
-
-    themeServices = {
-        Players = withPropSignals(players), RunService = withPropSignals(runService), UserInputService = withPropSignals(userInput),
-        CoreGui = coreGui, Lighting = lighting, Workspace = workspaceService,
-        TweenService = withPropSignals(tweenService), MarketplaceService = withPropSignals(marketplace),
-        TextService = withPropSignals(textService), HttpService = withPropSignals(httpService), Stats = withPropSignals(statsService),
-        SoundService = soundService, TeleportService = withPropSignals(teleportService),
-        ReplicatedStorage = ThemeInstance.new("ReplicatedStorage"),
-        TextChatService = ThemeInstance.new("TextChatService"),
-        Teams = ThemeInstance.new("Teams"),
-    }
-
-    local themeGame = {PlaceId = 1, GameId = 2, JobId = "theme-smoke"}
-    function themeGame:GetService(name) return themeServices[name] or ThemeInstance.new(name) end
-    function themeGame:IsLoaded() return true end
-    function themeGame:GetFullName() return "Game" end
-    function themeGame:HttpGet(url)
-        -- The theme pulls the optional Icons library from GitHub, then fetches each
-        -- split part through the same resolver path. Both are served locally so the
-        -- smoke test stays offline; any other fetch fails loudly.
-        if tostring(url):find("Icons", 1, true) then
-            return "return {SetIconsType=function() end, GetIcon=function() return nil end}"
-        end
-        local rel = tostring(url):gsub("^https://raw.githubusercontent.com/glowpkj/DepHub/main/", ""):gsub("%?.*$", "")
-        if _THEME_PARTS and _THEME_PARTS[rel] then return _THEME_PARTS[rel] end
-        error("Unexpected HTTP in theme smoke test: " .. tostring(url))
-    end
-    function themeGame:HttpGetAsync(url) return self:HttpGet(url) end
-    function themeGame:GetObjects() return {} end
-
-    local themeEnv = {}
-    themeEnv.game = themeGame
-    themeEnv.workspace = workspaceService
-    themeEnv.Enum = ThemeEnum
-    themeEnv.Instance = ThemeInstance
-    themeEnv.Color3 = ThemeColor3
-    themeEnv.ColorSequence = {new = function(a, b) return {__colorSequence = true, Color = a, Color2 = b} end}
-    themeEnv.ColorSequenceKeypoint = {new = function(t, c) return {Time = t, Value = c, __colorSequence = true} end}
-    themeEnv.NumberSequence = {new = function(a, b) return {__numberSequence = true, Value = a, Value2 = b} end}
-    themeEnv.NumberSequenceKeypoint = {new = function(t, v) return {Time = t, Value = v, __numberSequence = true} end}
-    themeEnv.NumberRange = {new = function(a, b) return {Min = a or 0, Max = b or a or 0} end}
-    themeEnv.UDim = ThemeUDim
-    themeEnv.UDim2 = ThemeUDim2
-    themeEnv.Vector2 = ThemeVector2
-    themeEnv.Vector3 = {new = function(x, y, z) return {X = x or 0, Y = y or 0, Z = z or 0, __vector = true} end}
-    themeEnv.CFrame = {new = function(...) return {__cframe = true} end, lookAt = function() return {__cframe = true} end, Angles = function() return {__cframe = true} end}
-    themeEnv.TweenInfo = ThemeTweenInfo
-    themeEnv.RaycastParams = {new = function() return {FilterDescendantsInstances = {}} end}
-    themeEnv.Rect = {new = function(...) return setmetatable({}, {__index = function() return 0 end}) end}
-    themeEnv.typeof = themeTypeof
-    themeEnv.type = type
-    themeEnv.math = math
-    themeEnv.table = table
-    themeEnv.string = string
-    themeEnv.os = os
-    themeEnv.pcall = pcall
-    themeEnv.xpcall = xpcall
-    themeEnv.error = error
-    themeEnv.assert = assert
-    themeEnv.tostring = tostring
-    themeEnv.tonumber = tonumber
-    themeEnv.ipairs = ipairs
-    themeEnv.pairs = pairs
-    themeEnv.next = next
-    themeEnv.select = select
-    themeEnv.unpack = table.unpack
-    themeEnv.setmetatable = setmetatable
-    themeEnv.getmetatable = getmetatable
-    themeEnv.rawget = rawget
-    themeEnv.rawset = rawset
-    themeEnv.tick = function() return os.clock() end
-    themeEnv.time = function() return os.clock() end
-    themeEnv.wait = function() end
-    themeEnv.spawn = function(fn, ...) return fn end
-    themeEnv.delay = function(_, fn, ...) return fn end
-    themeEnv.setfenv = function(fn, env2)
-        if type(fn) == "function" then setfenv(fn, env2) end
-        return fn
-    end
-    themeEnv.gethui = function() return coreGui end
-    themeEnv.getcustomasset = function(p) return "rbxasset://" .. tostring(p) end
-    themeEnv.identifyexecutor = function() return "ThemeSmoke", "1.0" end
-    themeEnv.request = function() return {StatusCode = 200, Body = "{}"} end
-    themeEnv["typeof"] = themeTypeof
-    themeEnv.loadstring = function(source)
-        local fn, err = loadstring(source)
-        if fn then setfenv(fn, themeEnv) end
-        return fn, err
-    end
-
-    -- Single flat environment the theme chunk runs in. `getgenv`/`getfenv` return
-    -- it so the theme's `(getgenv and getgenv()) or _G` pattern resolves here.
-    local themeEnvSel = themeEnv
-    themeEnvSel._G = themeEnvSel
-    themeEnvSel.getgenv = function() return themeEnvSel end
-    themeEnvSel.getfenv = function() return themeEnvSel end
-
-    -- Task scheduler double. Deferred work is QUEUED, not run inline: the theme
-    -- starts watchdog/restore loops with task.spawn/defer, and running those
-    -- synchronously during construction never terminates. The queue is flushed a
-    -- bounded number of times after the window is built.
-    local themeDeferred = {}
-    local themeWaitCount = 0
-    themeEnvSel.task = {
-        wait = function()
-            themeWaitCount += 1
-            if themeWaitCount > 5000 then
-                error("[theme-double] task.wait called " .. themeWaitCount .. " times -- unbounded init loop", 2)
-            end
+    local renderEnum = setmetatable({}, {
+        __index = function()
+            return setmetatable({}, {__index = function() return 0 end})
         end,
-        cancel = function() end,
-        defer = function(fn, ...) themeDeferred[#themeDeferred + 1] = {fn = fn, args = {...}} end,
-        delay = function(_, fn, ...) themeDeferred[#themeDeferred + 1] = {fn = fn, args = {...}} end,
-        spawn = function(fn, ...) themeDeferred[#themeDeferred + 1] = {fn = fn, args = {...}}; return fn end,
-    }
-    themeEnvSel.FlushThemeDeferred = function(rounds)
-        for _ = 1, rounds or 4 do
-            local pending = themeDeferred
-            themeDeferred = {}
-            for _, entry in ipairs(pending) do
-                pcall(entry.fn, table.unpack(entry.args))
-            end
-            if #themeDeferred == 0 then break end
-        end
-    end
-
-    local themeSource = assert(_THEME_SOURCE, "theme source not injected")
-    local themeChunk, themeCompileError = themeEnvSel.loadstring(themeSource)
-    check(themeChunk ~= nil, "demon-theme.luau compiles: " .. tostring(themeCompileError))
-
-    local themeOk, themeExport = pcall(themeChunk)
-    check(themeOk, "demon-theme.luau runs: " .. tostring(themeExport))
-    check(type(themeExport) == "table", "demon-theme.luau returns a table export")
-    check(type(themeExport.new) == "function", "export.new is a function")
-    check(type(themeExport.CreateWindow) == "function", "export.CreateWindow is a function")
-    check(type(themeExport.Themes) == "table", "export.Themes is a table")
-    check(type(themeExport.WeatherTypes) == "table", "export.WeatherTypes is a table")
-    check(type(themeExport.FocusOverlayTypes) == "table", "export.FocusOverlayTypes is a table")
-
-    -- Build a window exactly the way demon-ui.lua does.
-    local buildOk, library = pcall(themeExport.new, {
-        Title = "DepHub",
-        Version = "0.0.0",
-        Author = "DepHub",
-        Theme = "Monochrome",
-        TabPosition = "Side",
-        CategoryAlign = "Center",
-        ToggleKey = ThemeEnum.KeyCode.RightControl,
-        Acrylic = true,
-        AcrylicBlur = 18,
-        Size = ThemeUDim2.fromOffset(900, 580),
-        ThemeAutoLoad = false,
-        SoundsEnabled = true,
-        Tooltip = true,
     })
-    check(buildOk, "export.new builds a window: " .. tostring(library))
-    check(type(library) == "table", "the built window is a table")
-    check(type(library._STATE) == "table", "the window carries its _STATE")
-    check(type(library._UI) == "table" and library._UI.MainContainer ~= nil, "the window built a main container")
-    check(library._initialized == true, "the window finished initialising")
+    renderEnum.KeyCode = setmetatable({GetEnumItems = function() return {} end}, {__index = function() return 0 end})
+    renderEnum.UserInputType = {MouseButton1 = 1, Touch = 2, MouseMovement = 3}
+    renderEnum.UserInputState = {End = 1}
+    renderEnum.PlaybackState = {Playing = 1}
 
-    -- Run the queued deferred work (watchdog/restore kicks) a bounded number of
-    -- rounds; a healthy window settles, it never keeps queueing forever.
-    themeEnvSel.FlushThemeDeferred(4)
+    local renderColor3 = setmetatable({}, {
+        __index = function(_, key)
+            if key == "fromRGB" then return function(r, g, b) return {R = r, G = g, B = b} end end
+            if key == "new" then return function() return {} end end
+            return {}
+        end,
+    })
 
-    -- Theming, navigation and a real tab/section/control round trip.
-    check(pcall(function() library:CreateCategory("General", "layers") end), "CreateCategory succeeds")
-    local tab = library:CreateTab("General", "Smoke")
-    check(tab ~= nil and library._STATE.ContentPages["Smoke"] ~= nil, "CreateTab registers a content page")
-    local section = library:CreateSection("Smoke", "Settings", nil, true, "Left", "layers")
-    check(section ~= nil, "CreateSection returns a section")
-    check(pcall(function() library:AddToggle(section, "Enabled", false, function() end) end), "AddToggle builds a control")
-    check(pcall(function() library:AddSlider(section, "Amount", 0, 100, 50, 0, function() end) end), "AddSlider builds a control")
-    check(pcall(function() library:AddButton(section, "Run", function() end) end), "AddButton builds a control")
+    local renderEnv = {
+        game = {
+            GetService = function(_, name) return renderServices[name] or {} end,
+            HttpGet = function() return "" end,
+        },
+        workspace = renderServices.Workspace,
+        Instance = {new = renderInstance},
+        Enum = renderEnum,
+        Color3 = renderColor3,
+        ColorSequence = {new = function(t) return t or {} end},
+        ColorSequenceKeypoint = {new = function(t, c) return {Time = t, Value = c} end},
+        UDim = {new = function(s, o) return {Scale = s, Offset = o} end},
+        UDim2 = {
+            new = function(xs, xo, ys, yo) return {X = {Scale = xs, Offset = xo}, Y = {Scale = ys, Offset = yo}} end,
+            fromOffset = function(x, y) return {X = {Scale = 0, Offset = x}, Y = {Scale = 0, Offset = y}} end,
+            fromScale = function(x, y) return {X = {Scale = x, Offset = 0}, Y = {Scale = y, Offset = 0}} end,
+        },
+        Vector2 = {new = function(x, y) return {X = x, Y = y, Unit = {X = 0, Y = 0}} end},
+        CFrame = {new = function() return {} end},
+        Rect = {new = function() return {} end},
+        TweenInfo = {new = function() return {} end},
+        NumberSequence = {new = function() return {} end},
+        Random = {new = function() return {NextNumber = function() return 0.5 end, NextInteger = function(a) return a end} end},
+        tick = function() return 0 end,
+        os = os,
+        typeof = function(v) return type(v) end,
+        gethui = function() return renderServices.CoreGui end,
+        cloneref = function(v) return v end,
+        hookfunction = function() end,
+        makefolder = function() end,
+        writefile = function() end,
+        readfile = function() return "{}" end,
+        delfile = function() end,
+        delfolder = function() end,
+        isfolder = function() return false end,
+        isfile = function() return false end,
+        getcustomasset = function(x) return x end,
+        setclipboard = function() end,
+        task = {
+            spawn = function(fn, ...) return fn(...) end,
+            delay = function() end,
+            defer = function() end,
+            wait = function() end,
+        },
+        require = function() return nil end,
+        utf8 = utf8,
+    }
+    renderEnv.getgenv = function() return renderEnv end
+    renderEnv._G = renderEnv
+    renderEnv.type = type
+    renderEnv.pairs = pairs
+    renderEnv.ipairs = ipairs
+    renderEnv.rawget = rawget
+    renderEnv.rawset = rawset
+    renderEnv.setmetatable = setmetatable
+    renderEnv.getmetatable = getmetatable
+    renderEnv.table = table
+    renderEnv.string = string
+    renderEnv.math = math
+    renderEnv.select = select
+    renderEnv.tostring = tostring
+    renderEnv.tonumber = tonumber
+    renderEnv.error = error
+    renderEnv.assert = assert
+    renderEnv.pcall = pcall
+    renderEnv.print = print
 
-    -- HStack: controls grouped side by side. The row builds a container with a
-    -- horizontal UIListLayout, takes the controls through the same Add* API, and
-    -- re-shares the row width across them so each gets 1/N of the line.
-    local row = section:AddHStack()
-    check(type(row) == "table" and row.__tag == "HStack", "AddHStack returns an HStack handle")
-    check(row.CreateToggle ~= nil and row.CreateSlider ~= nil, "an HStack handle exposes the same Create* builders as a section")
-    local rowT1 = row:CreateToggle("Row A", false, function() end)
-    local rowT2 = row:CreateToggle("Row B", false, function() end)
-    check(rowT1 ~= nil and rowT2 ~= nil, "an HStack accepts controls through its own Create* builders")
-    -- The row reflow must have split the width 50/50 between the two children.
-    local rowFrame = row.Raw
-    check(type(rowFrame) == "table", "the HStack handle exposes its container frame")
-    local rowLayout = rowFrame:FindFirstChildOfClass("UIListLayout")
-    check(rowLayout ~= nil and rowLayout.FillDirection == ThemeEnum.FillDirection.Horizontal, "an HStack lays its children out horizontally")
-    local rowKids = {}
-    for _, child in ipairs(rowFrame:GetChildren()) do
-        if child.ClassName == "Frame" then rowKids[#rowKids + 1] = child end
+    -- loadstring in the real executor inherits the caller's environment; the
+    -- standalone Luau binary resets it, so restore it here.
+    local rawLoadstring = loadstring
+    local function renderLoadstring(source, name)
+        local chunk = rawLoadstring(source, name)
+        if chunk then pcall(setfenv, chunk, renderEnv) end
+        return chunk
     end
-    check(#rowKids == 2, "the HStack holds its two controls")
-    check(rowKids[1].Size.X.Scale == 0.5 and rowKids[2].Size.X.Scale == 0.5, "an HStack shares its width evenly across both controls")
+    renderEnv.loadstring = renderLoadstring
+    renderEnv.setfenv = setfenv
 
-    -- A slider in a half-width HStack used to break: its internals are
-    -- right-anchored with fixed offsets (label 1,-142; -/+ buttons at 1,-114 /
-    -- 1,-18), so at half width the label collapsed and the buttons overflowed off
-    -- the right edge -- the slider looked missing. The reflow now refuses to
-    -- squeeze a fixed-layout (tall holder) control: it keeps full width.
-    do
-        local probe = section:AddHStack()
-        local sliderHandle = probe:CreateSlider("Impulse", 0, 150, 25, 0, function() end)
-        local sliderHolder
-        for _, child in ipairs(probe.Raw:GetChildren()) do
-            if child._props.ClassName == "Frame" then sliderHolder = child end
+    local librarySource = assert(_THEME_SOURCE, "library source not injected")
+    local libraryChunk, libraryCompileError = renderLoadstring(librarySource, "dephubv2lib")
+    check(libraryChunk ~= nil, "src/dephubv2lib.lua compiles: " .. tostring(libraryCompileError))
+    local libraryOk, library = pcall(libraryChunk)
+    check(libraryOk, "src/dephubv2lib.lua runs: " .. tostring(library))
+    check(type(library) == "table", "src/dephubv2lib.lua returns a table export")
+    check(type(library.MakeWindow) == "function", "the library exposes MakeWindow")
+    check(type(library.GetIconByName) == "function", "the library exposes GetIconByName")
+    check(type(library.SetTheme) == "function", "the library exposes SetTheme")
+
+    local window = library:MakeWindow({Title = "DepHub Test", SubTitle = "render"})
+    check(type(window) == "table", "MakeWindow returns a window")
+    check(type(window.MakeTab) == "function", "the window exposes MakeTab")
+    check(type(window.Notify) == "function", "the window exposes Notify")
+    check(type(window.SelectTab) == "function", "the window exposes SelectTab")
+
+    local tab = window:MakeTab({Title = "Home"})
+    check(type(tab) == "table", "MakeTab returns a tab")
+    check(tab.IS_A_TAB == true, "the tab marks itself as a tab")
+    check(type(tab.AddSection) == "function", "the tab exposes AddSection")
+    check(type(tab.AddToggle) == "function", "the tab exposes AddToggle")
+    check(type(tab.SetVisible) == "function", "the tab exposes SetVisible")
+
+    local section = tab:AddSection("Section A")
+    check(type(section) == "table", "AddSection returns a header object")
+    check(section.Kind == "Section", "the section header is tagged as a Section")
+
+    local toggle = tab:AddToggle({Name = "My toggle", Default = true})
+    check(type(toggle) == "table", "AddToggle returns a handle")
+    check(toggle.Value == true, "the toggle keeps its default value")
+    check(toggle.Kind == "Toggle", "the toggle is tagged as a Toggle")
+
+    local slider = tab:AddSlider({Name = "My slider", Min = 0, Max = 100, Default = 25, Increment = 1})
+    check(type(slider) == "table", "AddSlider returns a handle")
+    check(slider.Value == 25, "the slider keeps its default value")
+
+    local dropdown = tab:AddDropdown({Name = "My dropdown", Options = {"A", "B"}, Default = "A"})
+    check(type(dropdown) == "table", "AddDropdown returns a handle")
+
+    local button = tab:AddButton({Name = "Click", Callback = function() end})
+    check(type(button) == "table", "AddButton returns a handle")
+
+    local textbox = tab:AddTextBox({Name = "Input", Default = "", Placeholder = "type"})
+    check(type(textbox) == "table", "AddTextBox returns a handle")
+    check(type(textbox.Set) == "function", "the textbox exposes Set")
+
+    local paragraph = tab:AddParagraph("Title", "Body")
+    check(type(paragraph) == "table", "AddParagraph returns a handle")
+    check(paragraph.Kind == "Paragraph", "the paragraph is tagged as a Paragraph")
+
+    window:Notify({Title = "Hello", Content = "World", Duration = 3})
+    check(true, "Notify runs without error")
+
+    -- Now the adapter itself, against the library just built.
+    local adapterSource = _ADAPTER_SOURCE
+    if type(adapterSource) == "string" then
+        renderEnv.__DEPHUB = {SourceBaseURL = "https://example.invalid/"}
+        renderEnv.__dephubHttpGet = function(url)
+            if url:find("dephubv2lib", 1, true) then return librarySource end
+            return nil
         end
-        check(sliderHolder ~= nil, "the slider builds its holder")
-        check(sliderHolder.Size.X.Scale == 1, "a slider in a row keeps full width instead of being squeezed")
-        check(sliderHolder.Size.Y.Offset == 58, "the slider holder keeps its full height")
-        -- A toggle added after must also stay full width (the row is now vertical
-        -- in effect), never sharing a line with the slider.
-        local t = probe:CreateToggle("Jump Anywhere", false, function() end)
-        check(t ~= nil, "the row still accepts a toggle next to a slider")
-        local widths = {}
-        for _, child in ipairs(probe.Raw:GetChildren()) do
-            if child._props.ClassName == "Frame" then widths[#widths + 1] = child.Size.X.Scale end
-        end
-        for _, w in ipairs(widths) do check(w == 1, "every control next to a slider keeps full width") end
+        local adapterChunk, adapterError = renderLoadstring(adapterSource, "demon-ui")
+        check(adapterChunk ~= nil, "src/core/demon-ui.lua compiles: " .. tostring(adapterError))
+        local adapterOk, adapter = pcall(adapterChunk)
+        check(adapterOk, "src/core/demon-ui.lua runs: " .. tostring(adapter))
+        check(type(adapter) == "table" and type(adapter.new) == "function", "the adapter exposes new")
+
+        local ui = adapter.new({Name = "DepHub", Version = "0.0.0"})
+        check(type(ui) == "table", "the adapter builds a shell")
+        check(ui:CreateCategory("Farm", "wheat") == true, "the shell creates a category")
+
+        local shellTab = ui:CreateTab("Auto Farm", "Farm")
+        check(type(shellTab) == "table", "the shell creates a tab")
+        check(shellTab.Key == "Farm|Auto Farm", "the tab records its category key")
+        check(ui:CreateTab("Auto Farm", "Farm") == shellTab, "the shell reuses the same tab")
+
+        local shellSection = shellTab:CreateSection("FRUIT")
+        check(type(shellSection) == "table", "the shell creates a section")
+        check(type(shellSection:CreateToggle("Auto collect", true)) == "table", "section CreateToggle works")
+        check(type(shellSection:CreateSlider("Range", 10, 200, 55)) == "table", "section CreateSlider works")
+        check(type(shellSection:CreateDropdown("Island", {"One", "Two"}, "One")) == "table", "section CreateDropdown works")
+        check(type(shellSection:CreateButton("Go", function() end)) == "table", "section CreateButton works")
+        check(type(shellSection:CreateParagraph("Info", "Body")) == "table", "section CreateParagraph works")
+        local input = shellSection:CreateInput("Command", "placeholder", "")
+        check(type(input) == "table" and type(input.Control) == "table", "section CreateInput returns a control record")
+        check(type(shellSection:CreateRow()) == "table", "section CreateRow returns a handle")
+        check(type(shellSection:CreateStack()) == "table", "section CreateStack returns a handle")
+
+        check(type(ui.Library.CreateDashboardBanner) == "function", "the shell provides CreateDashboardBanner")
+        check(type(ui.Library.CreatePerformanceDashboard) == "function", "the shell provides CreatePerformanceDashboard")
+        local dashboardTab = ui:CreateTab("Dashboard", "General")
+        check(pcall(function() return ui.Library:CreateDashboardBanner(dashboardTab.Name) end), "the dashboard banner builds")
+        check(pcall(function() return ui.Library:CreatePerformanceDashboard(dashboardTab.Name, "Right") end), "the dashboard metrics build")
+
+        check(type(renderEnv.__DEPHUB_TOGGLE) == "function", "the shell publishes __DEPHUB_TOGGLE")
+        check(renderEnv.__DEPHUB_TOGGLE() == true, "the toggle global reports success")
+
+        ui:SetCurrentSea("Sea2")
+        shellTab.Sea = "Sea1"
+        ui:_refreshVisibility()
+        check(shellTab.Visible == false, "a tab scoped to another sea is hidden")
+        shellTab.Sea = nil
+        ui:_refreshVisibility()
+        check(shellTab.Visible == true, "an unscoped tab shows again")
+
+        ui:Destroy()
+        check(ui.Destroyed == true, "Destroy flags the shell")
     end
-
-    -- VStack: a named vertical group, same stacked layout as the section body.
-    local stack = section:AddVStack()
-    check(type(stack) == "table" and stack.__tag == "VStack", "AddVStack returns a VStack handle")
-    check(pcall(function() stack:CreateToggle("Stacked", false, function() end) end), "a VStack accepts controls through its own builders")
-    local stackFrame = stack.Raw
-    local stackLayout = stackFrame:FindFirstChildOfClass("UIListLayout")
-    check(stackLayout ~= nil and stackLayout.FillDirection == ThemeEnum.FillDirection.Vertical, "a VStack lays its children out vertically")
-
-    -- Section height hugs its content. The body's UIListLayout.AbsoluteContentSize
-    -- already includes the body's UIPadding, so the section must be sized to the
-    -- measured content exactly -- the old `+ 24` left a dead band under the last
-    -- control, which is the empty space that showed up at the bottom of a section.
-    check(_THEME_PARTS["src/core/ui/theme/public-api.luau"] ~= nil, "the theme's public-api part is available")
-    local publicApi = _THEME_PARTS["src/core/ui/theme/public-api.luau"]
-    check(publicApi:find("AbsoluteContentSize.Y", 1, true) ~= nil, "the section height reads the body layout's measured content")
-    check(publicApi:find("innerH + 24", 1, true) == nil, "the section height no longer adds a constant to the measured content")
-    check(publicApi:find("(innerH > 0) and innerH or 0", 1, true) ~= nil, "the section height is the measured content itself (or zero)")
-
-    -- The fixed Dashboard tab the loader builds from every game. Against the
-    -- real theme this exercises CreateDashboardBanner (greeting/avatar + server
-    -- card) and CreatePerformanceDashboard (live metrics), which is exactly
-    -- what the loader calls -- so a break here is caught before release.
-    local dashboardTab = library:CreateTab("General", "Dashboard")
-    check(dashboardTab ~= nil and library._STATE.ContentPages["Dashboard"] ~= nil, "Dashboard tab registers a content page")
-    check(pcall(function() library:CreateDashboardBanner("Dashboard") end), "CreateDashboardBanner builds the dashboard banner")
-    check(pcall(function() library:CreatePerformanceDashboard("Dashboard", "Right") end), "CreatePerformanceDashboard builds the dashboard metrics")
-    -- The banner reads _STATE.TabTopContainers[tabName], so its presence proves
-    -- the tab really exists where the dashboard builders look for it.
-    check(library._STATE.TabTopContainers ~= nil and library._STATE.TabTopContainers["Dashboard"] ~= nil, "Dashboard tab has a top container")
-
-    -- Mouse ownership is scoped to the panel being open. MouseBehavior belongs to
-    -- the game's camera controller and is never snapshotted/restored: doing that
-    -- re-locked the pointer to the centre on close whenever the game had been
-    -- holding LockCenter -- the "mouse travado" bug. Only MouseIconEnabled is ours
-    -- while open, and close always returns a visible cursor.
-    -- The window starts open, so close it first to reach the closed state.
-    if library._STATE.GuiVisible then library:Toggle() end
-    library._STATE.AnimatingGui = false
-    check(library._STATE.GuiVisible == false, "the window starts open and closes on first toggle")
-
-    -- Simulate a game that hides its cursor and locks it to the centre while play
-    -- is in progress (first person / aiming), then open the panel.
-    userInput.MouseIconEnabled = false
-    userInput.MouseBehavior = ThemeEnum.MouseBehavior.LockCenter
-    library:Toggle() -- open: must free the mouse and take over cursor visibility
-    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default, "opening frees the mouse")
-    check(userInput.MouseIconEnabled == false, "opening hides the OS cursor behind the custom one")
-    runService.RenderStepped:Fire(0.016)
-    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default, "an open panel keeps the mouse free")
-
-    library._STATE.AnimatingGui = false
-    library:Toggle() -- close: hand the mouse back to the game and show a cursor
-    check(userInput.MouseIconEnabled == true, "closing hands back a visible cursor")
-    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.Default,
-        "closing never re-locks the mouse to the game's old LockCenter")
-
-    -- While the panel is closed nothing may touch the mouse, so hovering the
-    -- restore pill can no longer hide the OS cursor out from under the game.
-    userInput.MouseIconEnabled = true
-    userInput.MouseBehavior = ThemeEnum.MouseBehavior.LockCenter -- the game re-locks it itself
-    runService.RenderStepped:Fire(0.016)
-    check(userInput.MouseIconEnabled == true, "a closed panel leaves the cursor visible")
-    check(userInput.MouseBehavior == ThemeEnum.MouseBehavior.LockCenter,
-        "a closed panel leaves the game's mouse behaviour alone")
-
-    check(pcall(function() library:SetTheme("Monochrome") end), "SetTheme succeeds")
-    check(pcall(function() library:Notify("T", "M") end), "Notify succeeds")
-    check(pcall(function() library:Destroy() end), "Destroy succeeds")
-    check(library._STATE.Destroyed == true, "Destroy marks the window destroyed")
 end

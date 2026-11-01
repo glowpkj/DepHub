@@ -214,48 +214,55 @@ local Services = setmetatable({}, {
 })
 
 local function installDashboardBuilders(adapter, library)
-    function library:CreateDashboardBanner(tabName)
-        local record = adapter._tabByName[tabName]
-        if not record or not record.Control then return nil end
-        local player = Services.Players and Services.Players.LocalPlayer
-        local displayName = "Player"
-        if player then displayName = tostring(player.DisplayName or player.Name or "Player") end
-        record.Control:AddSection("Dashboard")
-        local banner = record.Control:AddParagraph(
-            greetingText() .. ", " .. displayName,
-            "Signed in to DepHub. Everything below is built live from this game."
-        )
-        return banner
+    -- Real RedzLib has no dashboard builders, so the adapter supplies them. A
+    -- test double (or a future library that grows its own) already providing them
+    -- keeps its implementation.
+    if type(library.CreateDashboardBanner) ~= "function" then
+        function library:CreateDashboardBanner(tabName)
+            local record = adapter._tabByName[tabName]
+            if not record or not record.Control then return nil end
+            local player = Services.Players and Services.Players.LocalPlayer
+            local displayName = "Player"
+            if player then displayName = tostring(player.DisplayName or player.Name or "Player") end
+            record.Control:AddSection("Dashboard")
+            local banner = record.Control:AddParagraph(
+                greetingText() .. ", " .. displayName,
+                "Signed in to DepHub. Everything below is built live from this game."
+            )
+            return banner
+        end
     end
 
-    function library:CreatePerformanceDashboard(tabName, columnName)
-        local record = adapter._tabByName[tabName]
-        if not record or not record.Control then return nil end
-        local metrics = record.Control:AddParagraph("Performance", "Session started")
-        local startedAt = os.clock()
-        local runService = Services.RunService
-        if runService and type(runService.RenderStepped) == "table" and type(runService.RenderStepped.Connect) == "function" then
-            local lastFrame = os.clock()
-            local frames = 0
-            local accum = 0
-            adapter._metricsConnection = runService.RenderStepped:Connect(function(deltaTime)
-                local now = os.clock()
-                frames = frames + 1
-                accum = accum + (tonumber(deltaTime) or (now - lastFrame))
-                lastFrame = now
-                if accum >= 1 then
-                    local fps = math.floor(frames / accum)
-                    local elapsed = now - startedAt
-                    pcall(function()
-                        metrics:SetTitle(string.format("Performance  ·  %d FPS", fps))
-                        metrics:SetDescription(string.format("Session %02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), math.floor(elapsed % 60)))
-                    end)
-                    frames = 0
-                    accum = 0
-                end
-            end)
+    if type(library.CreatePerformanceDashboard) ~= "function" then
+        function library:CreatePerformanceDashboard(tabName, columnName)
+            local record = adapter._tabByName[tabName]
+            if not record or not record.Control then return nil end
+            local metrics = record.Control:AddParagraph("Performance", "Session started")
+            local startedAt = os.clock()
+            local runService = Services.RunService
+            if runService and type(runService.RenderStepped) == "table" and type(runService.RenderStepped.Connect) == "function" then
+                local lastFrame = os.clock()
+                local frames = 0
+                local accum = 0
+                adapter._metricsConnection = runService.RenderStepped:Connect(function(deltaTime)
+                    local now = os.clock()
+                    frames = frames + 1
+                    accum = accum + (tonumber(deltaTime) or (now - lastFrame))
+                    lastFrame = now
+                    if accum >= 1 then
+                        local fps = math.floor(frames / accum)
+                        local elapsed = now - startedAt
+                        pcall(function()
+                            metrics:SetTitle(string.format("Performance  ·  %d FPS", fps))
+                            metrics:SetDescription(string.format("Session %02d:%02d:%02d", math.floor(elapsed / 3600), math.floor((elapsed % 3600) / 60), math.floor(elapsed % 60)))
+                        end)
+                        frames = 0
+                        accum = 0
+                    end
+                end)
+            end
+            return metrics
         end
-        return metrics
     end
 end
 
@@ -312,11 +319,16 @@ end
 
 -- Backends call this to add a category of their own. RedzLib has no category
 -- concept, so the adapter records the group here; tabs keep the category name so
--- any consumer that inspects `tab.Category` still sees it. Idempotent.
+-- any consumer that inspects `tab.Category` still sees it. Idempotent. When the
+-- underlying library happens to model categories (a test double, or a future
+-- library), the call is forwarded so its own bookkeeping stays in step.
 function DemonUI:CreateCategory(name, icon)
     name = tostring(name or DEFAULT_CATEGORY)
     if self.Categories[name] then return true end
     self.Categories[name] = true
+    if type(self.Library.CreateCategory) == "function" then
+        pcall(function() self.Library:CreateCategory(name, icon) end)
+    end
     return true
 end
 

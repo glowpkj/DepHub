@@ -274,8 +274,9 @@ end})
 -- control so tests can assert per-game isolation without a Roblox client.
 local DOD_LIBRARY_STUB = [==[
 local function NewWindow()
-    local state = {ContentPages = {}, CategoryButtons = {}, CategoryTabs = {}, ActiveCategory = "General", ActiveTab = nil}
+    local state = {ContentPages = {}, CategoryButtons = {}, CategoryTabs = {}, ActiveCategory = "General", ActiveTab = nil, GuiVisible = true}
     local library = {_STATE = state, _Categories = {}, _Tabs = {}, _Controls = {}}
+    DOD_STUB_LIBRARY = library
     function library:Toggle()
         state.GuiVisible = not state.GuiVisible
         return state.GuiVisible
@@ -408,9 +409,58 @@ local function NewWindow()
         return {Kind = "performanceDashboard", TabName = tabName, Column = column}
     end
     function library:Destroy() library.Destroyed = true end
+    -- The adapter loads this stub through the RedzLib entry point and drives it
+    -- through RedzLib's own shape, so the window has to expose MakeTab and every
+    -- Add* accepts a single named-options table. The handlers translate that into
+    -- the stub's positional form, keeping the flat DepHub contract the lifecycle
+    -- tests assert on.
+    local function opt(kind, value)
+        -- Accept both RedzLib's named table and the stub's positional argument.
+        if type(kind) == "table" then return kind[value] end
+        return value
+    end
+    function library:MakeTab(options)
+        options = options or {}
+        local name = opt(options, "Title") or opt(options, "Name") or options[1] or "Tab"
+        local handle = {Title = name, IS_A_TAB = true}
+        local tabs = library._Tabs or {}
+        tabs[#tabs + 1] = {Category = state.ActiveCategory, Name = name}
+        state.ContentPages[name] = {Visible = true}
+        state.ActiveTab = state.ActiveTab or name
+        state.CategoryTabs[state.ActiveCategory] = state.CategoryTabs[state.ActiveCategory] or {}
+        state.CategoryTabs[state.ActiveCategory][#state.CategoryTabs[state.ActiveCategory] + 1] = name
+        handle.AddSection = function(_, title) return library:CreateSection(name, opt(title, "Title") or title) end
+        handle.AddToggle = function(_, o) return library:AddToggle(nil, opt(o, "Name"), opt(o, "Default"), opt(o, "Callback")) end
+        handle.AddSlider = function(_, o) return library:AddSlider(nil, opt(o, "Name"), opt(o, "Min"), opt(o, "Max"), opt(o, "Default"), opt(o, "Increment"), opt(o, "Callback")) end
+        handle.AddDropdown = function(_, o) return library:AddDropdown(nil, opt(o, "Name"), opt(o, "Options"), opt(o, "Default"), opt(o, "Callback")) end
+        handle.AddButton = function(_, o) return library:AddButton(nil, opt(o, "Name"), opt(o, "Callback")) end
+        handle.AddTextBox = function(_, o) return library:AddTextbox(nil, opt(o, "Name"), opt(o, "Default"), opt(o, "Callback")) end
+        handle.AddParagraph = function(_, a, b)
+            if type(a) == "table" then return library:AddParagraph(nil, a.Title or a[1], a.Body or a[2]) end
+            return library:AddParagraph(nil, a, b)
+        end
+        handle.SetVisible = function(_, visible) state.ContentPages[name].Visible = visible end
+        handle.Select = function() state.ActiveTab = name end
+        return handle
+    end
+    function library:Toggle() return true end
+    -- The adapter drives visibility through RedzLib's Window:Minimize(), so the
+    -- stub models it as the visibility flip the old Toggle performed.
+    library.Minimize = function() state.GuiVisible = not state.GuiVisible; return state.GuiVisible end
     return library
 end
-return {new = function() return NewWindow() end}
+-- The adapter treats the module export as the library and the MakeWindow return
+-- as the window; tests introspect `ui.Library._Tabs/_Categories/_Controls/_STATE`,
+-- so the export forwards those to the single instance the window built.
+return setmetatable({
+    MakeWindow = function(_, options) return NewWindow() end
+}, {
+    __index = function(_, key)
+        local lib = DOD_STUB_LIBRARY
+        if lib then return lib[key] end
+        return nil
+    end,
+})
 ]==]
 local function sandbox(placeId, gameId)
     local player = Instance.new("Player")
@@ -552,9 +602,12 @@ local function sandbox(placeId, gameId)
     function game:HttpGet(url)
         context.Requests[#context.Requests + 1] = url
         assert(not url:find("src/ui/", 1, true), "Frontend download attempted")
-        -- The theme module is a normal repo file; the test double stands in for
-        -- it so the wrapper can build a window without a real client.
-        if url:find("demon-theme", 1, true) or url:find("demon-of-darkness-ui", 1, true) or url:find("DemonOfDarknessUI", 1, true) then
+        -- The shell's UI library is a normal repo file; the test double stands in
+        -- for it so the wrapper can build a window without a real client. RedzLib
+        -- itself needs a full Roblox client, so the harness answers with the same
+        -- contract-shaped stub it has always used.
+        if url:find("dephubv2lib", 1, true) or url:find("demon-theme", 1, true)
+            or url:find("demon-of-darkness-ui", 1, true) or url:find("DemonOfDarknessUI", 1, true) then
             return DOD_LIBRARY_STUB
         end
         -- Any of the loader's source hosts maps to the same repo path, so strip
