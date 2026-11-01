@@ -759,7 +759,7 @@ local player = ossContext.Player
 -- BF_INFRA is the teleport motor: it loads without a toggle and lives in
 -- State.Infra, so the backend tests need its file served too.
 local BF_FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local BF_FEATURES = {"bladhits", "fruit", "raid"}
+local BF_FEATURES = {"bladhits", "fruit"}
 local BF_INFRA = {"teleport"}
 -- INSERT_THEME_SOURCE
 -- INSERT_BLOXF_OSS_TESTS

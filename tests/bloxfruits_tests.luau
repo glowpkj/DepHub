@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "fruit", "raid"}
+local FEATURES = {"bladhits", "fruit"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -72,7 +72,7 @@ do
     local factory = state.Features.bladhits
     check(type(factory) == "table" and type(factory.new) == "function", "a blade hit e carregada pelo backend")
     check(state.Features.fruit ~= nil, "a feature de fruta e carregada pelo backend")
-    check(state.Features.raid ~= nil, "a feature de raid e carregada pelo backend")
+    check(state.Features.raid == nil, "a raid parkeada nao e carregada pelo backend")
     check(type(state.Errors) == "table" and #state.Errors == 0, "as features carregam sem erro")
 
     -- Nada liga sozinho: o painel abre sem instanciar a feature.
@@ -112,14 +112,10 @@ do
     check(state.Instances.fruit.Teleport == state.Infra.teleport, "o motor e o mesmo objeto da infra")
     state:SetToggle("fruit", false)
 
-    -- A raid instancia pelo proprio toggle e recebe TANTO o motor de teleporte
-    -- quanto a blade hit (o ataque e injetado, nao reimplementado). Sem a blade
-    -- hit instanciada antes, o raid nasce sem motor de ataque.
-    check(state.Instances.raid == nil, "a raid nao instancia so pelo load")
-    check(state:SetToggle("raid", true), "ligar o toggle instancia a raid")
-    check(state.Instances.raid.Teleport == state.Infra.teleport, "a raid recebeu o motor de teleporte")
-    check(state.Instances.raid.Combat == state.Instances.bladhits, "a raid recebeu a blade hit como motor de ataque")
-    state:SetToggle("raid", false)
+    -- A raid esta PARKEADA (o usuario vai refazer por completo): nao instancia,
+    -- nao carrega e o toggle e recusado. O arquivo foi pra parked/raid.lua.
+    check(state.Instances.raid == nil, "a raid parkeada nao instancia pelo load")
+    check(state:SetToggle("raid", true) == false, "a raid parkeada nao pode ser ligada")
 
     local status = state:GetStatus()
     check(status.TogglesOn == 1, "status conta so a blade hit ligada")
@@ -153,7 +149,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "teleport" or name == "fruit" or name == "raid", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "teleport" or name == "fruit", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -172,7 +168,7 @@ do
     local names = {}
     for _, tab in ipairs(ui.Library._Tabs) do names[tab.Name] = true end
     check(names["Combat"] == true, "a aba Combat e criada para a blade hit")
-    check(names["Farm"] == true, "a aba Farm e criada para fruta e raid")
+    check(names["Farm"] == true, "a aba Farm e criada para a fruta")
 end
 
 -- A feature de fruta e auto-contida e usa o motor de teleporte por INJECAO:
@@ -250,255 +246,6 @@ do
     fruit:Destroy()
 end
 
--- O auto complete e o SEGUNDO toggle da raid, e faz uma coisa so: terminar uma
--- raid que ja esta rolando. Nao compra chip, nao cria raid, nao aperta botao --
--- acha as ilhas em workspace.Map.RaidMap, vai na mais perto e recalcula.
-do
-    local ctx = bfContext(994732206, 994732206)
-    local Raid = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "raid.lua"])()
-    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
-
-    -- Personagem posicionado na origem.
-    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
-    ctx.Player.Character = char
-    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
-    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
-
-    local raid = Raid.new({ teleport = motor })
-    check(raid.AutoComplete == false, "o auto complete comeca desligado")
-    check(raid.IslandNumber == 1, "o auto complete comeca apontando pra ilha 1")
-
-    -- Sem RaidMap no workspace: nao ha ilha nenhuma, e ele reporta isso.
-    check(raid:RaidMap() == nil, "sem raid rolando nao ha RaidMap")
-    check(raid:IslandByNumber(1) == nil, "sem RaidMap nao ha ilha 1")
-    check(raid:HighestIslandNumber() == 0, "sem RaidMap nao ha ilha nenhuma")
-    check(raid:CompleteStep() == false, "sem RaidMap o passo de completar recusa")
-
-    -- A raid comeca: workspace.Map.RaidMap aparece com as ilhas.
-    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
-    local raidMap = Instance.new("Folder"); raidMap.Name, raidMap.Parent = "RaidMap", map
-    check(raid:RaidMap() == raidMap, "acha o RaidMap em workspace.Map")
-
-    -- Tres ilhas, nomeadas por numero -- a ORDEM e o nome, nao a distancia.
-    -- Propositalmente a 3 esta mais perto que a 2, pra provar que a sequencia e
-    -- por numero e nao por proximidade.
-    local i1 = Instance.new("Model"); i1.Name, i1.Parent = "RaidIsland1", raidMap
-    local i1p = Instance.new("Part"); i1p.Name, i1p.Position, i1p.Parent = "Floor", Vector3.new(0, 0, 50), i1
-    local i2 = Instance.new("Model"); i2.Name, i2.Parent = "RaidIsland2", raidMap
-    local i2p = Instance.new("Part"); i2p.Name, i2p.Position, i2p.Parent = "Floor", Vector3.new(0, 0, 500), i2
-    local i3 = Instance.new("Model"); i3.Name, i3.Parent = "RaidIsland3", raidMap
-    local i3p = Instance.new("Part"); i3p.Name, i3p.Position, i3p.Parent = "Floor", Vector3.new(0, 0, 200), i3
-
-    check(raid:IslandByNumber(1) == i1, "a ilha 1 e RaidIsland1")
-    check(raid:IslandByNumber(2) == i2, "a ilha 2 e RaidIsland2")
-    check(raid:IslandByNumber(3) == i3, "a ilha 3 e RaidIsland3")
-    check(raid:IslandByNumber(4) == nil, "nao existe ilha 4")
-    check(raid:HighestIslandNumber() == 3, "a ultima ilha e a 3")
-
-    -- A sequencia comeca na 1, mesmo com a 3 estando mais perto.
-    local island, number = raid:CurrentIsland()
-    check(island == i1 and number == 1, "a ilha atual comeca na 1, nao na mais perto")
-
-    -- O passo de completar acha a ilha 1 e voa pra la (o jogador esta na origem,
-    -- ilha 1 a 50 studs -- acima do limite de 40, entao voa). Sem mob nenhum no
-    -- workspace, a ilha ja conta como limpa -- mas ele so avanca no proximo
-    -- passo; aqui ele ainda registra onde estava.
-    check(raid:CompleteStep() == true, "com RaidMap o passo de completar acha a ilha")
-    check(motor:IsFlying() == true, "o passo de completar voa ate a ilha")
-    check(raid.RoundOver == false, "ha proxima ilha: a rodada nao acabou")
-    motor:Cancel()
-
-    -- Perto da ilha (menos de 40 studs) ele NAO reinicia o voo -- so fica
-    -- batendo. Reiniciar de perto travaria o personagem vibrando no lugar.
-    -- (Com mob vivo ele fica na ilha; o mob prova o caso "perto".)
-    root.Position = Vector3.new(0, 0, 20)
-    raid.IslandNumber = 1
-    motor:Cancel()
-    local enemies = Instance.new("Folder"); enemies.Name, enemies.Parent = "Enemies", ctx.Services.Workspace
-    local mob = Instance.new("Model"); mob.Name, mob.Parent = "Bandit", enemies
-    local mobHumanoid = Instance.new("Humanoid"); mobHumanoid.Health = 100; mobHumanoid.Parent = mob
-    check(raid:CompleteStep() == true, "perto da ilha o passo de completar ainda roda")
-    check(raid.IslandNumber == 1, "com mob vivo ele fica na ilha 1")
-    check(motor:IsFlying() == false, "perto da ilha nao reinicia o voo")
-
-    -- A ilha 1 limpa (sem mob vivo -- o mob morreu): ele AVANCA pro proximo
-    -- numero, nao pra mais perto.
-    root.Position = Vector3.new(0, 0, 0)
-    motor:Cancel()
-    mobHumanoid.Health = 0
-    check(raid:CompleteStep() == true, "ilha limpa: o passo de completar roda")
-    check(raid.IslandNumber == 2, "ilha 1 limpa -> avanca pra ilha 2 (numero, nao distancia)")
-    check(motor:IsFlying() == true, "avancou e voou pra ilha 2")
-
-    -- Ilha 3 tambem limpa: agora e a ultima -- sem proxima e sem mob = acabou.
-    motor:Cancel()
-    raid.IslandNumber = 3
-    check(raid:CompleteStep() == true, "ilha 3 limpa: o passo de completar roda")
-    check(raid.RoundOver == true, "sem proxima ilha e sem mob a rodada acaba")
-    check(motor:IsFlying() == false, "rodada acabou: ele nao voa mais pra lugar nenhum")
-
-    -- Auto complete sem motor de teleporte recusa.
-    local bare = Raid.new()
-    check(bare:SetAutoComplete(true) == false and bare.AutoComplete == false, "sem teleporte o auto complete recusa")
-
-    -- O toggle liga, reinicia a sequencia na ilha 1, e desliga sem explodir.
-    raid.IslandNumber = 5
-    raid.RoundOver = true
-    check(raid:SetAutoComplete(true) == true, "com teleporte o auto complete liga")
-    check(raid.IslandNumber == 1 and raid.RoundOver == false, "ligar reinicia a sequencia na ilha 1")
-    check(raid:SetAutoComplete(false) == true, "o auto complete desliga")
-    check(raid.AutoComplete == false, "depois de desligar nao esta mais ativo")
-
-    raid:Destroy()
-    bare:Destroy()
-end
-
--- O auto complete LIGA a blade hit quando ela existe, e DESLIGA ela ao desligar
--- o toggle -- mas so se foi o proprio complete que a ligou (nao mexe na blade
--- hit que o jogador ligou por fora).
-do
-    local ctx = bfContext(994732206, 994732206)
-    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
-    local Raid = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "raid.lua"])()
-
-    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
-    ctx.Player.Character = char
-    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
-    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
-    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
-    local raidMap = Instance.new("Folder"); raidMap.Name, raidMap.Parent = "RaidMap", map
-    local island = Instance.new("Model"); island.Name, island.Parent = "RaidIsland1", raidMap
-    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 0, 300), island
-
-    -- Uma blade hit de verdade, com os remotes resolvidos.
-    local BladeHit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "bladhits.lua"])()
-    local blade = BladeHit.new()
-    check(blade:ResolveRemotes(), "a blade hit resolve os remotes pra o complete dirigir")
-
-    local raid = Raid.new({ teleport = motor, combat = blade })
-    check(blade:IsEnabled() == false, "a blade hit comeca desligada")
-    check(raid:CompleteStep() == true, "o passo de completar acha a ilha")
-    check(blade:IsEnabled() == true, "o auto complete liga a blade hit")
-    check(raid.AttackEnabled == true, "o complete marca que foi ELE que ligou o ataque")
-
-    -- Desligar o auto complete derruba o ataque que ele ligou.
-    raid:SetAutoComplete(false)
-    check(blade:IsEnabled() == false, "desligar o auto complete desliga a blade hit que ele ligou")
-    check(raid.AttackEnabled == false, "a marca de ataque ligado some")
-
-    -- Se a blade hit ja estava ligada por fora, o complete nao a derruba.
-    check(blade:Enable() == true, "a blade hit e ligada por fora")
-    raid:CompleteStep()
-    check(raid.AttackEnabled == false, "o complete nao reivindica um ataque que ja estava ligado")
-    raid:SetAutoComplete(false)
-    check(blade:IsEnabled() == true, "a blade hit do jogador continua ligada")
-
-    blade:Destroy()
-    raid:Destroy()
-end
-
--- A raid e auto-contida e reusa DUAS pecas por injecao: o teleporte (pra ir ao-- tubo) e a blade hit (pra limpar as waves). Sem cada uma ela degrada de um jeito
--- especifico -- sem teleporte recusa; sem blade hit entra mas nao ataca. Este
--- bloco carrega ela sozinha e exercita a API publica.
-do
-    local ctx = bfContext(994732206, 994732206)
-    local Raid = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "raid.lua"])()
-    check(type(Raid) == "table" and type(Raid.new) == "function", "a raid carrega sozinha e publica new()")
-    check(#Raid.elements == 20 and Raid.elements[1] == "Flame", "a lista de elementos veio do original")
-
-    -- Sem motor de teleporte o Enable recusa: nao ha como ir ao tubo.
-    local bare = Raid.new()
-    check(bare.Teleport == nil and bare.Combat == nil, "sem injecao as duas pecas sao nil")
-    check(bare:Enable() == false, "a raid recusa sem motor de teleporte")
-
-    -- Com o teleporte (mas sem blade hit): liga, mas nao limpa wave.
-    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
-    bare:SetSea("Sea2")
-    bare.Teleport = motor
-    check(bare:Enable() == true, "com teleporte a raid liga")
-    check(bare:ClearStep() == false, "sem blade hit injetada a raid nao limpa wave")
-    bare:Disable()
-
-    -- O elemento e trocavel, e trocar invalida o chip comprado.
-    check(bare:SetElement("Dough") and bare.Element == "Dough", "SetElement troca o elemento")
-    check(bare:SetElement("") == false, "SetElement rejeita vazio")
-    bare.ChipBought, bare.ChipElement = true, "Flame"
-    bare:SetElement("Ice")
-    check(bare.ChipBought == false, "trocar de elemento invalida o chip comprado")
-
-    check(bare:SetStartWait(3) and bare.StartWait == 3, "SetStartWait aplica um valor valido")
-    check(bare:SetStartWait(-1) == false, "SetStartWait rejeita negativo")
-    check(bare:SetChipWait(2) and bare.ChipWait == 2, "SetChipWait aplica um valor valido")
-
-    -- O mar decide o tubo; sem informacao de jogo, cai no Sea 2.
-    local sea2 = bare:Location()
-    check(type(sea2) == "table" and sea2.tube ~= nil and sea2.button ~= nil, "Location devolve tubo e botao")
-    check(sea2.tube.Z == -4767.7, "sem informacao de mar o tubo e o do Sea 2")
-    bare:SetSea("Sea3")
-    check(bare:Location().tube.Z == -2816.5, "SetSea troca o tubo pro do Sea 3")
-
-    -- Enable/Disable ciclam e limpam o estado.
-    check(bare:Disable() and bare:IsEnabled() == false, "Enable/Disable ciclam")
-    check(bare.InRaid == false, "Disable sai do estado de raid")
-    bare:Destroy()
-end
-
--- A raid contra um mundo com o NPC, o botao e a blade hit: o chip e achado e
--- equipado, o botao e disparado, e a blade hit vira o motor de ataque. E o ciclo
--- que importa -- sem remotes reais, mas com as instancias que o jogo entrega.
-do
-    local ctx = bfContext(994732206, 994732206)
-    local Raid = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "raid.lua"])()
-    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
-
-    -- Remotes do NPC de raid e do evento de raid.
-    local rstorage = ctx.Services.ReplicatedStorage
-    local remotes = Instance.new("Folder"); remotes.Name = "Remotes"; remotes.Parent = rstorage
-    local comm = Instance.new("RemoteFunction"); comm.Name = "CommF_"; comm.Parent = remotes
-    local raids = Instance.new("RemoteEvent"); raids.Name = "Raids"; raids.Parent = remotes
-
-    -- Personagem com Humanoid (pra equipar o chip).
-    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
-    ctx.Player.Character = char
-    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
-    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
-
-    -- O chip esta na mochila.
-    local backpack = Instance.new("Backpack"); backpack.Name, backpack.Parent = "Backpack", ctx.Player
-    local chip = Instance.new("Tool"); chip.Name, chip.Parent = "Microchip", backpack
-
-    local raid = Raid.new({ teleport = motor })
-    check(raid:ChipTool() == chip, "a raid acha o Microchip na mochila")
-    check(raid:ChipEquipped() == false, "o chip ainda nao esta equipado")
-    check(raid:EquipChip() == true, "a raid equipa o Microchip")
-    check(raid:ChipEquipped() == true, "depois de EquipChip o chip esta na mao")
-
-    -- O evento de raid controla o estado "dentro da raid". O servidor entrega
-    -- StartTimer/Finished pelo OnClientEvent (o cliente so escuta).
-    check(raid:ConnectRaidEvent() == true, "a raid se conecta ao evento Raids")
-    raids.OnClientEvent:Fire("StartTimer")
-    check(raid.InRaid == true, "StartTimer poe a raid em estado de limpeza")
-    raids.OnClientEvent:Fire("Finished")
-    check(raid.InRaid == false, "Finished tira a raid do estado de limpeza")
-    raid:DisconnectRaidEvent()
-    check(raid.RaidConnection == nil, "Disconnect limpa a conexao do evento")
-
-    -- O botao: um ProximityPrompt no tubo e disparado pelo TriggerNear.
-    local fired = 0
-    ctx.Env.fireproximityprompt = function() fired = fired + 1 end
-    local loc = raid:Location()
-    local button = Instance.new("Part"); button.Name, button.Position, button.Parent = "RaidButton", loc.button, ctx.Services.Workspace
-    local prompt = Instance.new("ProximityPrompt"); prompt.Parent = button
-    check(raid:TriggerNear(loc.button) >= 1, "TriggerNear acha e dispara o prompt do botao")
-    check(fired >= 1, "fireproximityprompt foi chamado no botao")
-    ctx.Env.fireproximityprompt = nil
-
-    -- Sem blade hit injetada, o ClearStep recusa em vez de atacar sozinho.
-    check(raid:ClearStep() == false, "a raid nao ataca sem motor de ataque")
-    check(raid.LastStatus == "no attack motor injected", "a raid reporta que falta o motor de ataque")
-
-    raid:Destroy()
-end
 
 -- O motor de teleporte e infraestrutura: carrega e instancia sozinho (sem
 -- toggle), expoe Go/GoToIsland/GoToInstance, e recusa destino invalido sem

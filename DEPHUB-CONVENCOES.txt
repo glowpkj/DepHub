@@ -406,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.22)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.23)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 848 checks):
+FEITO / FUNCIONANDO (verificado offline, 763 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -425,11 +425,12 @@ FEITO / FUNCIONANDO (verificado offline, 848 checks):
 - Blox Fruits com features PROPRIAS (v0.1.18): o backend carrega
   features/bloxfruits/<nome>.lua (uma por feature, auto-contida, molde
   new/Enable/Disable) comecando pela blade hit. Hoje as features vivas sao
-  bladhits (Combat), fruit (Farm) e raid (Farm), alem do teleporte (infra). As
+  bladhits (Combat) e fruit (Farm), alem do teleporte (infra). A raid foi
+  parkeada em v0.1.23 (o usuario vai refazer por completo). As
   14 features que vieram de open source estao em features/bloxfruits/parked/
   (fora da pasta ativa, nada apagado, fora do manifest e do bundle). Nao existe
   flag global: o que carrega e o que esta em FEATURE_MODULES. Ver as secoes
-  "ARQUITETURA DO BLOX FRUITS", "BLADE HIT", "FRUIT", "RAID" e "FEATURES
+  "ARQUITETURA DO BLOX FRUITS", "BLADE HIT", "FRUIT", "RAID -- PARKEADA" e "FEATURES
   PARKEADAS" abaixo.
 - Abas montam controles (bug do CreateSection corrigido em v0.0.98).
 - Fix do mouse do shell (v0.0.97).
@@ -544,7 +545,7 @@ GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
 - O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
   CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
-ARQUITETURA DO BLOX FRUITS (v0.1.22) -- features proprias, uma por arquivo:
+ARQUITETURA DO BLOX FRUITS (v0.1.23) -- features proprias, uma por arquivo:
 - O usuario pegou a arvore do Blox Fruits de open source e decidiu montar o
   script dele com as features uma a uma, cada coisa no lugar certo. O molde:
   src/games/features/bloxfruits/<nome>.lua, UMA feature por arquivo.
@@ -558,7 +559,7 @@ ARQUITETURA DO BLOX FRUITS (v0.1.22) -- features proprias, uma por arquivo:
   por metodos (SetRange/SetInterval), e o backend so encaminha.
 - DUAS listas no backend, e a diferenca importa:
   * FEATURE_MODULES -- features de painel, cada uma com seu toggle. Hoje:
-    bladhits (Combat), fruit (Farm) e raid (Farm).
+    bladhits (Combat) e fruit (Farm). A raid saiu (parkeada em v0.1.23).
   * INFRA_MODULES (v0.1.18) -- motores sem UI e sem toggle. Carregam e
     INSTANCIAM sempre (nao ha toggle pra ligar) e ficam em State.Infra. Hoje so
     o teleporte.
@@ -567,10 +568,10 @@ ARQUITETURA DO BLOX FRUITS (v0.1.22) -- features proprias, uma por arquivo:
 - CONTEXTO DE CRIACAO (v0.1.20): toda feature recebe um context no `factory.new`
   com as pecas COMPARTILHADAS, e ela decide se usa cada uma:
   `{teleport = infra.teleport, combat = Instances.bladhits, state = backend}`.
-  Hoje o teleporte (motor de voo) e o combat (a blade hit, quando ja instanciada).
-  Sem teleporte a fruta ainda faz ESP/store e a raid recusa; sem combat a raid
-  entra mas reporta que nao tem com que atacar. E assim que uma feature reusa
-  outra sem acoplar: por injecao no contexto, nao por require.
+  Hoje o teleporte e o motor de voo (a fruta usa no grab); o combat e a blade hit
+  quando ja instanciada -- hoje NINGUEM consome o combat (a raid, que era a
+  consumidora, esta parkeada), mas o slot fica reservado. E assim que uma feature
+  reusa outra sem acoplar: por injecao no contexto, nao por require.
 - A arvore open-source antiga (as 14 features que vieram junto) foi movida para
   features/bloxfruits/parked/ via `git mv`: NADA foi apagado. Elas saem da pasta
   ativa, nao carregam, nao entram no manifest e nao entram no bundle (o walk do
@@ -649,71 +650,32 @@ FRUIT (features/bloxfruits/fruit.lua) -- Grab + ESP + Store (v0.1.19):
 - Injecao: o backend passa um context a TODA feature na criacao
   ({teleport = infra.teleport, state = backend}). A feature decide se usa.
 
-RAID (features/bloxfruits/raid.lua) -- auto raid (v0.1.20):
-- Portado do parked/events.lua (M.setAutoRaid). Faz o ciclo inteiro: garante o
-  Microchip (compra no NPC de raid se nao tiver), voa ao tubo da raid, equipa o
-  chip de novo na chegada, aperta o botao (fireproximityprompt no ProximityPrompt
-  do botao, dentro do raio), e quando o servidor diz que a raid comecou, limpa as
-  waves.
-- QUEM DIZ QUE A RAID COMECOU e o remote Raids (Remotes.Raids): o cliente escuta
-  OnClientEvent("StartTimer") e ("Finished"). O cliente nao adivinha o estado.
-- O ponto e a INTEGRACAO, igual a fruta: a raid NAO tem ataque proprio. Ela
-  recebe a blade hit por injecao (options.combat, que o backend passa) e o
-  ClearStep liga o ataque dela; se nao veio blade hit, o raid reporta
-  "no attack motor injected" em vez de reimplementar ataque. Um motor de ataque
-  no script, nao dois. Sem teleporte o Enable recusa (nao ha como ir ao tubo).
-- O backend garante a ordem: o toggle da raid liga a blade hit ANTES de criar a
-  raid, para a injecao levar o motor de ataque junto.
-- O tubo depende do MAR: resolvido em ReplicatedStorage.Util.Realm
-  (getCurrentSeaAsync), a MESMA fonte que o script antigo usava; sem a informacao
-  cai no Sea 2 (o padrao do original). Location() resolve a cada uso porque o
-  jogador pode trocar de mar sem recarregar.
-- O Microchip e por ELEMENTO: o dropdown escolhe o elemento, BuyChip pede
-  RaidsNpc "Select" com ele, e trocar de elemento invalida o chip comprado
-  (ChipBought volta a false) -- chip do elemento antigo nao serve.
-- Knobs de console (sem UI): SetElement/SetStartWait/SetChipWait/SetSea.
-  Os waits vieram do original e sao os unicos que mudam o comportamento do laco.
-- ARMADILHA: a blade hit e do usuario tambem -- pode estar ligada por ele. O
-  Disable da raid para o loop e desconecta o evento, mas NAO e dono da blade hit.
-
-AUTO COMPLETE RAID -- o SEGUNDO toggle da raid (v0.1.22):
-- Faz UMA coisa: TERMINAR uma raid que ja esta rolando. NAO compra chip, NAO
-  chama o NPC, NAO aperta botao de tubo, NAO cria raid. Se a raid ainda nao
-  comecou, ele nao faz nada -- quem comeca e o Auto raid (o outro toggle).
-- A SEQUENCIA E POR NUMERO, NAO POR DISTANCIA. O usuario conferiu o mapa no Dex:
-  a primeira ilha da raid e workspace.Map.RaidMap.RaidIsland1, e as seguintes so
-  mudam o numero (RaidIsland2, RaidIsland3...). Ou seja, o NUMERO E a ordem, e
-  "a mais perto" era a ideia errada -- ela podia voar pra uma ilha perto mas
-  fora de sequencia. A leitura e por nome: IslandByNumber(n) = "RaidIsland"..n.
-- O passo (CompleteStep) na ordem:
-    1. a ilha atual (IslandNumber, comeca em 1) tem mob vivo -> FICA nela; voa
-       pra ela so se estiver longe (> 40 studs)
-    2. ilha limpa -> existe RaidIsland(n+1)? entao AVANCA e voa pra ela
-    3. NAO existe proxima E NAO ha mob -> RODADA ACABOU: para de agir e so espera
-       (o timer/contador da raid segue sozinho; nao mexemos nele, nao
-       reiniciamos nada). Marca RoundOver = true.
-- "Tem mob vivo?" (HasLiveEnemy) olha Workspace.Enemies (o que a blade hit usa) e
-  tambem Workspace.Characters, e ainda os Humanoids dentro da ilha atual -- a
-  raid pode spawnar os bixos por qualquer um desses caminhos. Mob com
-  Health > 0 conta como vivo.
-- PERTO NAO REXECUTA (limite de 40 studs): se o jogador ja esta colado na ilha,
-  ele NAO reemite o voo. Reiniciar o tween a cada passo travaria o personagem
-  vibrando no lugar (Go cancela o voo anterior antes de comecar o novo).
-- O toggle LIGA a blade hit quando chega numa ilha, e DESLIGA ao desligar --
-  mas so se foi ELE que ligou (AttackEnabled marca isso). Blade hit que o
-  jogador ligou por fora fica ligada. Mesma regra do Auto raid.
-- Ligar o toggle RESETA a sequencia (IslandNumber = 1, RoundOver = false).
-- Logica que NAO existe de proposito: ele nao detecta "estou numa raid" por
-  evento (o Raids OnClientEvent pode nao chegar -- foi o que quebrou o Auto raid).
-  Ele simplesmente olha se ha RaidMap; sem RaidMap, nao ha ilha, e ele reporta
-  "no raid map (not in a raid?)". Mais simples e nao depende de evento nenhum.
+RAID -- PARKEADA (v0.1.23):
+- A raid inteira (Auto raid + Auto complete raid) saiu da lista ativa. O usuario
+  disse que nao estava do jeito que ele quer e vai refazer por completo, entao em
+  vez de deixar meia-bomba no painel, a feature foi parkeada: o arquivo foi de
+  features/bloxfruits/raid.lua para features/bloxfruits/parked/raid.lua (git mv,
+  nada apagado).
+- O que saiu junto: a secao RAID na aba Farm, os dois toggles e o dropdown de
+  elemento (State.RaidElements tambem saiu -- so a raid usava), e a entrada no
+  manifest (nao carrega, nao instancia, nao entra no bundle).
+- O que FICOU: a blade hit e a fruta, intocadas. E o backend mantem o slot
+  `combat` no context das features (a blade hit, quando instanciada) -- reservado
+  pra quem atacar atraves da blade hit compartilhada no futuro; hoje ninguem
+  consome.
+- Para trazer de volta: tira o raid.lua de parked/, re-adiciona
+  {name = "raid", page = "Farm", section = "RAID", toggle = "Auto raid"} em
+  FEATURE_MODULES, recria a secao no PANELS e poe a entrada no manifest (as duas:
+  994732206 e 1316421563). O historico do desenho anterior (sequencia por numero,
+  fim de rodada, etc.) fica no git log -- a raid sera refeita, nao remendada.
 
 PAINEL POR FEATURE (v0.1.19): o backend monta o painel de uma tabela PANELS
 (categoria, aba, secao, controles por feature) em vez de hardcodar uma feature.
 A categoria e sempre finalidade (Combat, Farm), nunca nome de jogo -- a
 convencao da secao 4a continua valendo. Icone desconhecido cai no fallback do
-GetIcon, entao nao quebra. Fruta e raid vivem na MESMA aba Farm (as duas sao
-Farm): a aba e a finalidade, e a secao dentro dela separa FRUIT de RAID.
+GetIcon, entao nao quebra. A fruta vive na aba Farm. Quando a raid voltar, ela
+compartilha a MESMA aba Farm -- a aba e a finalidade, e a secao separa FRUIT de
+RAID.
 
 FEATURES PARKEADAS (v0.1.17) -- fora da pasta ativa, NADA apagado:
 - As features que o usuario tirou do Blox Fruits (as 14 que vieram de open
@@ -721,8 +683,9 @@ FEATURES PARKEADAS (v0.1.17) -- fora da pasta ativa, NADA apagado:
   -- historico preservado, zero delecao.
 - Parkeada = fora do jogo: nao carrega, nao instancia, nao aparece no painel,
   nao esta no manifest e nao entra no bundle (o walk do bundle.js pula o
-  subdiretorio). As features vivas do Blox Fruits hoje: bladhits, fruit e raid
-  (alem do teleporte, que e infra) -- todas em features/bloxfruits/.
+  subdiretorio). As features vivas do Blox Fruits hoje: bladhits e fruit (alem
+  do teleporte, que e infra) -- todas em features/bloxfruits/. A raid foi
+  parkeada em v0.1.23 (o usuario vai refazer por completo).
 - Para trazer uma de volta: tira ela de parked/ e porta pro molde proprio
   (metodos new()/Enable()/Disable(), game:GetService proprio), depois registra
   em FEATURE_MODULES e no manifest das duas entradas.

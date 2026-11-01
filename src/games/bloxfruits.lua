@@ -32,7 +32,6 @@ local VERSION = "1.0.0"
 local FEATURE_MODULES = {
     {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
-    {name = "raid", page = "Farm", section = "RAID", toggle = "Auto raid"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -129,10 +128,8 @@ function State:Teleport()
     return self.Infra.teleport
 end
 
--- A lista de elementos de raid (o Microchip e por fruta). Vem do proprio modulo
--- da raid -- o backend so repassa, sem manter uma lista paralela.
-State.RaidElements = { "Flame", "Ice", "Quake", "Dark", "Light", "Sand", "Magma", "Rumble", "Buddha", "Paw",
-    "Gravity", "Dough", "Shadow", "Venom", "Control", "Spirit", "Bomb", "Spike", "Blizzard", "Phoenix" }
+-- A antiga lista de elementos de raid (State.RaidElements) saiu junto com a raid
+-- parkeada -- so ela usava. Quando a raid voltar, a lista volta com ela.
 
 function State:GetFeature(name)
     return self.Instances[name]
@@ -151,13 +148,11 @@ function State:SetFeature(name, enabled)
         if not instance then
             -- Toda feature recebe um contexto com as pecas que podem ser
             -- COMPARTILHADAS -- e a feature decide se usa cada uma. Hoje:
-            --   * teleport: o motor de voo (infra). A fruta usa no grab; a raid
-            --     usa pra ir ao tubo. Sem ele a fruta ainda faz ESP/store e a
-            --     raid recusa.
-            --   * combat: a blade hit, quando ja instanciada. A raid usa pra
-            --     limpar as waves em vez de ter um ataque proprio (um motor de
-            --     ataque no script, nao dois). Se a blade hit nao estiver
-            --     instanciada ainda, o raid entra e reporta que nao ataca.
+            --   * teleport: o motor de voo (infra). A fruta usa no grab.
+            --   * combat: a blade hit, quando ja instanciada. Reservado pra uma
+            --     feature que ataque em vez de ter um ataque proprio (um motor
+            --     de ataque no script, nao dois). Ninguem consome hoje -- a raid,
+            --     que era a consumidora, esta parkeada.
             local context = {
                 teleport = self.Infra.teleport,
                 combat = self.Instances.bladhits,
@@ -301,49 +296,11 @@ local PANELS = {
             end)
         end,
     },
-    raid = {
-        page = "Farm",
-        section = "RAID",
-        category = "Farm",
-        icon = "castle",
-        build = function(section, instance)
-            section:CreateToggle("Auto raid", false, function(value)
-                if value then
-                    -- A raid limpa as waves com a blade hit. Garanta que ela
-                    -- exista ANTES de criar a raid, para a injecao levar o
-                    -- motor de ataque junto (blade hit e raid sao uma coisa so
-                    -- do lado do jogador: ele liga a raid, ela ataca).
-                    if State.Instances.bladhits == nil then State:SetFeature("bladhits", true) end
-                    if not State:SetFeature("raid", true) then
-                        instance.Notify("Auto raid", "Teleport motor ausente.")
-                        return
-                    end
-                end
-                if not value then State:SetFeature("raid", false) end
-            end)
-            section:CreateDropdown("Raid element", State.RaidElements, "Flame", function(choice)
-                if State.Instances.raid then State.Instances.raid:SetElement(choice) end
-            end)
-            section:CreateToggle("Auto complete raid", false, function(value)
-                if value then
-                    -- Terminar uma raid so precisa do teleporte e da blade hit:
-                    -- nada de chip, nada de NPC. Mas a blade hit tem que existir
-                    -- pra ser injetada (o complete liga ela quando chega).
-                    if State.Instances.bladhits == nil then State:SetFeature("bladhits", true) end
-                    if not State:SetFeature("raid", true) then
-                        instance.Notify("Auto complete raid", "Teleport motor ausente.")
-                        return
-                    end
-                    if not State.Instances.raid:SetAutoComplete(true) then
-                        instance.Notify("Auto complete raid", "Teleport motor ausente.")
-                        return
-                    end
-                end
-                if not value and State.Instances.raid then State.Instances.raid:SetAutoComplete(false) end
-            end)
-            section:CreateParagraph("Auto raid", "Buys the Microchip, flies to the raid tube and presses the button. Auto complete finishes a raid already running -- nearest island, then the next.")
-        end,
-    },
+    -- RAID: parked. O Auto raid e o Auto complete nao estavam do jeito que o
+    -- usuario quer, entao a feature inteira saiu da lista ativa e foi para
+    -- features/bloxfruits/parked/raid.lua -- nada foi apagado. Para trazer de
+    -- volta, e so re-adicionar {name = "raid", page = "Farm", section = "RAID",
+    -- toggle = "Auto raid"} em FEATURE_MODULES e recriar o raid no PANELS.
 }
 
 local visual = env.__DEPHUB and env.__DEPHUB.UI or nil
