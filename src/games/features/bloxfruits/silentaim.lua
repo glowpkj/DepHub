@@ -8,6 +8,7 @@ local unpack = unpack or table.unpack
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
+local workspace = game:GetService("Workspace")
 local LocalPlayer = Players.LocalPlayer
 
 -- Silent Aim -- o aimbot silencioso do Blox Fruits, no molde proprio.
@@ -24,6 +25,14 @@ local LocalPlayer = Players.LocalPlayer
 -- __namecall original, senao o game fica com o gancho pendurado (a regra do
 -- repo: ligar tem que desligar de verdade). Por isso o hook e instalado no
 -- Enable e removido no Disable/Destroy.
+--
+-- O BEAM e o indicador visual: um Beam ligando o teu HumanoidRootPart ao do alvo
+-- atual, atualizado a cada frame -- sem ele o usuario nao sabe em quem o aim
+-- esta travado. Segue o script original (o roxo escuro, CameraFacing), mas o
+-- beam vive no ciclo Enable/Disable/Destroy (criado ao ligar, destruido ao
+-- desligar) em vez de ficar pendurado no workspace desde o load. Ele so aparece
+-- quando HA alvo e o aim NAO esta em excecao -- ou seja, mostra exatamente pra
+-- quem o aim vai.
 --
 -- Sem UI e sem toggle proprio: quem monta o painel e o backend (o toggle "Silent
 -- aim", o dropdown de excecoes e o slider de alcance). Aqui so vive a logica.
@@ -55,6 +64,9 @@ local EXCEPTION_GRACE = 1.0
 -- mais perto por esta margem (do script original, StickyFactor = 0.2). Evita a
 -- mira pular entre dois jogadores de distancia parecida.
 local STICKY_FACTOR = 0.2
+
+-- A cor do beam (do script original, Color3.fromRGB(120, 50, 200) -- roxo escuro).
+local BEAM_COLOR = Color3.fromRGB(120, 50, 200)
 
 -- Os limites do alcance, como o usuario pediu: minimo 500, padrao 500, maximo
 -- 1000. O slider e montado pelo backend com estes numeros.
@@ -102,6 +114,11 @@ function Feature.new(options)
     self.OriginalNamecall = nil
     self.Metatable = nil
     self.Hooked = false
+    -- O indicador visual: o Beam + as duas Attachments (na tua HRP e na do
+    -- alvo). Criados no Enable, destruidos no Disable/Destroy.
+    self.Beam = nil
+    self.LocalAttachment = nil
+    self.TargetAttachment = nil
     return self
 end
 
@@ -152,6 +169,61 @@ end
 function Feature:IsExceptionActive()
     if self.ExceptionHeld then return true end
     return (os.clock() - self.ExceptionTime) < EXCEPTION_GRACE
+end
+
+-- --- O beam (o indicador visual do alvo) ------------------------------------
+
+-- Cria o Beam e as duas Attachments. O beam vive no ciclo Enable/Disable (nao
+-- desde o load): nasce aqui, morre no _DestroyBeam. CameraFacing + cor roxa,
+-- como o script original.
+function Feature:_CreateBeam()
+    if self.Beam then return end
+    local beam = Instance.new("Beam")
+    beam.Name = "TargetBeam"
+    beam.FaceCamera = true
+    beam.LightEmission = 0
+    beam.LightInfluence = 0
+    beam.Width0 = 2
+    beam.Width1 = 2
+    beam.Color = ColorSequence.new(BEAM_COLOR)
+    beam.Enabled = false
+    beam.Parent = workspace
+    self.Beam = beam
+    self.LocalAttachment = Instance.new("Attachment")
+    self.LocalAttachment.Name = "BeamAtt0"
+    self.TargetAttachment = Instance.new("Attachment")
+    self.TargetAttachment.Name = "BeamAtt1"
+end
+
+-- Destroi o beam e as attachments. Parte do Disable/Destroy: sem isto o beam
+-- ficaria pendurado no workspace depois de desligar.
+function Feature:_DestroyBeam()
+    for _, part in ipairs({ self.Beam, self.LocalAttachment, self.TargetAttachment }) do
+        if part then pcall(function() part:Destroy() end) end
+    end
+    self.Beam = nil
+    self.LocalAttachment = nil
+    self.TargetAttachment = nil
+end
+
+-- Um frame do beam: liga-o da tua HumanoidRootPart a do alvo. So aparece quando
+-- HA alvo e o aim NAO esta em excecao -- ou seja, mostra exatamente pra quem o
+-- aim vai; escondido quando nao ha alvo ou a tecla de excecao esta ativa.
+function Feature:_UpdateBeam()
+    if not self.Beam then return end
+    local myRoot = root(LocalPlayer and LocalPlayer.Character)
+    local target = self.TargetName and Players:FindFirstChild(self.TargetName)
+    local targetRoot = target and root(target.Character)
+    local show = myRoot ~= nil and targetRoot ~= nil and not self:IsExceptionActive()
+    if not show then
+        self.Beam.Enabled = false
+        return
+    end
+    if self.LocalAttachment.Parent ~= myRoot then self.LocalAttachment.Parent = myRoot end
+    if self.TargetAttachment.Parent ~= targetRoot then self.TargetAttachment.Parent = targetRoot end
+    self.Beam.Attachment0 = self.LocalAttachment
+    self.Beam.Attachment1 = self.TargetAttachment
+    self.Beam.Enabled = true
 end
 
 -- --- O gancho (o olho do silent aim) ----------------------------------------
@@ -284,11 +356,21 @@ function Feature:Enable()
     self.ExceptionHeld = false
     self.ExceptionTime = 0
 
+    -- O indicador visual nasce aqui e morre no Disable.
+    self:_CreateBeam()
+
     -- A selecao de alvo roda no Heartbeat (nao no RenderStepped: a mira e logica,
     -- nao precisa desenhar nada).
     self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function()
         if not self.Enabled then return end
         pcall(function() self:_SelectStep() end)
+    end)
+
+    -- O beam segue a cada frame: liga a tua HRP a do alvo, ou esconde quando nao
+    -- ha alvo / a excecao esta ativa.
+    self.Connections[#self.Connections + 1] = RunService.RenderStepped:Connect(function()
+        if not self.Enabled then return end
+        pcall(function() self:_UpdateBeam() end)
     end)
 
     -- Teclas de excecao: segurar larga o aim; soltar conta o grace.
@@ -315,6 +397,7 @@ function Feature:Disable()
     end
     self.Connections = {}
     self:_ClearTarget()
+    self:_DestroyBeam()
     self:RemoveHook()
     return true
 end

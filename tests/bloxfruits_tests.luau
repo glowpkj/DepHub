@@ -674,10 +674,22 @@ do
     feature:_SelectStep()
     check(feature.TargetPosition == Vector3.new(120, 5, 0), "a posicao do alvo e relida a cada passo")
 
+    -- O BEAM: existe enquanto ligado, ligado a tua HRP e a do alvo, e VISIVEL
+    -- quando ha alvo e o aim nao esta em excecao -- e o que mostra em quem o aim
+    -- esta travado.
+    check(feature.Beam ~= nil and feature.Beam.Name == "TargetBeam", "o beam existe enquanto o aim esta ligado")
+    check(feature.Beam.Parent ~= nil, "o beam esta no workspace")
+    feature:_UpdateBeam()
+    check(feature.Beam.Enabled == true, "com alvo o beam aparece")
+    check(feature.Beam.Attachment0 == feature.LocalAttachment and feature.Beam.Attachment1 == feature.TargetAttachment, "o beam liga as duas attachments")
+    check(feature.LocalAttachment.Parent ~= nil and feature.TargetAttachment.Parent ~= nil, "as attachments estao penduradas nos HumanoidRootParts")
+
     -- Segurar a tecla de excecao (F) larga o aim: o remote sai com a posicao
     -- ORIGINAL, sem reescrita.
     ctx.Services.UserInputService.InputBegan:Fire({KeyCode = Enum.KeyCode.F})
     check(feature:IsExceptionActive() == true, "segurar a tecla de excecao ativa a supressao")
+    feature:_UpdateBeam()
+    check(feature.Beam.Enabled == false, "com a excecao ativa o beam se esconde")
     ctx:FireRemote(attack, "FireServer", "original-position")
     check(attack.Fired[2][1] == "original-position", "com a excecao ativa o remote sai intacto")
 
@@ -699,6 +711,8 @@ do
     -- Disable devolve o __namecall original: o game nao fica com o gancho.
     check(feature:Disable() == true, "o Disable desliga")
     check(feature.Hooked == false, "o gancho foi removido")
+    -- O beam tambem morre no Disable: nada fica pendurado no workspace.
+    check(feature.Beam == nil, "o Disable destroi o beam")
     ctx:FireRemote(attack, "FireServer", "depois-do-disable")
     check(attack.Fired[#attack.Fired][1] == "depois-do-disable", "depois do Disable o remote sai normal de novo")
 
