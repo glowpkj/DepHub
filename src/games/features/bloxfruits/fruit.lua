@@ -104,9 +104,14 @@ function Feature.new(options)
     self.Enabled = false
     self.GrabEnabled = false
     self.EspEnabled = false
+    self.TraceEnabled = false   -- linhas ligando o character a cada fruta
     self.StoreEnabled = false
     self.Threads = {}
     self.EspMap = {}
+    -- O Beam do tracer e criado uma vez por fruta no EspMap (junto com o
+    -- Highlight e o Billboard); a visibilidade dele segue TraceEnabled. Um
+    -- attachment local (na minha HRP) e um na fruta, por beam.
+    --
     -- O motor de teleporte geral. Sem ele o ESP e o store ainda rodam; so o
     -- grab recusa (nao tem como voar ate a fruta).
     self.Teleport = options.teleport or nil
@@ -180,12 +185,22 @@ function Feature:_cancel(name)
     if thread then pcall(task.cancel, thread); self.Threads[name] = nil end
 end
 
+-- Destroi os adornos de UMA entrada (highlight, billboard + suas partes, e o
+-- tracer com as duas attachments). Um unico ponto de limpeza: usado ao remover a
+-- fruta do mapa, ao trocar a parte e no disable.
+local function destroyEntry(entry)
+    if not entry then return end
+    pcall(function() entry.highlight:Destroy() end)
+    pcall(function() entry.billboard:Destroy() end)
+    if entry.beam then pcall(function() entry.beam:Destroy() end) end
+    if entry.localAttachment then pcall(function() entry.localAttachment:Destroy() end) end
+    if entry.fruitAttachment then pcall(function() entry.fruitAttachment:Destroy() end) end
+end
+
 function Feature:SetEsp(on)
     self.EspEnabled = on == true
     if not self.EspEnabled then
-        for _, entry in pairs(self.EspMap) do
-            pcall(function() entry.highlight:Destroy(); entry.billboard:Destroy() end)
-        end
+        for _, entry in pairs(self.EspMap) do destroyEntry(entry) end
         self.EspMap = {}
         self:_cancel("esp")
         return true
@@ -205,19 +220,27 @@ function Feature:SetEsp(on)
                     -- fica orfao (o "tabugado" que o usuario viu): entao
                     -- re-aponta em vez de fingir que esta tudo bem.
                     if entry and entry.part ~= part then
-                        pcall(function() entry.highlight:Destroy(); entry.billboard:Destroy() end)
+                        destroyEntry(entry)
                         self.EspMap[fruit] = nil
                         entry = nil
                     end
                     if not entry then
+                        -- Highlight: preenchimento azul-claro com contorno branco
+                        -- e uma emissao leve, pra fruta saltar do chao.
                         local highlight = Instance.new("Highlight")
-                        highlight.FillColor = Color3.fromRGB(120, 220, 255)
+                        highlight.FillColor = Color3.fromRGB(90, 200, 255)
                         highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        highlight.FillTransparency = 0.35
+                        highlight.OutlineTransparency = 0
+                        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                         highlight.Adornee = part
                         highlight.Parent = part
+
+                        -- Billboard: nome + distancia, cor da fruta (amarelo) pra
+                        -- ler de longe sem confundir com o highlight.
                         local billboard = Instance.new("BillboardGui")
-                        billboard.Size = UDim2.fromOffset(150, 20)
-                        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                        billboard.Size = UDim2.fromOffset(180, 22)
+                        billboard.StudsOffset = Vector3.new(0, 2.8, 0)
                         billboard.AlwaysOnTop = true
                         billboard.Adornee = part
                         billboard.Parent = part
@@ -225,34 +248,85 @@ function Feature:SetEsp(on)
                         label.BackgroundTransparency = 1
                         label.Size = UDim2.fromScale(1, 1)
                         label.Font = Enum.Font.GothamBold
-                        label.TextSize = 13
-                        label.TextColor3 = Color3.fromRGB(120, 220, 255)
-                        label.TextStrokeTransparency = 0.4
+                        label.TextSize = 14
+                        label.TextColor3 = Color3.fromRGB(255, 220, 90)
+                        label.TextStrokeTransparency = 0.3
+                        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                         label.Parent = billboard
-                        entry = {highlight = highlight, billboard = billboard, label = label, part = part}
+
+                        -- Tracer: um Beam liga a MINHA HumanoidRootPart a fruta.
+                        -- Nasce escondido (TraceEnabled manda na visibilidade no
+                        -- ciclo abaixo). As duas attachments nascem soltas; o
+                        -- attachment local e reparentado na minha HRP no update.
+                        local beam = Instance.new("Beam")
+                        beam.Name = "FruitTracer"
+                        beam.FaceCamera = true
+                        beam.LightEmission = 0.3
+                        beam.LightInfluence = 0
+                        beam.Width0 = 1.2
+                        beam.Width1 = 1.2
+                        beam.Color = ColorSequence.new(Color3.fromRGB(255, 220, 90))
+                        beam.Transparency = NumberSequence.new(0.25)
+                        beam.Enabled = false
+                        beam.Parent = part
+                        local fruitAttachment = Instance.new("Attachment")
+                        fruitAttachment.Parent = part
+                        local localAttachment = Instance.new("Attachment")
+                        beam.Attachment1 = fruitAttachment
+                        beam.Attachment0 = localAttachment
+
+                        entry = {
+                            highlight = highlight, billboard = billboard, label = label,
+                            part = part, beam = beam,
+                            localAttachment = localAttachment, fruitAttachment = fruitAttachment,
+                        }
                         self.EspMap[fruit] = entry
                     end
-                    local distance = root and math.floor((part.Position - root.Position).Magnitude) or 0
                     -- Alcance ilimitado: toda fruta no chao e destacada, a
                     -- qualquer distancia. A distancia continua no rotulo, so
                     -- deixou de ser um corte.
+                    local distance = root and math.floor((part.Position - root.Position).Magnitude) or 0
                     entry.highlight.Enabled = true
                     entry.billboard.Enabled = true
                     -- Fruta spawnada chama-se so "Fruit"; mostra o nome real se
                     -- houver OriginalName, senao o proprio Name.
                     local label = fruit:GetAttribute("OriginalName") or fruit.Name
                     entry.label.Text = ("%s  %dm"):format(label, distance)
+
+                    -- Tracer: so aparece com o toggle ligado E tendo a minha HRP.
+                    -- Reparenta o attachment local na HRP (ela troca no respawn,
+                    -- o beam nao pode apontar pra uma parte morta).
+                    if self.TraceEnabled and root then
+                        if entry.localAttachment.Parent ~= root then entry.localAttachment.Parent = root end
+                        entry.beam.Enabled = true
+                    else
+                        entry.beam.Enabled = false
+                    end
                 end
             end
             for fruit, entry in pairs(self.EspMap) do
                 if not live[fruit] then
-                    pcall(function() entry.highlight:Destroy(); entry.billboard:Destroy() end)
+                    destroyEntry(entry)
                     self.EspMap[fruit] = nil
                 end
             end
             task.wait(0.5)
         end
     end)
+    return true
+end
+
+-- O tracer: as linhas do character ate as frutas. E um toggle a PARTE (o
+-- usuario pediu pra ligar/desligar so ele); highlight e distancia continuam
+-- junto do Fruit ESP. Sem o ESP ligado, o tracer nao tem adorno pra desenhar --
+-- so guarda a escolha, que o proximo ciclo do ESP aplica.
+function Feature:SetTrace(on)
+    self.TraceEnabled = on == true
+    if not self.TraceEnabled then
+        for _, entry in pairs(self.EspMap) do
+            if entry.beam then entry.beam.Enabled = false end
+        end
+    end
     return true
 end
 

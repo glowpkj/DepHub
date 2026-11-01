@@ -108,12 +108,6 @@ function Feature.new(options)
     self.MaxRange = math.clamp(tonumber(options.range) or Feature.DEFAULT_RANGE, Feature.MIN_RANGE, Feature.MAX_RANGE)
     -- As teclas que SUPRIMEM o aim (rotulos). Comeca em F, como o original.
     self.Exceptions = options.exceptions or { "F" }
-    -- Modo debug: imprime cada remote de ataque que sai (nome + tipo de cada
-    -- slot) num rate-limit, pra o usuario ver o que o CLIQUE realmente manda no
-    -- executor dele. Ligado por options.debug ou Feature:SetDebug(true).
-    self.Debug = options.debug == true
-    self.DebugRemote = nil      -- ultimo remote logado (pra nao spammar)
-    self.DebugAt = 0
     -- Estado da mira.
     self.Target = nil            -- Player alvo
     self.TargetName = nil
@@ -345,41 +339,6 @@ function Feature:InstallHook()
             local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
 
             if isRemote then
-                -- DEBUG: quando ligado, imprime o que o remote manda. Serve pra
-                -- ver no executor o que o CLIQUE do BF realmente envia (nome do
-                -- remote + tipo de cada slot), em vez de adivinhar os indices.
-                -- Rate-limited por remote pra nao inundar o console.
-                if self_.Debug then
-                    local now = os.clock()
-                    if self_.DebugRemote ~= args[1] or (now - self_.DebugAt) > 1.0 then
-                        self_.DebugRemote = args[1]
-                        self_.DebugAt = now
-                        -- O NOME real do remote (nao o ClassName): sem isso o
-                        -- print so dizia "RemoteEvent" e nao dava pra saber QUAL
-                        -- remote de ataque era. FullName da o caminho inteiro.
-                        local name = "?"
-                        pcall(function() name = args[1].Name end)
-                        local parts = {}
-                        for i = 1, #args do
-                            local v = args[i]
-                            local shown = typeof and typeof(v) or type(v)
-                            -- Pra Instance, mostra o Name entre parenteses; pra
-                            -- Vector3, as coordenadas -- e o que diz se o slot e
-                            -- mesmo a posicao e pra onde aponta.
-                            if typeof and typeof(v) == "Instance" then
-                                local n = "?"; pcall(function() n = v.Name end)
-                                shown = "Instance(" .. n .. ")"
-                            elseif typeof and typeof(v) == "Vector3" then
-                                shown = ("Vector3(%.0f,%.0f,%.0f)"):format(v.X, v.Y, v.Z)
-                            elseif typeof and typeof(v) == "string" then
-                                shown = "string(" .. tostring(v) .. ")"
-                            end
-                            parts[#parts + 1] = i .. "=" .. shown
-                        end
-                        print("[SILENT AIM DEBUG] remote=" .. tostring(name) .. " method=" .. tostring(method) .. " | " .. table.concat(parts, ", "))
-                    end
-                end
-
                 -- O CLIQUE (M1/ar) sai pelo RegisterHit com a PART do alvo no
                 -- slot 2: (part, {}, nil, hitId) -- args[1] e o proprio remote.
                 -- Aqui o aim redireciona essa part pra HumanoidRootPart do alvo
@@ -557,13 +516,6 @@ function Feature:SetExceptions(labels)
         if keyForLabel(label) then list[#list + 1] = tostring(label):upper() end
     end
     self.Exceptions = list
-    return true
-end
-
--- Liga/desliga os prints de debug (o que cada remote de ataque manda).
-function Feature:SetDebug(on)
-    self.Debug = on == true
-    if self.Debug then print("[SILENT AIM DEBUG] ligado -- ataque (clique/skill) vai imprimir os slots.") end
     return true
 end
 

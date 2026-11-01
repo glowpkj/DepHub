@@ -10146,7 +10146,6 @@ function State:SetFeature(name, enabled)
                 -- o toggle ainda desligado; a escolha nao se perde).
                 range = self.PendingSilentAimRange,
                 exceptions = self.PendingSilentAimExceptions,
-                debug = self.PendingSilentAimDebug,
                 -- A aba Player nasce com o multiplicador de velocidade que o
                 -- painel ja marcou (o slider aplica mesmo sem reabrir o painel).
                 speed = self.PendingPlayerSpeed,
@@ -10224,7 +10223,6 @@ function State:Destroy()
     -- A escolha do painel guardada antes de ligar nao sobrevive ao unload.
     self.PendingSilentAimRange = nil
     self.PendingSilentAimExceptions = nil
-    self.PendingSilentAimDebug = nil
     self.PendingPlayerSpeed = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
@@ -10315,18 +10313,6 @@ local PANELS = {
             State:RegisterConfig("range", applyRange, rangeHandle)
 
             section:CreateParagraph("Silent aim", "Redirects your attack position to the nearest player. Hold an exception key to release the aim.")
-
-            -- Debug: imprime no console o que cada ataque (clique/skill) manda,
-            -- pra diagnosticar por que um ataque nao pega o alvo.
-            local function applyDebug(value)
-                if State.Instances.silentaim then State.Instances.silentaim:SetDebug(value) end
-                State.PendingSilentAimDebug = value
-            end
-            local debugToggle = section:CreateToggle("Debug logs", State.Config.debug == true, function(value)
-                applyDebug(value)
-                State.Config.debug = value == true
-            end)
-            State:RegisterConfig("debug", applyDebug, debugToggle)
         end,
     },
     fruit = {
@@ -10356,6 +10342,20 @@ local PANELS = {
                 State.Config.fruitEsp = value == true
             end)
             State:RegisterConfig("fruitEsp", applyEsp, espToggle)
+
+            -- Fruit tracer: as linhas ligando o character a cada fruta. Toggle a
+            -- PARTE (o highlight e a distancia continuam vindo com o Fruit ESP);
+            -- sem o ESP ligado, so guarda a escolha pro proximo ciclo.
+            local function applyTrace(value)
+                local feature = State.Instances.fruit
+                if value then feature = ensureFruit() end
+                if feature then feature:SetTrace(value) end
+            end
+            local traceToggle = section:CreateToggle("Fruit tracer", State.Config.fruitTrace == true, function(value)
+                applyTrace(value)
+                State.Config.fruitTrace = value == true
+            end)
+            State:RegisterConfig("fruitTrace", applyTrace, traceToggle)
 
             -- Grab: sem slider de distancia -- pega a fruta mais proxima de
             -- qualquer distancia.
@@ -11646,9 +11646,14 @@ function Feature.new(options)
     self.Enabled = false
     self.GrabEnabled = false
     self.EspEnabled = false
+    self.TraceEnabled = false   -- linhas ligando o character a cada fruta
     self.StoreEnabled = false
     self.Threads = {}
     self.EspMap = {}
+    -- O Beam do tracer e criado uma vez por fruta no EspMap (junto com o
+    -- Highlight e o Billboard); a visibilidade dele segue TraceEnabled. Um
+    -- attachment local (na minha HRP) e um na fruta, por beam.
+    --
     -- O motor de teleporte geral. Sem ele o ESP e o store ainda rodam; so o
     -- grab recusa (nao tem como voar ate a fruta).
     self.Teleport = options.teleport or nil
@@ -11722,12 +11727,22 @@ function Feature:_cancel(name)
     if thread then pcall(task.cancel, thread); self.Threads[name] = nil end
 end
 
+-- Destroi os adornos de UMA entrada (highlight, billboard + suas partes, e o
+-- tracer com as duas attachments). Um unico ponto de limpeza: usado ao remover a
+-- fruta do mapa, ao trocar a parte e no disable.
+local function destroyEntry(entry)
+    if not entry then return end
+    pcall(function() entry.highlight:Destroy() end)
+    pcall(function() entry.billboard:Destroy() end)
+    if entry.beam then pcall(function() entry.beam:Destroy() end) end
+    if entry.localAttachment then pcall(function() entry.localAttachment:Destroy() end) end
+    if entry.fruitAttachment then pcall(function() entry.fruitAttachment:Destroy() end) end
+end
+
 function Feature:SetEsp(on)
     self.EspEnabled = on == true
     if not self.EspEnabled then
-        for _, entry in pairs(self.EspMap) do
-            pcall(function() entry.highlight:Destroy(); entry.billboard:Destroy() end)
-        end
+        for _, entry in pairs(self.EspMap) do destroyEntry(entry) end
         self.EspMap = {}
         self:_cancel("esp")
         return true
@@ -11747,19 +11762,27 @@ function Feature:SetEsp(on)
                     -- fica orfao (o "tabugado" que o usuario viu): entao
                     -- re-aponta em vez de fingir que esta tudo bem.
                     if entry and entry.part ~= part then
-                        pcall(function() entry.highlight:Destroy(); entry.billboard:Destroy() end)
+                        destroyEntry(entry)
                         self.EspMap[fruit] = nil
                         entry = nil
                     end
                     if not entry then
+                        -- Highlight: preenchimento azul-claro com contorno branco
+                        -- e uma emissao leve, pra fruta saltar do chao.
                         local highlight = Instance.new("Highlight")
-                        highlight.FillColor = Color3.fromRGB(120, 220, 255)
+                        highlight.FillColor = Color3.fromRGB(90, 200, 255)
                         highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                        highlight.FillTransparency = 0.35
+                        highlight.OutlineTransparency = 0
+                        highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
                         highlight.Adornee = part
                         highlight.Parent = part
+
+                        -- Billboard: nome + distancia, cor da fruta (amarelo) pra
+                        -- ler de longe sem confundir com o highlight.
                         local billboard = Instance.new("BillboardGui")
-                        billboard.Size = UDim2.fromOffset(150, 20)
-                        billboard.StudsOffset = Vector3.new(0, 2.5, 0)
+                        billboard.Size = UDim2.fromOffset(180, 22)
+                        billboard.StudsOffset = Vector3.new(0, 2.8, 0)
                         billboard.AlwaysOnTop = true
                         billboard.Adornee = part
                         billboard.Parent = part
@@ -11767,34 +11790,85 @@ function Feature:SetEsp(on)
                         label.BackgroundTransparency = 1
                         label.Size = UDim2.fromScale(1, 1)
                         label.Font = Enum.Font.GothamBold
-                        label.TextSize = 13
-                        label.TextColor3 = Color3.fromRGB(120, 220, 255)
-                        label.TextStrokeTransparency = 0.4
+                        label.TextSize = 14
+                        label.TextColor3 = Color3.fromRGB(255, 220, 90)
+                        label.TextStrokeTransparency = 0.3
+                        label.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
                         label.Parent = billboard
-                        entry = {highlight = highlight, billboard = billboard, label = label, part = part}
+
+                        -- Tracer: um Beam liga a MINHA HumanoidRootPart a fruta.
+                        -- Nasce escondido (TraceEnabled manda na visibilidade no
+                        -- ciclo abaixo). As duas attachments nascem soltas; o
+                        -- attachment local e reparentado na minha HRP no update.
+                        local beam = Instance.new("Beam")
+                        beam.Name = "FruitTracer"
+                        beam.FaceCamera = true
+                        beam.LightEmission = 0.3
+                        beam.LightInfluence = 0
+                        beam.Width0 = 1.2
+                        beam.Width1 = 1.2
+                        beam.Color = ColorSequence.new(Color3.fromRGB(255, 220, 90))
+                        beam.Transparency = NumberSequence.new(0.25)
+                        beam.Enabled = false
+                        beam.Parent = part
+                        local fruitAttachment = Instance.new("Attachment")
+                        fruitAttachment.Parent = part
+                        local localAttachment = Instance.new("Attachment")
+                        beam.Attachment1 = fruitAttachment
+                        beam.Attachment0 = localAttachment
+
+                        entry = {
+                            highlight = highlight, billboard = billboard, label = label,
+                            part = part, beam = beam,
+                            localAttachment = localAttachment, fruitAttachment = fruitAttachment,
+                        }
                         self.EspMap[fruit] = entry
                     end
-                    local distance = root and math.floor((part.Position - root.Position).Magnitude) or 0
                     -- Alcance ilimitado: toda fruta no chao e destacada, a
                     -- qualquer distancia. A distancia continua no rotulo, so
                     -- deixou de ser um corte.
+                    local distance = root and math.floor((part.Position - root.Position).Magnitude) or 0
                     entry.highlight.Enabled = true
                     entry.billboard.Enabled = true
                     -- Fruta spawnada chama-se so "Fruit"; mostra o nome real se
                     -- houver OriginalName, senao o proprio Name.
                     local label = fruit:GetAttribute("OriginalName") or fruit.Name
                     entry.label.Text = ("%s  %dm"):format(label, distance)
+
+                    -- Tracer: so aparece com o toggle ligado E tendo a minha HRP.
+                    -- Reparenta o attachment local na HRP (ela troca no respawn,
+                    -- o beam nao pode apontar pra uma parte morta).
+                    if self.TraceEnabled and root then
+                        if entry.localAttachment.Parent ~= root then entry.localAttachment.Parent = root end
+                        entry.beam.Enabled = true
+                    else
+                        entry.beam.Enabled = false
+                    end
                 end
             end
             for fruit, entry in pairs(self.EspMap) do
                 if not live[fruit] then
-                    pcall(function() entry.highlight:Destroy(); entry.billboard:Destroy() end)
+                    destroyEntry(entry)
                     self.EspMap[fruit] = nil
                 end
             end
             task.wait(0.5)
         end
     end)
+    return true
+end
+
+-- O tracer: as linhas do character ate as frutas. E um toggle a PARTE (o
+-- usuario pediu pra ligar/desligar so ele); highlight e distancia continuam
+-- junto do Fruit ESP. Sem o ESP ligado, o tracer nao tem adorno pra desenhar --
+-- so guarda a escolha, que o proximo ciclo do ESP aplica.
+function Feature:SetTrace(on)
+    self.TraceEnabled = on == true
+    if not self.TraceEnabled then
+        for _, entry in pairs(self.EspMap) do
+            if entry.beam then entry.beam.Enabled = false end
+        end
+    end
     return true
 end
 
@@ -12758,12 +12832,6 @@ function Feature.new(options)
     self.MaxRange = math.clamp(tonumber(options.range) or Feature.DEFAULT_RANGE, Feature.MIN_RANGE, Feature.MAX_RANGE)
     -- As teclas que SUPRIMEM o aim (rotulos). Comeca em F, como o original.
     self.Exceptions = options.exceptions or { "F" }
-    -- Modo debug: imprime cada remote de ataque que sai (nome + tipo de cada
-    -- slot) num rate-limit, pra o usuario ver o que o CLIQUE realmente manda no
-    -- executor dele. Ligado por options.debug ou Feature:SetDebug(true).
-    self.Debug = options.debug == true
-    self.DebugRemote = nil      -- ultimo remote logado (pra nao spammar)
-    self.DebugAt = 0
     -- Estado da mira.
     self.Target = nil            -- Player alvo
     self.TargetName = nil
@@ -12995,41 +13063,6 @@ function Feature:InstallHook()
             local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
 
             if isRemote then
-                -- DEBUG: quando ligado, imprime o que o remote manda. Serve pra
-                -- ver no executor o que o CLIQUE do BF realmente envia (nome do
-                -- remote + tipo de cada slot), em vez de adivinhar os indices.
-                -- Rate-limited por remote pra nao inundar o console.
-                if self_.Debug then
-                    local now = os.clock()
-                    if self_.DebugRemote ~= args[1] or (now - self_.DebugAt) > 1.0 then
-                        self_.DebugRemote = args[1]
-                        self_.DebugAt = now
-                        -- O NOME real do remote (nao o ClassName): sem isso o
-                        -- print so dizia "RemoteEvent" e nao dava pra saber QUAL
-                        -- remote de ataque era. FullName da o caminho inteiro.
-                        local name = "?"
-                        pcall(function() name = args[1].Name end)
-                        local parts = {}
-                        for i = 1, #args do
-                            local v = args[i]
-                            local shown = typeof and typeof(v) or type(v)
-                            -- Pra Instance, mostra o Name entre parenteses; pra
-                            -- Vector3, as coordenadas -- e o que diz se o slot e
-                            -- mesmo a posicao e pra onde aponta.
-                            if typeof and typeof(v) == "Instance" then
-                                local n = "?"; pcall(function() n = v.Name end)
-                                shown = "Instance(" .. n .. ")"
-                            elseif typeof and typeof(v) == "Vector3" then
-                                shown = ("Vector3(%.0f,%.0f,%.0f)"):format(v.X, v.Y, v.Z)
-                            elseif typeof and typeof(v) == "string" then
-                                shown = "string(" .. tostring(v) .. ")"
-                            end
-                            parts[#parts + 1] = i .. "=" .. shown
-                        end
-                        print("[SILENT AIM DEBUG] remote=" .. tostring(name) .. " method=" .. tostring(method) .. " | " .. table.concat(parts, ", "))
-                    end
-                end
-
                 -- O CLIQUE (M1/ar) sai pelo RegisterHit com a PART do alvo no
                 -- slot 2: (part, {}, nil, hitId) -- args[1] e o proprio remote.
                 -- Aqui o aim redireciona essa part pra HumanoidRootPart do alvo
@@ -13207,13 +13240,6 @@ function Feature:SetExceptions(labels)
         if keyForLabel(label) then list[#list + 1] = tostring(label):upper() end
     end
     self.Exceptions = list
-    return true
-end
-
--- Liga/desliga os prints de debug (o que cada remote de ataque manda).
-function Feature:SetDebug(on)
-    self.Debug = on == true
-    if self.Debug then print("[SILENT AIM DEBUG] ligado -- ataque (clique/skill) vai imprimir os slots.") end
     return true
 end
 
@@ -24280,7 +24306,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known.
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.

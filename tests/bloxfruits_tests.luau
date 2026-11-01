@@ -216,6 +216,20 @@ do
     check(fruit.Keep["leopard"] == true, "escolher Leopard no dropdown entra na store keep list")
     state:SetFeature("fruit", false)
 
+    -- O tracer e um toggle SEPARADO do Fruit ESP: os dois existem e dirigem a
+    -- mesma feature por caminhos independentes (o ESP liga o realce/distancia; o
+    -- tracer so as linhas).
+    local espToggle = labels["toggle:Fruit ESP"]
+    local traceToggle = labels["toggle:Fruit tracer"]
+    check(espToggle ~= nil, "o painel registra o toggle Fruit ESP")
+    check(traceToggle ~= nil, "o painel registra o toggle Fruit tracer (a parte)")
+    traceToggle.Handle:SetValue(true)
+    check(state.Instances.fruit ~= nil and state.Instances.fruit.TraceEnabled == true, "ligar o Fruit tracer liga as linhas na feature")
+    check(state.Instances.fruit.EspEnabled ~= true, "ligar o tracer NAO liga o realce (sao toggles separados)")
+    traceToggle.Handle:SetValue(false)
+    check(state.Instances.fruit.TraceEnabled == false, "desligar o Fruit tracer desliga as linhas")
+    state:SetFeature("fruit", false)
+
     -- Silent aim: um toggle, um dropdown de teclas de excecao (Z X C V F) e um
     -- slider de alcance (500 a 1000). O toggle dirige o mesmo caminho do backend.
     local aimToggle = labels["toggle:Silent aim"]
@@ -228,7 +242,7 @@ do
     check(rangeSlider ~= nil, "o painel registra o slider Range")
     check(rangeSlider.Min == 500 and rangeSlider.Max == 1000, "o slider vai de 500 a 1000")
     check(rangeSlider.Value == 500, "o padrao do slider e 500")
-    check(labels["toggle:Debug logs"] ~= nil, "o painel registra o toggle Debug logs")
+    check(labels["toggle:Debug logs"] == nil, "o toggle Debug logs saiu do painel")
 
     -- O toggle do painel liga a feature pelo mesmo caminho do backend.
     aimToggle.Handle:SetValue(true)
@@ -262,15 +276,16 @@ do
     -- Sem nada salvo, o Load nao inventa valores.
     check(state:LoadConfig() == 0, "Load sem arquivo nao aplica nada")
 
-    -- Mexe em controles de features variadas: silent aim (alcance + debug). O
-    -- callback de cada controle ja grava no Config. (O slider do harness nao tem
-    -- SetValue: o valor e o callback sao do proprio registro do controle.)
+    -- Mexe em controles de features variadas: silent aim (alcance + tracer da
+    -- fruta). O callback de cada controle ja grava no Config. (O slider do
+    -- harness nao tem SetValue: o valor e o callback sao do proprio registro do
+    -- controle.)
     local rangeControl = labels["slider:Range"]
     rangeControl.Value = 777
     rangeControl.Callback(777)
     check(state.Config.range == 777, "mexer no Range grava no Config")
-    labels["toggle:Debug logs"].Handle:SetValue(true)
-    check(state.Config.debug == true, "mexer no Debug logs grava no Config")
+    labels["toggle:Fruit tracer"].Handle:SetValue(true)
+    check(state.Config.fruitTrace == true, "mexer no Fruit tracer grava no Config")
 
     -- O botao Save grava o arquivo do executor (filesystem em memoria).
     buttons["Save config"].Callback()
@@ -339,19 +354,19 @@ do
     local ctx = bfContext(994732206, 994732206)
     local ui = ctx:MountUI()
     -- Pre-existe um arquivo (como se a sessao anterior tivesse salvo).
-    ctx.Files["DepHub_BloxFruits_config.json"] = '{"debug":true,"range":640,"speed":4}'
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"fruitTrace":true,"range":640,"speed":4}'
     local state = ctx:Run("src/games/bloxfruits.lua")
     check(state.Config.range == 640, "o painel abre com o range salvo aplicado")
-    check(state.Config.debug == true, "o painel abre com o debug salvo aplicado")
+    check(state.Config.fruitTrace == true, "o painel abre com o tracer salvo aplicado")
     check(state.Config.speed == 4, "o painel abre com a velocidade salva aplicada")
     check(state.PendingSilentAimRange == 640, "o valor salvo tambem alimenta o Pending da feature")
 
-    -- A tela nasce refletindo o salvo: o controle do Debug logs ja abre ligado.
-    local debugControl = nil
+    -- A tela nasce refletindo o salvo: o controle do Fruit tracer ja abre ligado.
+    local traceControl = nil
     for _, control in ipairs(ui.Library._Controls) do
-        if control.Kind == "toggle" and control.Label == "Debug logs" then debugControl = control end
+        if control.Kind == "toggle" and control.Label == "Fruit tracer" then traceControl = control end
     end
-    check(debugControl ~= nil and debugControl.Handle.Value == true, "o toggle Debug logs abre no valor salvo (a tela reflete o Load)")
+    check(traceControl ~= nil and traceControl.Handle.Value == true, "o toggle Fruit tracer abre no valor salvo (a tela reflete o Load)")
 end
 
 -- Fallback em memoria: sem writefile/readfile/isfile, o Save nao quebra -- so
@@ -379,14 +394,14 @@ do
     local state = ctx:Run("src/games/bloxfruits.lua")
     state.Config = {
         range = 500,
-        debug = true,
+        fruitTrace = true,
         silentaim = false,
         island = "Cafe",
         fruitSkip = { "Dragon", "Leopard" },
     }
     local json = state:EncodeConfig()
     check(json:find('"range":500', 1, true) ~= nil, "encode: numero sem aspas")
-    check(json:find('"debug":true', 1, true) ~= nil, "encode: booleano true")
+    check(json:find('"fruitTrace":true', 1, true) ~= nil, "encode: booleano true")
     check(json:find('"silentaim":false', 1, true) ~= nil, "encode: booleano false")
     check(json:find('"island":"Cafe"', 1, true) ~= nil, "encode: string com aspas")
     check(json:find('"fruitSkip":["Dragon","Leopard"]', 1, true) ~= nil, "encode: array de string")
@@ -394,7 +409,7 @@ do
     -- Grava e le de volta pelo arquivo: o round-trip tem que preservar tudo.
     ctx.Env.writefile("DepHub_BloxFruits_config.json", json)
     local parsed = state:ReadConfig()
-    check(parsed.range == 500 and parsed.debug == true and parsed.silentaim == false, "decode: escalares voltam")
+    check(parsed.range == 500 and parsed.fruitTrace == true and parsed.silentaim == false, "decode: escalares voltam")
     check(parsed.island == "Cafe", "decode: string volta")
     check(#parsed.fruitSkip == 2 and parsed.fruitSkip[1] == "Dragon" and parsed.fruitSkip[2] == "Leopard", "decode: array volta inteiro")
 end
@@ -478,6 +493,65 @@ do
     check(bare:SetGrab(false) and bare.GrabEnabled == false, "SetGrab desliga o grab")
     check(bare:Enable() and bare:Disable() and bare:IsEnabled() == false, "Enable/Disable ciclam")
     bare:Destroy()
+end
+
+-- Tracer da fruta: um toggle a PARTE que liga/desliga so as linhas (o highlight
+-- e a distancia continuam vindo com o Fruit ESP). Sem o ESP ligado, o tracer so
+-- guarda a escolha. Precisa de uma fruta no chao pra montar a entrada do ESP.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Fruit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "fruit.lua"])()
+    local feature = Fruit.new()
+
+    -- Personagem com HRP (o tracer liga a minha HRP na fruta) + uma fruta
+    -- spawnada pelo jogo: Model "Fruit" com uma BasePart dentro.
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local fruit = Instance.new("Model"); fruit.Name, fruit.Parent = "Fruit", ctx.Services.Workspace
+    local fruitPart = Instance.new("Part"); fruitPart.Name, fruitPart.Position, fruitPart.Parent = "Handle", Vector3.new(30, 0, 0), fruit
+
+    -- O tracer e um toggle a parte: comeca desligado e ha um setter dedicado.
+    check(feature.TraceEnabled == false, "o tracer comeca desligado")
+    check(type(feature.SetTrace) == "function", "a feature expoe SetTrace")
+    check(feature:SetTrace(true) and feature.TraceEnabled == true, "SetTrace liga o tracer")
+    -- Sem o ESP ligado, ligar o tracer so guarda a escolha (nada pra desenhar).
+    check(next(feature.EspMap) == nil, "sem o ESP ligado o tracer so guarda a escolha")
+
+    -- Liga o ESP: a entrada nasce com Highlight, Billboard E beam de tracer. O
+    -- ciclo do ESP e um while com task.wait; o harness guarda o corpo no spawn em
+    -- vez de rodar. Aqui o task.wait da UMA passada do loop (desliga o while no
+    -- fim) e o spawn roda sincrono -- e o unico jeito de observar um frame.
+    local function espStep()
+        ctx.Env.task.wait = function() feature.EspEnabled = false end
+        ctx:FlushSpawned()
+    end
+    feature:SetEsp(true)
+    espStep()
+    local entry = feature.EspMap[fruit]
+    check(entry ~= nil, "o ESP monta a entrada da fruta")
+    check(entry.highlight ~= nil and entry.billboard ~= nil, "a entrada tem highlight e billboard (ESP)")
+    check(entry.beam ~= nil, "a entrada tem um beam de tracer")
+    check(entry.beam.Enabled == true, "com o tracer ligado o beam fica visivel")
+    check(entry.localAttachment.Parent == root, "o attachment local aponta pra minha HRP")
+    check(entry.beam.Attachment1 == entry.fruitAttachment, "o outro lado do beam aponta pra fruta")
+
+    -- O rotulo carrega a distancia (o outro pedaco do ESP que ativa junto).
+    check(entry.label.Text:find("m", 1, true) ~= nil, "o rotulo mostra a distancia")
+
+    -- Desligar o tracer esconde o beam sem derrubar o highlight/billboard: o
+    -- proximo ciclo passa com o TraceEnabled ja em false.
+    feature:SetTrace(false)
+    local beamRef = entry.beam
+    feature:SetEsp(true)
+    espStep()
+    check(beamRef.Enabled == false, "desligar o tracer esconde o beam")
+    check(entry.highlight.Enabled == true and entry.billboard.Enabled == true, "o highlight/billboard do ESP continuam")
+
+    -- Desligar o ESP limpa tudo, beam incluso.
+    feature:SetEsp(false)
+    check(next(feature.EspMap) == nil, "desligar o ESP limpa o mapa de entradas")
+    feature:Destroy()
 end
 
 -- A fruta no chao, de verdade: um Tool com OriginalName e Handle e achado; um
@@ -989,7 +1063,8 @@ do
     check(type(fired[2]) == "table" and next(fired[2]) == nil, "o slot 2 do clique continua a tabela vazia (intacto)")
     check(fired[4] == "hit-id-123", "o hitId do clique (slot 4) nao foi tocado")
 
-    -- Sem alvo travado: o clique sai intacto (o aim nao inventa alvo).
+    -- O clique sai intacto mesmo sem alvo travado -- sem debug pendurado no meio
+    -- do gancho (o modo debug saiu).
     feature.TargetLostAt = os.clock() - 100
     feature.TargetName = nil
     feature.TargetPosition = nil
@@ -997,14 +1072,6 @@ do
     ctx:FireRemote(feature.RegisterHit, "FireServer", somePart, {}, nil, "hit-id-9")
     local fired2 = feature.RegisterHit.Fired[#feature.RegisterHit.Fired]
     check(fired2[1] == somePart, "sem alvo o clique sai com a part original")
-
-    -- O DEBUG nao pode quebrar o hook: ligar, disparar um ataque, e a chamada
-    -- continua chegando (o print e so observacao).
-    check(feature:SetDebug(true) == true, "o modo debug liga")
-    local debugPart = Instance.new("Part"); debugPart.Name = "DebugPart"
-    ctx:FireRemote(feature.RegisterHit, "FireServer", debugPart, {}, nil, "dbg")
-    check(feature.RegisterHit.Fired[#feature.RegisterHit.Fired][4] == "dbg", "com debug ligado o ataque continua chegando")
-    feature:SetDebug(false)
 
     feature:Disable()
     feature:Destroy()
