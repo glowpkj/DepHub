@@ -117,10 +117,11 @@ end
 -- impulso (acelerar o pulo). O slider so muda a intensidade do impulso; com 0%
 -- fica so o bypass, com o pulo original.
 --
--- Devolve true quando ligou. Se o bypass nao pode ser aplicado (executor sem
--- debug.getupvalue/setupvalue, ou o modulo do jogo ausente), a feature ainda
--- liga para o IMPULSO e devolve false, "unavailable:<motivo>" para a UI avisar
--- -- nunca derruba o backend por causa disso.
+-- Devolve true quando o IMPULSO ficou ligado -- ele nao depende do jogo. O
+-- bypass e um extra: se nao puder ser aplicado (executor sem
+-- debug.getupvalue/setupvalue, ou o modulo do jogo ausente), o impulso continua
+-- valendo e o segundo retorno traz "bypass:<motivo>" para a UI avisar SEM dizer
+-- que a feature inteira esta indisponivel. Nunca derruba o backend.
 function State:SetJumpEnabled(enabled)
     if self.Destroyed then return false end
     local wanted = enabled == true
@@ -131,7 +132,7 @@ function State:SetJumpEnabled(enabled)
             self.Jump:SetImpulse(self.JumpImpulse)
             local bypassOk, bypassErr = self.Jump:Start()
             self.JumpEnabled = true
-            if bypassOk ~= true then return false, "unavailable:" .. tostring(bypassErr or "bypass") end
+            if bypassOk ~= true then return true, "bypass:" .. tostring(bypassErr or "indisponivel") end
         end
     else
         if self.Jump and self.JumpEnabled then self.Jump:Stop() end
@@ -199,6 +200,10 @@ do
                 if not ok then
                     State.LastError = tostring(err)
                     warn("[DepHub] Jump Anywhere unavailable: " .. tostring(err))
+                elseif err then
+                    -- O impulso esta ativo; so o bypass do jogo nao entrou.
+                    State.LastError = tostring(err)
+                    warn("[DepHub] Jump Anywhere: impulse on, jump bypass unavailable (" .. tostring(err) .. ")")
                 end
             end)
             section:CreateSlider("Impulse", 0, 150, State.JumpImpulse, function(value)

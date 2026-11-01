@@ -1,53 +1,55 @@
 -- Volleyball 4.2 - Jump Anywhere + impulso extra. Um unico recurso, um unico
 -- toggle: liga as DUAS coisas juntas --
---   1) JUMP BYPASS: patcheia o upvalue de checagem dentro de
---      CharacterActions.Jump para que "NoJump" (o veto de pulo do jogo) vire
---      nil; dali pra frente o pulo funciona em qualquer lugar da quadra.
---   2) IMPULSO EXTRA: quando o jogador pula de fato (CA.State.Jumped sobe), no
---      frame seguinte forca AssemblyLinearVelocity.Y para a velocidade de altura
---      padrao * (1 + Aumento/100). Sem impulso (0%), o pulo original fica igual.
+--   1) IMPULSO EXTRA: quando o jogador pula de fato, no frame seguinte
+--      multiplica AssemblyLinearVelocity.Y por (1 + Aumento/100). Este e o
+--      recurso PRINCIPAL e o unico que depende so do proprio personagem
+--      (Humanoid) -- nao precisa de modulo nenhum do jogo.
+--   2) JUMP BYPASS (best-effort): procura o modulo CharacterActions do jogo e
+--      patcheia o upvalue de checagem de pulo para que "NoJump" (o veto) vire
+--      nil. Se o modulo nao existir / o executor nao tiver debug.getupvalue, o
+--      bypass apenas nao entra -- o IMPULSO continua funcionando com o Humanoid.
 --
--- IMPORTANTE -- o impulso e INDEPENDENTE do bypass. O CharacterActions (CA) e o
--- modulo do PROPRIO jogo que guarda o flag `State.Jumped`; ele existe com ou sem
--- o patch. Antes, o CA so era gravado quando o patch dava certo, entao num
--- executor sem debug.getupvalue (ou com o indice do upvalue diferente) o CA
--- ficava nil e o impulso NUNCA rodava -- o "nao aumenta o impulso" que o usuario
--- viu. Agora o CA e resolvido sempre, e re-tentado enquanto nao existir: o
--- loader sobe o hub na hora, entao e normal o CharacterActions ainda nao ter
--- replicado no primeiro frame.
+-- Historico do bug: antes, o impulso rodava dentro de um heartbeat que exigia
+-- `self.CA` (o CharacterActions). Como o CA so era gravado quando o patch do
+-- upvalue dava certo -- e neste jogo o caminho do modulo nem batia -- o CA ficava
+-- nil e o impulso NUNCA rodava. O log do usuario provava: "CharacterActions
+-- indisponivel" e depois "bypass". Agora o impulso nao depende disso.
 --
--- O patch do upvalue em si segue por debug.getupvalue/setupvalue (primitivas de
--- executor). Se ele nao aplicar, o modulo NAO derruba o backend: o bypass fica
--- "unavailable" e o impulso continua funcionando. O Destroy SEMPRE restaura o
--- upvalue original se ele ainda for o nosso patch.
+-- O gatilho do impulso e o EVENTO do Humanoid (`Jumping`) e, como reserva, a
+-- transicao para o ar (FloorMaterial/GetState) com velocidade vertical subindo.
+-- O flag CA.State.Jumped fica como terceiro gatilho. Um cooldown curto evita
+-- aplicar duas vezes o mesmo pulo.
 --
 -- Sem UI aqui: quem monta o toggle/slider e o backend (viz. volleyball42.lua).
--- O modulo so publica Enable/Disable/SetImpulse/Start/Stop/Destroy.
+-- O modulo so publica new/Start/Stop/SetImpulse/Destroy.
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local workspaceService = game:GetService("Workspace")
 
 local Visual = {}
 Visual.__index = Visual
 
 Visual.Id = "DepHub_JumpAnywhere"
--- Caminho do modulo do jogo que guarda as acoes do personagem. E um ModuleScript
--- dentro de um Folder cujo nome e o do dev do mapa; resolvido lazy e sem
--- WaitForChild bloqueante.
+-- Caminho preferido do modulo do jogo que guarda as acoes do personagem. E um
+-- ModuleScript dentro de um Folder cujo nome e o do dev do mapa. Se esse caminho
+-- mudar (o dev renomeia a pasta), resolveCharacterActions cai pra busca recursiva
+-- por nome no Workspace.
 Visual.ScriptPath = {"guilhermealone1", "CharacterScript", "CharacterActions"}
--- Indice do upvalue que guarda a funcao de checagem de pulo dentro de CA.Jump
--- (checkLinefault). O script do jogo nao exporta esse nome, entao a posicao e o
--- contrato observado; se mudar num patch, o assert de tipo pega.
+Visual.ScriptName = "CharacterActions"
+-- Indice PREFERIDO do upvalue de checagem dentro de CA.Jump. Nao e o unico: se
+-- o upvalue desse indice nao for a funcao de check, findCheckUpvalue procura uma
+-- funcao cujo nome contenha "check" e, na falta dela, a primeira funcao. O script
+-- do jogo nao exporta o nome, entao confiar so no indice quebrava num build novo.
 Visual.CheckUpvalue = 3
--- Altura do pulo padrao do jogo, em studs: v^2 = 2*g*h com v=50, g=196.2.
-Visual.DefaultJumpHeight = (50 * 50) / (2 * 196.2)
--- De quantos em quantos frames re-tenta achar o CharacterActions enquanto ele
--- nao existe (30 frames ~ 0.5s a 60fps). Sem isso, se o hub subir antes do
--- modulo do jogo replicar, o impulso nunca mais seria armado nesta sessao.
+-- Re-tenta achar o CharacterActions / aplicar o patch a cada N frames enquanto
+-- faltar um dos dois (o hub sobe na hora; o modulo do jogo pode vir depois).
 Visual.ResolveRetryFrames = 30
--- Numero minimo de frames entre dois impulsos. O gatilho e por BORDA (Jumped
--- false -> true), mas se o jogo piscar o flag isso evita empilhar boost.
+-- Frames de re-tentativa do impulso quando a velocidade do pulo ainda nao foi
+-- escrita pela fisica. Curto de proposito: cobre a corrida sem empilhar boost.
+Visual.ImpulseRetryFrames = 4
+-- Frames minimos entre dois impulsos. Vários gatilhos podem ver o mesmo pulo.
 Visual.ImpulseCooldownFrames = 3
 
 local function childPath(root, path)
@@ -60,6 +62,17 @@ end
 
 local function resolveCharacterActions()
     local module = childPath(workspaceService, Visual.ScriptPath)
+    if not module then
+        -- O caminho fixo pode ter mudado, ou o modulo pode morar fora do
+        -- Workspace (ReplicatedStorage e o lugar comum para um ModuleScript de
+        -- cliente). Procura pelo nome, recursivamente, nos dois.
+        for _, root in ipairs({workspaceService, ReplicatedStorage}) do
+            local ok, found = pcall(function()
+                return root:FindFirstChild(Visual.ScriptName, true)
+            end)
+            if ok and found then module = found; break end
+        end
+    end
     if not module then return nil end
     local ok, data = pcall(require, module)
     if not ok or type(data) ~= "table" then return nil end
@@ -90,9 +103,28 @@ local function writeUpvalue(library, fn, index, value)
     return current == value
 end
 
+-- Acha o upvalue que guarda a checagem de pulo. Prefere o indice conhecido; se
+-- ele nao for funcao, procura um nome com "check"; por ultimo aceita a primeira
+-- funcao. Devolve indice, valor (ou nil).
+local function findCheckUpvalue(library, fn, preferred)
+    local firstFunction
+    for index = 1, 64 do
+        local name, value = readUpvalue(library, fn, index)
+        if value == nil then break end
+        if type(value) == "function" then
+            if index == preferred then return index, value end
+            if not firstFunction then firstFunction = {index, value} end
+            if type(name) == "string" and name:lower():find("check", 1, true) then
+                return index, value
+            end
+        end
+    end
+    if firstFunction then return firstFunction[1], firstFunction[2] end
+    return nil, nil
+end
+
 -- O flag de pulo do jogo virou "true" neste frame? Aceita booleano (o caso
--- documentado) e numero (um contador que sobe), porque os dois formatos
--- aparecem em versoes do script e tratar so booleano deixava o impulso morto.
+-- documentado) e numero (um contador que sobe).
 local function jumpStarted(current, previous)
     if type(current) == "number" then
         return current > (tonumber(previous) or 0)
@@ -100,54 +132,82 @@ local function jumpStarted(current, previous)
     return current == true and previous ~= true
 end
 
+-- O Humanoid do personagem atual, ou nil.
+local function currentHumanoid()
+    local player = Players.LocalPlayer
+    local character = player and player.Character
+    if not character then return nil end
+    return character:FindFirstChildOfClass("Humanoid")
+end
+
+-- O personagem esta no ar? Devolve true/false, ou nil quando nao da pra saber
+-- (executor/sandbox sem FloorMaterial e sem GetState). nil significa "nao usa
+-- este sinal".
+local function isAirborne(humanoid)
+    local floor = humanoid.FloorMaterial
+    if floor ~= nil then
+        return floor == Enum.Material.Air
+    end
+    local ok, state = pcall(humanoid.GetState, humanoid)
+    if ok then
+        return state == Enum.HumanoidStateType.Jumping
+            or state == Enum.HumanoidStateType.Freefall
+    end
+    return nil
+end
+
 function Visual.new()
-    local State = setmetatable({}, Visual)
-    State.Active = false
-    State.Impulse = 0          -- 0..150 (%)
-    State.BypassReady = false  -- o patch de upvalue esta aplicado?
-    State.BypassError = nil
-    State.PreviousJumped = false
-    State.Original = nil       -- funcao de check original, para restaurar
-    State.Patched = nil
-    State.CA = nil             -- CharacterActions do jogo (independente do patch)
-    State.Connections = {}
-    State.ResolveCountdown = 0 -- frames ate a proxima tentativa de achar o CA
-    State.ImpulseCooldown = 0  -- frames ate poder aplicar o proximo impulso
-    return State
+    local self = setmetatable({}, Visual)
+    self.Active = false
+    self.Impulse = 0          -- 0..150 (%)
+    self.BypassReady = false  -- o patch de upvalue esta aplicado?
+    self.BypassError = nil
+    self.CA = nil             -- CharacterActions do jogo (opcional)
+    self.CheckIndex = nil     -- indice do upvalue que patchamos
+    self.Original = nil
+    self.Patched = nil
+    self.Connections = {}
+    self.HumanoidConnections = {}
+    self.Humanoid = nil
+    self.WasAirborne = false
+    self.PreviousJumped = false
+    self.ResolveCountdown = 0
+    self.ImpulseCooldown = 0
+    return self
 end
 
 -- Aplica o patch do upvalue de check. Devolve true se ficou aplicado.
 --
 -- O CA e gravado SEMPRE que for encontrado, ANTES de exigir o debug: o impulso
--- le `CA.State.Jumped` e nao depende do patch. So o patch exige a primitiva.
+-- nao depende do patch. So o patch exige a primitiva.
 function Visual:_applyBypass()
     if self.BypassReady then return true end
-
-    local ca = self.CA or resolveCharacterActions()
-    if type(ca) == "table" then self.CA = ca end
-
     local library = getDebug()
     if not library then return false, "debug.getupvalue/setupvalue ausente no executor" end
+    local ca = self.CA
     if not ca then return false, "CharacterActions indisponivel" end
     if type(ca.Jump) ~= "function" then return false, "CA.Jump ausente" end
     if type(ca.State) ~= "table" then return false, "CA.State ausente" end
 
-    local _, original = readUpvalue(library, ca.Jump, Visual.CheckUpvalue)
+    local index, original = findCheckUpvalue(library, ca.Jump, Visual.CheckUpvalue)
     if type(original) ~= "function" then
-        return false, "upvalue " .. Visual.CheckUpvalue .. " de CA.Jump nao e funcao"
+        return false, "nenhum upvalue de funcao em CA.Jump"
     end
 
-    -- "NoJump" e o veto do jogo: devolver nil equivale a "pode pular".
+    -- "NoJump" e o veto do jogo: devolver nil equivale a "pode pular". Para
+    -- qualquer outro retorno, o wrapper e um repasse identico -- patchar o
+    -- upvalue errado nao muda comportamento nenhum.
     local patched = function(...)
         local result = original(...)
         if result == "NoJump" then return nil end
         return result
     end
 
-    if not writeUpvalue(library, ca.Jump, Visual.CheckUpvalue, patched) then
+    if not writeUpvalue(library, ca.Jump, index, patched) then
         return false, "falha ao escrever o upvalue"
     end
 
+    self.CheckIndex = index
     self.Original = original
     self.Patched = patched
     self.BypassReady = true
@@ -157,64 +217,117 @@ end
 function Visual:_restoreBypass()
     if not self.BypassReady or not self.CA then return end
     local library = getDebug()
-    if library then
-        local _, current = readUpvalue(library, self.CA.Jump, Visual.CheckUpvalue)
+    if library and self.CheckIndex then
+        local _, current = readUpvalue(library, self.CA.Jump, self.CheckIndex)
         -- So restaura se o upvalue ainda for o NOSSO patch (outro script pode
         -- ter patcheado depois; nao desfazemos o trabalho alheio as cegas).
         if current == self.Patched then
-            writeUpvalue(library, self.CA.Jump, Visual.CheckUpvalue, self.Original)
+            writeUpvalue(library, self.CA.Jump, self.CheckIndex, self.Original)
         end
     end
     self.BypassReady = false
+    self.CheckIndex = nil
     self.Original = nil
     self.Patched = nil
 end
 
--- No frame do pulo, forca a velocidade vertical para a altura padrao
--- multiplicada pelo impulso. Sem impulso (0%), mantem o pulo original.
-function Visual:_applyImpulse()
-    if not self.Active then return end
-    if self.Impulse <= 0 then return end
-
-    local player = Players.LocalPlayer
-    local character = player and player.Character
-    if not character then return end
-
-    -- Pode haver mais de um HumanoidRootPart em Model malformado: pega o que
-    -- realmente pertence ao Humanoid atual.
-    local hrp = character:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local gravity = workspaceService and workspaceService.Gravity
-    if type(gravity) ~= "number" or gravity <= 0 then return end
-
-    local baseVelocity = math.sqrt(2 * gravity * Visual.DefaultJumpHeight)
-    local multiplier = 1 + self.Impulse / 100
-    local velocity = hrp.AssemblyLinearVelocity
-    if type(velocity) ~= "table" and type(velocity) ~= "userdata" then return end
-
-    -- Impulso e um BOOST de pulo: mantem X/Z (direcao) e sobe o Y.
-    hrp.AssemblyLinearVelocity = Vector3.new(
-        velocity.X,
-        baseVelocity * multiplier,
-        velocity.Z
-    )
-end
-
--- Resolve o CharacterActions se possivel e (se ainda nao houver patch) tenta
--- aplica-lo. Chamado no Start e re-tentado a cada ResolveRetryFrames enquanto o
--- CA estiver ausente OU o patch nao tiver entrado -- porque o hub sobe antes do
--- modulo do jogo replicar e o patch pode falhar por um motivo temporario.
+-- Tenta resolver o CA e aplicar o patch. Nunca derruba nada: guarda o motivo em
+-- BypassError. O impulso nao depende do resultado.
 function Visual:_arm()
     if not self.CA then
         local ca = resolveCharacterActions()
         if type(ca) == "table" then self.CA = ca end
     end
-    if self.CA and not self.BypassReady then
+    if not self.CA then
+        self.BypassError = "CharacterActions indisponivel"
+        return false
+    end
+    if not self.BypassReady then
         local ok, err = self:_applyBypass()
         if not ok then self.BypassError = err end
     end
     return self.BypassReady
+end
+
+-- Liga/religa os eventos do Humanoid atual (Jumping/StateChanged). Re-chamado
+-- todo frame para acompanhar respawn (o Humanoid muda).
+function Visual:_watchHumanoid()
+    local humanoid = currentHumanoid()
+    if humanoid == self.Humanoid then return end
+
+    for _, connection in ipairs(self.HumanoidConnections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    self.HumanoidConnections = {}
+    self.Humanoid = humanoid
+    self.WasAirborne = false
+    if not humanoid then return end
+
+    -- `Jumping` e o sinal ideal: dispara no inicio do pulo. Em sandbox/executor
+    -- que nao exponha o sinal, o pcall apenas falha e o gatilho de estado cobre.
+    pcall(function()
+        local connection = humanoid.Jumping:Connect(function()
+            self:_queueImpulse()
+        end)
+        self.HumanoidConnections[#self.HumanoidConnections + 1] = connection
+    end)
+    pcall(function()
+        local connection = humanoid.StateChanged:Connect(function(_, newState)
+            if newState == Enum.HumanoidStateType.Jumping
+                or newState == Enum.HumanoidStateType.Freefall then
+                self:_queueImpulse()
+            end
+        end)
+        self.HumanoidConnections[#self.HumanoidConnections + 1] = connection
+    end)
+end
+
+-- Pede um impulso para o proximo frame, respeitando o cooldown. Pode ser
+-- chamado por varios gatilhos vendo o mesmo pulo.
+function Visual:_queueImpulse()
+    if not self.Active or self.Impulse <= 0 then return end
+    if self.ImpulseCooldown > 0 then return end
+    self.ImpulseCooldown = Visual.ImpulseCooldownFrames
+    -- Aplica um frame depois: a velocidade do pulo so esta posta no frame
+    -- seguinte, igual ao script de referencia. Se ela ainda nao estiver (corrida
+    -- com a fisica), re-tenta por alguns frames -- sem NUNCA inventar um pulo
+    -- para um personagem parado no chao.
+    task.spawn(function()
+        for _ = 1, Visual.ImpulseRetryFrames do
+            RunService.Heartbeat:Wait()
+            if not self.Active then return end
+            if self:_applyImpulse() then return end
+        end
+    end)
+end
+
+-- Multiplica a velocidade vertical REAL do pulo pelo impulso. Devolve true
+-- quando nao ha mais o que tentar (aplicou, ou nao ha alvo). Devolve false
+-- apenas quando o personagem ainda nao esta subindo -- o chamador re-tenta.
+function Visual:_applyImpulse()
+    if not self.Active then return true end
+    if self.Impulse <= 0 then return true end
+
+    local player = Players.LocalPlayer
+    local character = player and player.Character
+    if not character then return true end
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return true end
+
+    local velocity = hrp.AssemblyLinearVelocity
+    if type(velocity) ~= "table" and type(velocity) ~= "userdata" then return true end
+    -- So impulsa um PULO em subida. Velocidade negativa e queda de borda;
+    -- zero e personagem parado (o pulo ainda nao foi escrito). Nos dois casos
+    -- nao ha impulso a dar -- e nunca transformamos um deles em salto.
+    if velocity.Y <= 0 then return false end
+
+    local multiplier = 1 + self.Impulse / 100
+    hrp.AssemblyLinearVelocity = Vector3.new(
+        velocity.X,
+        velocity.Y * multiplier,
+        velocity.Z
+    )
+    return true
 end
 
 function Visual:Start()
@@ -223,18 +336,21 @@ function Visual:Start()
     self.PreviousJumped = false
     self.ImpulseCooldown = 0
     self.ResolveCountdown = 0
+    self.WasAirborne = false
 
-    -- Resolve o CA e tenta o patch. O resultado do patch (ok/erro) e o que o
-    -- backend usa pra avisar no toggle; o impulso nao depende dele.
+    -- Resolve o CA e tenta o patch (best-effort). O resultado e o que o backend
+    -- usa pra avisar no toggle; o IMPULSO nao depende dele.
     self:_arm()
     local bypassOk = self.BypassReady
-    local bypassErr = (not bypassOk) and self.BypassError or nil
+    local bypassErr = (not bypassOk) and (self.BypassError or "bypass") or nil
+
+    -- Liga o Humanoid atual de imediato (se ja existir).
+    self:_watchHumanoid()
 
     local connection = RunService.Heartbeat:Connect(function()
         if not self.Active then return end
 
-        -- Re-tenta achar o CA / aplicar o patch enquanto faltar um dos dois (o
-        -- hub sobe na hora, entao e normal o CA ainda nao existir no load).
+        -- Retry do bypass/CA enquanto faltar um dos dois.
         if not self.CA or not self.BypassReady then
             self.ResolveCountdown = (self.ResolveCountdown or 0) - 1
             if self.ResolveCountdown <= 0 then
@@ -247,21 +363,35 @@ function Visual:Start()
             self.ImpulseCooldown = self.ImpulseCooldown - 1
         end
 
-        local ca = self.CA
-        if not ca then return end
+        -- Acompanha respawn e liga os eventos do Humanoid atual.
+        self:_watchHumanoid()
 
-        local jumped = ca.State and ca.State.Jumped
-        if jumpStarted(jumped, self.PreviousJumped) and self.ImpulseCooldown <= 0 then
-            -- Aplica um frame depois: a velocidade do impulso so existe no
-            -- frame seguinte ao pulo, igual ao script de referencia.
-            self.ImpulseCooldown = Visual.ImpulseCooldownFrames
-            task.spawn(function()
-                RunService.Heartbeat:Wait()
-                self:_applyImpulse()
-            end)
+        -- Gatilho de RESERVA: subiu para o ar com velocidade positiva. Cobre
+        -- executor/sandbox onde o sinal `Jumping` nao chega.
+        local humanoid = self.Humanoid
+        if humanoid then
+            local airborne = isAirborne(humanoid)
+            if airborne ~= nil then
+                local player = Players.LocalPlayer
+                local character = player and player.Character
+                local hrp = character and character:FindFirstChild("HumanoidRootPart")
+                local rising = hrp and hrp.AssemblyLinearVelocity.Y > 1
+                if airborne and not self.WasAirborne and rising then
+                    self:_queueImpulse()
+                end
+                self.WasAirborne = airborne
+            end
         end
 
-        self.PreviousJumped = jumped
+        -- Gatilho terciario: o flag do CharacterActions, quando existir.
+        local ca = self.CA
+        if ca then
+            local jumped = ca.State and ca.State.Jumped
+            if jumpStarted(jumped, self.PreviousJumped) then
+                self:_queueImpulse()
+            end
+            self.PreviousJumped = jumped
+        end
     end)
     self.Connections[#self.Connections + 1] = connection
 
@@ -273,11 +403,18 @@ function Visual:Stop()
     self.Active = false
     self.PreviousJumped = false
     self.ImpulseCooldown = 0
+    self.WasAirborne = false
 
     for _, connection in ipairs(self.Connections) do
         pcall(function() connection:Disconnect() end)
     end
     self.Connections = {}
+
+    for _, connection in ipairs(self.HumanoidConnections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    self.HumanoidConnections = {}
+    self.Humanoid = nil
 
     self:_restoreBypass()
     return true

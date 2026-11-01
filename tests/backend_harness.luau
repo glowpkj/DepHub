@@ -192,7 +192,18 @@ end
 function instanceMeta:__tostring() return self._props.ClassName end
 function methods:GetChildren() return table.clone(self._children) end
 function methods:GetFullName() return self.Parent and self.Parent:GetFullName().."."..self.Name or self.Name end
-function methods:FindFirstChild(name) for _, child in ipairs(self._children) do if child.Name == name then return child end end end
+-- The real Instance:FindFirstChild takes a `recursive` flag; features that look
+-- up a game module whose folder was renamed rely on it. Without the flag it is
+-- still the plain direct-children search.
+function methods:FindFirstChild(name, recursive)
+    for _, child in ipairs(self._children) do if child.Name == name then return child end end
+    if recursive then
+        for _, child in ipairs(self._children) do
+            local found = child:FindFirstChild(name, true)
+            if found then return found end
+        end
+    end
+end
 function methods:FindFirstChildWhichIsA(class) return self:FindFirstChildOfClass(class) end
 function methods:GetDescendants() local result={}; for _,child in ipairs(self:GetChildren()) do result[#result+1]=child; for _,descendant in ipairs(child:GetDescendants()) do result[#result+1]=descendant end end; return result end
 function methods:FindFirstChildOfClass(class) for _, child in ipairs(self._children) do if child:IsA(class) then return child end end end
