@@ -110,27 +110,34 @@ end
 function Feature:_WatchArrival(label, targetPosition)
     self:_StopWatching()
     if not targetPosition then return end
-    if not (RunService and type(RunService.Heartbeat) == "table"
-        and type(RunService.Heartbeat.Connect) == "function") then
-        return
-    end
+    if not RunService then return end
+    -- Heartbeat e um RBXScriptSignal, NAO uma tabela Lua. Checar
+    -- type(RunService.Heartbeat) == "table" era falso no Roblox (o typeof e
+    -- "RBXScriptSignal") e por isso a vigia nunca conectava -- a chegada nunca
+    -- era detectada e o toggle nunca se desligava sozinho. A tentativa de
+    -- conectar e a propria validacao: pcall + o evento conectado.
+    local ok, connection = pcall(function()
+        return RunService.Heartbeat:Connect(function()
+            local position = self:RootPosition()
+            if not position then return end
+            local distance = (position - self._arrivalTarget).Magnitude
+            if distance <= ARRIVAL_DISTANCE then
+                local arrived = self._arrivalLabel
+                self:_StopWatching()
+                self.LastStatus = ("arrived at %s"):format(tostring(arrived))
+                -- A feature tem UM toggle (o da aba Travel). "Desligar so a
+                -- ilha deste voo" = desligar esse toggle -- nao ha outro para
+                -- tocar.
+                if type(self.OnArrive) == "function" then
+                    pcall(self.OnArrive, self, arrived)
+                end
+            end
+        end)
+    end)
+    if not ok or not connection then return end
     self._arrivalLabel = label
     self._arrivalTarget = targetPosition
-    self._arrivalConnection = RunService.Heartbeat:Connect(function()
-        local position = self:RootPosition()
-        if not position then return end
-        local distance = (position - self._arrivalTarget).Magnitude
-        if distance <= ARRIVAL_DISTANCE then
-            local arrived = self._arrivalLabel
-            self:_StopWatching()
-            self.LastStatus = ("arrived at %s"):format(tostring(arrived))
-            -- A feature tem UM toggle (o da aba Travel). "Desligar so a ilha
-            -- deste voo" = desligar esse toggle -- nao ha outro para tocar.
-            if type(self.OnArrive) == "function" then
-                pcall(self.OnArrive, self, arrived)
-            end
-        end
-    end)
+    self._arrivalConnection = connection
 end
 
 function Feature:_StopWatching()

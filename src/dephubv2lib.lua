@@ -13,7 +13,12 @@
 -- Public API (the part DepHub consumes):
 --   local lib = Library                     -- this module's export
 --   local win = lib:MakeWindow({Title=, SubTitle=, ScriptFolder=})
---   local tab = win:MakeTab({Title=, Icon=})
+--   local tab = win:MakeTab({Title=, Icon=})   -- Icon is an asset id OR a
+--                                              --   Unicode emoji (rendered as
+--                                              --   text); an icon NAME is still
+--                                              --   resolved through GetIconByName
+--   -- The window's starting size is read from lib.Default.UISize (a UDim2) at
+--   -- MakeWindow time; MakeWindow itself takes no Size option.
 --   tab:AddSection(title)                   -- visual header (string only)
 --   tab:AddToggle/Slider/Button/TextBox/Dropdown/Paragraph/Keybind/...
 --   win:Notify({Title=, Content=, Icon=, Duration=})
@@ -911,7 +916,11 @@ end
 am.Set=am.SetText
 an.Set=an.SetValue
 ao.Set=ao.SetValue
-end local al=function(
+end
+-- Build one tab button: the clickable row (TextButton), its title label, the
+-- selection marker frame, the content container, and the icon. The icon is an
+-- ImageLabel for an asset id, or a TextLabel for a Unicode emoji (DepHub).
+local al=function(
 
 al, am, an)
 local ao=createInstance("TextButton","Button",an,{
@@ -980,24 +989,47 @@ Padding=UDim.new(0,5)
 }
 })
 
-local ar=createInstance("ImageLabel",ao,{
+-- DepHub: icone da aba. O redz original so aceitava asset id num ImageLabel --
+-- qualquer outra coisa (um emoji Unicode, por exemplo) ficava invisivel. Aqui o
+-- icone e um emoji quando Icon nao e um asset id: nesse caso ele e desenhado num
+-- TextLabel, que e o unico elemento capaz de mostrar texto/emoji. Para asset id
+-- o ImageLabel de sempre e mantido, sem nenhuma mudanca de comportamento.
+local ar
+local as
+if am.Icon and not O(am.Icon)and#am.Icon>0 then
+ar=createInstance("TextLabel",ao,{
+Position=UDim2.new(0,8,0.5),
+Size=UDim2.new(0,16,0,16),
+AnchorPoint=Vector2.new(0,0.5),
+BackgroundTransparency=1,
+Text=am.Icon,
+TextSize=13,
+TextXAlignment=Enum.TextXAlignment.Center,
+TextYAlignment=Enum.TextYAlignment.Center,
+Font=Enum.Font.GothamBold
+})
+as=function()
+local at=ao.Title
+ar.Visible=true
+at.Size=UDim2.new(1,-28,1)
+at.Position=UDim2.fromOffset(28,0)end
+else
+ar=createInstance("ImageLabel",ao,{
 Position=UDim2.new(0,8,0.5),
 Size=UDim2.new(0,13,0,13),
 AnchorPoint=Vector2.new(0,0.5),
 BackgroundTransparency=1,
 ImageTransparency=0.3,
 Image=am.Icon or""
-})local as=function()
-
-
+})
+as=function()
 local as=string.sub(ar.Image,1,13)=="rbxassetid://"
 local at=ao.Title
 ar.Visible=as
 at.Size=UDim2.new(1,as and-25 or-15,1)
 at.Position=UDim2.fromOffset(as and 25 or 15)end
 
-
-u(ar:GetPropertyChangedSignal"Image",as)
+u(ar:GetPropertyChangedSignal"Image",as)end
 as()
 
 return ao,aq,ap,ar end local am=function(
@@ -2970,9 +3002,18 @@ local ax=av[2]or av.Icon or av.Image
 assert(type(aw)=="string",`"Tab.Title" 'string' expected, got {typeof(aw)}`)
 assert(ax==nil or type(ax)=="string",`"Tab.Icon" 'string' expected, got {typeof(ax)}`)
 
+-- DepHub: um icone que ja e um asset id ou um emoji Unicode passa direto (nao
+-- entra na busca de icones da biblioteca). So um NOME de icone (ex.: "swords")
+-- e resolvido por GetIconByName. Isso permite o backend usar emojis de verdade
+-- no icone da aba sem depender da tabela de icones do redz. O primeiro byte
+-- >=0x80 identifica o comeco de uma sequencia UTF-8 (emoji), sem confundir com
+-- um nome ascii de icone.
+local iconIsText=type(ax)=="string"and#ax>0
+local iconPassThrough=iconIsText and(O(ax)or(ax:sub(1,1):byte()or 0)>=0x80)
+
 local ay=setmetatable({
 Selected=self.SelectedTab==#S+1,
-Icon=Library:GetIconByName(ax),
+Icon=iconPassThrough and ax or Library:GetIconByName(iconIsText and ax or nil),
 Title=aw,
 
 Parent=self,

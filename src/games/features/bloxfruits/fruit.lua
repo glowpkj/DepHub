@@ -22,6 +22,10 @@ local LocalPlayer = Players.LocalPlayer
 -- Era assim no script antigo tambem -- fruits chamava o modulo de teleporte.
 -- A blade hit e a fruta agora compartilham UM teleporte, testado.
 --
+-- ESP e grab tem ALCANCE ILIMITADO: nao ha limite de distancia configuravel (os
+-- sliders "ESP max distance" e "Grab max distance" sairam). O ESP destaca toda
+-- fruta no chao; o grab voa ate a fruta mais proxima, de qualquer distancia.
+--
 -- Self-contained: faz os proprios game:GetService e nao depende do DepHub. So
 -- pede o motor de teleporte, e mesmo assim de forma opcional (sem ele o ESP e
 -- o store ainda funcionam; so o grab nao voa).
@@ -106,8 +110,11 @@ function Feature.new(options)
     -- O motor de teleporte geral. Sem ele o ESP e o store ainda rodam; so o
     -- grab recusa (nao tem como voar ate a fruta).
     self.Teleport = options.teleport or nil
-    self.Range = options.range or 0            -- 0 = pega de qualquer distancia
-    self.EspRange = options.espRange or 0      -- 0 = mostra toda fruta
+    -- Alcance ILIMITADO: nao ha mais limite de distancia configuravel (os dois
+    -- sliders "ESP max distance" / "Grab max distance" sairam). O ESP mostra toda
+    -- fruta no chao e o grab pega a mais proxima de qualquer distancia -- sem
+    -- loop extra: a varredura e a mesma GetChildren + as mesmas checagens de
+    -- existencia/validade de antes, so sem o corte por distancia.
     self.Skip = options.skip or {}             -- frutas nunca pegas (prefixo)
     self.Keep = options.keep or {}             -- frutas nunca guardadas
     self.StoreInterval = options.storeInterval or 2
@@ -144,12 +151,15 @@ end
 function Feature:NearestGroundFruit(skip)
     local root = self:_hrp()
     local best, bestPart, bestDistance
-    local maxRange = tonumber(self.Range) or 0
+    -- Alcance ilimitado: sem corte por distancia. Ainda so considera fruta com
+    -- parte fisica valida e fora da skip list -- as checagens eficientes de
+    -- existencia/validade continuam. A mais proxima ganha pelo melhor candidato
+    -- ja encontrado (o mesmo "best" de antes, so sem o teto de alcance).
     for _, fruit in ipairs(self:GroundFruits()) do
         local part = fruitPart(fruit)
         if part and not (skip and skip[fruit]) and not nameInSet(self.Skip, fruit) then
             local distance = root and (part.Position - root.Position).Magnitude or 0
-            if (maxRange <= 0 or distance <= maxRange) and (not bestDistance or distance < bestDistance) then
+            if not bestDistance or distance < bestDistance then
                 best, bestPart, bestDistance = fruit, part, distance
             end
         end
@@ -223,10 +233,11 @@ function Feature:SetEsp(on)
                         self.EspMap[fruit] = entry
                     end
                     local distance = root and math.floor((part.Position - root.Position).Magnitude) or 0
-                    local maxRange = tonumber(self.EspRange) or 0
-                    local shown = (maxRange <= 0) or (distance <= maxRange)
-                    entry.highlight.Enabled = shown
-                    entry.billboard.Enabled = shown
+                    -- Alcance ilimitado: toda fruta no chao e destacada, a
+                    -- qualquer distancia. A distancia continua no rotulo, so
+                    -- deixou de ser um corte.
+                    entry.highlight.Enabled = true
+                    entry.billboard.Enabled = true
                     -- Fruta spawnada chama-se so "Fruit"; mostra o nome real se
                     -- houver OriginalName, senao o proprio Name.
                     local label = fruit:GetAttribute("OriginalName") or fruit.Name
@@ -341,18 +352,20 @@ function Feature:SetStore(on)
 end
 
 -- --- Knobs ----------------------------------------------------------------
-function Feature:SetRange(value)
-    value = tonumber(value)
-    if not value or value < 0 then return false end
-    self.Range = value
-    return true
-end
+-- Skip/keep sao conjuntos de PREFIXOS de nome de fruta (em minusculo): "dragon"
+-- casa "Dragon-Dragon Fruit". A UI agora alimenta isso com um dropdown de
+-- selecao multipla -- a lista de frutas escolhidas vira o conjunto de prefixos.
+-- Os dois aceitam uma tabela-array {"Dragon","Rocket"} ou uma tabela-conjunto
+-- {dragon=true}; uma string ("Dragon, Rocket") continua aceita por seguranca.
 
-function Feature:SetEspRange(value)
-    value = tonumber(value)
-    if not value or value < 0 then return false end
-    self.EspRange = value
-    return true
+-- Normaliza um array {"Dragon","Rocket"} num conjunto {dragon=true,rocket=true}.
+local function listToSet(list)
+    local set = {}
+    for _, name in ipairs(list) do
+        local key = tostring(name):lower()
+        if key ~= "" then set[key] = true end
+    end
+    return set
 end
 
 -- "dragon rocket" -> {dragon=true, rocket=true}
@@ -365,13 +378,21 @@ function Feature:ParseList(text)
     return set
 end
 
-function Feature:SetSkip(text)
-    if type(text) == "string" then self.Skip = self:ParseList(text) else self.Skip = text or {} end
+function Feature:SetSkip(value)
+    if type(value) == "string" then self.Skip = self:ParseList(value)
+    elseif type(value) == "table" then
+        -- Uma tabela-conjunto ({dragon=true}) e um array ({"Dragon"}) sao
+        -- distinguidas pelo primeiro: se tem [1] e um array.
+        if value[1] ~= nil then self.Skip = listToSet(value) else self.Skip = value end
+    else self.Skip = {} end
     return true
 end
 
-function Feature:SetKeep(text)
-    if type(text) == "string" then self.Keep = self:ParseList(text) else self.Keep = text or {} end
+function Feature:SetKeep(value)
+    if type(value) == "string" then self.Keep = self:ParseList(value)
+    elseif type(value) == "table" then
+        if value[1] ~= nil then self.Keep = listToSet(value) else self.Keep = value end
+    else self.Keep = {} end
     return true
 end
 

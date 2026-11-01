@@ -251,6 +251,18 @@ do
     local dropdown = tab:AddDropdown({Name = "My dropdown", Options = {"A", "B"}, Default = "A"})
     check(type(dropdown) == "table", "AddDropdown returns a handle")
 
+    -- Multi-select dropdown (RedzLib native): Depot's Skip/Keep lists use it.
+    local multi = tab:AddDropdown({Name = "My multi", Options = {"Dragon", "Leopard"}, Default = {"Dragon"}, MultiSelect = true})
+    check(type(multi) == "table", "AddDropdown with MultiSelect returns a handle")
+    check(multi.Kind == "Dropdown", "the multi-select dropdown is tagged as a Dropdown")
+
+    -- Emoji tab icon: the real library must render a non-asset icon without error.
+    local emojiTab = window:MakeTab({Title = "Emoji Tab", Icon = "🍎"})
+    check(type(emojiTab) == "table", "MakeTab accepts a Unicode emoji icon")
+    -- An icon NAME still resolves through GetIconByName (no regression).
+    local namedTab = window:MakeTab({Title = "Named Tab", Icon = "search"})
+    check(type(namedTab) == "table", "MakeTab still accepts a named icon")
+
     local button = tab:AddButton({Name = "Click", Callback = function() end})
     check(type(button) == "table", "AddButton returns a handle")
 
@@ -283,8 +295,12 @@ do
         check(type(ui) == "table", "the adapter builds a shell")
         check(ui:CreateCategory("Farm", "wheat") == true, "the shell creates a category")
 
-        local shellTab = ui:CreateTab("Auto Farm", "Farm")
-        check(type(shellTab) == "table", "the shell creates a tab")
+        -- The compact size is written where the real library reads it.
+        local appliedSize = ui.Library.Default and ui.Library.Default.UISize
+        check(appliedSize and appliedSize.X.Offset == 600 and appliedSize.Y.Offset == 420, "the shell applies the 600x420 size")
+
+        local shellTab = ui:CreateTab("Auto Farm", "Farm", "🌾")
+        check(type(shellTab) == "table", "the shell creates a tab with an emoji icon")
         check(shellTab.Key == "Farm|Auto Farm", "the tab records its category key")
         check(ui:CreateTab("Auto Farm", "Farm") == shellTab, "the shell reuses the same tab")
 
@@ -293,6 +309,9 @@ do
         check(type(shellSection:CreateToggle("Auto collect", true)) == "table", "section CreateToggle works")
         check(type(shellSection:CreateSlider("Range", 10, 200, 55)) == "table", "section CreateSlider works")
         check(type(shellSection:CreateDropdown("Island", {"One", "Two"}, "One")) == "table", "section CreateDropdown works")
+        local multiHandle = shellSection:CreateMultiDropdown("Skip list", {"Dragon", "Leopard"}, {"Dragon"}, function() end)
+        check(type(multiHandle) == "table", "section CreateMultiDropdown works")
+        check(type(multiHandle.Set) == "function", "the multi-dropdown handle exposes Set for restore")
         check(type(shellSection:CreateButton("Go", function() end)) == "table", "section CreateButton works")
         check(type(shellSection:CreateParagraph("Info", "Body")) == "table", "section CreateParagraph works")
         local input = shellSection:CreateInput("Command", "placeholder", "")

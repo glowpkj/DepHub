@@ -24,7 +24,7 @@ local HOST_TEMPLATES = {
     "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.1.26"
+local VERSION = "0.1.27"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -537,7 +537,7 @@ end
 -- non-fatal: a dashboard that cannot be built must never stop the hub loading.
 local function buildDashboardTab()
     if type(window.CreateTab) ~= "function" or type(window.Library) ~= "table" then return false end
-    local ok, record = pcall(function() return window:CreateTab("Dashboard", "General") end)
+    local ok, record = pcall(function() return window:CreateTab("Dashboard", "General", "📊") end)
     if not ok or type(record) ~= "table" or type(record.Name) ~= "string" then
         Diag:Note("Dashboard: CreateTab falhou: " .. tostring(record))
         return false
@@ -598,7 +598,7 @@ end
 if not knownTarget then
     Diag:Note("Unknown game: no backend loaded (universal disabled).")
     pcall(function()
-        local tab = window:CreateTab("Unsupported")
+        local tab = window:CreateTab("Unsupported", "General", "🚫")
         if tab then
             local section = tab:CreateSection("State", "Left")
             if section then

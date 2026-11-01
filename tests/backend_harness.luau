@@ -383,9 +383,27 @@ local function NewWindow()
         library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Callback = callback}
         return {Kind = "slider", Value = default}
     end
-    function library:AddDropdown(_, label, options, index, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback}
-        return {Kind = "dropdown", Value = options[index]}
+    function library:AddDropdown(_, label, options, index, callback, multi)
+        local handle = {Kind = "dropdown", Value = options[index], MultiSelect = multi == true, Callback = callback}
+        library._Controls[#library._Controls + 1] = {Kind = "dropdown", Label = label, Options = options, Callback = callback, MultiSelect = multi == true, Handle = handle}
+        -- A multi-select dropdown in RedzLib hands its callback a SET table of the
+        -- selected names. Model that, plus the array-ifying the adapter does, so
+        -- tests can drive a selection and see the backend's array contract.
+        local selected = {}
+        if multi == true and type(index) == "table" then
+            for _, name in ipairs(index) do selected[name] = true end
+        end
+        function handle:Select(name, isSelected)
+            if multi ~= true then return nil end
+            selected[tostring(name)] = isSelected ~= false
+            if self.Callback then
+                local snapshot = {}
+                for option, on in pairs(selected) do if on then snapshot[option] = true end end
+                self.Callback(snapshot)
+            end
+            return selected
+        end
+        return handle
     end
     function library:AddButton(_, label, callback)
         library._Controls[#library._Controls + 1] = {Kind = "button", Label = label, Callback = callback}
@@ -438,7 +456,7 @@ local function NewWindow()
         handle.AddSection = function(_, title) return library:CreateSection(name, opt(title, "Title") or title) end
         handle.AddToggle = function(_, o) return library:AddToggle(nil, opt(o, "Name"), opt(o, "Default"), opt(o, "Callback")) end
         handle.AddSlider = function(_, o) return library:AddSlider(nil, opt(o, "Name"), opt(o, "Min"), opt(o, "Max"), opt(o, "Default"), opt(o, "Increment"), opt(o, "Callback")) end
-        handle.AddDropdown = function(_, o) return library:AddDropdown(nil, opt(o, "Name"), opt(o, "Options"), opt(o, "Default"), opt(o, "Callback")) end
+        handle.AddDropdown = function(_, o) return library:AddDropdown(nil, opt(o, "Name"), opt(o, "Options"), opt(o, "Default"), opt(o, "Callback"), opt(o, "MultiSelect")) end
         handle.AddButton = function(_, o) return library:AddButton(nil, opt(o, "Name"), opt(o, "Callback")) end
         handle.AddTextBox = function(_, o) return library:AddTextbox(nil, opt(o, "Name"), opt(o, "Default"), opt(o, "Callback")) end
         handle.AddParagraph = function(_, a, b)
@@ -459,6 +477,10 @@ end
 -- as the window; tests introspect `ui.Library._Tabs/_Categories/_Controls/_STATE`,
 -- so the export forwards those to the single instance the window built.
 return setmetatable({
+    -- RedzLib reads the starting window size from Library.Default.UISize, which
+    -- the adapter writes before MakeWindow. The double carries the same table so
+    -- that write is exercised (and a test can assert the applied size).
+    Default = { Theme = "Darker", UISize = UDim2.fromOffset(550, 380) },
     MakeWindow = function(_, options) return NewWindow() end
 }, {
     __index = function(_, key)

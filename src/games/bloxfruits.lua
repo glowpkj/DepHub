@@ -22,6 +22,19 @@ local report = (env.__DEPHUB and type(env.__DEPHUB.Log) == "function") and env._
 local FEATURE_PATH = "src/games/features/bloxfruits/"
 local VERSION = "1.0.0"
 
+-- A fonte CONFIÁVEL dos nomes de fruta do Blox Fruits. A lista abaixo e a mesma
+-- que o sistema de frutas ja usava (parked/fruits.lua, M.FRUITS): manter uma so
+-- evita duas listas divergindo. O dropdown de Skip list / Store keep list monta
+-- suas opcoes daqui, para o usuario escolher a fruta pelo nome certo sem digitar.
+local FRUIT_NAMES = {
+    "Barrier", "Blade", "Blizzard", "Bomb", "Buddha", "Chop", "Control", "Creation", "Dark",
+    "Diamond", "Door", "Dough", "Dragon", "Eagle", "Falcon", "Flame", "Gas", "Ghost", "Gravity",
+    "Ice", "Kilo", "Kitsune", "Leopard", "Light", "Lightning", "Love", "Magma", "Mammoth",
+    "Mochi", "Pain", "Paw", "Phoenix", "Portal", "Quake", "Revive", "Rocket", "Rubber", "Rumble",
+    "Sand", "Shadow", "Smoke", "Sound", "Spider", "Spike", "Spin", "Spirit", "Spring", "String",
+    "T-Rex", "Venom", "Yeti",
+}
+
 -- As features deste backend, na ordem em que carregam. Cada entrada: o arquivo,
 -- a aba/secao em que aparece e o rotulo do toggle. O resto (range, intervalo…)
 -- sai do proprio modulo, para o backend nao virar uma lista de knobs paralela.
@@ -127,6 +140,14 @@ end
 -- mover. Ele e o mesmo objeto para todo mundo -- um teleporte so, testado.
 function State:Teleport()
     return self.Infra.teleport
+end
+
+-- Os nomes de fruta para os dropdowns de Skip list / Store keep list. Devolve
+-- uma COPIA da lista canonica, para um chamador nao mexer na fonte por engano.
+function State:FruitNames()
+    local out = {}
+    for index, name in ipairs(FRUIT_NAMES) do out[index] = name end
+    return out
 end
 
 -- A antiga lista de elementos de raid (State.RaidElements) saiu junto com a raid
@@ -251,7 +272,8 @@ local PANELS = {
         page = "Combat",
         section = "BLADE HITS",
         category = "Combat",
-        icon = "swords",
+        icon = "⚔️",
+        tabIcon = "⚔️",
         build = function(section, instance)
             section:CreateToggle("Blade hits", false, function(value)
                 if value and not instance.Backend:SetFeature("bladhits", true) then
@@ -266,15 +288,16 @@ local PANELS = {
         page = "Farm",
         section = "FRUIT",
         category = "Farm",
-        icon = "cherry",
+        icon = "🍎",
+        tabIcon = "🍎",
         build = function(section, instance)
+            -- Fruit ESP: sem slider de distancia -- o alcance e ilimitado.
             section:CreateToggle("Fruit ESP", false, function(value)
                 while State.Instances.fruit == nil do task.wait() end
                 State.Instances.fruit:SetEsp(value)
             end)
-            section:CreateSlider("ESP max distance", 0, 2000, 0, function(value)
-                if State.Instances.fruit then State.Instances.fruit:SetEspRange(value) end
-            end)
+            -- Grab: sem slider de distancia -- pega a fruta mais proxima de
+            -- qualquer distancia.
             section:CreateToggle("Grab fruit", false, function(value)
                 if value and not State:SetFeature("fruit", true) then
                     instance.Notify("Grab fruit", "Teleport motor ausente.")
@@ -283,17 +306,19 @@ local PANELS = {
                 if not value then State:SetFeature("fruit", false) end
                 if State.Instances.fruit then State.Instances.fruit:SetGrab(value) end
             end)
-            section:CreateSlider("Grab max distance", 0, 2000, 0, function(value)
-                if State.Instances.fruit then State.Instances.fruit:SetRange(value) end
-            end)
             section:CreateToggle("Auto store fruit", false, function(value)
                 if State.Instances.fruit then State.Instances.fruit:SetStore(value) end
             end)
-            section:CreateInput("Skip list", "Dragon, Rocket", "", function(text)
-                if State.Instances.fruit then State.Instances.fruit:SetSkip(text) end
+            -- Skip list / Store keep list: seletores de fruta por DROPDOWN de
+            -- selecao multipla (nada de digitar o nome). Usam a mesma fonte de
+            -- nomes de fruta do sistema (State: FruitNames()). A lista escolhida
+            -- vira o conjunto de prefixos que a feature ja usava.
+            local fruits = State:FruitNames()
+            section:CreateMultiDropdown("Skip list", fruits, {}, function(selected)
+                if State.Instances.fruit then State.Instances.fruit:SetSkip(selected) end
             end)
-            section:CreateInput("Store keep list", "never store these", "", function(text)
-                if State.Instances.fruit then State.Instances.fruit:SetKeep(text) end
+            section:CreateMultiDropdown("Store keep list", fruits, {}, function(selected)
+                if State.Instances.fruit then State.Instances.fruit:SetKeep(selected) end
             end)
         end,
     },
@@ -301,7 +326,8 @@ local PANELS = {
         page = "Travel",
         section = "ISLAND TELEPORT",
         category = "Travel",
-        icon = "map",
+        icon = "🚀",
+        tabIcon = "🚀",
         build = function(section, instance)
             -- O dropdown lista as ilhas do Sea 2 (confirmadas pelo usuario). A
             -- selecao NAO teleporta sozinha: e gate do toggle. Trocar a ilha com
@@ -391,7 +417,7 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
             end
             local tab = tabs[panel.page]
             if tab == nil then
-                tab = visual:CreateTab(panel.page, panel.category, nil) or false
+                tab = visual:CreateTab(panel.page, panel.category, panel.tabIcon or panel.icon) or false
                 tabs[panel.page] = tab
             end
             if tab then

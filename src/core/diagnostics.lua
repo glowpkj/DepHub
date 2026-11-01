@@ -603,7 +603,7 @@ end
 
 function Diagnostics:Install(ui)
     if self.Installed or type(ui) ~= "table" or type(ui.CreateTab) ~= "function" then return false end
-    local tab = ui:CreateTab("Debug", "All")
+    local tab = ui:CreateTab("Debug", "All", "🧪")
     if not tab then return false end
     self.Tab = tab
     self.UI = ui

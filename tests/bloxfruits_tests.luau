@@ -169,6 +169,41 @@ do
     for _, tab in ipairs(ui.Library._Tabs) do names[tab.Name] = true end
     check(names["Combat"] == true, "a aba Combat e criada para a blade hit")
     check(names["Farm"] == true, "a aba Farm e criada para a fruta")
+
+    -- O tamanho compacto (600x420) foi APLICADO na criacao da janela: a shell
+    -- escreve o UDim2 em Library.Default.UISize, que e o que o RedzLib le.
+    local applied = ui.Library.Default and ui.Library.Default.UISize
+    check(applied and applied.X.Offset == 600 and applied.Y.Offset == 420, "o painel abre em 600x420 de verdade")
+
+    -- A aba de fruta NAO tem mais os sliders de distancia nem campos de texto:
+    -- as listas agora sao dropdowns de selecao multipla.
+    local labels = {}
+    for _, control in ipairs(ui.Library._Controls) do
+        labels[control.Kind .. ":" .. tostring(control.Label)] = control
+    end
+    check(labels["slider:ESP max distance"] == nil, "o slider ESP max distance saiu")
+    check(labels["slider:Grab max distance"] == nil, "o slider Grab max distance saiu")
+    check(labels["textbox:Skip list"] == nil, "a Skip list nao e mais um campo de texto")
+    check(labels["textbox:Store keep list"] == nil, "a Store keep list nao e mais um campo de texto")
+
+    local skipDropdown = labels["dropdown:Skip list"]
+    local keepDropdown = labels["dropdown:Store keep list"]
+    check(skipDropdown ~= nil and skipDropdown.MultiSelect == true, "a Skip list e um dropdown de selecao multipla")
+    check(keepDropdown ~= nil and keepDropdown.MultiSelect == true, "a Store keep list e um dropdown de selecao multipla")
+    check(skipDropdown.Options and #skipDropdown.Options > 40, "o dropdown lista as frutas reais (fonte do sistema)")
+    check(skipDropdown.Options[1] == "Barrier", "os nomes de fruta vem da lista canonica (primeiro = Barrier)")
+    check(table.find(skipDropdown.Options, "Dragon") ~= nil and table.find(skipDropdown.Options, "Kitsune") ~= nil, "nomes reais como Dragon e Kitsune estao na lista")
+
+    -- Escolher uma fruta no dropdown de Skip list chega na feature como o
+    -- conjunto de prefixos que ela ja usava -- o caminho do painel ate a logica.
+    state:SetFeature("fruit", true)
+    local fruit = state.Instances.fruit
+    check(fruit ~= nil, "a feature de fruta instancia ao ligar")
+    skipDropdown.Handle:Select("Dragon", true)
+    check(fruit.Skip["dragon"] == true, "escolher Dragon no dropdown entra na skip list")
+    keepDropdown.Handle:Select("Leopard", true)
+    check(fruit.Keep["leopard"] == true, "escolher Leopard no dropdown entra na store keep list")
+    state:SetFeature("fruit", false)
 end
 
 -- Chegada desliga o toggle SOZINHO, pelo caminho do backend: ligar o toggle do
@@ -229,15 +264,21 @@ do
     local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
     bare:SetTeleport(motor)
     check(bare.Teleport == motor, "SetTeleport injeta o motor")
-    check(bare:SetRange(0) and bare.Range == 0, "SetRange aceita 0 (qualquer distancia)")
-    check(bare:SetRange(-1) == false, "SetRange rejeita negativo")
-    check(bare:SetEspRange(500) and bare.EspRange == 500, "SetEspRange aplica um alcance valido")
 
-    -- Listas de skip/keep por prefixo, case-insensitive.
+    -- Alcance ILIMITADO: os sliders de distancia sairam, entao nao ha mais
+    -- SetRange/SetEspRange nem campos Range/EspRange na feature.
+    check(bare.SetRange == nil and bare.SetEspRange == nil, "os knobs de distancia sairam (alcance ilimitado)")
+    check(bare.Range == nil and bare.EspRange == nil, "nao ha mais campos de limite de distancia")
+
+    -- Listas de skip/keep. A UI manda um ARRAY de nomes (do dropdown de selecao
+    -- multipla); a feature guarda como conjunto de prefixos em minusculo.
+    bare:SetSkip({ "Dragon", "Rocket" })
+    check(bare.Skip["dragon"] == true and bare.Skip["rocket"] == true, "SetSkip aceita o array do dropdown")
+    bare:SetKeep({ "Leopard" })
+    check(bare.Keep["leopard"] == true, "SetKeep aceita o array do dropdown")
+    -- O formato antigo (string separada por virgula) continua aceito.
     bare:SetSkip("Dragon, Rocket")
-    check(bare.Skip["dragon"] == true and bare.Skip["rocket"] == true, "SetSkip parseia a lista")
-    bare:SetKeep("leopard")
-    check(bare.Keep["leopard"] == true, "SetKeep parseia a lista")
+    check(bare.Skip["dragon"] == true and bare.Skip["rocket"] == true, "SetSkip ainda aceita a string")
 
     -- Os tres sub-toggles ligam e desligam sem explodir.
     check(bare:SetGrab(true) and bare.GrabEnabled == true, "SetGrab liga o grab")
@@ -273,14 +314,16 @@ do
     local nearest, part = fruit:NearestGroundFruit()
     check(nearest == ground and part == handle, "NearestGroundFruit acha a fruta e a Handle")
 
-    -- Fora do range nao entra.
-    fruit:SetRange(10)
-    check(fruit:NearestGroundFruit() == nil, "range curto esconde a fruta distante")
-    fruit:SetRange(0)
+    -- Sem limite de distancia: a fruta a 30 studs (e qualquer outra, mais longe
+    -- ainda) continua sendo achada -- nao ha corte por range.
+    local far = Instance.new("Tool"); far.Name, far.Parent = "Leopard-Leopard Fruit", ctx.Services.Workspace
+    far:SetAttribute("OriginalName", "Leopard-Leopard Fruit")
+    local farHandle = Instance.new("Part"); farHandle.Name, farHandle.Position, farHandle.Parent = "Handle", Vector3.new(0, 0, 5000), far
+    check(fruit:NearestGroundFruit() == ground, "a fruta mais proxima ganha mesmo com uma fruta muito longe no mundo")
 
     -- Na skip list, nao entra.
     fruit:SetSkip("dragon")
-    check(fruit:NearestGroundFruit() == nil, "a skip list esconde a fruta pelo prefixo")
+    check(fruit:NearestGroundFruit() == far, "a skip list esconde so a fruta do prefixo; a proxima assume")
     fruit:SetSkip("")
 
     fruit:Destroy()
@@ -436,6 +479,59 @@ do
     root.Position = Vector3.new(0, 50, 0)
     ctx.Services.RunService.Heartbeat:Fire()
     check(#arrivals == 1, "mexer depois de chegar nao re-dispara a chegada")
+
+    islands:Destroy()
+    motor:Destroy()
+end
+
+-- RBXScriptSignal de VERDADE: no Roblox Heartbeat/RenderStepped/InputBegan sao
+-- RBXScriptSignal (typeof == "RBXScriptSignal"), NAO tabelas Lua. A checagem
+-- antiga `type(RunService.Heartbeat) == "table"` era FALSA no Roblox e a vigia
+-- de chegada nunca conectava. Este bloco troca o Heartbeat do sandbox por um
+-- objeto que se comporta como o sinal real (Connect presente, typeof correto,
+-- nao e tabela) e prova que a chegada ainda dispara.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Islands = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "islands.lua"])()
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+
+    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
+    local snow = Instance.new("Model"); snow.Name, snow.Parent = "SnowMountain", map
+    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 50, 0), snow
+
+    -- Um sinal estrito: um USERDATA com metatable (como o RBXScriptSignal real,
+    -- que NAO e uma tabela Lua). Com type(heartbeat) == "userdata" a checagem
+    -- invalida antiga (type(...) == "table") retorna FALSO -- exatamente como no
+    -- Roblox -- enquanto o Connect protegido continua funcionando.
+    local listeners = {}
+    local strictHeartbeat = newproxy(true)
+    getmetatable(strictHeartbeat).__index = function(_, key)
+        if key == "Connect" then
+            return function(_, fn)
+                listeners[#listeners + 1] = fn
+                return {Disconnect = function() end, Connected = true}
+            end
+        end
+        return nil
+    end
+    check(type(strictHeartbeat) ~= "table", "o sinal estrito nao e uma tabela Lua (como o RBXScriptSignal real)")
+    ctx.Services.RunService.Heartbeat = strictHeartbeat
+
+    local islands = Islands.new({ teleport = motor })
+    local arrivals = {}
+    islands.OnArrive = function(_, arrived) arrivals[#arrivals + 1] = arrived end
+
+    check(islands:SetEnabled(true) == true, "arma o voo com o sinal estrito")
+    check(motor:IsFlying() == true, "voa pra ilha no mapa")
+    root.Position = Vector3.new(0, 50, 0)
+    for _, fn in ipairs(listeners) do fn() end
+    check(#arrivals == 1, "a chegada dispara com um Heartbeat RBXScriptSignal de verdade")
+    check(arrivals[1] == "Snow Mountain", "a chegada reporta a ilha certa")
 
     islands:Destroy()
     motor:Destroy()

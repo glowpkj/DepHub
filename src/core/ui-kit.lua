@@ -23,18 +23,59 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local Kit = {}
 
--- Icons for the standard categories, so every game's sidebar looks the same for
--- the same finalidade. Names are theme icon names (see the shell's GetIcon).
-local CATEGORY_ICONS = {
-    Visual = "eye",
-    Combat = "crosshair",
-    Farm = "wheat",
-    Movement = "move-3d",
-    Player = "user",
-    World = "globe",
-    Misc = "wrench",
-    Settings = "settings",
+-- Unicode emoji icons for the standard categories and tabs, so every game's
+-- sidebar looks the same for the same finalidade. These are real emoji strings:
+-- the RedzLib shell renders a non-asset icon as text, not as a Roblox image id.
+-- Keep the glyph vocabulary here (one place) so the whole panel stays consistent.
+local EMOJI = {
+    -- categories
+    Visual = "👁️",
+    Combat = "⚔️",
+    Farm = "🌾",
+    Movement = "🚀",
+    Player = "🛡️",
+    World = "🌍",
+    Misc = "🔧",
+    Settings = "⚙️",
+    General = "🏠",
+    -- tabs (game panels + the fixed loader tabs)
+    Dashboard = "📊",
+    Debug = "🧪",
+    Unsupported = "🚫",
+    Fruits = "🍎",
+    Fruit = "🍎",
+    ESP = "👁️",
+    Travel = "🚀",
+    Teleport = "🚀",
+    Raid = "🏴",
+    Shop = "🛒",
+    Quest = "📜",
+    Roles = "🎭",
+    ["Coin Farm"] = "🪙",
+    ["Gun Drop"] = "🔫",
+    Players = "👥",
+    Social = "💬",
+    Server = "🌐",
+    Status = "📈",
+    Speed = "⚡",
+    Autoblock = "🛡️",
+    Parry = "🛡️",
+    Assistance = "🔮",
+    Prediction = "🔮",
+    Detection = "📡",
+    Ranges = "📏",
+    Visuals = "👁️",
+    ["Restaurant Farm"] = "🍽️",
+    Kitchen = "🍳",
+    Generators = "🔌",
+    Team = "🤝",
+    ["Titan ESP"] = "🗿",
+    Titans = "🗿",
 }
+Kit.EMOJI = EMOJI
+
+-- The category emoji for a finalidade, or a sensible default.
+local CATEGORY_ICONS = EMOJI
 
 -- Resolve the shared shell. Returns nil (never errors) when there is no UI, so
 -- a backend can call the kit unconditionally and simply build nothing.
@@ -57,12 +98,12 @@ end
 -- Create a tab inside a category. Category defaults to the tab's own name so a
 -- single-tab game stays trivial, but the normal call passes the finalidade:
 --     Kit.Tab("ESP", "Visual")
-function Kit.Tab(name, category)
+function Kit.Tab(name, category, icon)
     local ui = window()
     if not ui then return nil end
     category = category or name
     Kit.Category(category)
-    local ok, tab = pcall(function() return ui:CreateTab(name, category) end)
+    local ok, tab = pcall(function() return ui:CreateTab(name, category, icon or EMOJI[name]) end)
     if ok and tab then return tab end
     return nil
 end
@@ -80,8 +121,8 @@ end
 
 -- One-call convenience: tab (in a category) + section, which is the shape almost
 -- every feature uses. Returns the section (or nil).
-function Kit.Panel(tabName, category, sectionTitle, column)
-    local tab = Kit.Tab(tabName, category)
+function Kit.Panel(tabName, category, sectionTitle, column, icon)
+    local tab = Kit.Tab(tabName, category, icon)
     if not tab then return nil end
     return Kit.Section(tab, sectionTitle or tabName, column)
 end
@@ -109,8 +150,9 @@ function Kit.Stack(section)
     return nil
 end
 
+-- The emoji for a category (or tab) name; a neutral default for an unknown one.
 function Kit.categoryIcon(name)
-    return CATEGORY_ICONS[name] or "layers"
+    return CATEGORY_ICONS[name] or EMOJI.General
 end
 
 return Kit
