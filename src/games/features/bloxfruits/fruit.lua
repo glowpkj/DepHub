@@ -106,6 +106,9 @@ function Feature.new(options)
     self.EspEnabled = false
     self.TraceEnabled = false   -- linhas ligando o character a cada fruta
     self.StoreEnabled = false
+    self.RandomEnabled = false
+    self.GachaCooldownMin = 30
+    self.GachaCooldownMax = 300
     self.Threads = {}
     self.EspMap = {}
     -- O Beam do tracer e criado uma vez por fruta no EspMap (junto com o
@@ -123,7 +126,9 @@ function Feature.new(options)
     self.Skip = options.skip or {}             -- frutas nunca pegas (prefixo)
     self.Keep = options.keep or {}             -- frutas nunca guardadas
     self.StoreInterval = options.storeInterval or 2
+    self.RandomCooldown = options.randomCooldown or 90
     self.LastError = nil
+    self.LastGachaCooldown = nil
     return self
 end
 
@@ -425,6 +430,58 @@ function Feature:SetStore(on)
     return true
 end
 
+-- --- Auto random fruit (gacha) --------------------------------------------
+-- Rola a gacha de fruta (Zioles) em cooldown. O mecanismo e o RemoteFunction
+-- RF/GachaNetworkRF (Modules.Net), invocado com {Context="Purchase",
+-- BoxName="ZiolesGacha"} -- o mesmo caminho que o jogo usa. A resposta traz o
+-- cooldown real (um numero); enquanto for > 3 usamos ele em vez do default, pra
+-- respeitar o tempo que o servidor manda.
+
+-- Resolve o RemoteFunction da gacha. Modules.Net e o caminho atual; cai pro Net
+-- solto em ReplicatedStorage em builds antigas (mesmo padrao da blade hit).
+function Feature:_gachaRF()
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
+    if not net then return nil end
+    return net:FindFirstChild("RF/GachaNetworkRF")
+end
+
+-- Uma rolagem. Devolve true se o remote existiu e a chamada saiu. Quando a
+-- resposta traz um numero (o cooldown), guarda em self.LastGachaCooldown e
+-- devolve como 2o retorno pra o loop respeitar.
+function Feature:RollGacha()
+    local remote = self:_gachaRF()
+    if not remote then self.LastError = "gacha remote ausente"; return false end
+    local ok, result = pcall(function()
+        return remote:InvokeServer({ Context = "Purchase", BoxName = "ZiolesGacha" })
+    end)
+    if not ok then self.LastError = "gacha recusou"; return false end
+    self.LastGachaCooldown = nil
+    if type(result) == "number" and result > 3 then
+        self.LastGachaCooldown = math.clamp(math.floor(result), self.GachaCooldownMin, self.GachaCooldownMax)
+    end
+    return true, self.LastGachaCooldown
+end
+
+function Feature:SetRandom(on)
+    self.RandomEnabled = on == true
+    if not self.RandomEnabled then self:_cancel("random"); return true end
+    self:_spawn("random", function()
+        while self.RandomEnabled do
+            local ok, cooldown = pcall(function() return self:RollGacha() end)
+            local wait = self.RandomCooldown
+            if ok and type(cooldown) == "number" then wait = cooldown end
+            -- Espera em fatias de 1s pra desligar rapido (o cancel do thread
+            -- tambem corta, mas o loop respeita a flag alem do cancel).
+            while self.RandomEnabled and wait > 0 do
+                task.wait(1)
+                wait = wait - 1
+            end
+        end
+    end)
+    return true
+end
+
 -- --- Knobs ----------------------------------------------------------------
 -- Skip/keep sao conjuntos de PREFIXOS de nome de fruta (em minusculo): "dragon"
 -- casa "Dragon-Dragon Fruit". A UI agora alimenta isso com um dropdown de
@@ -470,6 +527,15 @@ function Feature:SetKeep(value)
     return true
 end
 
+-- Cooldown default da gacha, em segundos. O servidor manda o cooldown real na
+-- resposta (respeitado quando vier); isto e so o fallback ate a primeira
+-- resposta -- e o que o slider do painel mexe.
+function Feature:SetRandomInterval(seconds)
+    local value = tonumber(seconds)
+    if value then self.RandomCooldown = math.max(1, math.floor(value)) end
+    return true
+end
+
 -- --- Ciclo de vida --------------------------------------------------------
 -- A feature so faz alguma coisa com pelo menos um dos tres ligado. Enable()
 -- fica ligada enquanto qualquer um estiver; Disable() derruba todos.
@@ -484,9 +550,11 @@ function Feature:Disable()
     self.Enabled = false
     self.GrabEnabled = false
     self.StoreEnabled = false
+    self.RandomEnabled = false
     self:SetEsp(false)
     self:_cancel("grab")
     self:_cancel("store")
+    self:_cancel("random")
     return true
 end
 

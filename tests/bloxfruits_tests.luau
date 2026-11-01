@@ -29,6 +29,10 @@ local function bfContext(placeId, gameId)
     local netFolder = Instance.new("Folder"); netFolder.Name = "Net"; netFolder.Parent = modules
     local attack = Instance.new("RemoteEvent"); attack.Name = "RE/RegisterAttack"; attack.Parent = netFolder
     local hit = Instance.new("RemoteEvent"); hit.Name = "RE/RegisterHit"; hit.Parent = netFolder
+    -- A gacha de fruta (Auto random fruit) chama o RemoteFunction RF/GachaNetworkRF
+    -- no mesmo Modules.Net. O retorno padrao e nil; um teste pode dar SetMethod
+    -- pra devolver um cooldown e provar que a feature o respeita.
+    local gacha = Instance.new("RemoteFunction"); gacha.Name = "RF/GachaNetworkRF"; gacha.Parent = netFolder
     -- O jogo diz o mar em ReplicatedStorage.Util.Realm (getCurrentSeaAsync). Aqui
     -- ele responde Sea 2 por padrao; um teste pode trocar ctx.RealmSea antes de
     -- carregar o backend para exercitar outro mar.
@@ -237,6 +241,10 @@ do
     check(skipDropdown.Options and #skipDropdown.Options > 40, "o dropdown lista as frutas reais (fonte do sistema)")
     check(skipDropdown.Options[1] == "Barrier", "os nomes de fruta vem da lista canonica (primeiro = Barrier)")
     check(table.find(skipDropdown.Options, "Dragon") ~= nil and table.find(skipDropdown.Options, "Kitsune") ~= nil, "nomes reais como Dragon e Kitsune estao na lista")
+
+    -- Auto random fruit: o toggle + o slider de cooldown existem na aba de fruta.
+    check(labels["toggle:Auto random fruit"] ~= nil, "o toggle Auto random fruit existe no painel")
+    check(labels["slider:Gacha cooldown"] ~= nil, "o slider Gacha cooldown existe no painel")
 
     -- Escolher uma fruta no dropdown de Skip list chega na feature como o
     -- conjunto de prefixos que ela ja usava -- o caminho do painel ate a logica.
@@ -755,7 +763,64 @@ do
     fruit:Destroy()
 end
 
--- Island Teleport: o usuario escolhe no dropdown, mas so voa com o toggle LIGADO
+-- Auto random fruit: rola a gacha (Zioles) pelo RemoteFunction RF/GachaNetworkRF
+-- no mesmo Modules.Net. O payload e {Context="Purchase", BoxName="ZiolesGacha"};
+-- o retorno com um numero (o cooldown) e respeitado; desligar para o thread.
+do
+    local ctx, modules = bfContext(994732206, 994732206)
+    local Fruit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "fruit.lua"])()
+    local fruit = Fruit.new({ randomCooldown = 90 })
+
+    -- O RemoteFunction da gacha, resolvido pelo caminho real (Modules.Net).
+    local net = modules:FindFirstChild("Net")
+    local gacha = net:FindFirstChild("RF/GachaNetworkRF")
+    check(gacha ~= nil, "a gacha RF/GachaNetworkRF existe no Modules.Net")
+    -- O servidor responde com o cooldown real (45s): a feature tem que devolver.
+    -- O override tambem grava o payload pra conferir o que foi mandado.
+    local sent
+    ctx:SetMethod(gacha, "InvokeServer", function(_, payload) sent = payload return 45 end)
+
+    local ok, cooldown = fruit:RollGacha()
+    check(ok == true, "RollGacha invoca a gacha")
+    check(cooldown == 45, "RollGacha devolve o cooldown que o servidor mandou")
+    check(type(sent) == "table" and sent.Context == "Purchase" and sent.BoxName == "ZiolesGacha", "o payload e Purchase/ZiolesGacha")
+
+    -- Cooldown fora da faixa e preso a [30, 300].
+    ctx:SetMethod(gacha, "InvokeServer", function() return 9999 end)
+    check(select(2, fruit:RollGacha()) == 300, "cooldown acima do maximo e preso em 300")
+    ctx:SetMethod(gacha, "InvokeServer", function() return 1 end)
+    check(select(2, fruit:RollGacha()) == nil, "um numero <= 3 nao conta como cooldown (usa o default)")
+
+    -- Sem o remote, RollGacha falha com motivo (nao explode).
+    local bare, bareModules = bfContext(994732206, 994732206)
+    bareModules:FindFirstChild("Net"):FindFirstChild("RF/GachaNetworkRF"):Destroy()
+    local fruit2 = bare.Env.loadstring(sources[FEATURE_PREFIX .. "fruit.lua"])().new()
+    local ok2 = fruit2:RollGacha()
+    check(ok2 == false and fruit2.LastError == "gacha remote ausente", "sem o remote a gacha recusa com motivo")
+
+    -- SetRandom liga o flag e agenda o thread; desligar derruba.
+    check(fruit:SetRandom(true) == true, "SetRandom liga")
+    check(fruit.RandomEnabled == true, "o flag RandomEnabled fica ligado")
+    check(fruit.Threads.random ~= nil, "SetRandom agenda o thread do loop")
+    fruit:SetRandom(false)
+    check(fruit.RandomEnabled == false, "SetRandom(false) desliga")
+    check(fruit.Threads.random == nil, "desligar cancela o thread")
+
+    -- SetRandomInterval ajusta o cooldown default (o slider do painel).
+    fruit:SetRandomInterval(120)
+    check(fruit.RandomCooldown == 120, "SetRandomInterval muda o cooldown default")
+    fruit:SetRandomInterval(0)
+    check(fruit.RandomCooldown == 1, "um cooldown abaixo de 1 e preso em 1")
+
+    -- Disable derruba o random junto com o resto.
+    fruit:SetRandom(true)
+    fruit:Disable()
+    check(fruit.RandomEnabled == false and fruit.Threads.random == nil, "Disable desliga e cancela a gacha")
+
+    fruit:Destroy()
+    fruit2:Destroy()
+end
+
 -- (o gate que ele pediu). O destino e a instancia real workspace.Map.<Nome>; se
 -- ela nao estiver no mapa, ele avisa em vez de voar pro vazio.
 do

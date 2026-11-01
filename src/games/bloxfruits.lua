@@ -670,6 +670,31 @@ local PANELS = {
             end)
             State:RegisterConfig("fruitStore", applyStore, storeToggle)
 
+            -- Auto random fruit: rola a gacha de fruta (Zioles) em cooldown pelo
+            -- remote RF/GachaNetworkRF. O cooldown default e 90s, mas o servidor
+            -- manda o real na resposta e a feature respeita quando vier; o slider
+            -- so define o fallback ate a primeira resposta.
+            local function applyRandom(value)
+                local feature = State.Instances.fruit
+                if value then feature = ensureFruit() end
+                if feature then feature:SetRandom(value) end
+            end
+            local randomToggle = section:CreateToggle("Auto random fruit", State.Config.fruitRandom == true, function(value)
+                applyRandom(value)
+                State.Config.fruitRandom = value == true
+            end)
+            State:RegisterConfig("fruitRandom", applyRandom, randomToggle)
+
+            local function applyRandomInterval(value)
+                local feature = State.Instances.fruit
+                if feature then feature:SetRandomInterval(value) end
+            end
+            local randomHandle = section:CreateSlider("Gacha cooldown", 30, 300, State.Config.fruitRandomInterval or 90, function(value)
+                applyRandomInterval(value)
+                State.Config.fruitRandomInterval = value
+            end)
+            State:RegisterConfig("fruitRandomInterval", applyRandomInterval, randomHandle)
+
             -- Skip list / Store keep list: seletores de fruta por DROPDOWN de
             -- selecao multipla (nada de digitar o nome). Usam a mesma fonte de
             -- nomes de fruta do sistema (State: FruitNames()). A lista escolhida
