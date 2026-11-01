@@ -417,7 +417,14 @@ local function sandbox(placeId, gameId)
     function teleport:Teleport() self.Calls += 1 end
     function teleport:TeleportToPlaceInstance() self.Calls += 1 end
     local tween = {Create=function(_, object, info, goal)
-        return {Play=function() end, Cancel=function() end, Completed={Connect=function() end}}
+        -- The mock keeps the target object and the goal table so tests can assert
+        -- WHERE a flight is headed (the teleport motor's whole contract), not
+        -- just that Play was called.
+        local handle = {Instance=object, Info=info, Goal=goal, Playing=false,
+            Play=function(self) self.Playing = true end,
+            Cancel=function(self) self.Playing = false; self.Cancelled = true end,
+            Completed={Connect=function() end}}
+        return handle
     end}
     local vim = {}
     for _, name in ipairs({"SendKeyEvent", "SendMouseButtonEvent", "SendMouseMoveEvent", "SendKeyDownEvent", "SendKeyUpEvent", "SendMouseWheelEvent"}) do
@@ -737,8 +744,11 @@ local player = ossContext.Player
 -- Blox Fruits: the backend loads its own per-feature modules from
 -- features/bloxfruits/ (one file per feature, each self-contained). These are
 -- the files the tests have to serve, and the ones they exercise directly.
+-- BF_INFRA is the teleport motor: it loads without a toggle and lives in
+-- State.Infra, so the backend tests need its file served too.
 local BF_FEATURE_PREFIX = "src/games/features/bloxfruits/"
 local BF_FEATURES = {"bladhits"}
+local BF_INFRA = {"teleport"}
 -- INSERT_THEME_SOURCE
 -- INSERT_BLOXF_OSS_TESTS
 -- INSERT_LIFECYCLE_TESTS

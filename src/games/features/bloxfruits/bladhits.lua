@@ -41,10 +41,13 @@ function Feature.new(options)
     self.Enabled = false
     self.Thread = nil
     self.hits = 0
-    -- Rate limiting: a parte mais detectavel de um hit por remote. O piso e a
-    -- cadencia com jitter sao medidos, nunca um while wait(0.1) sem teto.
-    self.MinInterval = options.interval or 0.1
-    self.AttackRange = options.range or 100
+    -- Sem UI de range/intervalo: os valores sao fixos no melhor que funciona.
+    -- Range 300 cobre o pack inteiro de mobs do BF (as pastas Enemies/Characters
+    -- ficam densas), e 0.05s e o piso que ainda deixa o servidor aceitar os hits
+    -- sem derrubar por spam -- o jitter de 25% em cima disso tira a cadencia
+    -- perfeitamente periodica que o anti-cheat procura.
+    self.MinInterval = options.interval or 0.05
+    self.AttackRange = options.range or 300
     self.PlayerRange = options.playerRange or 60
     self.Players = options.players or false
     self.EnemiesFolder = options.enemiesFolder ~= false

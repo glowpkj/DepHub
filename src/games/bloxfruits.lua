@@ -25,8 +25,15 @@ local VERSION = "1.0.0"
 -- As features deste backend, na ordem em que carregam. Cada entrada: o arquivo,
 -- a aba/secao em que aparece e o rotulo do toggle. O resto (range, intervalo…)
 -- sai do proprio modulo, para o backend nao virar uma lista de knobs paralela.
+--
+-- Só a blade hit tem UI. O teleporte e INFRAESTRUTURA: um motor que outras
+-- features usam (pegar fruta, farm), nao um toggle -- por isso entra em
+-- INFRA_MODULES e nao aparece no painel.
 local FEATURE_MODULES = {
     {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
+}
+local INFRA_MODULES = {
+    {name = "teleport"},
 }
 
 local previous = type(env.__DEPHUB_BLOXFRUITS) == "table" and env.__DEPHUB_BLOXFRUITS or nil
@@ -74,6 +81,7 @@ local State = {
     Version = VERSION,
     Features = {},
     Instances = {},
+    Infra = {},
     Errors = {},
     Toggles = {},
     ToggleLabels = {},
@@ -90,6 +98,33 @@ for _, entry in ipairs(FEATURE_MODULES) do
         State.Errors[#State.Errors + 1] = entry.name .. ": " .. tostring(factory)
         report("BloxFruits: feature " .. entry.name .. " falhou: " .. tostring(factory))
     end
+end
+
+-- Infraestrutura: carrega e INSTANCIA sempre, porque nao ha toggle pra ligar.
+-- O motor de teleporte fica disponivel em State.Infra para qualquer feature
+-- (ou para o console) chamar. Sem character ou sem remotes ele nao explode --
+-- so nao faz nada -- entao instanciar no load e seguro.
+for _, entry in ipairs(INFRA_MODULES) do
+    local ok, factory = loadFactory(FEATURE_PATH .. entry.name .. ".lua")
+    if ok and type(factory) == "table" and type(factory.new) == "function" then
+        local created, instance = pcall(factory.new, {})
+        if created and type(instance) == "table" then
+            if type(instance.Enable) == "function" then pcall(instance.Enable, instance) end
+            State.Infra[entry.name] = instance
+            State.Features[entry.name] = factory
+        else
+            State.Errors[#State.Errors + 1] = entry.name .. ": " .. tostring(instance)
+        end
+    else
+        State.Errors[#State.Errors + 1] = entry.name .. ": " .. tostring(factory)
+        report("BloxFruits: infra " .. entry.name .. " falhou: " .. tostring(factory))
+    end
+end
+
+-- O motor de teleporte publico: as features chamam State:Teleport() para se
+-- mover. Ele e o mesmo objeto para todo mundo -- um teleporte so, testado.
+function State:Teleport()
+    return self.Infra.teleport
 end
 
 function State:GetFeature(name)
@@ -159,6 +194,7 @@ function State:GetStatus()
     return {
         Version = self.Version,
         Features = self.Instances,
+        Infra = self.Infra,
         Loaded = self.Features,
         TogglesOn = on,
         Errors = self.Errors,
@@ -171,6 +207,10 @@ function State:Destroy()
     for name, instance in pairs(self.Instances) do
         if type(instance.Destroy) == "function" then pcall(instance.Destroy, instance) end
         self.Instances[name] = nil
+    end
+    for name, instance in pairs(self.Infra) do
+        if type(instance.Destroy) == "function" then pcall(instance.Destroy, instance) end
+        self.Infra[name] = nil
     end
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
@@ -202,14 +242,6 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
                         end
                         if not value then State:SetFeature(entry.name, false) end
                     end)
-                    if entry.name == "bladhits" then
-                        section:CreateSlider("Blade range", 10, 300, 100, function(value)
-                            State:SetFeatureRange(entry.name, value)
-                        end)
-                        section:CreateSlider("Blade interval (ms)", 30, 500, 100, function(value)
-                            State:SetFeatureInterval(entry.name, value / 1000)
-                        end)
-                    end
                 end
             end
         end
@@ -220,7 +252,7 @@ end
 do
     local Diag = env.__DEPHUB and env.__DEPHUB.Diagnostics
     if Diag and type(Diag.RegisterModule) == "function" then
-        for _, entry in ipairs(FEATURE_MODULES) do
+        local function register(entry)
             local path = "features/bloxfruits/" .. entry.name .. ".lua"
             Diag:RegisterModule(path)
             local loaded = type(State.Features[entry.name]) == "table"
@@ -232,7 +264,10 @@ do
             end
             Diag:Module(path, loaded, detail)
         end
+        for _, entry in ipairs(FEATURE_MODULES) do register(entry) end
+        for _, entry in ipairs(INFRA_MODULES) do register(entry) end
         Diag:Feature("BloxFruits.Toggles on", function() return tostring(State:GetStatus().TogglesOn) end)
+        Diag:Feature("BloxFruits.Teleport", function() return State.Infra.teleport and "ready" or "absent" end)
         Diag:Feature("BloxFruits.LastError", function() return tostring(State.LastError or "none") end)
     end
 end

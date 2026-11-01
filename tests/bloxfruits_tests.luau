@@ -7,6 +7,8 @@
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
 local FEATURES = {"bladhits"}
+-- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
+local INFRA = {"teleport"}
 
 -- O backend resolve as features pelo mesmo game:HttpGet que um executor usa, e
 -- a blade hit faz os proprios game:GetService, entao cada arquivo tem que ser
@@ -14,6 +16,10 @@ local FEATURES = {"bladhits"}
 local function bfContext(placeId, gameId)
     local ctx = sandbox(placeId, gameId)
     for _, name in ipairs(FEATURES) do
+        local path = FEATURE_PREFIX .. name .. ".lua"
+        ctx.Responses[path] = sources[path]
+    end
+    for _, name in ipairs(INFRA) do
         local path = FEATURE_PREFIX .. name .. ".lua"
         ctx.Responses[path] = sources[path]
     end
@@ -37,8 +43,9 @@ do
     local instance = feature.new()
     check(type(instance) == "table", "blade hit instancia sem argumento")
     check(instance:IsEnabled() == false, "blade hit comeca desligada")
-    check(instance.AttackRange == 100, "alcance padrao e 100")
-    check(instance.MinInterval == 0.1, "intervalo padrao e 0.1s")
+    -- Sem UI de knob: os valores padrao sao fixos no melhor que funciona.
+    check(instance.AttackRange == 300, "alcance padrao e o maximo que funciona (300)")
+    check(instance.MinInterval == 0.05, "intervalo padrao e o piso seguro (0.05s)")
     check(instance.hits == 0, "contador de hits comeca em zero")
 
     -- Os setters validam, como o seu original.
@@ -82,19 +89,22 @@ do
     check(state:GetToggle("bladhits") == false, "depois de desligar o toggle le falso")
     check(state.Instances.bladhits:IsEnabled() == false, "depois de desligar a feature esta parada")
 
-    -- Os knobs passam pelo backend ate o metodo do modulo.
+    -- Os knobs continuam no modulo (sem UI): quem quiser mexe pelo console.
     state:SetToggle("bladhits", true)
-    check(state:SetFeatureRange("bladhits", 180), "o backend encaminha SetRange")
+    check(state:SetFeatureRange("bladhits", 180), "o backend ainda encaminha SetRange")
     check(state.Instances.bladhits.AttackRange == 180, "o alcance chega no modulo")
-    check(state:SetFeatureInterval("bladhits", 0.05), "o backend encaminha SetInterval")
+    check(state:SetFeatureInterval("bladhits", 0.05), "o backend ainda encaminha SetInterval")
     check(state.Instances.bladhits.MinInterval == 0.05, "o intervalo chega no modulo")
 
-    -- Um nome desconhecido nao explode nem liga nada.
+    -- Um nome desconhecido nao explode nem liga nada. O teleporte e infra, nao
+    -- feature: tambem e rejeitado como nome de toggle.
     check(state:SetToggle("nao-existe", true) == false, "feature desconhecida e rejeitada")
     check(state:SetFeatureRange("nao-existe", 5) == false, "knob de feature desconhecida e rejeitado")
+    check(state:SetToggle("teleport", true) == false, "o teleporte nao vira toggle")
 
     local status = state:GetStatus()
-    check(status.TogglesOn == 1, "status conta a feature ligada")
+    check(status.TogglesOn == 1, "status conta so a blade hit ligada")
+    check(status.Infra.teleport ~= nil, "status lista o teleporte na infra, fora da contagem")
 
     state:Destroy()
     check(state.Destroyed and next(state.Instances) == nil, "destroy derruba as instancias")
@@ -124,7 +134,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "teleport", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -145,6 +155,81 @@ do
     check(names["Combat"] == true, "a aba Combat e criada para a blade hit")
 end
 
+-- O motor de teleporte e infraestrutura: carrega e instancia sozinho (sem
+-- toggle), expoe Go/GoToIsland/GoToInstance, e recusa destino invalido sem
+-- explodir. Um teleporte so, que toda feature usa.
+do
+    local Factory = sources[FEATURE_PREFIX .. "teleport.lua"]
+    local ctx = bfContext(994732206, 994732206)
+    local Teleport = ctx.Env.loadstring(Factory)()
+    check(type(Teleport) == "table" and type(Teleport.new) == "function", "o teleporte carrega sozinho e publica new()")
+
+    local tp = Teleport.new()
+    check(tp:Enable() == true and tp:IsEnabled() == true, "o motor de teleporte liga o loop de voo")
+    check(tp:IsFlying() == false, "comeca sem voo em andamento")
+    check(tp.Speed == 200, "velocidade padrao e a do original (200)")
+
+    -- As tabelas de destino vieram inteiras do script antigo.
+    check(#Teleport.islands > 0 and #Teleport.islands2 > 0 and #Teleport.islands3 > 0, "as ilhas das 3 mares estao no modulo")
+    check(#Teleport.bosses > 0 and #Teleport.bosses2 > 0 and #Teleport.bosses3 > 0, "os bosses das 3 mares estao no modulo")
+    check(type(Teleport:Find(Teleport.islands, "Jungle")) == "table", "Find acha uma ilha pelo nome")
+    check(Teleport:Find(Teleport.islands, "NaoExiste") == nil, "Find devolve nil para nome desconhecido")
+    check(type(Teleport:Find(Teleport.islands, "jungle")) == "table", "Find ignora maiuscula")
+
+    -- Sem character nao ha voo, e nada explode.
+    check(tp:Go(Vector3.new(1, 2, 3)) == nil, "Go sem character devolve nil em vez de explodir")
+    check(tp:GoToIsland("Jungle") == nil, "GoToIsland sem character devolve nil")
+    check(tp:GoToInstance(nil) == nil, "GoToInstance sem instance devolve nil")
+
+    -- Com um character montado, o voo cria um tween e vira IsFlying.
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    ctx.Player.Character = character
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), character
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = character
+
+    local tween = tp:Go(Vector3.new(0, 0, 100))
+    check(tween ~= nil, "com character o Go dispara um voo")
+    check(tp:IsFlying() == true, "durante o voo IsFlying e verdadeiro")
+    check(tp:Cancel() == true, "Cancel aborta o voo")
+    check(tp:IsFlying() == false, "depois de Cancel nao ha mais voo")
+
+    -- O offset padrao soma 5 studs no Y (sair 5 acima evita spawnar no chao).
+    local off = tp.ArrivalOffset
+    check(off.Y == 5, "o offset de chegada padrao sobe 5 studs")
+
+    check(tp:SetSpeed(150) and tp.Speed == 150, "SetSpeed aplica uma velocidade valida")
+    check(tp:SetSpeed(0) == false, "SetSpeed rejeita zero")
+    check(tp:SetSpeed(-1) == false, "SetSpeed rejeita negativo")
+
+    -- GoToInstance aceita um BasePart do mundo: o contrato que a feature de
+    -- fruta vai usar (achar a fruta no workspace e teleportar ate ela).
+    local part = Instance.new("Part"); part.Position = Vector3.new(10, 20, 30)
+    check(type(tp:GoToInstance(part)) == "table", "GoToInstance aceita um BasePart")
+
+    tp:Disable()
+    check(tp:IsEnabled() == false, "Disable desliga o loop e para o voo")
+    tp:Destroy()
+end
+
+-- O backend publica o mesmo motor de teleporte para as features: State:Teleport()
+-- devolve a instancia viva, ja ligada, sem toggle nenhum.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    local tp = state:Teleport()
+    check(type(tp) == "table", "o backend expoe o motor de teleporte")
+    check(tp:IsEnabled() == true, "o motor ja vem ligado (infra, sem toggle)")
+    check(type(tp.Go) == "function" and type(tp.GoToIsland) == "function", "o motor expoe Go e GoToIsland")
+    check(state:GetStatus().Infra.teleport == tp, "o status lista o teleporte na infra")
+    -- Infra nao e feature de painel: nao entra em Toggles e nao aparece como knob.
+    check(state.Instances.teleport == nil, "o teleporte nao vira instancia de feature")
+    check(state.Toggles.teleport == nil, "o teleporte nao publica toggle")
+    check(state:SetToggle("teleport", true) == false, "o teleporte nao pode ser ligado por toggle")
+
+    state:Destroy()
+    check(next(state.Infra) == nil, "destroy derruba a infra junto")
+end
+
 -- O mesmo backend servido pela outra rota (PlaceId do Sea 1) tem que se
 -- comportar igual.
 do
@@ -152,5 +237,6 @@ do
     local state = ctx:Run("src/games/bloxfruits.lua")
     check(type(state) == "table" and state.Destroyed == false, "Blox Fruits sobe tambem na rota do Sea 1")
     check(state.Features.bladhits ~= nil, "a blade hit carrega na rota do Sea 1")
+    check(state.Infra.teleport ~= nil, "o motor de teleporte carrega na rota do Sea 1")
     check(ctx.State.__DEPHUB.BloxFruits == state, "o contrato do loader aponta pro backend")
 end

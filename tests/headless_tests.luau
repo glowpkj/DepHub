@@ -263,13 +263,21 @@ do
         local path = BF_FEATURE_PREFIX .. name .. ".lua"
         ctx.Responses[path] = sources[path]
     end
+    for _, name in ipairs(BF_INFRA) do
+        local path = BF_FEATURE_PREFIX .. name .. ".lua"
+        ctx.Responses[path] = sources[path]
+    end
     local state = ctx:Run("src/games/bloxfruits.lua")
     check(type(state) == "table" and state.Destroyed == false, "actual Blox Fruits entry starts the backend")
     check(state.Features.bladhits ~= nil, "Blox Fruits loads the blade hit feature")
     check(state.Instances.bladhits == nil, "no feature turns itself on at load")
+    -- Infra loads itself: the teleport motor is ready without a toggle.
+    check(state.Infra.teleport ~= nil, "the teleport motor is published as infra")
+    check(state.Infra.teleport:IsEnabled() == true, "the teleport motor comes up enabled")
 
     check(state:SetToggle("bladhits", true) or state.Instances.bladhits ~= nil, "the blade hit toggle routes through the backend")
     check(state:SetToggle("does not exist", true) == false, "an unknown feature is rejected")
+    check(state:SetToggle("teleport", true) == false, "infra is not a toggleable feature")
     check(state:SetFeatureRange("does not exist", 5) == false, "a knob on an unknown feature is rejected")
 
     local requests = #ctx.Requests
@@ -423,4 +431,56 @@ do
     check(bare:Enable() == false, "Enable falha quando os remotes nao existem")
     check(bare:IsEnabled() == false, "uma blade hit sem remotes fica desligada")
     bare:Destroy()
+end
+
+-- Teleport motor: the piece every feature will use to move. It must fly the
+-- character to a position by tweening the HumanoidRootPart, resolve a named
+-- island/boss to the same call, and accept a world Instance (what the fruit
+-- feature will hand it). No remotes, no UI -- pure movement.
+do
+    local ctx = sandbox(2753915549, 994732206)
+    ctx.Responses[BF_FEATURE_PREFIX .. "teleport.lua"] = sources[BF_FEATURE_PREFIX .. "teleport.lua"]
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+
+    local Teleport = ctx.Env.loadstring(sources[BF_FEATURE_PREFIX .. "teleport.lua"])()
+    local tp = Teleport.new()
+    check(tp:Enable() == true, "o motor de teleporte liga")
+
+    -- Go tweena o HRP ate o destino, e o tween carrega o CFrame alvo.
+    local tween = tp:Go(Vector3.new(0, 0, 600))
+    check(tween ~= nil, "Go dispara um voo ate a posicao")
+    check(tp:IsFlying() == true, "durante o voo IsFlying e verdadeiro")
+    check(tween.Instance == root, "o voo tweena o HumanoidRootPart")
+
+    -- O atalho GoTo soma o offset de chegada (5 studs acima).
+    tp:Cancel()
+    local tween2 = tp:GoTo(Vector3.new(10, 10, 10))
+    check(tween2 ~= nil, "GoTo dispara um voo")
+    check(tween2.Goal.CFrame.Position.Y == 15, "GoTo soma o offset de chegada (Y+5)")
+    tp:Cancel()
+    check(tp:IsFlying() == false, "Cancel limpa o voo corrente")
+
+    -- Um destino nomeado resolve pela tabela e voa pro mesmo lugar.
+    local jungle = Teleport:Find(Teleport.islands, "Jungle")
+    local named = tp:GoToIsland("Jungle")
+    check(named ~= nil, "GoToIsland voa ate a ilha pelo nome")
+    tp:Cancel()
+
+    -- GoToInstance aceita um BasePart do mundo -- o contrato da feature de fruta.
+    local fruitPart = Instance.new("Part"); fruitPart.Position = Vector3.new(100, 5, 200); fruitPart.Parent = ctx.Services.Workspace
+    local viaInstance = tp:GoToInstance(fruitPart)
+    check(viaInstance ~= nil, "GoToInstance voa ate um BasePart do mundo")
+    check(viaInstance.Goal.CFrame.Position.X == 100, "GoToInstance usa a posicao do Part (com offset)")
+
+    -- Sem character, nada explode: Go devolve nil.
+    ctx.Player.Character = nil
+    check(tp:Go(Vector3.new(1, 1, 1)) == nil, "sem character Go devolve nil")
+
+    tp:Disable()
+    check(tp:IsEnabled() == false and tp:IsFlying() == false, "Disable para o voo e o loop")
+    tp:Destroy()
 end

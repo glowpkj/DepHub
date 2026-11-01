@@ -406,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.17)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.18)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 683 checks):
+FEITO / FUNCIONANDO (verificado offline, 732 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -422,7 +422,7 @@ FEITO / FUNCIONANDO (verificado offline, 683 checks):
 - 11 jogos roteados: Violence District, Blood Strike, Steal An Egg, MM2,
   Noob Piece, TSB, Restaurant Tycoon 3, AOTR, Volleyball 4.2, Blox Fruits
   (Sea 1/2), Universal.
-- Blox Fruits com features PROPRIAS (v0.1.17): o backend carrega
+- Blox Fruits com features PROPRIAS (v0.1.18): o backend carrega
   features/bloxfruits/<nome>.lua (uma por feature, auto-contida, molde
   new/Enable/Disable) comecando pela blade hit -- que e a UNICA feature viva
   hoje. As 14 features que vieram de open source estao em
@@ -543,7 +543,7 @@ GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
 - O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
   CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
-ARQUITETURA DO BLOX FRUITS (v0.1.17) -- features proprias, uma por arquivo:
+ARQUITETURA DO BLOX FRUITS (v0.1.18) -- features proprias, uma por arquivo:
 - O usuario pegou a arvore do Blox Fruits de open source e decidiu montar o
   script dele com as features uma a uma, cada coisa no lugar certo. O molde:
   src/games/features/bloxfruits/<nome>.lua, UMA feature por arquivo.
@@ -555,21 +555,30 @@ ARQUITETURA DO BLOX FRUITS (v0.1.17) -- features proprias, uma por arquivo:
   o painel com a shell compartilhada e liga/desliga cada feature pelo toggle.
   Ele NAO tem lista de knobs paralela -- range/intervalo saem do proprio modulo
   por metodos (SetRange/SetInterval), e o backend so encaminha.
+- DUAS listas no backend, e a diferenca importa:
+  * FEATURE_MODULES -- features de painel, cada uma com seu toggle. Hoje so a
+    blade hit.
+  * INFRA_MODULES (v0.1.18) -- motores sem UI e sem toggle. Carregam e
+    INSTANCIAM sempre (nao ha toggle pra ligar) e ficam em State.Infra. Hoje so
+    o teleporte.
+  Uma feature usa a infra por `State:Teleport()`; a infra deixa de existir no
+  Destroy do backend junto com as features.
 - A arvore open-source antiga (as 14 features que vieram junto) foi movida para
   features/bloxfruits/parked/ via `git mv`: NADA foi apagado. Elas saem da pasta
   ativa, nao carregam, nao entram no manifest e nao entram no bundle (o walk do
   bundle.js pula o subdiretorio `parked`). Ficam guardadas para serem trazidas
-  pro molde proprio uma a uma, comecando pela blade hit.
+  pro molde proprio uma a uma.
 - Ao adicionar uma feature nova: cria features/bloxfruits/<nome>.lua no molde
-  acima, registra em FEATURE_MODULES no backend e na lista de arquivos das DUAS
-  entradas Blox Fruits do .github/dephub-games.json (senao o runtime nao baixa).
-  O teste tests/bloxfruits_tests.luau cobre o contrato (load, toggle, knobs,
-  Destroy) e tests/headless_tests.luau cobre o comportamento com remotes reais.
+  acima, registra em FEATURE_MODULES (ou INFRA_MODULES) no backend e na lista de
+  arquivos das DUAS entradas Blox Fruits do .github/dephub-games.json (senao o
+  runtime nao baixa). O teste tests/bloxfruits_tests.luau cobre o contrato
+  (load, toggle, knobs, Destroy) e tests/headless_tests.luau cobre o
+  comportamento com remotes/mundo reais.
 - SEM flag global (v0.1.17): nao existe `DISABLED` nem override de ambiente. O
-  que carrega e exatamente o que esta em FEATURE_MODULES -- para tirarem uma
-  feature, tira-se ela (movendo pra parked/), nao se levanta um switch que
-  desliga tudo. Uma feature em parked/ nao pode nem ser ligada por engano: o
-  backend a rejeita como qualquer nome desconhecido.
+  que carrega e exatamente o que esta em FEATURE_MODULES/INFRA_MODULES -- para
+  tirarem uma feature, tira-se ela (movendo pra parked/), nao se levanta um
+  switch que desliga tudo. Uma feature em parked/ nao pode nem ser ligada por
+  engano: o backend a rejeita como qualquer nome desconhecido.
 
 BLADE HIT (features/bloxfruits/bladhits.lua) -- a primeira feature propria:
 - Auto-hit: dispara os remotes do proprio jogo (RE/RegisterAttack +
@@ -582,9 +591,35 @@ BLADE HIT (features/bloxfruits/bladhits.lua) -- a primeira feature propria:
 - O hitId e o ponto critico: id forjado e ignorado em conta nova, entao o 4.
   argumento do RegisterHit carrega LastHitId (SetHitId). Sem id capturado ainda
   ele dispara igual, porque o jogo concede um no primeiro M1 real.
-- Knobs pelo proprio modulo: SetRange (10..300) e SetInterval (segundos, o
-  slider mostra ms). Pastas varridas: Workspace.Enemies, Workspace.Characters e
-  players (opcional, alcance proprio).
+- SO TOCA (v0.1.18): o painel mostra apenas o toggle. Os valores sao fixos no
+  melhor que funciona -- alcance 300 (cobre o pack denso de mobs) e intervalo
+  0.05s (o piso que o servidor ainda aceita, com jitter de 25% em cima para tirar
+  a periodicidade). SetRange/SetInterval seguem no modulo para o console, mas nao
+  ha slider. Pastas varridas: Workspace.Enemies, Workspace.Characters e players.
+
+TELEPORT (features/bloxfruits/teleport.lua) -- INFRA, a peca que todas usam:
+- E o motor de voo do script antigo, portado pro molde proprio, SEM UI e SEM
+  toggle: e infraestrutura, nao uma feature de painel. O backend o instancia
+  sempre e publica em State.Infra.teleport / State:Teleport().
+- Contrato para outras features:
+  * tp:Go(pos[, offset])        -> voa ate a posicao (offset opcional somado).
+  * tp:GoTo(pos)                -> Go com o offset padrao (5 studs acima).
+  * tp:GoToIsland/2/3(nome)     -> voa ate uma ilha do mar 1/2/3 pelo nome.
+  * tp:GoToBoss/2/3(nome)       -> idem para bosses.
+  * tp:GoToInstance(part|model) -> voa ate um BasePart/Model do mundo (e o que
+                                   a feature de fruta usa: achou a fruta, manda
+                                   a Part pra ca).
+  * tp:SetSpeed(n) / tp:Cancel() / tp:IsFlying().
+- Como o voo funciona: TweenService:Create no HumanoidRootPart, duracao
+  clampada por distancia (dist/speed, piso 0.05s, teto 90s). Durante o voo, o
+  Heartbeat zera AssemblyLinearVelocity e poe noclip em toda BasePart. NUNCA
+  ancora o HRP: o BF rejeita todo hit num character ancorado.
+- As tabelas islands/islands2/islands3 e bosses/bosses2/bosses3 vieram inteiras
+  do script antigo -- sao a fonte de posicoes para quem precisar delas.
+- ARMADILHA (ja mordeu aqui): o teste antigo do teleporte so checava que Play
+  foi chamado; sem o objeto e o CFrame do tween o teste nao prova que o voo VAI
+  pro lugar certo. O mock de TweenService no harness guarda Instance/Goal pra
+  isso ser assertavel.
 
 FEATURES PARKEADAS (v0.1.17) -- fora da pasta ativa, NADA apagado:
 - As features que o usuario tirou do Blox Fruits (as 14 que vieram de open
