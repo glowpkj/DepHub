@@ -36,6 +36,13 @@ local STATE_KEY = "__DEPHUB_LOADER_STATE"
 -- same. The loader's own in-memory cache still keeps it to one fetch per module.
 local CACHE_BUST = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
 
+-- Identidade da sessao (nao e hash criptografico; e so um carimbo unico por
+-- run, para o estado publicado em __DEPHUB ser rastreado ate uma execucao). O
+-- ambiente do executor e compartilhado por varios scripts, entao todo campo que
+-- uma sessao publica precisa saber de quem ele e -- e a sessao so limpa o que
+-- lhe pertence (ver o bloco de publicacao abaixo).
+local SESSION_ID = CACHE_BUST
+
 local placeId = tostring(game.PlaceId)
 local gameId = tostring(game.GameId)
 
@@ -167,18 +174,28 @@ env[STATE_KEY] = {
 
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
--- Provisional: the first candidate host. httpGet refines this through
--- resolveBase() on the first module fetch and stores the winner back, so the
--- value a later module reads is the host that actually served the current build.
+-- Provodencial: o primeiro host candidato. httpGet refina isso via
+-- resolveBase() no primeiro fetch de modulo e guarda o vencedor de volta, para
+-- o valor que um modulo le depois ser o host que serviu a build atual.
+-- So reusa o valor de sessao ANTERIOR se ele tiver sido guardado pela MESMA
+-- ref; senao comeca da base candidata (a ref muda, a URL antiga nao vale mais).
+if env.__DEPHUB.SourceBaseRef ~= sourceRef then
+    env.__DEPHUB.SourceBaseURL = BASE_URL
+end
 env.__DEPHUB.SourceBaseURL = env.__DEPHUB.SourceBaseURL or BASE_URL
--- Published so each backend can make its own module URLs unique per session and
--- avoid an executor serving a cached older revision (see CACHE_BUST above).
+-- Publicado para cada backend montar sua URL de modulo unica por sessao e
+-- evitar que um executor sirva uma revisao antiga em cache (ver CACHE_BUST).
 env.__DEPHUB.SourceCacheBust = CACHE_BUST
--- The source ref the session was launched with (the branch/ref argument). A
--- backend re-executing itself (Auto execute via queue_on_teleport) re-reads this
--- to relaunch the SAME build, instead of guessing. Kept on __DEPHUB next to
--- SourceBaseURL so a backend can read both from one place.
-env.__DEPHUB.SourceRef = env.__DEPHUB.SourceRef or sourceRef
+-- A ref com que ESTA sessao foi lancada (o argumento branch/ref). Um backend se
+-- re-executando (Auto execute via queue_on_teleport) le isso pra relancar a
+-- MESMA build em vez de adivinhar. E escrito SEMPRE com a ref da sessao atual --
+-- nao ha `or` preservando o valor antigo: se o usuario rodar outra ref no mesmo
+-- ambiente, o estado compartilhado nao pode continuar apontando pra ref anterior
+-- (era o bug em que o Auto execute reexecutava a versao velha).
+-- SourceSession carimba de quem e o valor, para um limpar posterior nao
+-- sobrescrever o de outra sessao.
+env.__DEPHUB.SourceRef = sourceRef
+env.__DEPHUB.SourceSession = SESSION_ID
 env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 

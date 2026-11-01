@@ -170,6 +170,13 @@ local STATE_KEY = "__DEPHUB_LOADER_STATE"
 -- same. The loader's own in-memory cache still keeps it to one fetch per module.
 local CACHE_BUST = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
 
+-- Identidade da sessao (nao e hash criptografico; e so um carimbo unico por
+-- run, para o estado publicado em __DEPHUB ser rastreado ate uma execucao). O
+-- ambiente do executor e compartilhado por varios scripts, entao todo campo que
+-- uma sessao publica precisa saber de quem ele e -- e a sessao so limpa o que
+-- lhe pertence (ver o bloco de publicacao abaixo).
+local SESSION_ID = CACHE_BUST
+
 -- Serve backend-initiated game:HttpGet calls from the bundle when possible.
 -- Feature/quest files a backend fetches directly (rather than through the
 -- loader httpGet) resolve here, so the bundle never needs the network. Any
@@ -351,18 +358,28 @@ env[STATE_KEY] = {
 
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
--- Provisional: the first candidate host. httpGet refines this through
--- resolveBase() on the first module fetch and stores the winner back, so the
--- value a later module reads is the host that actually served the current build.
+-- Provodencial: o primeiro host candidato. httpGet refina isso via
+-- resolveBase() no primeiro fetch de modulo e guarda o vencedor de volta, para
+-- o valor que um modulo le depois ser o host que serviu a build atual.
+-- So reusa o valor de sessao ANTERIOR se ele tiver sido guardado pela MESMA
+-- ref; senao comeca da base candidata (a ref muda, a URL antiga nao vale mais).
+if env.__DEPHUB.SourceBaseRef ~= sourceRef then
+    env.__DEPHUB.SourceBaseURL = BASE_URL
+end
 env.__DEPHUB.SourceBaseURL = env.__DEPHUB.SourceBaseURL or BASE_URL
--- Published so each backend can make its own module URLs unique per session and
--- avoid an executor serving a cached older revision (see CACHE_BUST above).
+-- Publicado para cada backend montar sua URL de modulo unica por sessao e
+-- evitar que um executor sirva uma revisao antiga em cache (ver CACHE_BUST).
 env.__DEPHUB.SourceCacheBust = CACHE_BUST
--- The source ref the session was launched with (the branch/ref argument). A
--- backend re-executing itself (Auto execute via queue_on_teleport) re-reads this
--- to relaunch the SAME build, instead of guessing. Kept on __DEPHUB next to
--- SourceBaseURL so a backend can read both from one place.
-env.__DEPHUB.SourceRef = env.__DEPHUB.SourceRef or sourceRef
+-- A ref com que ESTA sessao foi lancada (o argumento branch/ref). Um backend se
+-- re-executando (Auto execute via queue_on_teleport) le isso pra relancar a
+-- MESMA build em vez de adivinhar. E escrito SEMPRE com a ref da sessao atual --
+-- nao ha `or` preservando o valor antigo: se o usuario rodar outra ref no mesmo
+-- ambiente, o estado compartilhado nao pode continuar apontando pra ref anterior
+-- (era o bug em que o Auto execute reexecutava a versao velha).
+-- SourceSession carimba de quem e o valor, para um limpar posterior nao
+-- sobrescrever o de outra sessao.
+env.__DEPHUB.SourceRef = sourceRef
+env.__DEPHUB.SourceSession = SESSION_ID
 env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 
@@ -991,17 +1008,25 @@ function Store:Save()
         return false
     end
     local text = self:Encode()
-    local ok = pcall(api.write, self.file, text)
-    if not ok then
-        self.LastError = "writefile recusou a gravacao"
+    -- writefile pode lancar (pcall) OU devolver false explicito sem lancar; os
+    -- dois sao falha. O terceiro argumento de pcall (a mensagem) entra no motivo.
+    local ok, wrote = pcall(api.write, self.file, text)
+    if not ok or wrote == false then
+        self.LastError = ok and "writefile devolveu false" or "writefile recusou a gravacao"
         return false
     end
-    -- Confirma lendo de volta: alguns executores aceitam writefile e nao
-    -- persistem (ou gravam noutro lugar); sem esta checagem o Save diria "ok" e
-    -- o proximo start abriria vazio -- o "nao salva" que o usuario viu.
+    -- Confirma lendo de volta E comparando BYTE a BYTE com o que foi escrito.
+    -- Nao basta o arquivo "voltar com algo": um arquivo antigo, parcial ou de
+    -- outro conteudo passaria. So e gravacao ok quando o que voltou e exatamente
+    -- o texto que mandamos -- senao o Save diria "ok" e o proximo start abriria
+    -- outra coisa (o "nao salva" que o usuario viu).
     local readOk, back = pcall(api.read, self.file)
-    if not readOk or type(back) ~= "string" or #back == 0 then
+    if not readOk or type(back) ~= "string" then
         self.LastError = "o arquivo nao voltou depois de gravar"
+        return false
+    end
+    if back ~= text then
+        self.LastError = "o arquivo nao voltou igual ao que foi gravado"
         return false
     end
     self.LastError = nil
@@ -1013,10 +1038,18 @@ end
 function Store:Read()
     local api = self:FileApi()
     if not api then return self.Saved end
-    local has = pcall(api.isfile, self.file)
-    if not (has and api.isfile(self.file)) then return self.Saved end
-    local ok, text = pcall(api.read, self.file)
-    if not ok then return nil end
+    -- isfile pode lancar, devolver false ou devolver nil. Uma unica chamada,
+    -- com o retorno E o ok do pcall guardados -- a versao anterior chamava
+    -- isfile duas vezes e a segunda ficava FORA do pcall (um executor que lanca
+    -- na segunda derrubava o Load inteiro).
+    local ok, exists = pcall(api.isfile, self.file)
+    if not ok then
+        self.LastError = "isfile recusou"
+        return self.Saved
+    end
+    if exists ~= true then return self.Saved end
+    local readOk, text = pcall(api.read, self.file)
+    if not readOk or type(text) ~= "string" then return nil end
     local parsed = (self.decoder or decodeConfig)(text)
     self.Saved = parsed
     return parsed
@@ -1036,31 +1069,60 @@ end
 -- Aplica uma config (a do Read/Prime) ao estado e a UI: percorre a lista que o
 -- painel registrou e chama a MESMA operacao de cada callback. Sem essa lista, so
 -- os valores digitados na sessao teriam efeito -- o que veio do arquivo precisa
--- re-disparar cada setter. Devolve quantas chaves aplicou.
+-- re-disparar cada setter.
+--
+-- Devolve uma tabela { applied = {...}, failed = {...}, count = n }. `applied` e
+-- `failed` sao arrays de chaves: uma chave so entra em `applied` quando a
+-- aplicacao realmente rodou sem erro. Um pcall que retorna false OU lanca erro
+-- entra em `failed` com o motivo -- antes o codigo descartava o resultado e
+-- contava como aplicado de qualquer jeito (o painel dizia "Loaded N settings"
+-- mesmo quando uma feature tinha recusado).
+--
+-- O EFEITO ACONTECE UMA VEZ SO. O SetValue da RedzLib dispara o callback do
+-- controle quando o valor muda; chamar `apply` E `SetValue` rodava o efeito duas
+-- vezes. Aqui: se o controle vai mesmo mudar, so o SetValue roda (o callback
+-- dele e o efeito); se o controle ja esta no valor, o SetValue nao dispararia
+-- nada, entao o `apply` roda direto. Nunca os dois.
 function Store:Apply(config)
     config = config or self.Saved
-    if type(config) ~= "table" then return 0 end
-    local applied = 0
+    local result = { applied = {}, failed = {}, count = 0 }
+    if type(config) ~= "table" then return result end
     for _, entry in ipairs(self.Entries) do
         local value = config[entry.key]
         if value ~= nil then
-            pcall(entry.apply, value)
-            -- Move o controle na tela. O SetValue de toggle/slider pode disparar
-            -- o callback de novo com o MESMO valor; as operacoes sao idempotentes,
-            -- entao repetir e seguro.
-            if entry.handle ~= nil then
-                local handle = entry.handle
-                if type(handle.SetValue) == "function" then
-                    pcall(handle.SetValue, handle, value)
-                elseif type(handle.Set) == "function" then
-                    pcall(handle.Set, handle, value)
+            local handle = entry.handle
+            local handleCanDrive = handle ~= nil
+                and (type(handle.SetValue) == "function" or type(handle.Set) == "function")
+            local willChange = handleCanDrive and (handle.Value ~= value)
+
+            local ok, applied
+            if willChange then
+                -- O SetValue move o controle E dispara o callback (o efeito).
+                local setter = type(handle.SetValue) == "function" and handle.SetValue or handle.Set
+                ok, applied = pcall(setter, handle, value)
+            else
+                -- Sem handle, ou controle ja no valor: aplica o efeito direto.
+                ok, applied = pcall(entry.apply, value)
+                -- Move o controle (se houver) sem re-disparar: quando o valor ja
+                -- bate, o SetValue da RedzLib nao faz nada, mas garante que a UI
+                -- fique coerente em handles de outro tipo.
+                if ok and handleCanDrive then
+                    local setter = type(handle.SetValue) == "function" and handle.SetValue or handle.Set
+                    pcall(setter, handle, value)
                 end
             end
-            self.Values[entry.key] = value
-            applied = applied + 1
+
+            if ok and applied ~= false then
+                self.Values[entry.key] = value
+                result.applied[#result.applied + 1] = entry.key
+                result.count = result.count + 1
+            else
+                self.LastError = ("apply falhou em '%s'"):format(tostring(entry.key))
+                result.failed[#result.failed + 1] = entry.key
+            end
         end
     end
-    return applied
+    return result
 end
 
 -- Le e aplica num passo: e o que um botao "Load" chama.
@@ -2067,6 +2129,11 @@ end
 
 function Diagnostics:_addLog(kind, text)
     if self.LogPaused and kind ~= "console" then return end
+    -- Remote sniffing off: descarta linhas de remote mesmo que os wrappers ainda
+    -- estejam instalados. Sem esta guarda o toggle "Remote sniff" so mudava a
+    -- variavel -- com os hooks ja instalados, a captura continuava e o usuario
+    -- via um switch que nao desligava nada.
+    if kind == "remote" and self.SniffEnabled ~= true then return end
     self.Logs[#self.Logs + 1] = {Kind = tostring(kind or "log"), Text = tostring(text), T = stamp()}
     while #self.Logs > MAX_LOG do table.remove(self.Logs, 1) end
 end
@@ -10225,10 +10292,14 @@ end
 
 -- Aplica uma config (a que veio do ReadConfig) ao estado e a UI: percorre a
 -- lista que o painel registrou e chama a mesma operacao de cada callback.
+-- Devolve o NUMERO de chaves realmente aplicadas (compativel com os chamadores
+-- antigos); o detalhe (quais foram e quais falharam) fica em self.LastApplyResult.
 function State:ApplyConfig(config)
     if not self.Store then return 0 end
     self:syncStore()
-    return self.Store:Apply(config)
+    local result = self.Store:Apply(config)
+    self.LastApplyResult = result
+    return result.count
 end
 
 -- Le do disco e aplica num passo: e o que o botao Load chamou.
@@ -10257,13 +10328,48 @@ end
 -- queue_on_teleport), entao o DepHub sobe de novo sozinho. Usa o mesmo
 -- source ref do run atual (via env.__DEPHUB.SourceRef/SourceBaseURL), pra
 -- religar a mesma build que o usuario esta rodando.
+--
+-- SEGURANCA: essa string vira codigo Lua (`loadstring(...)`), e ref/base vem de
+-- estado COMPARTILHADO do ambiente do executor -- qualquer script no mesmo
+-- ambiente pode ter escrito ali. Interpolar direto deixava aspas/barra/quebra de
+-- linha virarem sintaxe no chunk enfileirado. Por isso ref e base passam por
+-- validacao ANTES: ref com formato de commit/tag/branch (sem aspas, barra,
+-- controle, espaco ou `..`), base HTTPS de host permitido. Reprovar nao monta
+-- codigo nenhum -- cai no default seguro.
+local SOURCE_HOSTS = {
+    ["raw.githubusercontent.com"] = true,
+    ["github.com"] = true,
+    ["cdn.jsdelivr.net"] = true,
+}
+
+-- Uma ref segura: SHA completo, tag, ou branch de segmentos simples
+-- (letra/numero/`_`/`-`/`.`/`/`), sem `..`, sem comecar/terminar com barra.
+local function safeRef(ref)
+    if type(ref) ~= "string" or ref == "" or #ref > 200 then return nil end
+    if ref:find("%.%.") or ref:find("^[/]") or ref:find("[/]$") then return nil end
+    if not ref:match("^[%w_%./-]+$") then return nil end
+    return ref
+end
+
+-- Uma base segura: HTTPS, host na allowlist. Devolve a base sem barra final ou
+-- nil se nao passar.
+local function safeBase(base)
+    if type(base) ~= "string" or #base > 300 then return nil end
+    local scheme, host = base:match("^(https)://([^/]+)/")
+    if not scheme or not host or not SOURCE_HOSTS[host] then return nil end
+    if base:find('"') or base:find("\\") or base:find("[\r\n]") then return nil end
+    return base
+end
+
 function State:SelfExecLine()
     local shared = env.__DEPHUB
     local loaderState = env.__DEPHUB_LOADER_STATE
-    local ref = (shared and shared.SourceRef)
-        or (type(loaderState) == "table" and loaderState.SourceRef)
+    -- Sem `or` preservando valor antigo: a ref da sessao atual, validada.
+    local ref = safeRef(shared and shared.SourceRef)
+        or safeRef(type(loaderState) == "table" and loaderState.SourceRef)
         or "main"
-    local base = (shared and shared.SourceBaseURL) or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+    local base = safeBase(shared and shared.SourceBaseURL)
+        or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
     if not base:match("/$") then base = base .. "/" end
     return ('loadstring(__dephubHttpGet("%sDepHub.lua"))("%s")'):format(base, ref)
 end
@@ -10864,8 +10970,15 @@ local PANELS = {
             end)
             section:CreateButton("Load config", function()
                 local applied = State:LoadConfig()
-                if applied > 0 then
+                local failed = State.LastApplyResult and #State.LastApplyResult.failed or 0
+                if applied > 0 and failed == 0 then
                     instance.Notify("Config", ("Loaded %d settings."):format(applied))
+                elseif applied > 0 then
+                    -- Aplicou parte: diz quantas entraram e quantas nao -- antes o
+                    -- painel dizia "Loaded N" mesmo com feature recusando a config.
+                    instance.Notify("Config", ("Loaded %d, %d failed."):format(applied, failed))
+                elseif failed > 0 then
+                    instance.Notify("Config", ("Load failed (%d)."):format(failed))
                 else
                     instance.Notify("Config", "Nothing saved yet.")
                 end
@@ -12608,10 +12721,18 @@ function Feature:Go()
 
     -- Destino por posicao fixa (ex.: Cafe): vai direto pro ponto.
     if entry.pos then
-        local ok = pcall(function() motor:GoTo(entry.pos) end)
+        -- Captura o SEGUNDO retorno do pcall: o pcall so diz que nao lancou; o
+        -- motor pode devolver nil (sem character/HRP) sem erro nenhum. Sem
+        -- olhar esse retorno, a feature armava a vigia e dizia "flying" sem voo.
+        local ok, started = pcall(function() return motor:GoTo(entry.pos) end)
         if not ok then
             self.LastStatus = "teleport failed"
             self.LastError = "falha no voo"
+            return false
+        end
+        if started == nil then
+            self.LastStatus = "character not ready"
+            self.LastError = "sem personagem"
             return false
         end
         self.LastStatus = ("flying to %s"):format(self.Selected)
@@ -12627,10 +12748,16 @@ function Feature:Go()
         self.LastStatus = ("not in map: workspace.Map.%s"):format(tostring(entry.instance))
         return false
     end
-    local ok = pcall(function() motor:GoToInstance(island) end)
+    -- Mesmo cuidado: o retorno do motor diz se o voo comecou de fato.
+    local ok, started = pcall(function() return motor:GoToInstance(island) end)
     if not ok then
         self.LastStatus = "teleport failed"
         self.LastError = "falha no voo"
+        return false
+    end
+    if started == nil then
+        self.LastStatus = "character not ready"
+        self.LastError = "sem personagem"
         return false
     end
     self.LastStatus = ("flying to %s"):format(self.Selected)
@@ -12674,7 +12801,16 @@ function Feature:SetEnabled(on)
         self.ToggleOn = false
         return false
     end
-    self:Go()
+    -- Propaga o RESULTADO REAL do voo. Antes retornava true sempre, entao o
+    -- toggle ficava marcado como ligado mesmo quando nao havia personagem --
+    -- agora, se o voo nao comecou (sem character), SetEnabled devolve false e o
+    -- backend avisa o motivo (LastStatus/LastError) em vez de fingir sucesso.
+    -- A ilha fora do mapa mantem o toggle armado: o usuario so troca no dropdown.
+    local started = self:Go()
+    if not started and self.LastStatus == "character not ready" then
+        self.ToggleOn = false
+        return false
+    end
     return true
 end
 
@@ -12760,6 +12896,11 @@ Feature.DEFAULT_FLASHSTEP = 0
 -- O nome do NumberValue do stun, filho do character.
 local STUN_NAME = "Stun"
 
+-- Sentinela de "atributo NAO existia" (nil nao pode ser guardado como campo de
+-- tabela). Guardamos isso pra restaurar remontando o estado: atributo que nao
+-- existia antes e REMOVIDO no cleanup, nao setado pra um default.
+local ABSENT = setmetatable({}, { __tostring = function() return "<absent>" end })
+
 function Feature.new(options)
     options = options or {}
     local self = setmetatable({}, Feature)
@@ -12780,6 +12921,11 @@ function Feature.new(options)
     self._SelfWrite = false
     -- O Stun cujo Changed ja esta conectado (estado fora da instance).
     self._StunWatched = nil
+    -- Valor ORIGINAL por atributo, do character atual (o restore devolve o que
+    -- estava, nao um default). Ver _Capture.
+    self._Original = {}
+    -- Stun que a PROPRIA feature criou (so esse e destruido no cleanup).
+    self._StunCreated = false
     -- O character atual + as conexoes dele (re-bind no respawn).
     self.Character = nil
     self.Connections = {}
@@ -12795,6 +12941,22 @@ end
 
 -- --- Aplicacao dos valores no character -------------------------------------
 
+-- Guarda, UMA vez por atributo por character, o valor que o jogo tinha antes de
+-- a feature escrever. Idempotente: se ja capturou, nao sobrescreve (senao a
+-- segunda escrita capturaria o valor que a propria feature pos).
+function Feature:_Capture(character, attribute)
+    if self._Captured == nil then self._Captured = {} end
+    local perCharacter = self._Captured[character]
+    if perCharacter == nil then
+        perCharacter = {}
+        self._Captured[character] = perCharacter
+    end
+    if perCharacter[attribute] == nil then
+        local value = character:GetAttribute(attribute)
+        perCharacter[attribute] = (value == nil) and ABSENT or value
+    end
+end
+
 -- Escreve os atributos no character conforme o estado dos controles. O que esta
 -- desligado NAO e tocado -- o valor do jogo fica como esta.
 function Feature:_Apply(character)
@@ -12804,15 +12966,19 @@ function Feature:_Apply(character)
     self._SelfWrite = true
     pcall(function()
         if self.SpeedOn then
+            self:_Capture(character, "SpeedMultiplier")
             character:SetAttribute("SpeedMultiplier", self.Speed)
         end
         if self.UnbreakableOn then
+            self:_Capture(character, "UnbreakableAll")
             character:SetAttribute("UnbreakableAll", true)
         end
         if self.WaterWalkingOn then
+            self:_Capture(character, "WaterWalking")
             character:SetAttribute("WaterWalking", true)
         end
         if self.FlashstepOn then
+            self:_Capture(character, "FlashstepCooldown")
             character:SetAttribute("FlashstepCooldown", self.FlashstepCooldown)
         end
     end)
@@ -12821,7 +12987,8 @@ function Feature:_Apply(character)
 end
 
 -- O Stun e um NumberValue filho do character: mantem em 0. Se o character veio
--- sem o Value (ou o jogo o removeu), cria um.
+-- sem o Value (ou o jogo o removeu), cria um -- e marca que foi a FEATURE que
+-- criou, pra destruir o dela no cleanup (sem tocar num Stun que o jogo tinha).
 function Feature:_ApplyStun(character)
     if not self.StunOn or not character then return end
     local stun = character:FindFirstChild(STUN_NAME)
@@ -12833,7 +13000,10 @@ function Feature:_ApplyStun(character)
             value.Parent = character
             return value
         end)
-        if ok and created then self:_WatchStun(created) end
+        if ok and created then
+            self._StunCreated = true
+            self:_WatchStun(created)
+        end
         return
     end
     if stun:IsA("NumberValue") and stun.Value ~= 0 then
@@ -12860,19 +13030,42 @@ function Feature:_WatchStun(stun)
     end)
 end
 
--- Remove o que a feature setou, devolvendo o character ao estado do jogo. So
--- limpa o que ESTA feature ligou (nao mexe no que o usuario/jogo tinha).
+-- Remove o que a feature setou, devolvendo o character ao estado que ele tinha
+-- ANTES da feature. So limpa o que ESTA feature ligou (nao mexe no que o
+-- usuario/jogo tinha) e devolve cada atributo ao valor ORIGINAL capturado --
+-- nao a um default. Atributo que nao existia antes e REMOVIDO.
 -- Escreve com o guarda levantado: o vigia de "manter ligado" nao pode re-agir a
 -- escrita de limpeza da propria feature, senao ela desfaz o desligamento.
 function Feature:_Clear(character)
     if not character then return end
     self._SelfWrite = true
+    local captured = self._Captured and self._Captured[character]
     pcall(function()
-        if self.SpeedOn then character:SetAttribute("SpeedMultiplier", Feature.DEFAULT_SPEED) end
-        if self.FlashstepOn then character:SetAttribute("FlashstepCooldown", Feature.DEFAULT_FLASHSTEP) end
-        if self.UnbreakableOn then character:SetAttribute("UnbreakableAll", false) end
-        if self.WaterWalkingOn then character:SetAttribute("WaterWalking", false) end
+        local function restore(attribute, whenOn)
+            if not whenOn then return end
+            local original = captured and captured[attribute]
+            if original == nil then return end
+            if original == ABSENT then
+                -- Nao existia antes: remove em vez de setar um default.
+                pcall(function() character:SetAttribute(attribute, nil) end)
+            else
+                character:SetAttribute(attribute, original)
+            end
+        end
+        restore("SpeedMultiplier", self.SpeedOn)
+        restore("FlashstepCooldown", self.FlashstepOn)
+        restore("UnbreakableAll", self.UnbreakableOn)
+        restore("WaterWalking", self.WaterWalkingOn)
     end)
+    -- Stun: so destroe se a PROPRIA feature criou o NumberValue. Se o jogo ja
+    -- tinha um, nao e nosso pra destruir.
+    if self._StunCreated then
+        local stun = character:FindFirstChild(STUN_NAME)
+        if stun then pcall(function() stun:Destroy() end) end
+        self._StunCreated = false
+        self._StunWatched = nil
+    end
+    if self._Captured then self._Captured[character] = nil end
     self._SelfWrite = false
 end
 
@@ -12906,6 +13099,9 @@ function Feature:_Unbind()
     self.Connections = {}
     self.Character = nil
     self._StunWatched = nil
+    -- O Stun criado pertencia ao character antigo; o proximo character comeca
+    -- sem Stun da feature (ela recria no _ApplyStun se precisar).
+    self._StunCreated = false
 end
 
 -- --- Controles (chamados pelo backend) --------------------------------------
@@ -12926,7 +13122,19 @@ function Feature:SetUnbreakable(on)
     -- Guarda levantado: se for pra DESLIGAR, a escrita nao pode ser vista pelo
     -- vigia de manter-ligado e re-aplicada.
     self._SelfWrite = true
-    pcall(function() character:SetAttribute("UnbreakableAll", self.UnbreakableOn) end)
+    if self.UnbreakableOn then
+        self:_Capture(character, "UnbreakableAll")
+        pcall(function() character:SetAttribute("UnbreakableAll", true) end)
+    else
+        -- Desligar devolve o valor ORIGINAL (nao um false cego).
+        local captured = self._Captured and self._Captured[character]
+        local original = captured and captured["UnbreakableAll"]
+        if original == ABSENT then
+            pcall(function() character:SetAttribute("UnbreakableAll", nil) end)
+        else
+            pcall(function() character:SetAttribute("UnbreakableAll", original == nil and false or original) end)
+        end
+    end
     self._SelfWrite = false
     return true
 end
@@ -12936,7 +13144,18 @@ function Feature:SetWaterWalking(on)
     local character = self.Character or myCharacter()
     if not character then return true end
     self._SelfWrite = true
-    pcall(function() character:SetAttribute("WaterWalking", self.WaterWalkingOn) end)
+    if self.WaterWalkingOn then
+        self:_Capture(character, "WaterWalking")
+        pcall(function() character:SetAttribute("WaterWalking", true) end)
+    else
+        local captured = self._Captured and self._Captured[character]
+        local original = captured and captured["WaterWalking"]
+        if original == ABSENT then
+            pcall(function() character:SetAttribute("WaterWalking", nil) end)
+        else
+            pcall(function() character:SetAttribute("WaterWalking", original == nil and false or original) end)
+        end
+    end
     self._SelfWrite = false
     return true
 end
@@ -13683,6 +13902,8 @@ function Teleport.new(options)
     -- Cache do noclip por character: a lista de BaseParts so e reconstruida
     -- quando o character muda (respawn). Ver Enable() para o porque.
     self._noclipParts = nil
+    -- CanCollide ORIGINAL por parte (o restore devolve esse valor, nao true).
+    self._originalCollide = nil
     self._root = nil
     self._character = nil
     return self
@@ -13700,12 +13921,19 @@ end
 -- Devolve a colisao que o voo tirou: recompoe CanCollide nos BaseParts do
 -- character em cache. Chamado quando o voo termina (Completed) ou e cancelado,
 -- para o personagem nao ficar "atravessando" o chao depois de pousar.
+-- Restaura o valor ORIGINAL de cada parte (o que ela tinha antes do voo), nao
+-- um `true` cego: uma parte que ja era nao-colidivel (acessorio, decoracao) tem
+-- que voltar nao-colidivel, senao o voo deixa o personagem mexido.
 function Teleport:_RestoreCollision()
     local parts = self._noclipParts
+    local original = self._originalCollide
     if parts then
         for index = 1, #parts do
             local part = parts[index]
-            if part.Parent and not part.CanCollide then pcall(function() part.CanCollide = true end) end
+            local was = original and original[part]
+            if part.Parent and was ~= nil and part.CanCollide ~= was then
+                pcall(function() part.CanCollide = was end)
+            end
         end
     end
 end
@@ -13930,10 +14158,15 @@ function Teleport:Enable()
             self._character = character
             self._root = character:FindFirstChild("HumanoidRootPart")
             self._noclipParts = {}
+            -- Guarda o CanCollide ORIGINAL de cada parte no momento em que o
+            -- cache e montado: o restore devolve exatamente o que estava la
+            -- (parte que ja era nao-colidivel volta nao-colidivel).
+            self._originalCollide = {}
             -- GetDescendants so aqui (mudanca de character), nao por frame.
             for _, part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
                     self._noclipParts[#self._noclipParts + 1] = part
+                    self._originalCollide[part] = part.CanCollide
                 end
             end
         end
@@ -13962,6 +14195,7 @@ function Teleport:Disable()
         self._heartbeat = nil
     end
     self._noclipParts = nil
+    self._originalCollide = nil
     self._root = nil
     self._character = nil
     return true
@@ -24618,7 +24852,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/85211729168715.txt"] = [[
-﻿0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. The Travel island list is per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with type(x) == "table", but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. And the panel now saves and reloads everything: two controls that were built with a hardcoded off and never registered (Blade hits and the Island teleport toggle) are now saved and applied like the rest, so a config written from the panel actually carries them. On top of that, the saved state reactivates itself for real on join -- a toggle saved on no longer just shows as on in the panel, it drives the feature (the fruit ESP saved on comes up with its draw loop running, the blade hit enabled, and so on), because the auto-load replays the same setter every control already uses on click. Auto execute is fixed too: the reload line could not find the executor's queue_on_teleport when it was only published on getgenv() (it read the bare global only, so the toggle silently did nothing on those executors), and the reload now always targets the same branch you launched instead of guessing. Under the hood the file-API, JSON and save/reload logic was pulled out of the Blox Fruits backend into one shared core module (src/core/config-store.lua) so the other games adopt the same persistence without copying it. The dropdown popup can no longer get stuck on the panel: the library reuses one dropdown popup for every dropdown in every tab, and its parent was left unbound by the library refactor, so it was created loose and framed at a fixed corner -- once anything attached it, it showed as a small dark box with a magnifier over the content (the box the user saw in the Combat tab under Blade hits). It is now born hidden inside the library's own overlay, only shown while a dropdown is actually open, and closed on every tab change, so it can never render outside its own dropdown.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. The Travel island list is per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with type(x) == "table", but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. And the panel now saves and reloads everything: two controls that were built with a hardcoded off and never registered (Blade hits and the Island teleport toggle) are now saved and applied like the rest, so a config written from the panel actually carries them. On top of that, the saved state reactivates itself for real on join -- a toggle saved on no longer just shows as on in the panel, it drives the feature (the fruit ESP saved on comes up with its draw loop running, the blade hit enabled, and so on), because the auto-load replays the same setter every control already uses on click. Auto execute is fixed too: the reload line could not find the executor's queue_on_teleport when it was only published on getgenv() (it read the bare global only, so the toggle silently did nothing on those executors), and the reload now always targets the same branch you launched instead of guessing. Under the hood the file-API, JSON and save/reload logic was pulled out of the Blox Fruits backend into one shared core module (src/core/config-store.lua) so the other games adopt the same persistence without copying it. The dropdown popup can no longer get stuck on the panel: the library reuses one dropdown popup for every dropdown in every tab, and its parent was left unbound by the library refactor, so it was created loose and framed at a fixed corner -- once anything attached it, it showed as a small dark box with a magnifier over the content (the box the user saw in the Combat tab under Blade hits). It is now born hidden inside the library's own overlay, only shown while a dropdown is actually open, and closed on every tab change, so it can never render outside its own dropdown. And the underlying state is now corrected across the board: the shared config store reads its file with a single guarded isfile call (the old code checked it twice and the second call ran outside the pcall, so an executor that throws there broke the whole Load), a Save now reads the file back and only reports success when the bytes match exactly what it wrote (a stale or partial file no longer counts as saved), and a Load now reports which settings actually applied versus which failed -- it no longer runs the same effect twice (the toggle callback fired once via the control and again via the direct setter) and no longer claims success when a feature refused the value. Teleport restores each part's original CanCollide instead of forcing everything collidable, so an accessory or decoration that was already non-collidable stays that way after a flight. The Player tab restores your character's original attribute values (and removes the ones that did not exist before) and destroys the Stun NumberValue only when the feature itself created it, instead of writing defaults over what the game had. Island teleport now checks whether the flight actually started -- a motor that returns nothing without error no longer leaves the toggle armed and reporting 'flying' with no movement -- and reports a real failure instead. The remote sniff toggle really stops capturing when switched off, even with the hooks already installed. And the auto-execute reload line now always targets the current session's ref (never a stale one left in shared state) and validates the ref and source URL before building the reload code, so a value another script wrote into the shared environment cannot shape the queued script.
 0.1.01 | Shared UI (every game): sections now hug their content. A section's height is the measured content of its body, and since that measurement already includes the body's own padding the old size added an extra 24px of dead space under the last control -- the empty band that showed up at the bottom of a section. Removed. Also added real VStack/HStack grouping: related controls sit side by side on one line (a toggle next to the slider that drives it, the switches of one feature together) across Volleyball 4.2, Universal, Violence District, TSB, MM2, Noob Piece, AOT:R, Blood Strike, Steal An Egg, Restaurant Tycoon 3 and Blox Fruits, so tabs are shorter and less cluttered. New shell primitives AddHStack/AddVStack, exposed as Kit.Row/Kit.Stack, with tests.
 0.1.00 | Shared UI (every game) + Debug: full English pass. Every player-visible string -- tab names, section titles, toggle/slider labels, paragraphs, notifications, status reads and the Debug console vocabulary ([FAIL], module/probe details, command replies) -- is now English (was Portuguese). Docs and code comments stay in Portuguese. Also the default open/close key is now N. The Debug tab, loader notes and backend diagnostics all read in English.
 0.0.99 | Blox Fruits: the shared UI kit is now loaded alongside the backend; tab organisation is unchanged (tabs are already purpose-named, and the sea category is kept on purpose because it scopes features to the sea the player is in).
@@ -24657,7 +24891,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-﻿0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known. The island teleport toggle now really stops the teleport: turning it off (or anything tied to it) cancels the flight in progress -- the motor's tween is cancelled so the character stops being dragged, the arrival watcher is disarmed, and collision is restored -- instead of only refusing to start new flights and letting the current one finish. The teleport motor is lighter per frame: the noclip pass no longer walks Character:GetDescendants() every Heartbeat (the heavy part of the flight loop); the BasePart list is cached and rebuilt only when the character changes (respawn), so the normal frame just zeroes velocity and flips CanCollide on a short cached array. Saving the panel config is also hardened: the file API is read from both the chunk globals and getgenv() (an executor that publishes only one used to fall back to memory in silence, which is the "it does not save" the user hit), the Save reads the file back after writing and only reports success when the bytes are really there, and a failed Save now names the real reason (no file API, writefile refused, or the file did not come back) instead of a generic "session only". Also, the script's own per-frame cost is lighter when the aim is on: the silent aim no longer allocates two closures every frame in its Heartbeat/RenderStepped handlers, and its retry to find the game's attack remotes is now bounded instead of running sixty times a second forever if a remote never shows up. And the panel now saves and reloads everything: two controls that were built with a hardcoded off and never registered (Blade hits and the Island teleport toggle) are now saved and applied like the rest, so a config written from the panel actually carries them. On top of that, the saved state reactivates itself for real on join -- a toggle saved on no longer just shows as on in the panel, it drives the feature (the fruit ESP saved on comes up with its draw loop running, the blade hit enabled, and so on), because the auto-load replays the same setter every control already uses on click. Auto execute is fixed too: the reload line could not find the executor's queue_on_teleport when it was only published on getgenv() (it read the bare global only, so the toggle silently did nothing on those executors), and the reload now always targets the same branch you launched instead of guessing. Under the hood the file-API, JSON and save/reload logic was pulled out of the Blox Fruits backend into one shared core module (src/core/config-store.lua) so the other games adopt the same persistence without copying it. The dropdown popup can no longer get stuck on the panel: the library reuses one dropdown popup for every dropdown in every tab, and its parent was left unbound by the library refactor, so it was created loose and framed at a fixed corner -- once anything attached it, it showed as a small dark box with a magnifier over the content (the box the user saw in the Combat tab under Blade hits). It is now born hidden inside the library's own overlay, only shown while a dropdown is actually open, and closed on every tab change, so it can never render outside its own dropdown.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known. The island teleport toggle now really stops the teleport: turning it off (or anything tied to it) cancels the flight in progress -- the motor's tween is cancelled so the character stops being dragged, the arrival watcher is disarmed, and collision is restored -- instead of only refusing to start new flights and letting the current one finish. The teleport motor is lighter per frame: the noclip pass no longer walks Character:GetDescendants() every Heartbeat (the heavy part of the flight loop); the BasePart list is cached and rebuilt only when the character changes (respawn), so the normal frame just zeroes velocity and flips CanCollide on a short cached array. Saving the panel config is also hardened: the file API is read from both the chunk globals and getgenv() (an executor that publishes only one used to fall back to memory in silence, which is the "it does not save" the user hit), the Save reads the file back after writing and only reports success when the bytes are really there, and a failed Save now names the real reason (no file API, writefile refused, or the file did not come back) instead of a generic "session only". Also, the script's own per-frame cost is lighter when the aim is on: the silent aim no longer allocates two closures every frame in its Heartbeat/RenderStepped handlers, and its retry to find the game's attack remotes is now bounded instead of running sixty times a second forever if a remote never shows up. And the panel now saves and reloads everything: two controls that were built with a hardcoded off and never registered (Blade hits and the Island teleport toggle) are now saved and applied like the rest, so a config written from the panel actually carries them. On top of that, the saved state reactivates itself for real on join -- a toggle saved on no longer just shows as on in the panel, it drives the feature (the fruit ESP saved on comes up with its draw loop running, the blade hit enabled, and so on), because the auto-load replays the same setter every control already uses on click. Auto execute is fixed too: the reload line could not find the executor's queue_on_teleport when it was only published on getgenv() (it read the bare global only, so the toggle silently did nothing on those executors), and the reload now always targets the same branch you launched instead of guessing. Under the hood the file-API, JSON and save/reload logic was pulled out of the Blox Fruits backend into one shared core module (src/core/config-store.lua) so the other games adopt the same persistence without copying it. The dropdown popup can no longer get stuck on the panel: the library reuses one dropdown popup for every dropdown in every tab, and its parent was left unbound by the library refactor, so it was created loose and framed at a fixed corner -- once anything attached it, it showed as a small dark box with a magnifier over the content (the box the user saw in the Combat tab under Blade hits). It is now born hidden inside the library's own overlay, only shown while a dropdown is actually open, and closed on every tab change, so it can never render outside its own dropdown. And the underlying state is now corrected across the board: the shared config store reads its file with a single guarded isfile call (the old code checked it twice and the second call ran outside the pcall, so an executor that throws there broke the whole Load), a Save now reads the file back and only reports success when the bytes match exactly what it wrote (a stale or partial file no longer counts as saved), and a Load now reports which settings actually applied versus which failed -- it no longer runs the same effect twice (the toggle callback fired once via the control and again via the direct setter) and no longer claims success when a feature refused the value. Teleport restores each part's original CanCollide instead of forcing everything collidable, so an accessory or decoration that was already non-collidable stays that way after a flight. The Player tab restores your character's original attribute values (and removes the ones that did not exist before) and destroys the Stun NumberValue only when the feature itself created it, instead of writing defaults over what the game had. Island teleport now checks whether the flight actually started -- a motor that returns nothing without error no longer leaves the toggle armed and reporting 'flying' with no movement -- and reports a real failure instead. The remote sniff toggle really stops capturing when switched off, even with the hooks already installed. And the auto-execute reload line now always targets the current session's ref (never a stale one left in shared state) and validates the ref and source URL before building the reload code, so a value another script wrote into the shared environment cannot shape the queued script.
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.
@@ -25624,6 +25858,13 @@ local STATE_KEY = "__DEPHUB_LOADER_STATE"
 -- same. The loader's own in-memory cache still keeps it to one fetch per module.
 local CACHE_BUST = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
 
+-- Identidade da sessao (nao e hash criptografico; e so um carimbo unico por
+-- run, para o estado publicado em __DEPHUB ser rastreado ate uma execucao). O
+-- ambiente do executor e compartilhado por varios scripts, entao todo campo que
+-- uma sessao publica precisa saber de quem ele e -- e a sessao so limpa o que
+-- lhe pertence (ver o bloco de publicacao abaixo).
+local SESSION_ID = CACHE_BUST
+
 local placeId = tostring(game.PlaceId)
 local gameId = tostring(game.GameId)
 
@@ -25755,18 +25996,28 @@ env[STATE_KEY] = {
 
 env.__DEPHUB = env.__DEPHUB or {}
 env.__DEPHUB.Version = VERSION
--- Provisional: the first candidate host. httpGet refines this through
--- resolveBase() on the first module fetch and stores the winner back, so the
--- value a later module reads is the host that actually served the current build.
+-- Provodencial: o primeiro host candidato. httpGet refina isso via
+-- resolveBase() no primeiro fetch de modulo e guarda o vencedor de volta, para
+-- o valor que um modulo le depois ser o host que serviu a build atual.
+-- So reusa o valor de sessao ANTERIOR se ele tiver sido guardado pela MESMA
+-- ref; senao comeca da base candidata (a ref muda, a URL antiga nao vale mais).
+if env.__DEPHUB.SourceBaseRef ~= sourceRef then
+    env.__DEPHUB.SourceBaseURL = BASE_URL
+end
 env.__DEPHUB.SourceBaseURL = env.__DEPHUB.SourceBaseURL or BASE_URL
--- Published so each backend can make its own module URLs unique per session and
--- avoid an executor serving a cached older revision (see CACHE_BUST above).
+-- Publicado para cada backend montar sua URL de modulo unica por sessao e
+-- evitar que um executor sirva uma revisao antiga em cache (ver CACHE_BUST).
 env.__DEPHUB.SourceCacheBust = CACHE_BUST
--- The source ref the session was launched with (the branch/ref argument). A
--- backend re-executing itself (Auto execute via queue_on_teleport) re-reads this
--- to relaunch the SAME build, instead of guessing. Kept on __DEPHUB next to
--- SourceBaseURL so a backend can read both from one place.
-env.__DEPHUB.SourceRef = env.__DEPHUB.SourceRef or sourceRef
+-- A ref com que ESTA sessao foi lancada (o argumento branch/ref). Um backend se
+-- re-executando (Auto execute via queue_on_teleport) le isso pra relancar a
+-- MESMA build em vez de adivinhar. E escrito SEMPRE com a ref da sessao atual --
+-- nao ha `or` preservando o valor antigo: se o usuario rodar outra ref no mesmo
+-- ambiente, o estado compartilhado nao pode continuar apontando pra ref anterior
+-- (era o bug em que o Auto execute reexecutava a versao velha).
+-- SourceSession carimba de quem e o valor, para um limpar posterior nao
+-- sobrescrever o de outra sessao.
+env.__DEPHUB.SourceRef = sourceRef
+env.__DEPHUB.SourceSession = SESSION_ID
 env.__DEPHUB.Log = log
 local session = env[STATE_KEY]
 

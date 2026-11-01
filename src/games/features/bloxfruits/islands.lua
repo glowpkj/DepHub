@@ -301,10 +301,18 @@ function Feature:Go()
 
     -- Destino por posicao fixa (ex.: Cafe): vai direto pro ponto.
     if entry.pos then
-        local ok = pcall(function() motor:GoTo(entry.pos) end)
+        -- Captura o SEGUNDO retorno do pcall: o pcall so diz que nao lancou; o
+        -- motor pode devolver nil (sem character/HRP) sem erro nenhum. Sem
+        -- olhar esse retorno, a feature armava a vigia e dizia "flying" sem voo.
+        local ok, started = pcall(function() return motor:GoTo(entry.pos) end)
         if not ok then
             self.LastStatus = "teleport failed"
             self.LastError = "falha no voo"
+            return false
+        end
+        if started == nil then
+            self.LastStatus = "character not ready"
+            self.LastError = "sem personagem"
             return false
         end
         self.LastStatus = ("flying to %s"):format(self.Selected)
@@ -320,10 +328,16 @@ function Feature:Go()
         self.LastStatus = ("not in map: workspace.Map.%s"):format(tostring(entry.instance))
         return false
     end
-    local ok = pcall(function() motor:GoToInstance(island) end)
+    -- Mesmo cuidado: o retorno do motor diz se o voo comecou de fato.
+    local ok, started = pcall(function() return motor:GoToInstance(island) end)
     if not ok then
         self.LastStatus = "teleport failed"
         self.LastError = "falha no voo"
+        return false
+    end
+    if started == nil then
+        self.LastStatus = "character not ready"
+        self.LastError = "sem personagem"
         return false
     end
     self.LastStatus = ("flying to %s"):format(self.Selected)
@@ -367,7 +381,16 @@ function Feature:SetEnabled(on)
         self.ToggleOn = false
         return false
     end
-    self:Go()
+    -- Propaga o RESULTADO REAL do voo. Antes retornava true sempre, entao o
+    -- toggle ficava marcado como ligado mesmo quando nao havia personagem --
+    -- agora, se o voo nao comecou (sem character), SetEnabled devolve false e o
+    -- backend avisa o motivo (LastStatus/LastError) em vez de fingir sucesso.
+    -- A ilha fora do mapa mantem o toggle armado: o usuario so troca no dropdown.
+    local started = self:Go()
+    if not started and self.LastStatus == "character not ready" then
+        self.ToggleOn = false
+        return false
+    end
     return true
 end
 

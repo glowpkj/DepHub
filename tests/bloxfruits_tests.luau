@@ -299,6 +299,10 @@ do
     check(applied > 0, "o Load aplica as chaves salvas")
     check(state.Config.range == 777, "o Load devolve o range salvo")
     check(state.PendingSilentAimRange == 777, "o Load re-aplica o range no estado da feature (Pending)")
+    -- O detalhe estruturado do Apply fica disponivel para o botao Load reportar
+    -- falhas parciais em vez de um "Loaded N" que esconde recusa.
+    check(type(state.LastApplyResult) == "table" and state.LastApplyResult.count == applied, "ApplyConfig guarda o resultado estruturado (LastApplyResult)")
+    check(#state.LastApplyResult.failed == 0, "o Load limpo nao tem chaves falhadas")
 
     -- O valor chega na instancia viva: liga a feature e confere que o Load
     -- seguinte empurra o alcance pra ela.
@@ -383,6 +387,41 @@ do
     local state = ctx:Run("src/games/bloxfruits.lua")
     check(state.Config.autoexec == true, "o auto execute salvo volta no Config")
     check(type(ctx.QueuedTeleportScript) == "string" and ctx.QueuedTeleportScript:find("DepHub.lua", 1, true) ~= nil, "com auto execute salvo, o start ja enfileira o reload")
+end
+
+-- SourceRef: a linha de re-execucao usa a ref da SESSAO ATUAL (nao uma ref
+-- antiga que ficou em estado compartilhado) e valida ref/base antes de montar
+-- codigo Lua. O ambiente do executor e compartilhado; a linha vira loadstring.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local _ = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    -- Ref valida (branch simples): entra na linha.
+    ctx.State.__DEPHUB = ctx.State.__DEPHUB or {}
+    ctx.State.__DEPHUB.SourceRef = "main"
+    ctx.State.__DEPHUB.SourceBaseURL = "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+    local line = state:SelfExecLine()
+    check(line:find('loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/main/DepHub.lua"))("main")', 1, true) ~= nil, "a linha usa a base e a ref validas")
+
+    -- Ref com aspas/barra/quebra de linha NAO entra: cai no default "main".
+    ctx.State.__DEPHUB.SourceRef = 'main" ) ; game:HttpGet("evil'
+    local hostile = state:SelfExecLine()
+    check(hostile:find('"main")', 1, true) ~= nil, "ref hostil cai no default seguro (main)")
+    check(hostile:find("evil", 1, true) == nil, "ref hostil nao e interpolada na linha")
+
+    -- Base fora da allowlist (host desconhecido) cai no default.
+    ctx.State.__DEPHUB.SourceRef = "main"
+    ctx.State.__DEPHUB.SourceBaseURL = "http://evil.example.com/"
+    local badBase = state:SelfExecLine()
+    check(badBase:find("evil.example.com", 1, true) == nil, "host fora da allowlist nao entra na linha")
+    check(badBase:find("raw.githubusercontent.com", 1, true) ~= nil, "base invalida cai no default do GitHub")
+
+    -- Base HTTPS de host permitido mas com aspas/controle tambem e recusada: cai
+    -- no default (nao monta codigo com o conteudo hostil).
+    ctx.State.__DEPHUB.SourceBaseURL = 'https://raw.githubusercontent.com/glowpkj/DepHub/main/"\n'
+    local badBase2 = state:SelfExecLine()
+    check(badBase2 == 'loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/main/DepHub.lua"))("main")', "base com aspas/quebra de linha cai no default seguro")
 end
 
 -- Auto-load: com uma config ja no disco, o painel abre com ela aplicada ("so
@@ -794,6 +833,29 @@ do
     -- Sem motor de teleporte, ligar recusa.
     local bare = Islands.new()
     check(bare:SetEnabled(true) == false and bare.ToggleOn == false, "sem teleporte o toggle recusa")
+
+    -- Bug: pcall bem-sucedido != voo iniciado. O motor devolve nil sem lancar
+    -- quando nao ha HumanoidRootPart. Antes a feature so olhava o booleano do
+    -- pcall, dizia "flying" e armava a vigia sem voo nenhum. Agora o retorno real
+    -- do motor e checado e SetEnabled propaga a falha.
+    local noRootChar = Instance.new("Model"); noRootChar.Name, noRootChar.Parent = "Character", ctx.Player
+    ctx.Player.Character = noRootChar
+    local body = Instance.new("Part"); body.Name, body.Parent = "Torso", noRootChar
+    -- Sem HumanoidRootPart: GoToInstance devolve nil (nao lanca).
+    local mapIsland = Instance.new("Model"); mapIsland.Name, mapIsland.Parent = "Fishmen", map
+    local dFloor = Instance.new("Part"); dFloor.Name, dFloor.Position, dFloor.Parent = "Floor", Vector3.new(0, 0, 0), mapIsland
+    check(islands:Select("Fishmen") == true, "escolher Fishmen (no mapa) e aceito")
+    islands:SetEnabled(false)
+    local armed = islands:SetEnabled(true)
+    check(armed == false, "SetEnabled propaga a falha quando o motor nao iniciou o voo")
+    check(islands.ToggleOn == false, "sem character pronto o toggle NAO fica armado")
+    check(islands.LastStatus == "character not ready", "reporta 'character not ready' em vez de 'flying'")
+    check(islands._arrivalConnection == nil, "nao arma a vigia de chegada quando o voo nao iniciou")
+
+    -- Restabelece o character com root para o fim do bloco.
+    local restored = Instance.new("Model"); restored.Name, restored.Parent = "Character", ctx.Player
+    local rRoot = Instance.new("Part"); rRoot.Name, rRoot.Parent = "HumanoidRootPart", restored
+    ctx.Player.Character = restored
 
     bare:Destroy()
     islands:Destroy()
@@ -1261,11 +1323,57 @@ do
     stun2.Value = 1
     check(stun2.Value == 0, "o Stun do character novo tambem fica em 0")
 
-    -- Disable devolve o character ao neutro: o que a feature ligou e limpo.
+    -- Disable devolve o character ao estado ORIGINAL (nao a um default): o que a
+    -- feature ligou e limpo, e um atributo que NAO existia antes e REMOVIDO -- o
+    -- baseline nunca foi um numero padrao presumido.
     feature:Disable()
-    check(char2:GetAttribute("UnbreakableAll") ~= true and char2:GetAttribute("WaterWalking") ~= true, "o Disable limpa o que a feature ligou")
-    check(char2:GetAttribute("SpeedMultiplier") == Player.DEFAULT_SPEED, "o Disable devolve a velocidade ao padrao do jogo")
-    check(char2:GetAttribute("FlashstepCooldown") == Player.DEFAULT_FLASHSTEP, "o Disable devolve o flashstep ao padrao (pronto)")
+    check(char2:GetAttribute("UnbreakableAll") == nil, "o Disable REMOVE o Unbreakable (nao existia antes da feature)")
+    check(char2:GetAttribute("WaterWalking") == nil, "o Disable REMOVE o Water walk (nao existia antes)")
+    check(char2:GetAttribute("SpeedMultiplier") == nil, "o Disable REMOVE a velocidade (nao existia antes da feature)")
+    check(char2:GetAttribute("FlashstepCooldown") == nil, "o Disable REMOVE o flashstep (nao existia antes)")
+
+    -- O Stun que a FEATURE criou e destruido no cleanup (se o jogo ja tinha um,
+    -- nao e nosso). Aqui o char2 tem o Stun do PROPRIO teste (stun2), entao ele
+    -- permanece -- so o que a feature cria e que sai.
+    check(char2:FindFirstChild("Stun") ~= nil, "o Stun do jogo (stun2) nao e destruido pelo Disable")
+
+    feature:Destroy()
+end
+
+-- Player cleanup: estado ORIGINAL restaurado (nao defaults) e o Stun que a
+-- FEATURE criou destruido. Um character que ja tinha valores do jogo volta com
+-- eles; um que nao tinha Stun nao pode sair com um Stun orfao.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Player = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "player.lua"])()
+
+    -- Character SEM Stun e com atributos PRE-EXISTENTES do jogo (valores que a
+    -- feature nao pode sobrescrever no fim).
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    char:SetAttribute("SpeedMultiplier", 8)
+    char:SetAttribute("UnbreakableAll", true)
+    char:SetAttribute("WaterWalking", false)
+
+    local feature = Player.new({ speed = 4 })
+    -- Liga primeiro (bind no character + re-bind no respawn); os setters vem
+    -- depois, como no painel real.
+    feature:Enable()
+    check(feature.Character == char, "Enable liga a feature ao character do local player")
+    feature:SetSpeed(4)
+    feature:SetUnbreakable(true)
+    feature:SetWaterWalking(true)
+
+    -- A feature criou um Stun (o character nao tinha nenhum).
+    check(char:FindFirstChild("Stun") ~= nil, "a feature cria o Stun quando o character nao tem")
+
+    -- Desliga: o Stun CRIADO pela feature sai, e os atributos voltam ao que o
+    -- jogo tinha ANTES (8, true, false) -- nao a defaults.
+    feature:Disable()
+    check(char:FindFirstChild("Stun") == nil, "o Disable DESTROI o Stun que a FEATURE criou")
+    check(char:GetAttribute("SpeedMultiplier") == 8, "a velocidade volta ao valor ORIGINAL do jogo (8)")
+    check(char:GetAttribute("UnbreakableAll") == true, "o Unbreakable volta ao valor original (true)")
+    check(char:GetAttribute("WaterWalking") == false, "o Water walk volta ao valor original (false)")
 
     feature:Destroy()
 end
@@ -1330,6 +1438,22 @@ do
     -- nao fica atravessando o chao depois.
     check(tp:Cancel() == true, "Cancel no meio do voo")
     check(root.CanCollide == true, "Cancel devolve a colisao (o personagem volta a pisar)")
+
+    -- Bug: _RestoreCollision setava CanCollide=true CEGO. Uma parte que ja era
+    -- nao-colidivel (acessorio, decoracao) tem que voltar nao-colidivel -- nao
+    -- ganhar colisao. Aqui uma parte nasce CanCollide=false e tem que continuar
+    -- false depois do voo.
+    local accessory = Instance.new("Part"); accessory.Name, accessory.Parent = "Accessory", character
+    accessory.CanCollide = false
+    root.CanCollide = true
+    local tween3 = tp:Go(Vector3.new(0, 0, 100))
+    check(tween3 ~= nil, "novo voo para testar a colisao original")
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(accessory.CanCollide == false, "durante o voo a parte nao-colidivel continua false")
+    check(root.CanCollide == false, "durante o voo a parte colidivel vira false")
+    check(tp:Cancel() == true, "Cancel devolve o estado de cada parte")
+    check(root.CanCollide == true, "a parte que era colidivel volta colidivel")
+    check(accessory.CanCollide == false, "a parte que ja era nao-colidivel volta nao-colidivel (nao vira true)")
 
     check(tp:SetSpeed(150) and tp.Speed == 150, "SetSpeed aplica uma velocidade valida")
     check(tp:SetSpeed(0) == false, "SetSpeed rejeita zero")

@@ -155,6 +155,11 @@ end
 
 function Diagnostics:_addLog(kind, text)
     if self.LogPaused and kind ~= "console" then return end
+    -- Remote sniffing off: descarta linhas de remote mesmo que os wrappers ainda
+    -- estejam instalados. Sem esta guarda o toggle "Remote sniff" so mudava a
+    -- variavel -- com os hooks ja instalados, a captura continuava e o usuario
+    -- via um switch que nao desligava nada.
+    if kind == "remote" and self.SniffEnabled ~= true then return end
     self.Logs[#self.Logs + 1] = {Kind = tostring(kind or "log"), Text = tostring(text), T = stamp()}
     while #self.Logs > MAX_LOG do table.remove(self.Logs, 1) end
 end

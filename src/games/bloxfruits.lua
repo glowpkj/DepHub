@@ -218,10 +218,14 @@ end
 
 -- Aplica uma config (a que veio do ReadConfig) ao estado e a UI: percorre a
 -- lista que o painel registrou e chama a mesma operacao de cada callback.
+-- Devolve o NUMERO de chaves realmente aplicadas (compativel com os chamadores
+-- antigos); o detalhe (quais foram e quais falharam) fica em self.LastApplyResult.
 function State:ApplyConfig(config)
     if not self.Store then return 0 end
     self:syncStore()
-    return self.Store:Apply(config)
+    local result = self.Store:Apply(config)
+    self.LastApplyResult = result
+    return result.count
 end
 
 -- Le do disco e aplica num passo: e o que o botao Load chamou.
@@ -250,13 +254,48 @@ end
 -- queue_on_teleport), entao o DepHub sobe de novo sozinho. Usa o mesmo
 -- source ref do run atual (via env.__DEPHUB.SourceRef/SourceBaseURL), pra
 -- religar a mesma build que o usuario esta rodando.
+--
+-- SEGURANCA: essa string vira codigo Lua (`loadstring(...)`), e ref/base vem de
+-- estado COMPARTILHADO do ambiente do executor -- qualquer script no mesmo
+-- ambiente pode ter escrito ali. Interpolar direto deixava aspas/barra/quebra de
+-- linha virarem sintaxe no chunk enfileirado. Por isso ref e base passam por
+-- validacao ANTES: ref com formato de commit/tag/branch (sem aspas, barra,
+-- controle, espaco ou `..`), base HTTPS de host permitido. Reprovar nao monta
+-- codigo nenhum -- cai no default seguro.
+local SOURCE_HOSTS = {
+    ["raw.githubusercontent.com"] = true,
+    ["github.com"] = true,
+    ["cdn.jsdelivr.net"] = true,
+}
+
+-- Uma ref segura: SHA completo, tag, ou branch de segmentos simples
+-- (letra/numero/`_`/`-`/`.`/`/`), sem `..`, sem comecar/terminar com barra.
+local function safeRef(ref)
+    if type(ref) ~= "string" or ref == "" or #ref > 200 then return nil end
+    if ref:find("%.%.") or ref:find("^[/]") or ref:find("[/]$") then return nil end
+    if not ref:match("^[%w_%./-]+$") then return nil end
+    return ref
+end
+
+-- Uma base segura: HTTPS, host na allowlist. Devolve a base sem barra final ou
+-- nil se nao passar.
+local function safeBase(base)
+    if type(base) ~= "string" or #base > 300 then return nil end
+    local scheme, host = base:match("^(https)://([^/]+)/")
+    if not scheme or not host or not SOURCE_HOSTS[host] then return nil end
+    if base:find('"') or base:find("\\") or base:find("[\r\n]") then return nil end
+    return base
+end
+
 function State:SelfExecLine()
     local shared = env.__DEPHUB
     local loaderState = env.__DEPHUB_LOADER_STATE
-    local ref = (shared and shared.SourceRef)
-        or (type(loaderState) == "table" and loaderState.SourceRef)
+    -- Sem `or` preservando valor antigo: a ref da sessao atual, validada.
+    local ref = safeRef(shared and shared.SourceRef)
+        or safeRef(type(loaderState) == "table" and loaderState.SourceRef)
         or "main"
-    local base = (shared and shared.SourceBaseURL) or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+    local base = safeBase(shared and shared.SourceBaseURL)
+        or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
     if not base:match("/$") then base = base .. "/" end
     return ('loadstring(game:HttpGet("%sDepHub.lua"))("%s")'):format(base, ref)
 end
@@ -857,8 +896,15 @@ local PANELS = {
             end)
             section:CreateButton("Load config", function()
                 local applied = State:LoadConfig()
-                if applied > 0 then
+                local failed = State.LastApplyResult and #State.LastApplyResult.failed or 0
+                if applied > 0 and failed == 0 then
                     instance.Notify("Config", ("Loaded %d settings."):format(applied))
+                elseif applied > 0 then
+                    -- Aplicou parte: diz quantas entraram e quantas nao -- antes o
+                    -- painel dizia "Loaded N" mesmo com feature recusando a config.
+                    instance.Notify("Config", ("Loaded %d, %d failed."):format(applied, failed))
+                elseif failed > 0 then
+                    instance.Notify("Config", ("Load failed (%d)."):format(failed))
                 else
                     instance.Notify("Config", "Nothing saved yet.")
                 end

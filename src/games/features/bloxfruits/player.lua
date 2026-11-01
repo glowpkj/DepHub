@@ -47,6 +47,11 @@ Feature.DEFAULT_FLASHSTEP = 0
 -- O nome do NumberValue do stun, filho do character.
 local STUN_NAME = "Stun"
 
+-- Sentinela de "atributo NAO existia" (nil nao pode ser guardado como campo de
+-- tabela). Guardamos isso pra restaurar remontando o estado: atributo que nao
+-- existia antes e REMOVIDO no cleanup, nao setado pra um default.
+local ABSENT = setmetatable({}, { __tostring = function() return "<absent>" end })
+
 function Feature.new(options)
     options = options or {}
     local self = setmetatable({}, Feature)
@@ -67,6 +72,11 @@ function Feature.new(options)
     self._SelfWrite = false
     -- O Stun cujo Changed ja esta conectado (estado fora da instance).
     self._StunWatched = nil
+    -- Valor ORIGINAL por atributo, do character atual (o restore devolve o que
+    -- estava, nao um default). Ver _Capture.
+    self._Original = {}
+    -- Stun que a PROPRIA feature criou (so esse e destruido no cleanup).
+    self._StunCreated = false
     -- O character atual + as conexoes dele (re-bind no respawn).
     self.Character = nil
     self.Connections = {}
@@ -82,6 +92,22 @@ end
 
 -- --- Aplicacao dos valores no character -------------------------------------
 
+-- Guarda, UMA vez por atributo por character, o valor que o jogo tinha antes de
+-- a feature escrever. Idempotente: se ja capturou, nao sobrescreve (senao a
+-- segunda escrita capturaria o valor que a propria feature pos).
+function Feature:_Capture(character, attribute)
+    if self._Captured == nil then self._Captured = {} end
+    local perCharacter = self._Captured[character]
+    if perCharacter == nil then
+        perCharacter = {}
+        self._Captured[character] = perCharacter
+    end
+    if perCharacter[attribute] == nil then
+        local value = character:GetAttribute(attribute)
+        perCharacter[attribute] = (value == nil) and ABSENT or value
+    end
+end
+
 -- Escreve os atributos no character conforme o estado dos controles. O que esta
 -- desligado NAO e tocado -- o valor do jogo fica como esta.
 function Feature:_Apply(character)
@@ -91,15 +117,19 @@ function Feature:_Apply(character)
     self._SelfWrite = true
     pcall(function()
         if self.SpeedOn then
+            self:_Capture(character, "SpeedMultiplier")
             character:SetAttribute("SpeedMultiplier", self.Speed)
         end
         if self.UnbreakableOn then
+            self:_Capture(character, "UnbreakableAll")
             character:SetAttribute("UnbreakableAll", true)
         end
         if self.WaterWalkingOn then
+            self:_Capture(character, "WaterWalking")
             character:SetAttribute("WaterWalking", true)
         end
         if self.FlashstepOn then
+            self:_Capture(character, "FlashstepCooldown")
             character:SetAttribute("FlashstepCooldown", self.FlashstepCooldown)
         end
     end)
@@ -108,7 +138,8 @@ function Feature:_Apply(character)
 end
 
 -- O Stun e um NumberValue filho do character: mantem em 0. Se o character veio
--- sem o Value (ou o jogo o removeu), cria um.
+-- sem o Value (ou o jogo o removeu), cria um -- e marca que foi a FEATURE que
+-- criou, pra destruir o dela no cleanup (sem tocar num Stun que o jogo tinha).
 function Feature:_ApplyStun(character)
     if not self.StunOn or not character then return end
     local stun = character:FindFirstChild(STUN_NAME)
@@ -120,7 +151,10 @@ function Feature:_ApplyStun(character)
             value.Parent = character
             return value
         end)
-        if ok and created then self:_WatchStun(created) end
+        if ok and created then
+            self._StunCreated = true
+            self:_WatchStun(created)
+        end
         return
     end
     if stun:IsA("NumberValue") and stun.Value ~= 0 then
@@ -147,19 +181,42 @@ function Feature:_WatchStun(stun)
     end)
 end
 
--- Remove o que a feature setou, devolvendo o character ao estado do jogo. So
--- limpa o que ESTA feature ligou (nao mexe no que o usuario/jogo tinha).
+-- Remove o que a feature setou, devolvendo o character ao estado que ele tinha
+-- ANTES da feature. So limpa o que ESTA feature ligou (nao mexe no que o
+-- usuario/jogo tinha) e devolve cada atributo ao valor ORIGINAL capturado --
+-- nao a um default. Atributo que nao existia antes e REMOVIDO.
 -- Escreve com o guarda levantado: o vigia de "manter ligado" nao pode re-agir a
 -- escrita de limpeza da propria feature, senao ela desfaz o desligamento.
 function Feature:_Clear(character)
     if not character then return end
     self._SelfWrite = true
+    local captured = self._Captured and self._Captured[character]
     pcall(function()
-        if self.SpeedOn then character:SetAttribute("SpeedMultiplier", Feature.DEFAULT_SPEED) end
-        if self.FlashstepOn then character:SetAttribute("FlashstepCooldown", Feature.DEFAULT_FLASHSTEP) end
-        if self.UnbreakableOn then character:SetAttribute("UnbreakableAll", false) end
-        if self.WaterWalkingOn then character:SetAttribute("WaterWalking", false) end
+        local function restore(attribute, whenOn)
+            if not whenOn then return end
+            local original = captured and captured[attribute]
+            if original == nil then return end
+            if original == ABSENT then
+                -- Nao existia antes: remove em vez de setar um default.
+                pcall(function() character:SetAttribute(attribute, nil) end)
+            else
+                character:SetAttribute(attribute, original)
+            end
+        end
+        restore("SpeedMultiplier", self.SpeedOn)
+        restore("FlashstepCooldown", self.FlashstepOn)
+        restore("UnbreakableAll", self.UnbreakableOn)
+        restore("WaterWalking", self.WaterWalkingOn)
     end)
+    -- Stun: so destroe se a PROPRIA feature criou o NumberValue. Se o jogo ja
+    -- tinha um, nao e nosso pra destruir.
+    if self._StunCreated then
+        local stun = character:FindFirstChild(STUN_NAME)
+        if stun then pcall(function() stun:Destroy() end) end
+        self._StunCreated = false
+        self._StunWatched = nil
+    end
+    if self._Captured then self._Captured[character] = nil end
     self._SelfWrite = false
 end
 
@@ -193,6 +250,9 @@ function Feature:_Unbind()
     self.Connections = {}
     self.Character = nil
     self._StunWatched = nil
+    -- O Stun criado pertencia ao character antigo; o proximo character comeca
+    -- sem Stun da feature (ela recria no _ApplyStun se precisar).
+    self._StunCreated = false
 end
 
 -- --- Controles (chamados pelo backend) --------------------------------------
@@ -213,7 +273,19 @@ function Feature:SetUnbreakable(on)
     -- Guarda levantado: se for pra DESLIGAR, a escrita nao pode ser vista pelo
     -- vigia de manter-ligado e re-aplicada.
     self._SelfWrite = true
-    pcall(function() character:SetAttribute("UnbreakableAll", self.UnbreakableOn) end)
+    if self.UnbreakableOn then
+        self:_Capture(character, "UnbreakableAll")
+        pcall(function() character:SetAttribute("UnbreakableAll", true) end)
+    else
+        -- Desligar devolve o valor ORIGINAL (nao um false cego).
+        local captured = self._Captured and self._Captured[character]
+        local original = captured and captured["UnbreakableAll"]
+        if original == ABSENT then
+            pcall(function() character:SetAttribute("UnbreakableAll", nil) end)
+        else
+            pcall(function() character:SetAttribute("UnbreakableAll", original == nil and false or original) end)
+        end
+    end
     self._SelfWrite = false
     return true
 end
@@ -223,7 +295,18 @@ function Feature:SetWaterWalking(on)
     local character = self.Character or myCharacter()
     if not character then return true end
     self._SelfWrite = true
-    pcall(function() character:SetAttribute("WaterWalking", self.WaterWalkingOn) end)
+    if self.WaterWalkingOn then
+        self:_Capture(character, "WaterWalking")
+        pcall(function() character:SetAttribute("WaterWalking", true) end)
+    else
+        local captured = self._Captured and self._Captured[character]
+        local original = captured and captured["WaterWalking"]
+        if original == ABSENT then
+            pcall(function() character:SetAttribute("WaterWalking", nil) end)
+        else
+            pcall(function() character:SetAttribute("WaterWalking", original == nil and false or original) end)
+        end
+    end
     self._SelfWrite = false
     return true
 end

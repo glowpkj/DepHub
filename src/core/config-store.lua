@@ -170,17 +170,25 @@ function Store:Save()
         return false
     end
     local text = self:Encode()
-    local ok = pcall(api.write, self.file, text)
-    if not ok then
-        self.LastError = "writefile recusou a gravacao"
+    -- writefile pode lancar (pcall) OU devolver false explicito sem lancar; os
+    -- dois sao falha. O terceiro argumento de pcall (a mensagem) entra no motivo.
+    local ok, wrote = pcall(api.write, self.file, text)
+    if not ok or wrote == false then
+        self.LastError = ok and "writefile devolveu false" or "writefile recusou a gravacao"
         return false
     end
-    -- Confirma lendo de volta: alguns executores aceitam writefile e nao
-    -- persistem (ou gravam noutro lugar); sem esta checagem o Save diria "ok" e
-    -- o proximo start abriria vazio -- o "nao salva" que o usuario viu.
+    -- Confirma lendo de volta E comparando BYTE a BYTE com o que foi escrito.
+    -- Nao basta o arquivo "voltar com algo": um arquivo antigo, parcial ou de
+    -- outro conteudo passaria. So e gravacao ok quando o que voltou e exatamente
+    -- o texto que mandamos -- senao o Save diria "ok" e o proximo start abriria
+    -- outra coisa (o "nao salva" que o usuario viu).
     local readOk, back = pcall(api.read, self.file)
-    if not readOk or type(back) ~= "string" or #back == 0 then
+    if not readOk or type(back) ~= "string" then
         self.LastError = "o arquivo nao voltou depois de gravar"
+        return false
+    end
+    if back ~= text then
+        self.LastError = "o arquivo nao voltou igual ao que foi gravado"
         return false
     end
     self.LastError = nil
@@ -192,10 +200,18 @@ end
 function Store:Read()
     local api = self:FileApi()
     if not api then return self.Saved end
-    local has = pcall(api.isfile, self.file)
-    if not (has and api.isfile(self.file)) then return self.Saved end
-    local ok, text = pcall(api.read, self.file)
-    if not ok then return nil end
+    -- isfile pode lancar, devolver false ou devolver nil. Uma unica chamada,
+    -- com o retorno E o ok do pcall guardados -- a versao anterior chamava
+    -- isfile duas vezes e a segunda ficava FORA do pcall (um executor que lanca
+    -- na segunda derrubava o Load inteiro).
+    local ok, exists = pcall(api.isfile, self.file)
+    if not ok then
+        self.LastError = "isfile recusou"
+        return self.Saved
+    end
+    if exists ~= true then return self.Saved end
+    local readOk, text = pcall(api.read, self.file)
+    if not readOk or type(text) ~= "string" then return nil end
     local parsed = (self.decoder or decodeConfig)(text)
     self.Saved = parsed
     return parsed
@@ -215,31 +231,60 @@ end
 -- Aplica uma config (a do Read/Prime) ao estado e a UI: percorre a lista que o
 -- painel registrou e chama a MESMA operacao de cada callback. Sem essa lista, so
 -- os valores digitados na sessao teriam efeito -- o que veio do arquivo precisa
--- re-disparar cada setter. Devolve quantas chaves aplicou.
+-- re-disparar cada setter.
+--
+-- Devolve uma tabela { applied = {...}, failed = {...}, count = n }. `applied` e
+-- `failed` sao arrays de chaves: uma chave so entra em `applied` quando a
+-- aplicacao realmente rodou sem erro. Um pcall que retorna false OU lanca erro
+-- entra em `failed` com o motivo -- antes o codigo descartava o resultado e
+-- contava como aplicado de qualquer jeito (o painel dizia "Loaded N settings"
+-- mesmo quando uma feature tinha recusado).
+--
+-- O EFEITO ACONTECE UMA VEZ SO. O SetValue da RedzLib dispara o callback do
+-- controle quando o valor muda; chamar `apply` E `SetValue` rodava o efeito duas
+-- vezes. Aqui: se o controle vai mesmo mudar, so o SetValue roda (o callback
+-- dele e o efeito); se o controle ja esta no valor, o SetValue nao dispararia
+-- nada, entao o `apply` roda direto. Nunca os dois.
 function Store:Apply(config)
     config = config or self.Saved
-    if type(config) ~= "table" then return 0 end
-    local applied = 0
+    local result = { applied = {}, failed = {}, count = 0 }
+    if type(config) ~= "table" then return result end
     for _, entry in ipairs(self.Entries) do
         local value = config[entry.key]
         if value ~= nil then
-            pcall(entry.apply, value)
-            -- Move o controle na tela. O SetValue de toggle/slider pode disparar
-            -- o callback de novo com o MESMO valor; as operacoes sao idempotentes,
-            -- entao repetir e seguro.
-            if entry.handle ~= nil then
-                local handle = entry.handle
-                if type(handle.SetValue) == "function" then
-                    pcall(handle.SetValue, handle, value)
-                elseif type(handle.Set) == "function" then
-                    pcall(handle.Set, handle, value)
+            local handle = entry.handle
+            local handleCanDrive = handle ~= nil
+                and (type(handle.SetValue) == "function" or type(handle.Set) == "function")
+            local willChange = handleCanDrive and (handle.Value ~= value)
+
+            local ok, applied
+            if willChange then
+                -- O SetValue move o controle E dispara o callback (o efeito).
+                local setter = type(handle.SetValue) == "function" and handle.SetValue or handle.Set
+                ok, applied = pcall(setter, handle, value)
+            else
+                -- Sem handle, ou controle ja no valor: aplica o efeito direto.
+                ok, applied = pcall(entry.apply, value)
+                -- Move o controle (se houver) sem re-disparar: quando o valor ja
+                -- bate, o SetValue da RedzLib nao faz nada, mas garante que a UI
+                -- fique coerente em handles de outro tipo.
+                if ok and handleCanDrive then
+                    local setter = type(handle.SetValue) == "function" and handle.SetValue or handle.Set
+                    pcall(setter, handle, value)
                 end
             end
-            self.Values[entry.key] = value
-            applied = applied + 1
+
+            if ok and applied ~= false then
+                self.Values[entry.key] = value
+                result.applied[#result.applied + 1] = entry.key
+                result.count = result.count + 1
+            else
+                self.LastError = ("apply falhou em '%s'"):format(tostring(entry.key))
+                result.failed[#result.failed + 1] = entry.key
+            end
         end
     end
-    return applied
+    return result
 end
 
 -- Le e aplica num passo: e o que um botao "Load" chama.

@@ -61,6 +61,8 @@ function Teleport.new(options)
     -- Cache do noclip por character: a lista de BaseParts so e reconstruida
     -- quando o character muda (respawn). Ver Enable() para o porque.
     self._noclipParts = nil
+    -- CanCollide ORIGINAL por parte (o restore devolve esse valor, nao true).
+    self._originalCollide = nil
     self._root = nil
     self._character = nil
     return self
@@ -78,12 +80,19 @@ end
 -- Devolve a colisao que o voo tirou: recompoe CanCollide nos BaseParts do
 -- character em cache. Chamado quando o voo termina (Completed) ou e cancelado,
 -- para o personagem nao ficar "atravessando" o chao depois de pousar.
+-- Restaura o valor ORIGINAL de cada parte (o que ela tinha antes do voo), nao
+-- um `true` cego: uma parte que ja era nao-colidivel (acessorio, decoracao) tem
+-- que voltar nao-colidivel, senao o voo deixa o personagem mexido.
 function Teleport:_RestoreCollision()
     local parts = self._noclipParts
+    local original = self._originalCollide
     if parts then
         for index = 1, #parts do
             local part = parts[index]
-            if part.Parent and not part.CanCollide then pcall(function() part.CanCollide = true end) end
+            local was = original and original[part]
+            if part.Parent and was ~= nil and part.CanCollide ~= was then
+                pcall(function() part.CanCollide = was end)
+            end
         end
     end
 end
@@ -308,10 +317,15 @@ function Teleport:Enable()
             self._character = character
             self._root = character:FindFirstChild("HumanoidRootPart")
             self._noclipParts = {}
+            -- Guarda o CanCollide ORIGINAL de cada parte no momento em que o
+            -- cache e montado: o restore devolve exatamente o que estava la
+            -- (parte que ja era nao-colidivel volta nao-colidivel).
+            self._originalCollide = {}
             -- GetDescendants so aqui (mudanca de character), nao por frame.
             for _, part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
                     self._noclipParts[#self._noclipParts + 1] = part
+                    self._originalCollide[part] = part.CanCollide
                 end
             end
         end
@@ -340,6 +354,7 @@ function Teleport:Disable()
         self._heartbeat = nil
     end
     self._noclipParts = nil
+    self._originalCollide = nil
     self._root = nil
     self._character = nil
     return true

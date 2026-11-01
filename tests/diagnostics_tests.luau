@@ -158,6 +158,17 @@ do
     local result = remote:InvokeServer("S_Skills", "Usage", "108")
     check(result == "resp" and forwarded and forwarded[1] == "S_Skills", "sniffed remote still forwards the call")
     check(diag:LogText():find("GET Test.GET(S_Skills, Usage, 108)", 1, true) ~= nil, "sniffed remote call is logged with arguments")
+
+    -- Bug: desligar o toggle so mudava SniffEnabled -- com os hooks ja
+    -- instalados, o wrapper continuava registrando. Desligado, a captura tem que
+    -- PARAR (a interface prometia algo que nao cumpria).
+    diag.SniffEnabled = false
+    local before = diag:LogText()
+    remote:InvokeServer("S_Skills", "Usage", "999")
+    check(diag:LogText() == before, "sniff off para a captura mesmo com o hook instalado")
+    diag.SniffEnabled = true
+    remote:InvokeServer("S_Skills", "Usage", "108")
+    check(diag:LogText():find("108", 1, true) ~= nil, "sniff on volta a capturar")
     ctx.State.hookfunction = nil
 
     -- In game, reading a method the type does not have raises rather than
