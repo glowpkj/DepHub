@@ -107,6 +107,25 @@ do
     runtime:Register("worker", function() return true end)
     check(runtime:GetTask("worker").Callback ~= originalWorker, "runtime re-registration swaps the callback")
     runtime:Destroy()
+
+    -- Bug: Start marcava Started = true ANTES de iniciar os componentes; se um
+    -- Start levantasse, o Runtime ficava meio iniciado mas reportava sucesso.
+    -- Agora Started so vira true quando TODOS sobem, e a falha fica em LastError.
+    local broken = Runtime.new({Scheduler=Scheduler, HealthMonitor=HealthMonitor})
+    local started = {}
+    broken.Dashboard = {Start=function() started[#started + 1] = "Dashboard" end}
+    broken.HealthMonitor = {Start=function() error("health boom") end}
+    broken.Scheduler = {Start=function() started[#started + 1] = "Scheduler" end}
+    check(broken:Start() == false, "Start devolve false quando um componente falha")
+    check(broken.Started == false, "com falha o Runtime NAO fica marcado como iniciado")
+    check(broken.LastError and broken.LastError:find("health boom"), "a falha do componente vai para LastError")
+    check(#started == 1 and started[1] == "Dashboard", "inicia em ordem e para no primeiro que falha")
+    -- Um retry com o componente bom agora sobe tudo e marca Started de verdade.
+    broken.HealthMonitor = {Start=function() started[#started + 1] = "HealthMonitor" end}
+    check(broken:Start() == true, "o retry sobe o Runtime")
+    check(broken.Started == true, "apos o retry o Runtime esta realmente iniciado")
+    check(#started == 4, "o retry completa os tres componentes (Dashboard repete, idempotente)")
+    broken:Destroy()
     check(runtime.Destroyed and runtime.Scheduler == nil, "destroyed runtime releases its scheduler")
 end
 

@@ -332,7 +332,11 @@ function Feature:InstallHook()
 
     self.Metatable = mt
     self.OriginalNamecall = original
-    -- A metatable e protegida (readonly); liberar antes de escrever.
+    -- A metatable e protegida (readonly); liberar antes de escrever. Guardamos o
+    -- estado pra reativar no RemoveHook (nao deixar a metatable destravada).
+    if type(isreadonly) == "function" then
+        self.MetatableWasReadonly = pcall(isreadonly, mt) and isreadonly(mt) == true
+    end
     if type(setreadonly) == "function" then pcall(setreadonly, mt, false) end
 
     local self_ = self
@@ -409,22 +413,38 @@ function Feature:InstallHook()
 
         return original(unpack(args))
     end)
+    -- Guarda a closure INSTALADA: o RemoveHook so restaura se o __namecall atual
+    -- ainda for esta -- se outro script (ou outra instancia) instalou uma camada
+    -- depois, nao sobrescrevemos a dele com o nosso original obsoleto.
+    self.InstalledNamecall = mt.__namecall
     self.Hooked = true
     return true
 end
 
 -- Restaura o __namecall original. Sem isso o game ficaria com o gancho pendurado.
+-- Restaura SO se o valor atual ainda for o NOSSO gancho (senao outra camada
+-- assumiu o __namecall e apagar aqui destruiria a dela).
 function Feature:RemoveHook()
     if not self.Hooked then return end
     self.Hooked = false
-    if self.Metatable and self.OriginalNamecall then
+    local mt = self.Metatable
+    if mt and self.OriginalNamecall then
         pcall(function()
-            if type(setreadonly) == "function" then pcall(setreadonly, self.Metatable, false) end
-            self.Metatable.__namecall = self.OriginalNamecall
+            if type(setreadonly) == "function" then pcall(setreadonly, mt, false) end
+            -- So restaura se ainda for o nosso gancho. Se mudou, so reativa a
+            -- readonly (deixamos a metatable como estava) e nao mexemos no valor.
+            if self.InstalledNamecall == nil or mt.__namecall == self.InstalledNamecall then
+                mt.__namecall = self.OriginalNamecall
+            end
+            if self.MetatableWasReadonly and type(setreadonly) == "function" then
+                pcall(setreadonly, mt, true)
+            end
         end)
     end
     self.Metatable = nil
     self.OriginalNamecall = nil
+    self.InstalledNamecall = nil
+    self.MetatableWasReadonly = nil
 end
 
 -- --- Selecao de alvo --------------------------------------------------------

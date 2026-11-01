@@ -151,6 +151,39 @@ do
     state:Destroy()
 end
 
+-- Um Enable que falha nao pode deixar a feature meio-ligada no registry: a
+-- proxima vez ela seria reusada nesse estado. Agora o backend desliga e, se a
+-- instancia foi CRIADA nesta chamada, remove do registry.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    -- "bladhits" e um nome real de FEATURE_MODULES (o SetFeature so chega no
+    -- Enable se o nome estiver na lista) -- trocamos a fabrica por uma que falha.
+    local disabled = false
+    local stub = {
+        Enable=function() error("enable boom") end,
+        Disable=function() disabled = true end,
+        IsEnabled=function() return false end,
+    }
+    state.Features.bladhits = { new=function() return stub end }
+
+    check(state:SetFeature("bladhits", true) == false, "um Enable que falha devolve false")
+    check(disabled == true, "a feature foi desligada (rollback) apos a falha do Enable")
+    check(state.Instances.bladhits == nil, "uma instancia criada e falha sai do registry (nao fica meio-ligada)")
+    check(state.Toggles.bladhits == false, "o toggle fica desligado apos a falha")
+
+    -- Uma instancia que JA existia nao e apagada do registry por uma re-tentativa
+    -- que falha -- so e desligada.
+    local existing = { Enable=function() error("still boom") end, Disable=function() end, IsEnabled=function() return false end }
+    state.Instances.bladhits = existing
+    state.Features.bladhits = { new=function() return existing end }
+    check(state:SetFeature("bladhits", true) == false, "re-tentar uma instancia existente que falha devolve false")
+    check(state.Instances.bladhits == existing, "uma instancia que ja existia NAO sai do registry por uma falha")
+
+    state:Destroy()
+end
+
 -- As features parkeadas ficam fora da pasta ativa: o backend nao as resolve e
 -- o manifest nao as lista (nada apagado -- so nao carregam).
 do
@@ -1093,6 +1126,44 @@ do
 
     feature:Destroy()
     ctx:RemovePlayers()
+end
+
+-- Cleanup do gancho do silent aim: o Disable so devolve o __namecall se o valor
+-- atual ainda for o NOSSO gancho. Se outro script instalou uma camada depois, a
+-- dele fica -- apagar aqui destruiria a de outro.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local SilentAim = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])()
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local myRoot = Instance.new("Part"); myRoot.Name, myRoot.Position, myRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+
+    local mt = ctx.Env.getrawmetatable(ctx.State.__DEPHUB_OSS_RUNTIME.game)
+    local baseNamecall = mt.__namecall
+
+    -- Caso normal: instala e desliga -> volta ao __namecall original.
+    local feature = SilentAim.new({ range = 1000 })
+    check(feature:Enable() == true, "o Enable instala o gancho (cleanup)")
+    local installed = feature.InstalledNamecall
+    check(type(installed) == "function" and installed ~= baseNamecall, "o gancho instalado e guardado em InstalledNamecall")
+    check(mt.__namecall == installed, "o __namecall da metatable e o nosso gancho instalado")
+    feature:Disable()
+    check(mt.__namecall == baseNamecall, "com o valor ainda nosso, o Disable devolve o __namecall original")
+
+    -- Caso de conflito: instala, OUTRO script sobrescreve, depois desliga.
+    local feature2 = SilentAim.new({ range = 1000 })
+    check(feature2:Enable() == true, "o Enable instala o gancho de novo")
+    local ours = feature2.InstalledNamecall
+    local foreign = function() return "foreign" end
+    mt.__namecall = foreign  -- simula outra camada assumindo o __namecall
+    feature2:Disable()
+    check(mt.__namecall == foreign, "nao sobrescreve a camada de outro script (deixa o foreign)")
+    check(ours ~= foreign, "sanity: a camada alheia nao e a nossa")
+
+    -- Restaura o estado da metatable pro resto da suite.
+    mt.__namecall = baseNamecall
+    feature:Destroy()
+    feature2:Destroy()
 end
 
 -- Silent aim grude FORTE: uma vez travado, a mira NAO pisca entre players. O

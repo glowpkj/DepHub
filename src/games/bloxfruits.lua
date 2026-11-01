@@ -384,6 +384,7 @@ function State:SetFeature(name, enabled)
     local factory = self.Features[name]
     if not entry or type(factory) ~= "table" then return false end
     if enabled then
+        local createdHere = false
         local instance = self.Instances[name]
         if not instance then
             -- Toda feature recebe um contexto com as pecas que podem ser
@@ -417,9 +418,21 @@ function State:SetFeature(name, enabled)
             end
             instance = created
             self.Instances[name] = instance
+            createdHere = true
         end
         local ok = pcall(instance.Enable, instance)
-        if not ok then self.LastError = "enable " .. name; return false end
+        if not ok then
+            -- Um Enable que falhou nao pode deixar a feature meio ligada no
+            -- registry: a proxima vez ela seria reusada nesse estado. Desliga
+            -- (best-effort) e, se esta chamada CRIOU a instancia, remove do
+            -- registry -- se a instancia ja existia, so desligamos (nao
+            -- apagamos o registro de outra sessao de toggle).
+            self.LastError = "enable " .. name
+            pcall(instance.Disable, instance)
+            if createdHere then self.Instances[name] = nil end
+            self.Toggles[name] = false
+            return false
+        end
         self.Toggles[name] = instance:IsEnabled() == true
         return self.Toggles[name]
     end

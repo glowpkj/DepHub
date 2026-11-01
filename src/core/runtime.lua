@@ -120,21 +120,29 @@ function Runtime:Start()
         return true
     end
 
-    self.Started = true
     self.StartedAt = os_clock()
 
-    if self.Dashboard then
-        self.Dashboard:Start()
+    -- Cada componente e iniciado sob pcall e so marcamos Started quando TODOS
+    -- subiram. Antes, Started virava true ANTES das chamadas: se uma delas
+    -- levantasse, o Runtime ficava meio iniciado mas reportava sucesso (e um
+    -- retry batia no "if self.Started then return true"). Como o Start de cada
+    -- componente e idempotente, um retry re-executa sem duplicar.
+    local components = {self.Dashboard, self.HealthMonitor, self.Scheduler}
+    local names = {"Dashboard", "HealthMonitor", "Scheduler"}
+    for index = 1, #components do
+        local component = components[index]
+        if component then
+            local ok, err = pcall(component.Start, component)
+            if not ok then
+                self.Started = false
+                self.LastError = "start " .. names[index] .. ": " .. tostring(err)
+                self.Health = "Degraded"
+                return false
+            end
+        end
     end
 
-    if self.HealthMonitor then
-        self.HealthMonitor:Start()
-    end
-
-    if self.Scheduler then
-        self.Scheduler:Start()
-    end
-
+    self.Started = true
     self:Emit("Started")
     return true
 end
