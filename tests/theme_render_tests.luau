@@ -265,12 +265,15 @@ do
     check(type(multi) == "table", "AddDropdown with MultiSelect returns a handle")
     check(multi.Kind == "Dropdown", "the multi-select dropdown is tagged as a Dropdown")
 
-    -- Emoji tab icon: the real library must render a non-asset icon without error.
-    local emojiTab = window:MakeTab({Title = "Emoji Tab", Icon = "🍎"})
-    check(type(emojiTab) == "table", "MakeTab accepts a Unicode emoji icon")
-    -- An icon NAME still resolves through GetIconByName (no regression).
+    -- Icons are catalogue names now: a known name resolves to an asset id. An
+    -- unknown name (or an emoji) resolves to nothing and the tab is built with no
+    -- icon -- both must succeed without error.
     local namedTab = window:MakeTab({Title = "Named Tab", Icon = "search"})
-    check(type(namedTab) == "table", "MakeTab still accepts a named icon")
+    check(type(namedTab) == "table", "MakeTab accepts a named icon")
+    local unknownIconTab = window:MakeTab({Title = "Unknown Icon", Icon = "not-a-real-icon-name"})
+    check(type(unknownIconTab) == "table", "MakeTab tolerates an unknown icon name")
+    local emojiTab = window:MakeTab({Title = "Emoji Tab", Icon = "🍎"})
+    check(type(emojiTab) == "table", "MakeTab tolerates an emoji icon (no icon drawn)")
 
     local button = tab:AddButton({Name = "Click", Callback = function() end})
     check(type(button) == "table", "AddButton returns a handle")
@@ -302,14 +305,14 @@ do
 
         local ui = adapter.new({Name = "DepHub", Version = "0.0.0"})
         check(type(ui) == "table", "the adapter builds a shell")
-        check(ui:CreateCategory("Farm", "wheat") == true, "the shell creates a category")
+        check(ui:CreateCategory("Farm", "sprout") == true, "the shell creates a category")
 
         -- The compact size is written where the real library reads it.
         local appliedSize = ui.Library.Default and ui.Library.Default.UISize
         check(appliedSize and appliedSize.X.Offset == 600 and appliedSize.Y.Offset == 420, "the shell applies the 600x420 size")
 
-        local shellTab = ui:CreateTab("Auto Farm", "Farm", "🌾")
-        check(type(shellTab) == "table", "the shell creates a tab with an emoji icon")
+        local shellTab = ui:CreateTab("Auto Farm", "Farm", "sprout")
+        check(type(shellTab) == "table", "the shell creates a tab with a named icon")
         check(shellTab.Key == "Farm|Auto Farm", "the tab records its category key")
         check(ui:CreateTab("Auto Farm", "Farm") == shellTab, "the shell reuses the same tab")
 

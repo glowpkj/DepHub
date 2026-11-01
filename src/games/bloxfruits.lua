@@ -272,8 +272,8 @@ local PANELS = {
         page = "Combat",
         section = "BLADE HITS",
         category = "Combat",
-        icon = "⚔️",
-        tabIcon = "⚔️",
+        icon = "swords",
+        tabIcon = "swords",
         build = function(section, instance)
             section:CreateToggle("Blade hits", false, function(value)
                 if value and not instance.Backend:SetFeature("bladhits", true) then
@@ -288,8 +288,8 @@ local PANELS = {
         page = "Farm",
         section = "FRUIT",
         category = "Farm",
-        icon = "🍎",
-        tabIcon = "🍎",
+        icon = "apple",
+        tabIcon = "apple",
         build = function(section, instance)
             -- Fruit ESP: sem slider de distancia -- o alcance e ilimitado.
             section:CreateToggle("Fruit ESP", false, function(value)
@@ -326,8 +326,8 @@ local PANELS = {
         page = "Travel",
         section = "ISLAND TELEPORT",
         category = "Travel",
-        icon = "🚀",
-        tabIcon = "🚀",
+        icon = "rocket",
+        tabIcon = "rocket",
         build = function(section, instance)
             -- O dropdown lista as ilhas do Sea 2 (confirmadas pelo usuario). A
             -- selecao NAO teleporta sozinha: e gate do toggle. Trocar a ilha com

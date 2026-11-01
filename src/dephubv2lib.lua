@@ -13,10 +13,12 @@
 -- Public API (the part DepHub consumes):
 --   local lib = Library                     -- this module's export
 --   local win = lib:MakeWindow({Title=, SubTitle=, ScriptFolder=})
---   local tab = win:MakeTab({Title=, Icon=})   -- Icon is an asset id OR a
---                                              --   Unicode emoji (rendered as
---                                              --   text); an icon NAME is still
---                                              --   resolved through GetIconByName
+--   local tab = win:MakeTab({Title=, Icon=})   -- Icon is an icon NAME resolved
+--                                              --   through GetIconByName (see
+--                                              --   src/redz-icons.lua) or a raw
+--                                              --   asset id; an unknown name (or
+--                                              --   an emoji) leaves the tab with
+--                                              --   no icon
 --   -- The window's starting size is read from lib.Default.UISize (a UDim2) at
 --   -- MakeWindow time; MakeWindow itself takes no Size option.
 --   tab:AddSection(title)                   -- visual header (string only)
@@ -177,7 +179,16 @@ Library.Save=Library.Default
 -- Signal connection helper, theme path reader, theme value/collection appliers,
 -- and the wrapped file writer used to persist flags.
 -- ===========================================================================
-local ViewportSize=workspace.CurrentCamera.ViewportSize local u=function(
+-- DepHub: a escala da UI. O redz original usa ViewportSize.Y/450, ou seja a
+-- janela CRESCE em telas grandes (numa tela 1080p a escala passa de 2.2x e o
+-- painel de 600x420 vira 1356x949 -- enorme). Aqui a escala e relativa a uma
+-- altura de referencia (900), presa ao intervalo [0.75, 1.25]: numa tela 1080p a
+-- escala fica ~1.13x e o painel aparece perto do tamanho declarado, sem encher a
+-- tela. A referencia e fixa de proposito -- a janela deve ter o MESMO tamanho em
+-- qualquer tela, em vez de crescer com a resolucao.
+local ViewportSize=workspace.CurrentCamera.ViewportSize
+local SCALE_DIVISOR=900
+local u=function(
 
 u, v, w)
 table.insert(Library.Connections,u[w or"Connect"](u,v))end
@@ -592,7 +603,10 @@ return O:sub(1,#P)==P end local P=function(
 
 
 P)
-return(ViewportSize.Y/450)*P end local Q=function(
+-- A escala final: ViewportSize.Y / SCALE_DIVISOR, presa a [0.75, 1.25] para nao
+-- ficar minuscula nem gigante em telas extremas. Numa tela 1080p (~1017 de
+-- altura util) da ~1.13x -- o painel de 600x420 aparece com ~678x474 na tela.
+return(math.clamp((ViewportSize and ViewportSize.Y or SCALE_DIVISOR)/SCALE_DIVISOR,0.75,1.25))*P end local Q=function(
 
 
 Q)
@@ -919,7 +933,7 @@ ao.Set=ao.SetValue
 end
 -- Build one tab button: the clickable row (TextButton), its title label, the
 -- selection marker frame, the content container, and the icon. The icon is an
--- ImageLabel for an asset id, or a TextLabel for a Unicode emoji (DepHub).
+-- ImageLabel showing the resolved asset id (or nothing when there is no icon).
 local al=function(
 
 al, am, an)
@@ -989,32 +1003,12 @@ Padding=UDim.new(0,5)
 }
 })
 
--- DepHub: icone da aba. O redz original so aceitava asset id num ImageLabel --
--- qualquer outra coisa (um emoji Unicode, por exemplo) ficava invisivel. Aqui o
--- icone e um emoji quando Icon nao e um asset id: nesse caso ele e desenhado num
--- TextLabel, que e o unico elemento capaz de mostrar texto/emoji. Para asset id
--- o ImageLabel de sempre e mantido, sem nenhuma mudanca de comportamento.
-local ar
-local as
-if am.Icon and not O(am.Icon)and#am.Icon>0 then
-ar=createInstance("TextLabel",ao,{
-Position=UDim2.new(0,8,0.5),
-Size=UDim2.new(0,16,0,16),
-AnchorPoint=Vector2.new(0,0.5),
-BackgroundTransparency=1,
-Text=am.Icon,
-TextSize=13,
-TextXAlignment=Enum.TextXAlignment.Center,
-TextYAlignment=Enum.TextYAlignment.Center,
-Font=Enum.Font.GothamBold
-})
-as=function()
-local at=ao.Title
-ar.Visible=true
-at.Size=UDim2.new(1,-28,1)
-at.Position=UDim2.fromOffset(28,0)end
-else
-ar=createInstance("ImageLabel",ao,{
+-- DepHub: icone da aba. Agora so existe o caminho de ImageLabel: o Icon ja vem
+-- do MakeTab resolvido pelo catalogo da propria biblioteca (asset id ou nil). Um
+-- Icon nil (nome desconhecido / sem icone) simplesmente nao desenha nada e a aba
+-- fica sem icone -- era o pedido ("se nao tiver, deixa sem"). O caminho de emoji
+-- (TextLabel) foi removido: nao se usa mais emoji nos icones.
+local ar=createInstance("ImageLabel",ao,{
 Position=UDim2.new(0,8,0.5),
 Size=UDim2.new(0,13,0,13),
 AnchorPoint=Vector2.new(0,0.5),
@@ -1022,14 +1016,14 @@ BackgroundTransparency=1,
 ImageTransparency=0.3,
 Image=am.Icon or""
 })
-as=function()
+local as=function()
 local as=string.sub(ar.Image,1,13)=="rbxassetid://"
 local at=ao.Title
 ar.Visible=as
 at.Size=UDim2.new(1,as and-25 or-15,1)
 at.Position=UDim2.fromOffset(as and 25 or 15)end
 
-u(ar:GetPropertyChangedSignal"Image",as)end
+u(ar:GetPropertyChangedSignal"Image",as)
 as()
 
 return ao,aq,ap,ar end local am=function(
@@ -3002,18 +2996,15 @@ local ax=av[2]or av.Icon or av.Image
 assert(type(aw)=="string",`"Tab.Title" 'string' expected, got {typeof(aw)}`)
 assert(ax==nil or type(ax)=="string",`"Tab.Icon" 'string' expected, got {typeof(ax)}`)
 
--- DepHub: um icone que ja e um asset id ou um emoji Unicode passa direto (nao
--- entra na busca de icones da biblioteca). So um NOME de icone (ex.: "swords")
--- e resolvido por GetIconByName. Isso permite o backend usar emojis de verdade
--- no icone da aba sem depender da tabela de icones do redz. O primeiro byte
--- >=0x80 identifica o comeco de uma sequencia UTF-8 (emoji), sem confundir com
--- um nome ascii de icone.
-local iconIsText=type(ax)=="string"and#ax>0
-local iconPassThrough=iconIsText and(O(ax)or(ax:sub(1,1):byte()or 0)>=0x80)
-
+-- DepHub: o icone da aba e resolvido pelo catalogo da PROPRIA biblioteca. Um
+-- nome (ex.: "rocket", "sword", "cherry") vira o asset id real do redz; um
+-- asset id cru passa direto; um nome que nao existe no catalogo vira nil -- e a
+-- aba aparece SEM icone, que e o pedido ("se nao tiver, deixa sem"). Emoji nao
+-- tem tratamento especial: nao e um nome do catalogo nem um asset id, entao
+-- simplesmente nao resolve e a aba fica sem icone.
 local ay=setmetatable({
 Selected=self.SelectedTab==#S+1,
-Icon=iconPassThrough and ax or Library:GetIconByName(iconIsText and ax or nil),
+Icon=type(ax)=="string"and#ax>0 and Library:GetIconByName(ax) or nil,
 Title=aw,
 
 Parent=self,
@@ -3888,24 +3879,81 @@ self.Flags=ag
 -- uma tabela local no proprio repo. Sem ela o GetIconByName simplesmente nao
 -- acha o nome e o controle sai sem icone -- que e o comportamento degradado que
 -- o proprio redz ja tinha.
+-- DepHub: o catalogo de icones e VENDORED no repo (src/core/redz-icons.lua) --
+-- e o arquivo Icons.lua real que o redz publicava (818 nomes -> asset ids). O
+-- redz original tentava loadstring({ScriptFolder}/Icons.lua) e caia para uma
+-- tabela minuscula de 4 nomes; por isso qualquer outro icone saia vazio e a
+-- shell forcava emoji. Aqui o catalogo completo entra primeiro, via o mesmo
+-- caminho que o loader usa para os modulos, e o fallback de 4 nomes so existe
+-- para o caso extremo de o catalogo nao carregar.
+--
+-- Os valores guardados sao ids SEM o prefixo rbxassetid:// -- o GetIconByName
+-- (abaixo) e quem acrescenta o prefixo. Guardar o valor ja com prefixo faria
+-- o id sair com dois "rbxassetid://" e o icone nao carregaria.
 self.Icons=(function()
 local ah=ae.ScriptFolder
 
-local ai,aj=pcall(function()
-return loadstring(readFileSafe(`{ah}/Icons.lua`))()
+-- 1) Catalogo real vendorado no repo (nomes -> "rbxassetid://id"). Normaliza
+--    para guardar o valor sem prefixo, que e o formato que o GetIconByName usa.
+--    Resolve o arquivo pelo mesmo caminho que o loader usa para os modulos: o
+--    httpGet publicado (no bundle ele serve de BUNDLED_SOURCES, sem rede) ou,
+--    sem ele, game:HttpGet da SourceBaseURL (execucao normal pela rede).
+--
+--    O resolver publicado devolve APENAS o corpo (uma string), enquanto o
+--    httpGet interno do loader devolve (ok, corpo). Os dois formatos sao
+--    aceitos aqui, e o caminho de rede so roda quando nao ha resolver nenhum --
+--    assim o bundle nunca toca a rede (o verify_bundle falha se tocar).
+local ao,ap=pcall(function()
+    local base=(getgenv and getgenv().__DEPHUB and getgenv().__DEPHUB.SourceBaseURL)
+        or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+    local url=base.."src/core/redz-icons.lua"
+    -- Aceita as duas formas: (corpo) e (ok, corpo). O resolver do bundle devolve
+    -- so o corpo; o httpGet do loader devolve (ok, corpo). Se o corpo vier vazio
+    -- a tentativa inteira e descartada.
+    local function tryFetch(fn,arg)
+        if type(fn)~="function"then return nil end
+        local a,b=pcall(fn,arg)
+        if not a then return nil end
+        if type(a)=="string"and#a>0 and a~=true then return a end
+        if type(b)=="string"and#b>0 then return b end
+        return nil
+    end
+    local get=__dephubHttpGet or __DEPHUB_HTTP_GET
+    local source=tryFetch(get,url) or tryFetch(get,"src/core/redz-icons.lua")
+    if not source then return nil end
+    local chunk=loadstring(source)
+    if type(chunk)~="function"then return nil end
+    return chunk()
 end)
-
-if ai and type(aj)=="table"then
-return aj
+if ao and type(ap)=="table"then
+    local normalized={}
+    for name,value in pairs(ap)do
+        if type(value)=="string"then
+            normalized[name]=(value:gsub("^rbxassetid://",""))
+        end
+    end
+    if next(normalized)~=nil then return normalized end
 end
 
--- Icones usados pelo DepHub (nomes que os backends passam em CreateCategory e
--- nos configs de painel). Asset ids do catalogo Roblox.
+-- 2) Compatibilidade: o Icons.lua local do redz, se existir ao lado do script.
+local ai,aj=pcall(function()
+    return loadstring(readFileSafe(`{ah}/Icons.lua`))()
+end)
+if ai and type(aj)=="table"then
+    local normalized={}
+    for name,value in pairs(aj)do
+        if type(value)=="string"then normalized[name]=(value:gsub("^rbxassetid://","")) end
+    end
+    return normalized
+end
+
+-- 3) Fallback minimo: os quatro nomes que a shell sempre teve. Valores SEM
+--    prefixo (o GetIconByName acrescenta).
 return{
-layers="rbxassetid://6031091004",
-swords="rbxassetid://6549167889",
-cherry="rbxassetid://6766380907",
-map="rbxassetid://6031280882",
+layers="6031091004",
+swords="6549167889",
+cherry="6766380907",
+map="6031280882",
 }
 end)()
 

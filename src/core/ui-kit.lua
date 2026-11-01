@@ -23,59 +23,61 @@ local env = type(getgenv) == "function" and getgenv() or _G
 
 local Kit = {}
 
--- Unicode emoji icons for the standard categories and tabs, so every game's
--- sidebar looks the same for the same finalidade. These are real emoji strings:
--- the RedzLib shell renders a non-asset icon as text, not as a Roblox image id.
--- Keep the glyph vocabulary here (one place) so the whole panel stays consistent.
-local EMOJI = {
+-- Icon NAMES from the RedzLib icon catalogue (src/core/redz-icons.lua), so every
+-- game's sidebar looks the same for the same finalidade. These are names the
+-- library resolves to real asset ids through GetIconByName -- NOT emojis. A name
+-- that is not in the catalogue simply yields no icon (the tab renders without
+-- one), so a wrong name degrades quietly instead of showing a stray glyph.
+-- Keep the vocabulary here (one place) so the whole panel stays consistent.
+local ICONS = {
     -- categories
-    Visual = "👁️",
-    Combat = "⚔️",
-    Farm = "🌾",
-    Movement = "🚀",
-    Player = "🛡️",
-    World = "🌍",
-    Misc = "🔧",
-    Settings = "⚙️",
-    General = "🏠",
+    Visual = "eye",
+    Combat = "swords",
+    Farm = "sprout",
+    Movement = "rocket",
+    Player = "shield",
+    World = "globe",
+    Misc = "wrench",
+    Settings = "settings",
+    General = "home",
     -- tabs (game panels + the fixed loader tabs)
-    Dashboard = "📊",
-    Debug = "🧪",
-    Unsupported = "🚫",
-    Fruits = "🍎",
-    Fruit = "🍎",
-    ESP = "👁️",
-    Travel = "🚀",
-    Teleport = "🚀",
-    Raid = "🏴",
-    Shop = "🛒",
-    Quest = "📜",
-    Roles = "🎭",
-    ["Coin Farm"] = "🪙",
-    ["Gun Drop"] = "🔫",
-    Players = "👥",
-    Social = "💬",
-    Server = "🌐",
-    Status = "📈",
-    Speed = "⚡",
-    Autoblock = "🛡️",
-    Parry = "🛡️",
-    Assistance = "🔮",
-    Prediction = "🔮",
-    Detection = "📡",
-    Ranges = "📏",
-    Visuals = "👁️",
-    ["Restaurant Farm"] = "🍽️",
-    Kitchen = "🍳",
-    Generators = "🔌",
-    Team = "🤝",
-    ["Titan ESP"] = "🗿",
-    Titans = "🗿",
+    Dashboard = "barchart",
+    Debug = "flaskconical",
+    Unsupported = "shieldclose",
+    Fruits = "apple",
+    Fruit = "apple",
+    ESP = "eye",
+    Travel = "rocket",
+    Teleport = "rocket",
+    Raid = "flag",
+    Shop = "shoppingcart",
+    Quest = "scroll",
+    Roles = "venetianmask",
+    ["Coin Farm"] = "coins",
+    ["Gun Drop"] = "crosshair",
+    Players = "users",
+    Social = "messagecircle",
+    Server = "server",
+    Status = "trendingup",
+    Speed = "electricity",
+    Autoblock = "shieldcheck",
+    Parry = "shield",
+    Assistance = "target",
+    Prediction = "scan",
+    Detection = "scan",
+    Ranges = "ruler",
+    Visuals = "eye",
+    ["Restaurant Farm"] = "utensils",
+    Kitchen = "microwave",
+    Generators = "network",
+    Team = "users",
+    ["Titan ESP"] = "mountain",
+    Titans = "mountain",
 }
-Kit.EMOJI = EMOJI
+Kit.EMOJI = ICONS
 
--- The category emoji for a finalidade, or a sensible default.
-local CATEGORY_ICONS = EMOJI
+-- The category icon NAME for a finalidade, or a sensible default.
+local CATEGORY_ICONS = ICONS
 
 -- Resolve the shared shell. Returns nil (never errors) when there is no UI, so
 -- a backend can call the kit unconditionally and simply build nothing.
@@ -103,7 +105,7 @@ function Kit.Tab(name, category, icon)
     if not ui then return nil end
     category = category or name
     Kit.Category(category)
-    local ok, tab = pcall(function() return ui:CreateTab(name, category, icon or EMOJI[name]) end)
+    local ok, tab = pcall(function() return ui:CreateTab(name, category, icon or ICONS[name]) end)
     if ok and tab then return tab end
     return nil
 end
@@ -150,9 +152,9 @@ function Kit.Stack(section)
     return nil
 end
 
--- The emoji for a category (or tab) name; a neutral default for an unknown one.
+-- The icon name for a category (or tab); a neutral default for an unknown one.
 function Kit.categoryIcon(name)
-    return CATEGORY_ICONS[name] or EMOJI.General
+    return CATEGORY_ICONS[name] or ICONS.General
 end
 
 return Kit
