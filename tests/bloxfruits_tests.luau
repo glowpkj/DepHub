@@ -241,6 +241,124 @@ do
     check(state.Instances.silentaim:IsEnabled() == false, "a feature desliga pelo toggle")
 end
 
+-- Config do painel: o bloco CONFIG (sem feature) sempre monta, com os botoes de
+-- salvar/carregar. As escolhas ficam em State.Config a cada mexida de controle;
+-- o Save grava pro arquivo do executor e o Load devolve -- reaplicando o estado
+-- e a UI. Aqui, com o filesystem em memoria do harness.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table", "o backend sobe para o teste de config")
+
+    local labels, buttons = {}, {}
+    for _, control in ipairs(ui.Library._Controls) do
+        labels[control.Kind .. ":" .. tostring(control.Label)] = control
+        if control.Kind == "button" then buttons[tostring(control.Label)] = control end
+    end
+    check(buttons["Save config"] ~= nil and type(buttons["Save config"].Callback) == "function", "o bloco CONFIG monta o botao Save config")
+    check(buttons["Load config"] ~= nil and type(buttons["Load config"].Callback) == "function", "o bloco CONFIG monta o botao Load config")
+
+    -- Sem nada salvo, o Load nao inventa valores.
+    check(state:LoadConfig() == 0, "Load sem arquivo nao aplica nada")
+
+    -- Mexe em controles de features variadas: silent aim (alcance + debug). O
+    -- callback de cada controle ja grava no Config. (O slider do harness nao tem
+    -- SetValue: o valor e o callback sao do proprio registro do controle.)
+    local rangeControl = labels["slider:Range"]
+    rangeControl.Value = 777
+    rangeControl.Callback(777)
+    check(state.Config.range == 777, "mexer no Range grava no Config")
+    labels["toggle:Debug logs"].Handle:SetValue(true)
+    check(state.Config.debug == true, "mexer no Debug logs grava no Config")
+
+    -- O botao Save grava o arquivo do executor (filesystem em memoria).
+    buttons["Save config"].Callback()
+    local file = ctx.Files["DepHub_BloxFruits_config.json"]
+    check(type(file) == "string" and file:find('"range":777', 1, true) ~= nil, "o Save grava o arquivo com o range escolhido")
+
+    -- Zera a escolha viva (como numa sessao nova, controles no padrao) e carrega.
+    state.Config.range = nil
+    state.PendingSilentAimRange = nil
+    local applied = state:LoadConfig()
+    check(applied > 0, "o Load aplica as chaves salvas")
+    check(state.Config.range == 777, "o Load devolve o range salvo")
+    check(state.PendingSilentAimRange == 777, "o Load re-aplica o range no estado da feature (Pending)")
+
+    -- O valor chega na instancia viva: liga a feature e confere que o Load
+    -- seguinte empurra o alcance pra ela.
+    state:SetFeature("silentaim", true)
+    state.Config.range = nil
+    state:LoadConfig()
+    check(state.Instances.silentaim ~= nil and state.Instances.silentaim.MaxRange == 777, "o Load aplica o range na feature instanciada")
+end
+
+-- Auto-load: com uma config ja no disco, o painel abre com ela aplicada ("so
+-- salvar e gg" -- o usuario nao clica em Load toda sessao).
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    -- Pre-existe um arquivo (como se a sessao anterior tivesse salvo).
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"debug":true,"range":640,"speed":4}'
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(state.Config.range == 640, "o painel abre com o range salvo aplicado")
+    check(state.Config.debug == true, "o painel abre com o debug salvo aplicado")
+    check(state.Config.speed == 4, "o painel abre com a velocidade salva aplicada")
+    check(state.PendingSilentAimRange == 640, "o valor salvo tambem alimenta o Pending da feature")
+
+    -- A tela nasce refletindo o salvo: o controle do Debug logs ja abre ligado.
+    local debugControl = nil
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Debug logs" then debugControl = control end
+    end
+    check(debugControl ~= nil and debugControl.Handle.Value == true, "o toggle Debug logs abre no valor salvo (a tela reflete o Load)")
+end
+
+-- Fallback em memoria: sem writefile/readfile/isfile, o Save nao quebra -- so
+-- fica na sessao. O Load devolve o que ficou guardado.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    ctx.Env.writefile = nil
+    ctx.Env.readfile = nil
+    ctx.Env.isfile = nil
+
+    check(state:CanPersist() == false, "sem a API de arquivo CanPersist e false")
+    state.Config.range = 640
+    check(state:SaveConfig() == false, "sem arquivo o Save so guarda em memoria")
+    state.Config.range = nil
+    check(state:LoadConfig() == 1 and state.Config.range == 640, "o Load devolve a config em memoria")
+end
+
+-- Encode/decode do codec JSON minimo: escalares, booleanos e arrays de string.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local _ = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    state.Config = {
+        range = 500,
+        debug = true,
+        silentaim = false,
+        island = "Cafe",
+        fruitSkip = { "Dragon", "Leopard" },
+    }
+    local json = state:EncodeConfig()
+    check(json:find('"range":500', 1, true) ~= nil, "encode: numero sem aspas")
+    check(json:find('"debug":true', 1, true) ~= nil, "encode: booleano true")
+    check(json:find('"silentaim":false', 1, true) ~= nil, "encode: booleano false")
+    check(json:find('"island":"Cafe"', 1, true) ~= nil, "encode: string com aspas")
+    check(json:find('"fruitSkip":["Dragon","Leopard"]', 1, true) ~= nil, "encode: array de string")
+
+    -- Grava e le de volta pelo arquivo: o round-trip tem que preservar tudo.
+    ctx.Env.writefile("DepHub_BloxFruits_config.json", json)
+    local parsed = state:ReadConfig()
+    check(parsed.range == 500 and parsed.debug == true and parsed.silentaim == false, "decode: escalares voltam")
+    check(parsed.island == "Cafe", "decode: string volta")
+    check(#parsed.fruitSkip == 2 and parsed.fruitSkip[1] == "Dragon" and parsed.fruitSkip[2] == "Leopard", "decode: array volta inteiro")
+end
+
 -- Chegada desliga o toggle SOZINHO, pelo caminho do backend: ligar o toggle do
 -- painel voa, encostar no destino desliga o mesmo controle (SetValue(false)),
 -- que por sua vez chama SetEnabled(false). Nada mais e tocado.

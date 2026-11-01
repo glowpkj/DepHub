@@ -127,7 +127,188 @@ local State = {
     Toggles = {},
     ToggleLabels = {},
     LastError = nil,
+    -- Os valores do painel que o Save salva e o Load devolve. Um unico lugar
+    -- (State.Config) que o painel escreve a cada mudanca de controle e le ao
+    -- carregar. Sem UI propria: quem monta os botoes e o painel.
+    Config = {},
+    -- Como re-aplicar cada chave do Config: { key, apply } na ordem em que o
+    -- painel registrou. O Load percorre esta lista e chama apply(valor) -- a
+    -- MESMA operacao que o callback do controle faz -- para o estado e a UI
+    -- voltarem juntos. Registrar aqui evita duplicar a logica de setter.
+    ConfigApply = {},
+    -- O JSON cru lido do disco (ou nil). Enquanto o painel nao terminou de
+    -- montar, o Load so guarda aqui e aplica quando os controles existirem.
+    SavedConfig = nil,
 }
+
+-- Persistencia das configs. Usa a API de arquivo do executor (writefile/
+-- readfile/isfile); sem ela, cai pra memoria (a config vive so na sessao, sem
+-- erro) -- mesmo padrao do Steal An Egg. O arquivo e um JSON simples com os
+-- valores do painel de Blox Fruits.
+local CONFIG_FILE = "DepHub_BloxFruits_config.json"
+
+function State:CanPersist()
+    return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+end
+
+-- Serializa uma tabela plana (string/number/boolean) pro nosso JSON. E um
+-- subconjunto JSON de proposito: o repo nao tem um codec JSON no cliente, e o
+-- que a config guarda e so escalares + listas de string.
+local function encodeValue(value)
+    local valueType = type(value)
+    if valueType == "string" then
+        return '"' .. value:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
+    elseif valueType == "number" then
+        return tostring(value)
+    elseif valueType == "boolean" then
+        return value and "true" or "false"
+    elseif valueType == "table" then
+        local parts = {}
+        for _, item in ipairs(value) do parts[#parts + 1] = encodeValue(item) end
+        return "[" .. table.concat(parts, ",") .. "]"
+    end
+    return "null"
+end
+
+function State:EncodeConfig()
+    local parts = {}
+    local keys = {}
+    for key in pairs(self.Config) do keys[#keys + 1] = key end
+    table.sort(keys)
+    for _, key in ipairs(keys) do
+        parts[#parts + 1] = '"' .. key .. '":' .. encodeValue(self.Config[key])
+    end
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
+-- Le um objeto JSON raso (so escalares + arrays de string) pro self.Config.
+-- Um parser minimo e tolerante: o que nao casar e simplesmente ignorado.
+local function decodeConfig(text)
+    local out = {}
+    if type(text) ~= "string" then return out end
+    for key, raw in text:gmatch('"([^"]+)":%s*([^,}]+)') do
+        raw = raw:gsub("%s+$", "")
+        local str = raw:match('^"(.*)"$')
+        if str then
+            out[key] = str:gsub('\\"', '"'):gsub("\\\\", "\\")
+        elseif raw == "true" then
+            out[key] = true
+        elseif raw == "false" then
+            out[key] = false
+        elseif raw:match("^%-?%d+%.?%d*$") then
+            out[key] = tonumber(raw)
+        elseif raw:match("^%[") then
+            local list = {}
+            -- Junta ate o fechamento do array (o gmatch pega so a parte sem }).
+            local arrayText = text:match('"' .. key .. '":%s*(%b[])')
+            if arrayText then
+                for item in arrayText:gmatch('"(.-)"') do list[#list + 1] = item end
+            end
+            out[key] = list
+        end
+    end
+    return out
+end
+
+-- Grava as configs atuais. Devolve true se gravou em disco, false se so deu pra
+-- guardar em memoria (executor sem writefile).
+--
+-- O snapshot em memoria e uma COPIA (nao um alias): assim mexer no painel depois
+-- de salvar nao reescreve o que foi salvo -- sem isso, `Config.range = nil`
+-- apagaria o valor tambem do "salvo" e o Load nao teria o que devolver.
+function State:SaveConfig()
+    local snapshot = {}
+    for key, value in pairs(self.Config) do
+        if type(value) == "table" then
+            local copy = {}
+            for index, item in ipairs(value) do copy[index] = item end
+            snapshot[key] = copy
+        else
+            snapshot[key] = value
+        end
+    end
+    self.SavedConfig = snapshot
+    if not self:CanPersist() then return false end
+    local ok = pcall(writefile, CONFIG_FILE, self:EncodeConfig())
+    return ok == true
+end
+
+-- Le as configs do disco (ou da memoria) e devolve a tabela, sem aplicar nada.
+-- Devolve nil quando nao ha arquivo nem config guardada.
+function State:ReadConfig()
+    if not self:CanPersist() then
+        return self.SavedConfig
+    end
+    local has = pcall(isfile, CONFIG_FILE)
+    if not (has and isfile(CONFIG_FILE)) then return self.SavedConfig end
+    local ok, text = pcall(readfile, CONFIG_FILE)
+    if not ok then return nil end
+    local parsed = decodeConfig(text)
+    self.SavedConfig = parsed
+    return parsed
+end
+
+-- Aplica uma config (a que veio do ReadConfig) ao estado e a UI: percorre a
+-- lista que o painel registrou e chama a mesma operacao de cada callback. Sem
+-- essa lista, so os valores digitados na sessao teriam efeito -- o que veio do
+-- arquivo precisa re-disparar cada setter. Devolve quantas chaves aplicou.
+function State:ApplyConfig(config)
+    config = config or self.SavedConfig
+    if type(config) ~= "table" then return 0 end
+    local applied = 0
+    for _, entry in ipairs(self.ConfigApply) do
+        local value = config[entry.key]
+        if value ~= nil then
+            pcall(entry.apply, value)
+            -- Move o controle na tela. No RedzLib o SetValue de toggle/slider
+            -- dispara o callback do controle -- ou seja, o apply pode rodar uma
+            -- segunda vez com o MESMO valor. As operacoes sao idempotentes
+            -- (SetFeature ja ligado e no-op; os setters reaplicam o mesmo valor),
+            -- entao o unico cuidado e nao repetir o Notify da ilha (feito no
+            -- applyIsland, que so avisa quando o Select falha).
+            if entry.handle ~= nil then
+                local handle = entry.handle
+                if type(handle.SetValue) == "function" then
+                    pcall(handle.SetValue, handle, value)
+                elseif type(handle.Set) == "function" then
+                    pcall(handle.Set, handle, value)
+                end
+            end
+            self.Config[entry.key] = value
+            applied = applied + 1
+        end
+    end
+    return applied
+end
+
+-- Le do disco e aplica num passo: e o que o botao Load chamou. Devolve quantas
+-- chaves aplicou (0 quando nao havia nada salvo).
+function State:LoadConfig()
+    local config = self:ReadConfig()
+    return self:ApplyConfig(config)
+end
+
+-- Le do disco so pra preencher State.Config, sem aplicar (o Apply precisa dos
+-- handles, que so existem depois do painel montar). Chamado ANTES de montar o
+-- painel, pra cada controle ja nascer no valor salvo. Devolve a tabela lida.
+function State:PrimeConfig()
+    local config = self:ReadConfig()
+    if type(config) == "table" then
+        for key, value in pairs(config) do self.Config[key] = value end
+    end
+    return config
+end
+
+-- Registra como a chave volta ao vivo: a funcao de aplicar (o mesmo corpo do
+-- callback) e, opcionalmente, o handle do controle -- para o Load tambem mexer
+-- no que esta na tela, nao so no estado. Chamado pelo painel no build.
+function State:RegisterConfig(key, apply, handle)
+    self.ConfigApply[#self.ConfigApply + 1] = { key = key, apply = apply, handle = handle }
+    return apply
+end
+
+
+
 
 -- Carrega cada feature e guarda a fabrica. Nenhum init ainda: o modulo so
 -- instancia quando o toggle liga, para o painel abrir sem ligar nada sozinho.
@@ -342,38 +523,58 @@ local PANELS = {
 
             -- Silent aim: liga/desliga. Se o executor nao expoe o gancho de
             -- metatable, o Enable recusa -- avisa em vez de ligar um no-op.
-            section:CreateToggle("Silent aim", false, function(value)
+            local function applyAim(value)
                 if value and not State:SetFeature("silentaim", true) then
                     instance.Notify("Silent aim", "Unsupported executor (needs getrawmetatable).")
                 end
                 if not value then State:SetFeature("silentaim", false) end
+            end
+            local aimToggle = section:CreateToggle("Silent aim", State.Config.silentaim == true, function(value)
+                applyAim(value)
+                State.Config.silentaim = value == true
             end)
+            State:RegisterConfig("silentaim", applyAim, aimToggle)
 
             -- As teclas que SUPRIMEM o aim: segurar qualquer uma delas larga o
             -- alvo. Multi-dropdown (marca/desmarca), comecando em F (o padrao).
-            section:CreateMultiDropdown("Exception keys", keys, { "F" }, function(selected)
+            local function applyExceptions(selected)
                 if State.Instances.silentaim then
                     State.Instances.silentaim:SetExceptions(selected)
                 else
                     -- Ainda nao instanciada: guarda a escolha pra quando ligar.
                     State.PendingSilentAimExceptions = selected
                 end
+            end
+            local keysHandle = section:CreateMultiDropdown("Exception keys", keys, State.Config.exceptionKeys or { "F" }, function(selected)
+                applyExceptions(selected)
+                State.Config.exceptionKeys = selected
             end)
+            State:RegisterConfig("exceptionKeys", applyExceptions, keysHandle)
 
             -- Range: minimo 500, padrao 500, maximo 1000.
-            section:CreateSlider("Range", minRange, maxRange, defaultRange, function(value)
+            local function applyRange(value)
                 if State.Instances.silentaim then State.Instances.silentaim:SetRange(value) end
                 State.PendingSilentAimRange = value
+            end
+            local rangeHandle = section:CreateSlider("Range", minRange, maxRange, State.Config.range or defaultRange, function(value)
+                applyRange(value)
+                State.Config.range = value
             end)
+            State:RegisterConfig("range", applyRange, rangeHandle)
 
             section:CreateParagraph("Silent aim", "Redirects your attack position to the nearest player. Hold an exception key to release the aim.")
 
             -- Debug: imprime no console o que cada ataque (clique/skill) manda,
             -- pra diagnosticar por que um ataque nao pega o alvo.
-            section:CreateToggle("Debug logs", false, function(value)
+            local function applyDebug(value)
                 if State.Instances.silentaim then State.Instances.silentaim:SetDebug(value) end
                 State.PendingSilentAimDebug = value
+            end
+            local debugToggle = section:CreateToggle("Debug logs", State.Config.debug == true, function(value)
+                applyDebug(value)
+                State.Config.debug = value == true
             end)
+            State:RegisterConfig("debug", applyDebug, debugToggle)
         end,
     },
     fruit = {
@@ -383,35 +584,78 @@ local PANELS = {
         icon = "apple",
         tabIcon = "apple",
         build = function(section, instance)
+            -- A feature de fruta so nasce no primeiro SetFeature(..., true).
+            -- Quem liga um knob de fruta sobe a feature aqui; e o que dispensa o
+            -- spin (while Instances.fruit == nil do task.wait() end) que travava a
+            -- thread quando a fruta nunca era instanciada.
+            local function ensureFruit()
+                if State.Instances.fruit == nil then State:SetFeature("fruit", true) end
+                return State.Instances.fruit
+            end
+
             -- Fruit ESP: sem slider de distancia -- o alcance e ilimitado.
-            section:CreateToggle("Fruit ESP", false, function(value)
-                while State.Instances.fruit == nil do task.wait() end
-                State.Instances.fruit:SetEsp(value)
+            local function applyEsp(value)
+                local feature = State.Instances.fruit
+                if value then feature = ensureFruit() end
+                if feature then feature:SetEsp(value) end
+            end
+            local espToggle = section:CreateToggle("Fruit ESP", State.Config.fruitEsp == true, function(value)
+                applyEsp(value)
+                State.Config.fruitEsp = value == true
             end)
+            State:RegisterConfig("fruitEsp", applyEsp, espToggle)
+
             -- Grab: sem slider de distancia -- pega a fruta mais proxima de
             -- qualquer distancia.
-            section:CreateToggle("Grab fruit", false, function(value)
+            local function applyGrab(value)
                 if value and not State:SetFeature("fruit", true) then
                     instance.Notify("Grab fruit", "Teleport motor ausente.")
                     return
                 end
                 if not value then State:SetFeature("fruit", false) end
                 if State.Instances.fruit then State.Instances.fruit:SetGrab(value) end
+            end
+            local grabToggle = section:CreateToggle("Grab fruit", State.Config.fruitGrab == true, function(value)
+                applyGrab(value)
+                State.Config.fruitGrab = value == true
             end)
-            section:CreateToggle("Auto store fruit", false, function(value)
-                if State.Instances.fruit then State.Instances.fruit:SetStore(value) end
+            State:RegisterConfig("fruitGrab", applyGrab, grabToggle)
+
+            local function applyStore(value)
+                local feature = State.Instances.fruit
+                if value then feature = ensureFruit() end
+                if feature then feature:SetStore(value) end
+            end
+            local storeToggle = section:CreateToggle("Auto store fruit", State.Config.fruitStore == true, function(value)
+                applyStore(value)
+                State.Config.fruitStore = value == true
             end)
+            State:RegisterConfig("fruitStore", applyStore, storeToggle)
+
             -- Skip list / Store keep list: seletores de fruta por DROPDOWN de
             -- selecao multipla (nada de digitar o nome). Usam a mesma fonte de
             -- nomes de fruta do sistema (State: FruitNames()). A lista escolhida
             -- vira o conjunto de prefixos que a feature ja usava.
             local fruits = State:FruitNames()
-            section:CreateMultiDropdown("Skip list", fruits, {}, function(selected)
+            local function applySkip(selected)
+                if #selected > 0 then ensureFruit() end
                 if State.Instances.fruit then State.Instances.fruit:SetSkip(selected) end
+            end
+            local skipHandle = section:CreateMultiDropdown("Skip list", fruits, State.Config.fruitSkip or {}, function(selected)
+                applySkip(selected)
+                State.Config.fruitSkip = selected
             end)
-            section:CreateMultiDropdown("Store keep list", fruits, {}, function(selected)
+            State:RegisterConfig("fruitSkip", applySkip, skipHandle)
+
+            local function applyKeep(selected)
+                if #selected > 0 then ensureFruit() end
                 if State.Instances.fruit then State.Instances.fruit:SetKeep(selected) end
+            end
+            local keepHandle = section:CreateMultiDropdown("Store keep list", fruits, State.Config.fruitKeep or {}, function(selected)
+                applyKeep(selected)
+                State.Config.fruitKeep = selected
             end)
+            State:RegisterConfig("fruitKeep", applyKeep, keepHandle)
         end,
     },
     islands = {
@@ -435,7 +679,15 @@ local PANELS = {
             elseif factory and type(factory.islands) == "table" then
                 islands = factory.islands
             end
+            -- A ilha inicial: a salva, se ainda existir na lista do mar atual
+            -- (a config e escrita noutro mar pode citar uma ilha que nao existe
+            -- aqui); senao, a primeira da lista.
             local selected = islands[1]
+            if State.Config.island ~= nil then
+                for _, name in ipairs(islands) do
+                    if name == State.Config.island then selected = name break end
+                end
+            end
             -- O handle do toggle: a chegada precisa desligar ESTE controle
             -- (programaticamente), nao so a flag interna. SetValue dispara o
             -- callback, que por sua vez chama SetEnabled(false) -- um unico
@@ -479,7 +731,9 @@ local PANELS = {
             -- A instancia pode ja existir (toggle reaberto nesta sessao): liga o
             -- hook de imediato tambem.
             wireArrivalHook()
-            section:CreateDropdown("Island", islands, selected, function(choice)
+            -- Aplica uma escolha de ilha: guarda como o atual e, se a feature ja
+            -- existe, seleciona (com o toggle ligado, isso ja voa).
+            local function applyIsland(choice)
                 selected = choice
                 if State.Instances.islands then
                     local ok = State.Instances.islands:Select(choice)
@@ -487,7 +741,12 @@ local PANELS = {
                         instance.Notify("Island teleport", State.Instances.islands.LastStatus or "ilha fora do mapa.")
                     end
                 end
+            end
+            local islandDown = section:CreateDropdown("Island", islands, selected, function(choice)
+                applyIsland(choice)
+                State.Config.island = choice
             end)
+            State:RegisterConfig("island", applyIsland, islandDown)
             section:CreateParagraph("Island teleport", "Pick an island and fly there. Only travels while the toggle is on.")
         end,
     },
@@ -509,32 +768,83 @@ local PANELS = {
             -- O Speed multiplier: o atributo SpeedMultiplier do character. O
             -- padrao do jogo e 2.3 -- mexer no slider ja aplica (a feature sobe
             -- sozinha) e o valor vale sempre que o slider mexer.
-            section:CreateSlider("Speed multiplier", minSpeed, maxSpeed, defaultSpeed, function(value)
+            local function applySpeed(value)
                 State:SetFeature("player", true)
                 if State.Instances.player then State.Instances.player:SetSpeed(value) end
                 State.PendingPlayerSpeed = value
+            end
+            local speedHandle = section:CreateSlider("Speed multiplier", minSpeed, maxSpeed, State.Config.speed or defaultSpeed, function(value)
+                applySpeed(value)
+                State.Config.speed = value
             end)
+            State:RegisterConfig("speed", applySpeed, speedHandle)
 
             -- UnbreakableAll: toggle que seta true e MANTEM true (re-aplica se o
             -- jogo tentar voltar). Ligar ja sobe a feature.
-            section:CreateToggle("Unbreakable", false, function(value)
+            local function applyUnbreakable(value)
                 State:SetFeature("player", true)
                 if State.Instances.player then State.Instances.player:SetUnbreakable(value) end
+            end
+            local unbreakableToggle = section:CreateToggle("Unbreakable", State.Config.unbreakable == true, function(value)
+                applyUnbreakable(value)
+                State.Config.unbreakable = value == true
             end)
+            State:RegisterConfig("unbreakable", applyUnbreakable, unbreakableToggle)
 
             -- WaterWalking: o atributo de andar sobre a agua.
-            section:CreateToggle("Water walk", false, function(value)
+            local function applyWater(value)
                 State:SetFeature("player", true)
                 if State.Instances.player then State.Instances.player:SetWaterWalking(value) end
+            end
+            local waterToggle = section:CreateToggle("Water walk", State.Config.waterwalk == true, function(value)
+                applyWater(value)
+                State.Config.waterwalk = value == true
             end)
+            State:RegisterConfig("waterwalk", applyWater, waterToggle)
 
             -- FlashstepCooldown: 0 = pronto (sem cooldown), 1 = com cooldown.
-            section:CreateSlider("Flashstep cooldown", 0, 1, 0, function(value)
+            local function applyFlashstep(value)
                 State:SetFeature("player", true)
                 if State.Instances.player then State.Instances.player:SetFlashstep(value) end
+            end
+            local flashHandle = section:CreateSlider("Flashstep cooldown", 0, 1, State.Config.flashstep or 0, function(value)
+                applyFlashstep(value)
+                State.Config.flashstep = value
             end)
+            State:RegisterConfig("flashstep", applyFlashstep, flashHandle)
 
             section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, and Flashstep cooldown (0 = ready). Stun is kept at 0.")
+        end,
+    },
+    -- CONFIG: os botoes de salvar/carregar. Nao e uma feature (nao tem toggle
+    -- nem modulo por tras): e o unico lugar que grava e devolve todas as
+    -- escolhas do painel. Por isso `alwaysShow` -- o loop de UI o constroi
+    -- mesmo sem um modulo em FEATURE_MODULES.
+    config = {
+        page = "Player",
+        section = "CONFIG",
+        category = "Player",
+        icon = "save",
+        tabIcon = "user",
+        alwaysShow = true,
+        build = function(section, instance)
+            section:CreateButton("Save config", function()
+                local ok = State:SaveConfig()
+                if ok then
+                    instance.Notify("Config", "Saved.")
+                else
+                    instance.Notify("Config", "Saved for this session only (no file API).")
+                end
+            end)
+            section:CreateButton("Load config", function()
+                local applied = State:LoadConfig()
+                if applied > 0 then
+                    instance.Notify("Config", ("Loaded %d settings."):format(applied))
+                else
+                    instance.Notify("Config", "Nothing saved yet.")
+                end
+            end)
+            section:CreateParagraph("Config", "Save your panel settings to a file and load them back on any session.")
         end,
     },
     -- RAID: parked. O Auto raid e o Auto complete nao estavam do jeito que o
@@ -552,25 +862,48 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
         Backend = State,
         Notify = function(title, body) visual:Notify(title, body) end,
     }
-    for _, entry in ipairs(FEATURE_MODULES) do
-        local panel = PANELS[entry.name]
-        if panel and State.Features[entry.name] then
-            if not categories[panel.category] then
-                categories[panel.category] = true
-                visual:CreateCategory(panel.category, panel.icon)
-            end
-            local tab = tabs[panel.page]
-            if tab == nil then
-                tab = visual:CreateTab(panel.page, panel.category, panel.tabIcon or panel.icon) or false
-                tabs[panel.page] = tab
-            end
-            if tab then
-                local section = tab:CreateSection(panel.section)
-                if section then panel.build(section, helper) end
-            end
+    -- Constroi um bloco de UI. Cria a categoria e a aba na primeira vez; a
+    -- partir dai so adiciona a secao. Vale tanto para as features quanto para o
+    -- bloco de config (que nao tem modulo).
+    local function buildPanel(panel)
+        if not categories[panel.category] then
+            categories[panel.category] = true
+            visual:CreateCategory(panel.category, panel.icon)
+        end
+        local tab = tabs[panel.page]
+        if tab == nil then
+            tab = visual:CreateTab(panel.page, panel.category, panel.tabIcon or panel.icon) or false
+            tabs[panel.page] = tab
+        end
+        if tab then
+            local section = tab:CreateSection(panel.section)
+            if section then panel.build(section, helper) end
         end
     end
+
+    -- Auto-load, parte 1: le o arquivo pra State.Config ANTES de montar, pra
+    -- cada controle ja nascer no valor salvo (sem piscar em default). Sem
+    -- arquivo, State.Config fica vazio e os controles usam o padrao.
+    local saved = nil
+    pcall(function() saved = State:PrimeConfig() end)
+
+    for _, entry in ipairs(FEATURE_MODULES) do
+        local panel = PANELS[entry.name]
+        if panel and State.Features[entry.name] then buildPanel(panel) end
+    end
+    -- Blocos sem feature (o CONFIG): sempre construidos.
+    for _, panel in pairs(PANELS) do
+        if panel.alwaysShow == true then buildPanel(panel) end
+    end
     State.UIFrontend = visual
+
+    -- Auto-load, parte 2: empurra os valores lidos pros estados das features
+    -- (Pending do silent aim, alcance, etc.). Os handles ja existem, entao o
+    -- ApplyConfig tambem confere a posicao dos controles. "Salvar e gg": o
+    -- usuario nao clica em Load toda sessao.
+    if type(saved) == "table" then
+        pcall(function() State:ApplyConfig(saved) end)
+    end
 end
 
 do

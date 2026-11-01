@@ -9097,7 +9097,938 @@ local State = {
     Toggles = {},
     ToggleLabels = {},
     LastError = nil,
+    -- Os valores do painel que o Save salva e o Load devolve. Um unico lugar
+    -- (State.Config) que o painel escreve a cada mudanca de controle e le ao
+    -- carregar. Sem UI propria: quem monta os botoes e o painel.
+    Config = {},
+    -- Como re-aplicar cada chave do Config: { key, apply } na ordem em que o
+    -- painel registrou. O Load percorre esta lista e chama apply(valor) -- a
+    -- MESMA operacao que o callback do controle faz -- para o estado e a UI
+    -- voltarem juntos. Registrar aqui evita duplicar a logica de setter.
+    ConfigApply = {},
+    -- O JSON cru lido do disco (ou nil). Enquanto o painel nao terminou de
+    -- montar, o Load so guarda aqui e aplica quando os controles existirem.
+    SavedConfig = nil,
 }
+
+-- Persistencia das configs. Usa a API de arquivo do executor (writefile/
+-- readfile/isfile); sem ela, cai pra memoria (a config vive so na sessao, sem
+-- erro) -- mesmo padrao do Steal An Egg. O arquivo e um JSON simples com os
+-- valores do painel de Blox Fruits.
+local CONFIG_FILE = "DepHub_BloxFruits_config.json"
+
+function State:CanPersist()
+    return type(writefile) == "function" and type(readfile) == "function" and type(isfile) == "function"
+end
+
+-- Serializa uma tabela plana (string/number/boolean) pro nosso JSON. E um
+-- subconjunto JSON de proposito: o repo nao tem um codec JSON no cliente, e o
+-- que a config guarda e so escalares + listas de string.
+local function encodeValue(value)
+    local valueType = type(value)
+    if valueType == "string" then
+        return '"' .. value:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
+    elseif valueType == "number" then
+        return tostring(value)
+    elseif valueType == "boolean" then
+        return value and "true" or "false"
+    elseif valueType == "table" then
+        local parts = {}
+        for _, item in ipairs(value) do parts[#parts + 1] = encodeValue(item) end
+        return "[" .. table.concat(parts, ",") .. "]"
+    end
+    return "null"
+end
+
+function State:EncodeConfig()
+    local parts = {}
+    local keys = {}
+    for key in pairs(self.Config) do keys[#keys + 1] = key end
+    table.sort(keys)
+    for _, key in ipairs(keys) do
+        parts[#parts + 1] = '"' .. key .. '":' .. encodeValue(self.Config[key])
+    end
+    return "{" .. table.concat(parts, ",") .. "}"
+end
+
+-- Le um objeto JSON raso (so escalares + arrays de string) pro self.Config.
+-- Um parser minimo e tolerante: o que nao casar e simplesmente ignorado.
+local function decodeConfig(text)
+    local out = {}
+    if type(text) ~= "string" then return out end
+    for key, raw in text:gmatch('"([^"]+)":%s*([^,}]+)') do
+        raw = raw:gsub("%s+$", "")
+        local str = raw:match('^"(.*)"
+local sourceRef = tostring((...) or env.__DEPHUB_SOURCE_REF or "main")
+-- Source hosts in fallback order. raw.githubusercontent.com is FIRST on purpose:
+-- its edge cache is short-lived and it is the origin the project actually pushes
+-- to, so it serves the current revision. jsDelivr re-resolves per request but its
+-- per-file branch cache has repeatedly been caught serving an OLD revision (a
+-- stale version.txt next to a fresh file, or vice-versa) -- exactly the failure
+-- that made a run pick an old mirror and load a build missing every new feature.
+-- It stays last as a fallback for when raw is unreachable. github.com/<ref>/raw/
+-- is a third origin between them.
+local HOST_TEMPLATES = {
+    "https://raw.githubusercontent.com/glowpkj/DepHub/" .. sourceRef .. "/",
+    "https://github.com/glowpkj/DepHub/raw/" .. sourceRef .. "/",
+    "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
+}
+local BASE_URL = HOST_TEMPLATES[1]
+local VERSION = "0.1.27"
+local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
+local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
+local STATE_KEY = "__DEPHUB_LOADER_STATE"
+
+-- Executors cache game:HttpGet by exact URL, so a fixed source URL can keep
+-- serving an older revision of a module even after main is updated. A token
+-- that changes per session makes the module URLs unique, forcing a real fetch
+-- of current source; GitHub's raw host ignores the query, so the file is the
+-- same. The loader's own in-memory cache still keeps it to one fetch per module.
+local CACHE_BUST = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
+
+-- Serve backend-initiated game:HttpGet calls from the bundle when possible.
+-- Feature/quest files a backend fetches directly (rather than through the
+-- loader httpGet) resolve here, so the bundle never needs the network. Any
+-- cache-busting query string is stripped before the lookup.
+--
+-- Not every executor exposes HttpGet as a DataModel member: some provide it
+-- only as a global, and writing a nonexistent member errors. So probe before
+-- wrapping, and fall back to the global helper when the member is absent.
+do
+    local bundledFor = function(url)
+        if type(url) ~= "string" then return nil end
+        local clean = url:match("^[^?]*") or url
+        local rel = clean:match("DepHub/[^/]+/(.+)$")
+        if rel and BUNDLED_SOURCES[rel] then return BUNDLED_SOURCES[rel] end
+        return nil
+    end
+    local memberOk, nativeHttpGet = pcall(function() return game.HttpGet end)
+    if memberOk and type(nativeHttpGet) == "function" then
+        if pcall(function() game.HttpGet = nativeHttpGet end) then
+            local ok, err = pcall(function()
+                game.HttpGet = function(a, b, ...)
+                    local url = (b ~= nil) and b or a
+                    local self = (b ~= nil) and a or game
+                    local hit = bundledFor(url)
+                    if hit then return hit end
+                    return nativeHttpGet(self, url, ...)
+                end
+            end)
+            if not ok then game.HttpGet = nativeHttpGet end
+        end
+    elseif type(HttpGet) == "function" then
+        -- No DataModel member: install a global shim for backends that call
+        -- HttpGet(url) directly, and a game:HttpGet method on the metatable of
+        -- a proxy is not possible here, so also expose it as game.HttpGet only
+        -- when the engine accepts the write (checked above).
+        local nativeGlobal = HttpGet
+        local shim = function(a, b, ...)
+            local url = (b ~= nil) and b or a
+            if type(url) ~= "string" then url = a end
+            local hit = bundledFor(url)
+            if hit then return hit end
+            return nativeGlobal(url, ...)
+        end
+        if pcall(function() game.HttpGet = shim end) then
+            game.HttpGet = shim
+        end
+        HttpGet = shim
+    end
+end
+
+local placeId = tostring(game.PlaceId)
+local gameId = tostring(game.GameId)
+
+-- Loader logging: the console only ever sees ONE line -- the DepHub version --
+-- so a normal load is quiet. Everything else (progress, host resolution, the
+-- exact failure) is still recorded for the Debug tab through Diagnostics.Log.
+-- Genuine failures (a backend that threw, an unknown place) go to warn, so a
+-- broken run is never silent.
+local function log(message)
+    local text = tostring(message)
+    local diag = env and env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if diag and type(diag.Log) == "function" then pcall(diag.Log, diag, "loader", text) end
+end
+
+-- A genuine failure is the one thing the console should show besides the
+-- version: it goes to warn so a broken run is never silent.
+local function report(message)
+    local text = tostring(message)
+    log(text)
+    pcall(warn, "[DepHub] " .. text)
+end
+
+local function detectExecutor()
+    local ok, name = pcall(function()
+        if type(identifyexecutor) == "function" then return identifyexecutor() end
+        if type(getexecutorname) == "function" then return getexecutorname() end
+        return "Desconhecido"
+    end)
+    return ok and tostring(name) or "Desconhecido"
+end
+
+local BACKEND_KEYS = {
+    "AOTR", "TSB", "MM2", "NoobPiece", "BloxFruits", "Universal", "Runtime", "Volleyball42"
+}
+
+local HANDLE_KEYS = {
+    "Updater", "Window", "UIGuard", "TempUI", "UI", "DemonUI", "Scheduler", "HealthMonitor", "Dashboard", "AntiAFK"
+}
+
+local LEGACY_GLOBALS = {
+    "__DEPHUB_UNIVERSAL", "__DEPHUB_TSB", "__DEPHUB_TSB_FRONTEND",
+    "__DEPHUB_MM2", "__DEPHUB_AOTR", "__DEPHUB_MM2_FRONTEND",
+    "__DEPHUB_AOTR_FRONTEND", "__DEPHUB_NOOBPIECE", "__DEPHUB_UI_GUARD",
+    "__DEPHUB_DASHBOARD"
+}
+
+local function cleanupRuntime()
+    local oldLoading = env.__DEPHUB_LOADING_INSTANCE
+    if oldLoading then
+        pcall(oldLoading.Destroy, oldLoading)
+        env.__DEPHUB_LOADING_INSTANCE = nil
+    end
+
+    -- Release the previous diagnostics console first so its log hooks (warn/
+    -- print interception) are removed before the new session installs its own.
+    local previousDiag = env.__DEPHUB and env.__DEPHUB.Diagnostics
+    if previousDiag and type(previousDiag.Destroy) == "function" then pcall(previousDiag.Destroy, previousDiag) end
+    if env.__DEPHUB then env.__DEPHUB.Diagnostics = nil end
+
+    env.__DEPHUB_UNIVERSAL = nil
+    env.__DEPHUB_FRONTEND = nil
+    env.__DEPHUB_UI_MODULES = nil
+    env.__DEPHUB_UI_LOADING = nil
+
+    local state = env.__DEPHUB
+    if type(state) == "table" then
+        for _, key in ipairs(BACKEND_KEYS) do
+            local target = state[key]
+            if type(target) == "table" and type(target.Destroy) == "function" then pcall(target.Destroy, target) end
+            state[key] = nil
+        end
+        for _, key in ipairs(HANDLE_KEYS) do
+            local target = state[key]
+            if type(target) == "table" and type(target.Destroy) == "function" then pcall(target.Destroy, target) end
+            state[key] = nil
+        end
+        state.Frontend = nil
+        state.UILibrary = nil
+        state.DemonUI = nil
+        state.UI = nil
+    end
+
+    for _, key in ipairs(LEGACY_GLOBALS) do
+        env[key] = nil
+    end
+end
+
+local function sessionHealthy()
+    local state = env.__DEPHUB
+    if type(state) ~= "table" then return false end
+    local backend = state.AOTR or state.TSB or state.MM2 or state.NoobPiece
+        or state.BloxFruits or state.Universal or state.Runtime or state.Volleyball42
+    return type(backend) == "table" and not backend.Destroyed
+end
+
+local previousState = env[STATE_KEY]
+if type(previousState) == "table" and previousState.status == "running" then
+    report("Initialization in progress. Wait before running again.")
+    return false
+end
+if env[EXECUTED_KEY]
+    and type(previousState) == "table"
+    and previousState.status == "success"
+    and previousState.Version == VERSION
+    and previousState.PlaceId == placeId
+    and previousState.GameId == gameId
+    and previousState.SourceRef == sourceRef
+    and sessionHealthy() then
+    -- Já existe uma sessão viva desta mesma versão: nada a fazer. Logar deixa
+    -- explicito, em vez de parecer que o loader morreu em silencio. O console
+    -- recebe a mesma linha de versao de um load novo, para o run ser idempotente
+    -- do ponto de vista de quem cola o bootstrap.
+    log("Already running v" .. VERSION .. " (session healthy); skipping reload.")
+    pcall(print, "DepHub v" .. VERSION)
+    return true
+end
+
+cleanupRuntime()
+env[EXECUTED_KEY] = false
+
+-- The source-host resolver is defined once performRequest exists (below), but it
+-- is referenced while publishing state, so it is forward-declared here.
+local resolveBase
+
+env[STATE_KEY] = {
+    status = "running", startedAt = os.clock(), Version = VERSION,
+    PlaceId = placeId, GameId = gameId, SourceRef = sourceRef
+}
+
+env.__DEPHUB = env.__DEPHUB or {}
+env.__DEPHUB.Version = VERSION
+-- Provisional: the first candidate host. httpGet refines this through
+-- resolveBase() on the first module fetch and stores the winner back, so the
+-- value a later module reads is the host that actually served the current build.
+env.__DEPHUB.SourceBaseURL = env.__DEPHUB.SourceBaseURL or BASE_URL
+-- Published so each backend can make its own module URLs unique per session and
+-- avoid an executor serving a cached older revision (see CACHE_BUST above).
+env.__DEPHUB.SourceCacheBust = CACHE_BUST
+env.__DEPHUB.Log = log
+local session = env[STATE_KEY]
+
+-- The diagnostics collector is declared here so early failures can be recorded,
+-- but it is only instantiated after the module loader exists (below).
+local Diag
+
+env.__DEPHUB.Debug = function()
+    return {
+        Executor = detectExecutor(),
+        RemoteVersion = env.__DEPHUB.RemoteVersion,
+        SourceBaseURL = env.__DEPHUB.SourceBaseURL,
+        BaseVersion = env.__DEPHUB.BaseVersion,
+        State = env[STATE_KEY],
+        Cache = env[CACHE_KEY],
+        Version = VERSION
+    }
+end
+
+local function fail(reason)
+    local message = tostring(reason or "Unknown failure")
+    log("Failure: " .. message)
+    pcall(warn, "[DepHub] Failure: " .. message)
+    if Diag then Diag:Note("LOADER FAILURE: " .. message) end
+    if env[STATE_KEY] ~= session then return false end
+    cleanupRuntime()
+    if env[STATE_KEY] == session then
+        local state = env[STATE_KEY]
+        if type(state) == "table" then
+            state.status = "failed"
+            state.error = message
+            state.finishedAt = os.clock()
+        end
+        env[EXECUTED_KEY] = false
+    end
+    return false
+end
+
+local function getCache()
+    local cache = env[CACHE_KEY]
+    if type(cache) ~= "table" or cache.Version ~= VERSION or cache.SourceRef ~= sourceRef or type(cache.Sources) ~= "table" then
+        cache = {Version = VERSION, SourceRef = sourceRef, Sources = {}}
+        env[CACHE_KEY] = cache
+    end
+    return cache.Sources
+end
+
+local function performRequest(url)
+    local requestFunctions = {}
+    if type(request) == "function" then requestFunctions[#requestFunctions+1] = request end
+    if type(http_request) == "function" then requestFunctions[#requestFunctions+1] = http_request end
+    if type(syn) == "table" and type(syn.request) == "function" then requestFunctions[#requestFunctions+1] = syn.request end
+    local lastError = "Resposta HTTP vazia"
+    for attempt = 1, 2 do
+        for _, requestFunction in ipairs(requestFunctions) do
+            if requestFunction then
+                local ok, response = pcall(requestFunction, {Url = url, Method = "GET"})
+                if ok and type(response) == "table" then
+                    local body = response.Body or response.body
+                    local status = tonumber(response.StatusCode or response.status_code or 200) or 200
+                    if status >= 200 and status < 400 and type(body) == "string" and #body > 0 then return true, body end
+                    lastError = "HTTP " .. tostring(status)
+                elseif not ok then
+                    lastError = tostring(response)
+                end
+            end
+        end
+        if type(HttpGet) == "function" then
+            local ok, result = pcall(HttpGet, url)
+            if ok and type(result) == "string" and #result > 0 then return true, result end
+            lastError = ok and "Resposta HTTP vazia" or tostring(result)
+        end
+        local memberOk, memberHttpGet = pcall(function() return game.HttpGet end)
+        if memberOk and type(memberHttpGet) == "function" then
+            local ok, result = pcall(function() return game:HttpGet(url) end)
+            if ok and type(result) == "string" and #result > 0 then return true, result end
+            lastError = ok and "Resposta HTTP vazia" or tostring(result)
+        end
+        if attempt < 2 then task.wait(0.1 + math.random() * 0.08) end
+    end
+    return false, lastError
+end
+
+-- Pick the source host that serves the current build. A host is accepted only
+-- when its src/version.txt is EXACTLY this loader's version: a host that answers
+-- version.txt but serves a stale tree is the failure that loaded a build missing
+-- every new feature (jsDelivr kept a cached tree around the old version while
+-- reporting it). Hosts are tried in HOST_TEMPLATES order -- raw first -- and the
+-- winner is stored in env so later sessions and every module reuse one mirror.
+resolveBase = function()
+    if type(env.__DEPHUB) == "table" and type(env.__DEPHUB.SourceBaseURL) == "string"
+        and env.__DEPHUB.SourceBaseRef == sourceRef then
+        return env.__DEPHUB.SourceBaseURL
+    end
+
+    local bestBase, bestVersion
+    local exactBase
+    local function segments(v)
+        local out = {}
+        for part in tostring(v):gmatch("%d+") do out[#out + 1] = tonumber(part) or 0 end
+        return out
+    end
+    local function newer(a, b)
+        if not a then return false end
+        if not b then return true end
+        local sa, sb = segments(a), segments(b)
+        for i = 1, math.max(#sa, #sb) do
+            local x, y = sa[i] or 0, sb[i] or 0
+            if x ~= y then return x > y end
+        end
+        return false
+    end
+
+    for _, base in ipairs(HOST_TEMPLATES) do
+        local token = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
+        local ok, body = performRequest(base .. "src/version.txt?cb=" .. token)
+        if ok and type(body) == "string" then
+            local version = tostring(body):match("[%d%.]+")
+            if version then
+                -- Prefer a host serving EXACTLY this build: a host whose
+                -- version.txt matches the loader is the one that also serves the
+                -- current modules. A host ahead or behind is stale somewhere.
+                if version == VERSION and not exactBase then
+                    exactBase = base
+                    break
+                end
+                if newer(version, bestVersion) then
+                    bestBase, bestVersion = base, version
+                end
+            end
+        end
+    end
+
+    local base = exactBase or bestBase or BASE_URL
+    env.__DEPHUB = env.__DEPHUB or {}
+    env.__DEPHUB.SourceBaseURL = base
+    env.__DEPHUB.SourceBaseRef = sourceRef
+    -- Report the version of the chosen host, not of whichever host happened to
+    -- answer first: the log must match the mirror the modules are fetched from.
+    env.__DEPHUB.BaseVersion = exactBase and VERSION or bestVersion
+    return base
+end
+
+local function httpGet(path, useCache)
+    local bundled = BUNDLED_SOURCES[path]
+    if type(bundled) == "string" and #bundled > 0 then return true, bundled end
+    local base = resolveBase()
+    local cache = getCache()
+    if useCache ~= false and type(cache[path]) == "string" and #cache[path] > 0 then return true, cache[path] end
+    local separator = path:find("?", 1, true) and "&" or "?"
+    local ok, result = performRequest(base .. path .. separator .. "cb=" .. CACHE_BUST)
+    if not ok then return false, result end
+    if useCache ~= false then cache[path] = result end
+    return true, result
+end
+
+local function compile(source)
+    if type(loadstring) ~= "function" then return false, "loadstring indisponivel" end
+    local ok, chunk, compileError = pcall(loadstring, source)
+    if not ok or type(chunk) ~= "function" then return false, tostring(compileError or chunk) end
+    return true, chunk
+end
+
+local function loadModule(path, useCache)
+    if env[STATE_KEY] ~= session then return false, "Sessao substituida" end
+    local okSource, source = httpGet(path, useCache)
+    if not okSource then return false, source end
+    if env[STATE_KEY] ~= session then return false, "Sessao substituida" end
+    local okCompile, chunk = compile(source)
+    if not okCompile then return false, chunk end
+    local okRun, result = pcall(chunk)
+    if not okRun then return false, tostring(result) end
+    return true, result
+end
+
+-- Instantiate the diagnostics collector now that the loader can fetch modules.
+-- A no-op stand-in keeps every later Diag call valid even if it fails to load.
+do
+    local okDiag, diagModule = loadModule("src/core/diagnostics.lua", false)
+    if okDiag and type(diagModule) == "table" and type(diagModule.new) == "function" then
+        local okNew, instance = pcall(diagModule.new)
+        if okNew and type(instance) == "table" then Diag = instance end
+    end
+    if not Diag then
+        Diag = {SetEnvironment=function() end, RegisterModule=function() end, Module=function() end,
+            Probe=function() end, Feature=function() end, Watch=function() end, Command=function() end,
+            SniffRemote=function() end, RunCommand=function() return "" end, Note=function() end, Log=function() end,
+            Install=function() return false end, Report=function() return "diagnostico indisponivel" end,
+            LogText=function() return "" end, MetricsLine=function() return "" end, Destroy=function() end,
+            Copy=function() return false, "diagnostico indisponivel" end}
+        Diag.__stub = true
+    end
+    env.__DEPHUB.Diagnostics = Diag
+end
+Diag:RegisterModule("src/core/diagnostics.lua")
+Diag:Module("src/core/diagnostics.lua", not Diag.__stub, Diag.__stub and "did not load" or "loaded")
+Diag:SetEnvironment({
+    Executor = detectExecutor(),
+    Version = VERSION,
+    PlaceId = placeId,
+    GameId = gameId,
+    GameName = tostring(game.Name or "?"),
+    SourceRef = sourceRef,
+    HttpGet = type(game.HttpGet) == "function" and "game:HttpGet" or "absent",
+    request = type(request) == "function" and "present" or "absent",
+    loadstring = type(loadstring) == "function" and "present" or "absent"
+})
+
+local executorName = detectExecutor()
+log("Starting loader v" .. VERSION)
+log("Executor detected: " .. tostring(executorName))
+log("PlaceId: " .. placeId)
+log("GameId: " .. gameId)
+
+local okVersion, remoteVersion = httpGet("src/version.txt", false)
+if okVersion then env.__DEPHUB.RemoteVersion = tostring(remoteVersion):match("[%d%.]+") or VERSION end
+log("Source: " .. tostring(env.__DEPHUB.SourceBaseURL) .. " (remote " .. tostring(env.__DEPHUB.RemoteVersion or "?") .. ")")
+
+-- Compare two dotted version strings numerically, segment by segment. Returns
+-- true only when "a" is strictly newer than "b", so an older remote (a test
+-- stub, a branch build, a stale mirror) never triggers a reload.
+local function versionIsNewer(a, b)
+    local function segments(v)
+        local out = {}
+        for part in tostring(v):gmatch("%d+") do out[#out + 1] = tonumber(part) or 0 end
+        return out
+    end
+    local sa, sb = segments(a), segments(b)
+    for i = 1, math.max(#sa, #sb) do
+        local x, y = sa[i] or 0, sb[i] or 0
+        if x ~= y then return x > y end
+    end
+    return false
+end
+
+-- Self-heal for the bootstrap cached by the executor. The loader's own module
+-- fetches carry a per-session cache-bust token, but the bootstrap line a user
+-- pastes (game:HttpGet(BASE_URL .. "DepHub.lua")) has a fixed URL, so an
+-- executor can keep serving the old loader body even after main is bumped --
+-- the running build then lags a whole version behind (old branch behaviour in
+-- game). When the remote version is newer than this build, re-fetch the loader
+-- itself with a fresh token and re-execute it. The guard records the version we
+-- are switching to (in env, which survives the re-execution), so the freshly
+-- loaded build sees the flag matching its own VERSION and does not loop.
+local remV = env.__DEPHUB.RemoteVersion
+if okVersion and type(remV) == "string" and versionIsNewer(remV, VERSION) and env.__DEPHUB_SELF_UPDATE_ATTEMPT ~= remV then
+    env.__DEPHUB_SELF_UPDATE_ATTEMPT = remV
+    log("Versao remota " .. remV .. " difere da local " .. VERSION .. "; recarregando loader.")
+    local token = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
+    local fetched, freshSource = performRequest(resolveBase() .. "DepHub.lua?cb=" .. token)
+    if fetched and type(freshSource) == "string" and #freshSource > 0 then
+        local okCompile, freshChunk = compile(freshSource)
+        if okCompile then
+            -- Retire this session before re-executing: the fresh build runs from
+            -- the top and would otherwise see a "running" session and bail with
+            -- "inicializacao em andamento". Clearing it lets the new build take
+            -- over cleanly; this frame returns right after, so it never resumes.
+            env[STATE_KEY] = nil
+            local okRun, runError = pcall(freshChunk, sourceRef)
+            if okRun then return true end
+            report("Recarga do loader falhou ao executar: " .. tostring(runError))
+        else
+            report("Recarga do loader nao compilou: " .. tostring(freshChunk))
+        end
+    else
+        report("Recarga do loader nao baixou: " .. tostring(freshSource))
+    end
+    -- Fall through: if the reload did not take, run the cached build as before
+    -- rather than leaving the player with nothing. Restore the session that was
+    -- cleared for the reload attempt so this frame can still finish cleanly.
+    env[STATE_KEY] = session
+end
+-- This build is the one the guard was waiting for, so the attempt is complete.
+if env.__DEPHUB_SELF_UPDATE_ATTEMPT == VERSION then env.__DEPHUB_SELF_UPDATE_ATTEMPT = nil end
+
+local targets = {
+    ["13379208636"] = {Core = "src/games/aotr.lua", AOTR = true},
+    ["4658598196"] = {Core = "src/games/aotr.lua", AOTR = true},
+    ["994732206"] = {Core = "src/games/bloxfruits.lua"},
+    ["85211729168715"] = {Core = "src/games/bloxfruits.lua"},
+    ["119048529960596"] = {Core = "src/games/rt3.lua"},
+    ["10449761463"] = {Core = "src/games/tsb.lua", TSB = true},
+    ["3808081382"] = {Core = "src/games/tsb.lua", TSB = true},
+    ["142823291"] = {Core = "src/games/mm2.lua", MM2 = true},
+    ["66654135"] = {Core = "src/games/mm2.lua", MM2 = true},
+    ["84822469255086"] = {Core = "src/games/noobpiece.lua", NoobPiece = true},
+    ["3840352284"] = {Core = "src/games/volleyball42.lua", Volleyball42 = true},
+    ["1316421563"] = {Core = "src/games/volleyball42.lua", Volleyball42 = true},
+    ["114234929420007"] = {Core = "src/games/bloodstrike.lua", BloodStrike = true},
+    ["107778070777162"] = {Core = "src/games/steal-a-egg.lua", StealAnEgg = true},
+    ["93978595733734"] = {Core = "src/games/violence-district.lua", ViolenceDistrict = true},
+    ["6739698191"] = {Core = "src/games/violence-district.lua", ViolenceDistrict = true}
+}
+
+local gameName = tostring(game.Name or ""):lower()
+local isAOTRName = gameName:find("attack on titan") ~= nil and gameName:find("revolution") ~= nil
+-- A known place/game id wins. The AOT:R name check is a documented fallback for
+-- its newer universe. Any other game falls back to the universal backend, which
+-- is built to run anywhere (movement, ESP, aim, chat, server hop) instead of
+-- leaving the player with an empty window. Set env.__DEPHUB_DISABLE_UNIVERSAL
+-- to true to opt out and get the plain "unsupported" state instead.
+local knownTarget = targets[placeId] or targets[gameId] or (isAOTRName and {Core = "src/games/aotr.lua", AOTR = true}) or nil
+if not knownTarget and env.__DEPHUB_DISABLE_UNIVERSAL ~= true then
+    knownTarget = {Core = "src/games/universal.lua", Universal = true}
+end
+-- Nao usar um Wait() bloqueante no sinal de Loaded aqui: se o jogo ja carregou,
+-- ele nao dispara de novo e o Wait travaria a thread para sempre (mesmo sintoma
+-- do PlayerAdded removido). Se o jogo ainda estiver carregando, alguns frames de
+-- espera ativa cobrem o caso sem prender o script indefinidamente.
+for _ = 1, 30 do
+    if game:IsLoaded() then break end
+    task.wait(0.1)
+end
+task.wait()
+
+-- The shell is identical for every game, so the loader only hands it the name
+-- and version. Categories and tabs are the backend's job: each game fills the
+-- shared shell with its own interface.
+local okDemon, demonModule = loadModule("src/core/demon-ui.lua", false)
+Diag:RegisterModule("src/core/demon-ui.lua")
+if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "function" then
+    Diag:Module("src/core/demon-ui.lua", false, tostring(demonModule))
+    return fail("The UI shell did not load: " .. tostring(demonModule))
+end
+Diag:Module("src/core/demon-ui.lua", true, "loaded")
+log("UI module loaded; building window...")
+
+local okWindow, window = pcall(demonModule.new, {
+    Name = "DepHub",
+    Version = VERSION
+})
+if not okWindow or type(window) ~= "table" then
+    Diag:Module("demon-ui window", false, tostring(window))
+    return fail("Could not build the UI window: " .. tostring(window))
+end
+Diag:Module("demon-ui window", true, "janela criada")
+log("Window built; loading backend...")
+
+env.__DEPHUB.DemonUI = window
+
+env.__DEPHUB.UI = window
+
+-- The UI kit every backend uses to build its part of the shell in the standard
+-- shape (category -> tab -> section -> controls). Centralizing the category/tab/
+-- section creation here is what keeps the "column must be Left/Right" contract
+-- in one place instead of re-implemented (and mis-implemented) per game.
+do
+    local okKit, kitModule = loadModule("src/core/ui-kit.lua", false)
+    if okKit and type(kitModule) == "table" then
+        env.__DEPHUB.UIKit = kitModule
+        Diag:Module("src/core/ui-kit.lua", true, "loaded")
+    else
+        Diag:Module("src/core/ui-kit.lua", false, tostring(kitModule))
+    end
+end
+
+-- Fixed Dashboard tab: every game gets the same home screen, created here by
+-- the loader so it exists no matter which backend (or no backend) runs. It
+-- reuses the library's own dashboard builders -- CreateDashboardBanner (the
+-- player greeting/avatar card plus the game/server card) and
+-- CreatePerformanceDashboard (live framerate/latency/players/session metrics) --
+-- so there is no game-specific code and no new UI to keep in sync. The builders
+-- take the tab name, which the adapter returns on the tab record. Failures are
+-- non-fatal: a dashboard that cannot be built must never stop the hub loading.
+local function buildDashboardTab()
+    if type(window.CreateTab) ~= "function" or type(window.Library) ~= "table" then return false end
+    local ok, record = pcall(function() return window:CreateTab("Dashboard", "General", "barchart") end)
+    if not ok or type(record) ~= "table" or type(record.Name) ~= "string" then
+        Diag:Note("Dashboard: CreateTab falhou: " .. tostring(record))
+        return false
+    end
+    local lib = window.Library
+    local okBanner, bannerErr = pcall(function() lib:CreateDashboardBanner(record.Name) end)
+    if not okBanner then Diag:Note("Dashboard: banner falhou: " .. tostring(bannerErr)) end
+    local okPerf, perfErr = pcall(function() lib:CreatePerformanceDashboard(record.Name, "Right") end)
+    if not okPerf then Diag:Note("Dashboard: metricas falharam: " .. tostring(perfErr)) end
+    return okBanner and okPerf
+end
+local dashboardBuilt = buildDashboardTab()
+Diag:Module("dashboard tab", dashboardBuilt, dashboardBuilt and "Dashboard tab created" or "could not build the Dashboard tab")
+
+-- The Debug tab and the print/warn log hooks are opt-in. They are useful for
+-- development but add a tab to every game and intercept every print, so by
+-- default the hub runs clean. Set env.__DEPHUB_ENABLE_DEBUG = true before
+-- loading to get the tab, or call the console command `debug on` live. The
+-- collector itself is always created, so backends keep instrumenting it and the
+-- data is ready the moment the tab is shown -- nothing is thrown away.
+local function debugEnabled()
+    return env.__DEPHUB_ENABLE_DEBUG == true
+end
+if debugEnabled() then Diag:Install(window) end
+
+-- Live switch: installs or removes the Debug tab and the log hooks without a
+-- reload. Registered as a built-in console command on the collector.
+Diag:Command("debug", function(argument)
+    argument = tostring(argument or ""):lower()
+    if argument == "on" or argument == "true" or argument == "1" then
+        env.__DEPHUB_ENABLE_DEBUG = true
+        Diag:Install(window)
+        return "debug ligado (aba Debug ativa)"
+    elseif argument == "off" or argument == "false" or argument == "0" then
+        env.__DEPHUB_ENABLE_DEBUG = false
+        Diag:Uninstall()
+        return "debug desligado (aba Debug removida; coleta continua ativa)"
+    end
+    return "uso: debug on|off (atual: " .. tostring(debugEnabled()) .. ")"
+end)
+
+-- When the Debug tab is hidden there is no console to reach the command above,
+-- so expose one global the user can call straight from the executor console to
+-- bring it back: __DEPHUB_DEBUG() and __DEPHUB_DEBUG_OFF().
+env.__DEPHUB_DEBUG = function()
+    env.__DEPHUB_ENABLE_DEBUG = true
+    local ok = Diag:Install(window)
+    return ok and "Debug tab active" or "could not activate the Debug tab"
+end
+env.__DEPHUB_DEBUG_OFF = function()
+    env.__DEPHUB_ENABLE_DEBUG = false
+    Diag:Uninstall()
+    return "Debug tab removed"
+end
+
+-- Unknown game with universal disabled: keep the window, tell the player the
+-- place is unsupported and stop. No incompatible backend is forced on them.
+if not knownTarget then
+    Diag:Note("Unknown game: no backend loaded (universal disabled).")
+    pcall(function()
+        local tab = window:CreateTab("Unsupported", "General", "shieldclose")
+        if tab then
+            local section = tab:CreateSection("State", "Left")
+            if section then
+                section:CreateParagraph("Unrecognized game",
+                    "DepHub has no specific support for this place and the universal backend is disabled.\nPlaceId: " .. placeId ..
+                    "\nGameId: " .. gameId .. "\nTo use the universal backend, set env.__DEPHUB_DISABLE_UNIVERSAL = false (or nil) and reload.")
+            end
+        end
+    end)
+    env.__DEPHUB.Mode = "Unsupported"
+    env.__DEPHUB.Backend = nil
+    env[EXECUTED_KEY] = true
+    env[STATE_KEY].status = "unsupported"
+    env[STATE_KEY].finishedAt = os.clock()
+    report("Unknown game - PlaceId " .. placeId .. " / GameId " .. gameId)
+    return true
+end
+
+local target = knownTarget
+Diag:RegisterModule(target.Core)
+log("Loading backend " .. tostring(target.Core) .. "...")
+local okCore, coreResult = loadModule(target.Core, false)
+if not okCore then
+    Diag:Module(target.Core, false, tostring(coreResult))
+    return fail("Core " .. tostring(target.Core) .. " failed: " .. tostring(coreResult))
+end
+local isRT3 = target.Core == "src/games/rt3.lua"
+local isTSB = target.TSB == true
+local isMM2 = target.MM2 == true
+local isAOTR = target.AOTR == true
+local isNoobPiece = target.NoobPiece == true
+local isVolleyball42 = target.Volleyball42 == true
+local isBloodStrike = target.BloodStrike == true
+local isStealAnEgg = target.StealAnEgg == true
+local isViolenceDistrict = target.ViolenceDistrict == true
+
+if isRT3 then
+    if coreResult ~= true then
+        Diag:Module(target.Core, false, "retornou " .. tostring(coreResult))
+        return fail("Modulo RT3 nao inicializou")
+    end
+    Diag:Module(target.Core, true, "loaded")
+elseif type(coreResult) ~= "table" then
+    Diag:Module(target.Core, false, "retornou " .. typeof(coreResult) .. " (" .. tostring(coreResult) .. ")")
+    return fail("Core " .. tostring(target.Core) .. " retornou " .. typeof(coreResult) .. " (" .. tostring(coreResult) .. ")")
+else
+    Diag:Module(target.Core, true, "loaded")
+end
+
+env.__DEPHUB.Universal = target.Universal and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isMM2 and not isAOTR and not isNoobPiece and not isVolleyball42 and not isBloodStrike and not isStealAnEgg and not isViolenceDistrict and coreResult or nil
+env.__DEPHUB.TSB = isTSB and coreResult or nil
+env.__DEPHUB.MM2 = isMM2 and coreResult or nil
+env.__DEPHUB.AOTR = isAOTR and coreResult or nil
+env.__DEPHUB.NoobPiece = isNoobPiece and coreResult or nil
+env.__DEPHUB.Volleyball42 = isVolleyball42 and coreResult or nil
+env.__DEPHUB.BloodStrike = isBloodStrike and coreResult or nil
+env.__DEPHUB.StealAnEgg = isStealAnEgg and coreResult or nil
+env.__DEPHUB.ViolenceDistrict = isViolenceDistrict and coreResult or nil
+
+local backend
+if target.Universal then backend = coreResult
+elseif isRT3 then backend = env.__DEPHUB.Runtime
+elseif isTSB then backend = coreResult
+elseif isMM2 then backend = coreResult
+elseif isAOTR then backend = coreResult
+elseif isNoobPiece then backend = coreResult
+elseif isVolleyball42 then backend = coreResult
+elseif isBloodStrike then backend = coreResult
+elseif isStealAnEgg then backend = coreResult
+elseif isViolenceDistrict then backend = coreResult
+else backend = coreResult end
+
+-- Informational only: the shell no longer changes per game, so this label
+-- simply names which backend was loaded.
+env.__DEPHUB.Mode = tostring(knownTarget.Core or "Game"):match("([^/]+)%.lua$") or "Game"
+env.__DEPHUB.Backend = backend
+
+if env[STATE_KEY] ~= session then return false end
+
+env[EXECUTED_KEY] = true
+env[STATE_KEY].status = "success"
+env[STATE_KEY].finishedAt = os.clock()
+-- The one line the console sees on a healthy load.
+log("Backend loaded. DepHub v" .. VERSION .. " ready.")
+
+print("DepHub v" .. VERSION)
+
+task.defer(function()
+    if env[STATE_KEY] ~= session or session.status ~= "success" then return end
+    local ok, updaterModule = loadModule("src/core/updater.lua", false)
+    if not ok or type(updaterModule) ~= "table" or type(updaterModule.new) ~= "function" then return end
+    local okNew, updater = pcall(function()
+        return updaterModule.new({PlaceId = game.PlaceId, GameId = game.GameId, PollInterval = 30, Mode = "serverhop"})
+    end)
+    if okNew and updater then
+        if env[STATE_KEY] ~= session then
+            if type(updater.Destroy) == "function" then updater:Destroy() end
+            return
+        end
+        env.__DEPHUB.Updater = updater
+        pcall(updater.Start, updater)
+    end
+end)
+
+return true
+)
+        if str then
+            out[key] = str:gsub('\\"', '"'):gsub("\\\\", "\\")
+        elseif raw == "true" then
+            out[key] = true
+        elseif raw == "false" then
+            out[key] = false
+        elseif raw:match("^%-?%d+%.?%d*$") then
+            out[key] = tonumber(raw)
+        elseif raw:match("^%[") then
+            local list = {}
+            -- Junta ate o fechamento do array (o gmatch pega so a parte sem }).
+            local arrayText = text:match('"' .. key .. '":%s*(%b[])')
+            if arrayText then
+                for item in arrayText:gmatch('"(.-)"') do list[#list + 1] = item end
+            end
+            out[key] = list
+        end
+    end
+    return out
+end
+
+-- Grava as configs atuais. Devolve true se gravou em disco, false se so deu pra
+-- guardar em memoria (executor sem writefile).
+--
+-- O snapshot em memoria e uma COPIA (nao um alias): assim mexer no painel depois
+-- de salvar nao reescreve o que foi salvo -- sem isso, `Config.range = nil`
+-- apagaria o valor tambem do "salvo" e o Load nao teria o que devolver.
+function State:SaveConfig()
+    local snapshot = {}
+    for key, value in pairs(self.Config) do
+        if type(value) == "table" then
+            local copy = {}
+            for index, item in ipairs(value) do copy[index] = item end
+            snapshot[key] = copy
+        else
+            snapshot[key] = value
+        end
+    end
+    self.SavedConfig = snapshot
+    if not self:CanPersist() then return false end
+    local ok = pcall(writefile, CONFIG_FILE, self:EncodeConfig())
+    return ok == true
+end
+
+-- Le as configs do disco (ou da memoria) e devolve a tabela, sem aplicar nada.
+-- Devolve nil quando nao ha arquivo nem config guardada.
+function State:ReadConfig()
+    if not self:CanPersist() then
+        return self.SavedConfig
+    end
+    local has = pcall(isfile, CONFIG_FILE)
+    if not (has and isfile(CONFIG_FILE)) then return self.SavedConfig end
+    local ok, text = pcall(readfile, CONFIG_FILE)
+    if not ok then return nil end
+    local parsed = decodeConfig(text)
+    self.SavedConfig = parsed
+    return parsed
+end
+
+-- Aplica uma config (a que veio do ReadConfig) ao estado e a UI: percorre a
+-- lista que o painel registrou e chama a mesma operacao de cada callback. Sem
+-- essa lista, so os valores digitados na sessao teriam efeito -- o que veio do
+-- arquivo precisa re-disparar cada setter. Devolve quantas chaves aplicou.
+function State:ApplyConfig(config)
+    config = config or self.SavedConfig
+    if type(config) ~= "table" then return 0 end
+    local applied = 0
+    for _, entry in ipairs(self.ConfigApply) do
+        local value = config[entry.key]
+        if value ~= nil then
+            pcall(entry.apply, value)
+            -- Move o controle na tela. No RedzLib o SetValue de toggle/slider
+            -- dispara o callback do controle -- ou seja, o apply pode rodar uma
+            -- segunda vez com o MESMO valor. As operacoes sao idempotentes
+            -- (SetFeature ja ligado e no-op; os setters reaplicam o mesmo valor),
+            -- entao o unico cuidado e nao repetir o Notify da ilha (feito no
+            -- applyIsland, que so avisa quando o Select falha).
+            if entry.handle ~= nil then
+                local handle = entry.handle
+                if type(handle.SetValue) == "function" then
+                    pcall(handle.SetValue, handle, value)
+                elseif type(handle.Set) == "function" then
+                    pcall(handle.Set, handle, value)
+                end
+            end
+            self.Config[entry.key] = value
+            applied = applied + 1
+        end
+    end
+    return applied
+end
+
+-- Le do disco e aplica num passo: e o que o botao Load chamou. Devolve quantas
+-- chaves aplicou (0 quando nao havia nada salvo).
+function State:LoadConfig()
+    local config = self:ReadConfig()
+    return self:ApplyConfig(config)
+end
+
+-- Le do disco so pra preencher State.Config, sem aplicar (o Apply precisa dos
+-- handles, que so existem depois do painel montar). Chamado ANTES de montar o
+-- painel, pra cada controle ja nascer no valor salvo. Devolve a tabela lida.
+function State:PrimeConfig()
+    local config = self:ReadConfig()
+    if type(config) == "table" then
+        for key, value in pairs(config) do self.Config[key] = value end
+    end
+    return config
+end
+
+-- Registra como a chave volta ao vivo: a funcao de aplicar (o mesmo corpo do
+-- callback) e, opcionalmente, o handle do controle -- para o Load tambem mexer
+-- no que esta na tela, nao so no estado. Chamado pelo painel no build.
+function State:RegisterConfig(key, apply, handle)
+    self.ConfigApply[#self.ConfigApply + 1] = { key = key, apply = apply, handle = handle }
+    return apply
+end
+
+
+
 
 -- Carrega cada feature e guarda a fabrica. Nenhum init ainda: o modulo so
 -- instancia quando o toggle liga, para o painel abrir sem ligar nada sozinho.
@@ -9312,38 +10243,58 @@ local PANELS = {
 
             -- Silent aim: liga/desliga. Se o executor nao expoe o gancho de
             -- metatable, o Enable recusa -- avisa em vez de ligar um no-op.
-            section:CreateToggle("Silent aim", false, function(value)
+            local function applyAim(value)
                 if value and not State:SetFeature("silentaim", true) then
                     instance.Notify("Silent aim", "Unsupported executor (needs getrawmetatable).")
                 end
                 if not value then State:SetFeature("silentaim", false) end
+            end
+            local aimToggle = section:CreateToggle("Silent aim", State.Config.silentaim == true, function(value)
+                applyAim(value)
+                State.Config.silentaim = value == true
             end)
+            State:RegisterConfig("silentaim", applyAim, aimToggle)
 
             -- As teclas que SUPRIMEM o aim: segurar qualquer uma delas larga o
             -- alvo. Multi-dropdown (marca/desmarca), comecando em F (o padrao).
-            section:CreateMultiDropdown("Exception keys", keys, { "F" }, function(selected)
+            local function applyExceptions(selected)
                 if State.Instances.silentaim then
                     State.Instances.silentaim:SetExceptions(selected)
                 else
                     -- Ainda nao instanciada: guarda a escolha pra quando ligar.
                     State.PendingSilentAimExceptions = selected
                 end
+            end
+            local keysHandle = section:CreateMultiDropdown("Exception keys", keys, State.Config.exceptionKeys or { "F" }, function(selected)
+                applyExceptions(selected)
+                State.Config.exceptionKeys = selected
             end)
+            State:RegisterConfig("exceptionKeys", applyExceptions, keysHandle)
 
             -- Range: minimo 500, padrao 500, maximo 1000.
-            section:CreateSlider("Range", minRange, maxRange, defaultRange, function(value)
+            local function applyRange(value)
                 if State.Instances.silentaim then State.Instances.silentaim:SetRange(value) end
                 State.PendingSilentAimRange = value
+            end
+            local rangeHandle = section:CreateSlider("Range", minRange, maxRange, State.Config.range or defaultRange, function(value)
+                applyRange(value)
+                State.Config.range = value
             end)
+            State:RegisterConfig("range", applyRange, rangeHandle)
 
             section:CreateParagraph("Silent aim", "Redirects your attack position to the nearest player. Hold an exception key to release the aim.")
 
             -- Debug: imprime no console o que cada ataque (clique/skill) manda,
             -- pra diagnosticar por que um ataque nao pega o alvo.
-            section:CreateToggle("Debug logs", false, function(value)
+            local function applyDebug(value)
                 if State.Instances.silentaim then State.Instances.silentaim:SetDebug(value) end
                 State.PendingSilentAimDebug = value
+            end
+            local debugToggle = section:CreateToggle("Debug logs", State.Config.debug == true, function(value)
+                applyDebug(value)
+                State.Config.debug = value == true
             end)
+            State:RegisterConfig("debug", applyDebug, debugToggle)
         end,
     },
     fruit = {
@@ -9353,35 +10304,78 @@ local PANELS = {
         icon = "apple",
         tabIcon = "apple",
         build = function(section, instance)
+            -- A feature de fruta so nasce no primeiro SetFeature(..., true).
+            -- Quem liga um knob de fruta sobe a feature aqui; e o que dispensa o
+            -- spin (while Instances.fruit == nil do task.wait() end) que travava a
+            -- thread quando a fruta nunca era instanciada.
+            local function ensureFruit()
+                if State.Instances.fruit == nil then State:SetFeature("fruit", true) end
+                return State.Instances.fruit
+            end
+
             -- Fruit ESP: sem slider de distancia -- o alcance e ilimitado.
-            section:CreateToggle("Fruit ESP", false, function(value)
-                while State.Instances.fruit == nil do task.wait() end
-                State.Instances.fruit:SetEsp(value)
+            local function applyEsp(value)
+                local feature = State.Instances.fruit
+                if value then feature = ensureFruit() end
+                if feature then feature:SetEsp(value) end
+            end
+            local espToggle = section:CreateToggle("Fruit ESP", State.Config.fruitEsp == true, function(value)
+                applyEsp(value)
+                State.Config.fruitEsp = value == true
             end)
+            State:RegisterConfig("fruitEsp", applyEsp, espToggle)
+
             -- Grab: sem slider de distancia -- pega a fruta mais proxima de
             -- qualquer distancia.
-            section:CreateToggle("Grab fruit", false, function(value)
+            local function applyGrab(value)
                 if value and not State:SetFeature("fruit", true) then
                     instance.Notify("Grab fruit", "Teleport motor ausente.")
                     return
                 end
                 if not value then State:SetFeature("fruit", false) end
                 if State.Instances.fruit then State.Instances.fruit:SetGrab(value) end
+            end
+            local grabToggle = section:CreateToggle("Grab fruit", State.Config.fruitGrab == true, function(value)
+                applyGrab(value)
+                State.Config.fruitGrab = value == true
             end)
-            section:CreateToggle("Auto store fruit", false, function(value)
-                if State.Instances.fruit then State.Instances.fruit:SetStore(value) end
+            State:RegisterConfig("fruitGrab", applyGrab, grabToggle)
+
+            local function applyStore(value)
+                local feature = State.Instances.fruit
+                if value then feature = ensureFruit() end
+                if feature then feature:SetStore(value) end
+            end
+            local storeToggle = section:CreateToggle("Auto store fruit", State.Config.fruitStore == true, function(value)
+                applyStore(value)
+                State.Config.fruitStore = value == true
             end)
+            State:RegisterConfig("fruitStore", applyStore, storeToggle)
+
             -- Skip list / Store keep list: seletores de fruta por DROPDOWN de
             -- selecao multipla (nada de digitar o nome). Usam a mesma fonte de
             -- nomes de fruta do sistema (State: FruitNames()). A lista escolhida
             -- vira o conjunto de prefixos que a feature ja usava.
             local fruits = State:FruitNames()
-            section:CreateMultiDropdown("Skip list", fruits, {}, function(selected)
+            local function applySkip(selected)
+                if #selected > 0 then ensureFruit() end
                 if State.Instances.fruit then State.Instances.fruit:SetSkip(selected) end
+            end
+            local skipHandle = section:CreateMultiDropdown("Skip list", fruits, State.Config.fruitSkip or {}, function(selected)
+                applySkip(selected)
+                State.Config.fruitSkip = selected
             end)
-            section:CreateMultiDropdown("Store keep list", fruits, {}, function(selected)
+            State:RegisterConfig("fruitSkip", applySkip, skipHandle)
+
+            local function applyKeep(selected)
+                if #selected > 0 then ensureFruit() end
                 if State.Instances.fruit then State.Instances.fruit:SetKeep(selected) end
+            end
+            local keepHandle = section:CreateMultiDropdown("Store keep list", fruits, State.Config.fruitKeep or {}, function(selected)
+                applyKeep(selected)
+                State.Config.fruitKeep = selected
             end)
+            State:RegisterConfig("fruitKeep", applyKeep, keepHandle)
         end,
     },
     islands = {
@@ -9405,7 +10399,15 @@ local PANELS = {
             elseif factory and type(factory.islands) == "table" then
                 islands = factory.islands
             end
+            -- A ilha inicial: a salva, se ainda existir na lista do mar atual
+            -- (a config e escrita noutro mar pode citar uma ilha que nao existe
+            -- aqui); senao, a primeira da lista.
             local selected = islands[1]
+            if State.Config.island ~= nil then
+                for _, name in ipairs(islands) do
+                    if name == State.Config.island then selected = name break end
+                end
+            end
             -- O handle do toggle: a chegada precisa desligar ESTE controle
             -- (programaticamente), nao so a flag interna. SetValue dispara o
             -- callback, que por sua vez chama SetEnabled(false) -- um unico
@@ -9449,7 +10451,9 @@ local PANELS = {
             -- A instancia pode ja existir (toggle reaberto nesta sessao): liga o
             -- hook de imediato tambem.
             wireArrivalHook()
-            section:CreateDropdown("Island", islands, selected, function(choice)
+            -- Aplica uma escolha de ilha: guarda como o atual e, se a feature ja
+            -- existe, seleciona (com o toggle ligado, isso ja voa).
+            local function applyIsland(choice)
                 selected = choice
                 if State.Instances.islands then
                     local ok = State.Instances.islands:Select(choice)
@@ -9457,7 +10461,12 @@ local PANELS = {
                         instance.Notify("Island teleport", State.Instances.islands.LastStatus or "ilha fora do mapa.")
                     end
                 end
+            end
+            local islandDown = section:CreateDropdown("Island", islands, selected, function(choice)
+                applyIsland(choice)
+                State.Config.island = choice
             end)
+            State:RegisterConfig("island", applyIsland, islandDown)
             section:CreateParagraph("Island teleport", "Pick an island and fly there. Only travels while the toggle is on.")
         end,
     },
@@ -9479,32 +10488,83 @@ local PANELS = {
             -- O Speed multiplier: o atributo SpeedMultiplier do character. O
             -- padrao do jogo e 2.3 -- mexer no slider ja aplica (a feature sobe
             -- sozinha) e o valor vale sempre que o slider mexer.
-            section:CreateSlider("Speed multiplier", minSpeed, maxSpeed, defaultSpeed, function(value)
+            local function applySpeed(value)
                 State:SetFeature("player", true)
                 if State.Instances.player then State.Instances.player:SetSpeed(value) end
                 State.PendingPlayerSpeed = value
+            end
+            local speedHandle = section:CreateSlider("Speed multiplier", minSpeed, maxSpeed, State.Config.speed or defaultSpeed, function(value)
+                applySpeed(value)
+                State.Config.speed = value
             end)
+            State:RegisterConfig("speed", applySpeed, speedHandle)
 
             -- UnbreakableAll: toggle que seta true e MANTEM true (re-aplica se o
             -- jogo tentar voltar). Ligar ja sobe a feature.
-            section:CreateToggle("Unbreakable", false, function(value)
+            local function applyUnbreakable(value)
                 State:SetFeature("player", true)
                 if State.Instances.player then State.Instances.player:SetUnbreakable(value) end
+            end
+            local unbreakableToggle = section:CreateToggle("Unbreakable", State.Config.unbreakable == true, function(value)
+                applyUnbreakable(value)
+                State.Config.unbreakable = value == true
             end)
+            State:RegisterConfig("unbreakable", applyUnbreakable, unbreakableToggle)
 
             -- WaterWalking: o atributo de andar sobre a agua.
-            section:CreateToggle("Water walk", false, function(value)
+            local function applyWater(value)
                 State:SetFeature("player", true)
                 if State.Instances.player then State.Instances.player:SetWaterWalking(value) end
+            end
+            local waterToggle = section:CreateToggle("Water walk", State.Config.waterwalk == true, function(value)
+                applyWater(value)
+                State.Config.waterwalk = value == true
             end)
+            State:RegisterConfig("waterwalk", applyWater, waterToggle)
 
             -- FlashstepCooldown: 0 = pronto (sem cooldown), 1 = com cooldown.
-            section:CreateSlider("Flashstep cooldown", 0, 1, 0, function(value)
+            local function applyFlashstep(value)
                 State:SetFeature("player", true)
                 if State.Instances.player then State.Instances.player:SetFlashstep(value) end
+            end
+            local flashHandle = section:CreateSlider("Flashstep cooldown", 0, 1, State.Config.flashstep or 0, function(value)
+                applyFlashstep(value)
+                State.Config.flashstep = value
             end)
+            State:RegisterConfig("flashstep", applyFlashstep, flashHandle)
 
             section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, and Flashstep cooldown (0 = ready). Stun is kept at 0.")
+        end,
+    },
+    -- CONFIG: os botoes de salvar/carregar. Nao e uma feature (nao tem toggle
+    -- nem modulo por tras): e o unico lugar que grava e devolve todas as
+    -- escolhas do painel. Por isso `alwaysShow` -- o loop de UI o constroi
+    -- mesmo sem um modulo em FEATURE_MODULES.
+    config = {
+        page = "Player",
+        section = "CONFIG",
+        category = "Player",
+        icon = "save",
+        tabIcon = "user",
+        alwaysShow = true,
+        build = function(section, instance)
+            section:CreateButton("Save config", function()
+                local ok = State:SaveConfig()
+                if ok then
+                    instance.Notify("Config", "Saved.")
+                else
+                    instance.Notify("Config", "Saved for this session only (no file API).")
+                end
+            end)
+            section:CreateButton("Load config", function()
+                local applied = State:LoadConfig()
+                if applied > 0 then
+                    instance.Notify("Config", ("Loaded %d settings."):format(applied))
+                else
+                    instance.Notify("Config", "Nothing saved yet.")
+                end
+            end)
+            section:CreateParagraph("Config", "Save your panel settings to a file and load them back on any session.")
         end,
     },
     -- RAID: parked. O Auto raid e o Auto complete nao estavam do jeito que o
@@ -9522,25 +10582,48 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
         Backend = State,
         Notify = function(title, body) visual:Notify(title, body) end,
     }
-    for _, entry in ipairs(FEATURE_MODULES) do
-        local panel = PANELS[entry.name]
-        if panel and State.Features[entry.name] then
-            if not categories[panel.category] then
-                categories[panel.category] = true
-                visual:CreateCategory(panel.category, panel.icon)
-            end
-            local tab = tabs[panel.page]
-            if tab == nil then
-                tab = visual:CreateTab(panel.page, panel.category, panel.tabIcon or panel.icon) or false
-                tabs[panel.page] = tab
-            end
-            if tab then
-                local section = tab:CreateSection(panel.section)
-                if section then panel.build(section, helper) end
-            end
+    -- Constroi um bloco de UI. Cria a categoria e a aba na primeira vez; a
+    -- partir dai so adiciona a secao. Vale tanto para as features quanto para o
+    -- bloco de config (que nao tem modulo).
+    local function buildPanel(panel)
+        if not categories[panel.category] then
+            categories[panel.category] = true
+            visual:CreateCategory(panel.category, panel.icon)
+        end
+        local tab = tabs[panel.page]
+        if tab == nil then
+            tab = visual:CreateTab(panel.page, panel.category, panel.tabIcon or panel.icon) or false
+            tabs[panel.page] = tab
+        end
+        if tab then
+            local section = tab:CreateSection(panel.section)
+            if section then panel.build(section, helper) end
         end
     end
+
+    -- Auto-load, parte 1: le o arquivo pra State.Config ANTES de montar, pra
+    -- cada controle ja nascer no valor salvo (sem piscar em default). Sem
+    -- arquivo, State.Config fica vazio e os controles usam o padrao.
+    local saved = nil
+    pcall(function() saved = State:PrimeConfig() end)
+
+    for _, entry in ipairs(FEATURE_MODULES) do
+        local panel = PANELS[entry.name]
+        if panel and State.Features[entry.name] then buildPanel(panel) end
+    end
+    -- Blocos sem feature (o CONFIG): sempre construidos.
+    for _, panel in pairs(PANELS) do
+        if panel.alwaysShow == true then buildPanel(panel) end
+    end
     State.UIFrontend = visual
+
+    -- Auto-load, parte 2: empurra os valores lidos pros estados das features
+    -- (Pending do silent aim, alcance, etc.). Os handles ja existem, entao o
+    -- ApplyConfig tambem confere a posicao dos controles. "Salvar e gg": o
+    -- usuario nao clica em Load toda sessao.
+    if type(saved) == "table" then
+        pcall(function() State:ApplyConfig(saved) end)
+    end
 end
 
 do
@@ -23067,7 +24150,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything.
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.
@@ -24033,56 +25116,6 @@ local STATE_KEY = "__DEPHUB_LOADER_STATE"
 -- of current source; GitHub's raw host ignores the query, so the file is the
 -- same. The loader's own in-memory cache still keeps it to one fetch per module.
 local CACHE_BUST = tostring(os.time()) .. "." .. tostring(math.floor((os.clock() % 1) * 1e6))
-
--- Serve backend-initiated game:HttpGet calls from the bundle when possible.
--- Feature/quest files a backend fetches directly (rather than through the
--- loader httpGet) resolve here, so the bundle never needs the network. Any
--- cache-busting query string is stripped before the lookup.
---
--- Not every executor exposes HttpGet as a DataModel member: some provide it
--- only as a global, and writing a nonexistent member errors. So probe before
--- wrapping, and fall back to the global helper when the member is absent.
-do
-    local bundledFor = function(url)
-        if type(url) ~= "string" then return nil end
-        local clean = url:match("^[^?]*") or url
-        local rel = clean:match("DepHub/[^/]+/(.+)$")
-        if rel and BUNDLED_SOURCES[rel] then return BUNDLED_SOURCES[rel] end
-        return nil
-    end
-    local memberOk, nativeHttpGet = pcall(function() return game.HttpGet end)
-    if memberOk and type(nativeHttpGet) == "function" then
-        if pcall(function() game.HttpGet = nativeHttpGet end) then
-            local ok, err = pcall(function()
-                game.HttpGet = function(a, b, ...)
-                    local url = (b ~= nil) and b or a
-                    local self = (b ~= nil) and a or game
-                    local hit = bundledFor(url)
-                    if hit then return hit end
-                    return nativeHttpGet(self, url, ...)
-                end
-            end)
-            if not ok then game.HttpGet = nativeHttpGet end
-        end
-    elseif type(HttpGet) == "function" then
-        -- No DataModel member: install a global shim for backends that call
-        -- HttpGet(url) directly, and a game:HttpGet method on the metatable of
-        -- a proxy is not possible here, so also expose it as game.HttpGet only
-        -- when the engine accepts the write (checked above).
-        local nativeGlobal = HttpGet
-        local shim = function(a, b, ...)
-            local url = (b ~= nil) and b or a
-            if type(url) ~= "string" then url = a end
-            local hit = bundledFor(url)
-            if hit then return hit end
-            return nativeGlobal(url, ...)
-        end
-        if pcall(function() game.HttpGet = shim end) then
-            game.HttpGet = shim
-        end
-        HttpGet = shim
-    end
-end
 
 local placeId = tostring(game.PlaceId)
 local gameId = tostring(game.GameId)
