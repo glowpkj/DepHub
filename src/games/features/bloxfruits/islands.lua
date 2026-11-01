@@ -22,8 +22,14 @@ local LocalPlayer = Players.LocalPlayer
 -- uma coordenada chumbada: isso nao quebra quando o mapa muda e usa exatamente os
 -- nomes que o usuario confirmou. Se a instancia nao existir (mar errado, ilha
 -- fora do mapa), ele AVISA em vez de voar pro vazio. Alguns destinos que nao sao
--- instancia do mapa (ex.: Cafe) usam uma POSICAO fixa (Vector3) na mesma lista --
--- o resto do fluxo (gate do toggle, vigia de chegada, auto-desligar) e igual.
+-- instancia do mapa (ex.: Cafe no Sea 2, Castle on Sea no Sea 3) usam uma POSICAO
+-- fixa (Vector3) na mesma lista -- o resto do fluxo (gate do toggle, vigia de
+-- chegada, auto-desligar) e igual.
+--
+-- A lista de destinos e POR MAR (SEA_ISLANDS): Sea 1, Sea 2 e Sea 3 tem mapas e
+-- pontos fixos diferentes, entao o dropdown mostra so as ilhas do mar atual. O
+-- backend descobre o mar (ReplicatedStorage.Util.Realm) e chama SetSea; trocar o
+-- mar troca a lista.
 --
 -- Gate de verdade: selecionar no dropdown NAO teleporta. So vai se o toggle
 -- estiver ligado. Trocar a ilha com o toggle ligado voa de novo; com ele
@@ -52,40 +58,90 @@ local MAP_CONTAINER = "Map"
 -- "do lado da ilha" sem confundir com passar por cima dela.
 local ARRIVAL_DISTANCE = 25
 
--- Os destinos do dropdown de teleporte. Cada entrada tem um `label` (o rotulo
--- que aparece) e UM tipo de destino:
+-- Os destinos do dropdown de teleporte, POR MAR. Cada mar tem suas proprias
+-- ilhas e pontos fixos -- o mapa de Sea 1, Sea 2 e Sea 3 sao completamente
+-- diferentes, entao nao faz sentido oferecer ilha de Sea 3 estando no Sea 1 (o
+-- usuario deixou isso claro). O backend descobre o mar atual e o dropdown e
+-- montado so a partir da lista daquele mar.
+--
+-- Cada entrada tem um `label` (o rotulo que aparece) e UM tipo de destino:
 --   * `instance = "NomeNoMapa"` -- a INSTANCIA real em workspace.Map.<Nome>. Usado
 --     pelas ilhas: nao quebra quando o mapa muda de posicao e usa os nomes que o
 --     usuario confirmou.
 --   * `pos = Vector3.new(x,y,z)` -- uma POSICAO fixa no mundo. Usado por lugares
---     que NAO sao uma instancia do mapa (ex.: Cafe, um ponto dentro de uma
---     cidade). A posicao vem do CFrame real do lugar (convertido pra Vector3).
+--     que NAO sao uma instancia do mapa (ex.: Cafe, Castle on Sea -- um ponto
+--     dentro de uma cidade). A posicao e o ponto real do lugar (a rotacao do
+--     CFrame NAO e usada: o motor so voa ate a posicao).
 -- A tabela e explicita em vez de deduzida porque alguns rotulos bonitos nao
 -- batem com o nome do mapa (ex.: Ghost Ship -> GhostShip).
-local SEA2_ISLANDS = {
-    { label = "Snow Mountain",       instance = "SnowMountain" },
-    { label = "Indra Island",        instance = "IndraIsland" },
-    { label = "Ice Castle",          instance = "IceCastle" },
-    { label = "Green Bit",           instance = "GreenBit" },
-    { label = "Grave Island",        instance = "GraveIsland" },
-    { label = "Ghost Ship Interior", instance = "GhostShipInterior" },
-    { label = "Ghost Ship",          instance = "GhostShip" },
-    { label = "Forgotten Island",    instance = "ForgottenIsland" },
-    { label = "Fishmen",             instance = "Fishmen" },
-    { label = "Dressrosa",           instance = "Dressrosa" },
-    { label = "Darkbeard Arena",     instance = "DarkbeardArena" },
-    { label = "Dapper Jack Arena",   instance = "DapperJackArena" },
-    -- Destinos por POSICAO fixa (nao sao instancias do mapa). A posicao e o
-    -- CFrame real do lugar, reduzido ao Vector3 do ponto (o motor so voa ate a
-    -- posicao; a rotacao nao e aplicada).
-    { label = "Cafe",                pos = Vector3.new(-379.38089, 73.6452713, 303.899628) },
+--
+-- Os mapas vao sendo preenchidos conforme o usuario confirma os nomes/posicoes
+-- de cada mar; um mar sem lista fica vazio (o dropdown avisa em vez de oferecer
+-- destinos errados).
+local SEA_ISLANDS = {
+    Sea1 = {
+        -- A confirmar pelo usuario (nome das ilhas + pontos fixos do Sea 1).
+    },
+    Sea2 = {
+        { label = "Snow Mountain",       instance = "SnowMountain" },
+        { label = "Indra Island",        instance = "IndraIsland" },
+        { label = "Ice Castle",          instance = "IceCastle" },
+        { label = "Green Bit",           instance = "GreenBit" },
+        { label = "Grave Island",        instance = "GraveIsland" },
+        { label = "Ghost Ship Interior", instance = "GhostShipInterior" },
+        { label = "Ghost Ship",          instance = "GhostShip" },
+        { label = "Forgotten Island",    instance = "ForgottenIsland" },
+        { label = "Fishmen",             instance = "Fishmen" },
+        { label = "Dressrosa",           instance = "Dressrosa" },
+        { label = "Darkbeard Arena",     instance = "DarkbeardArena" },
+        { label = "Dapper Jack Arena",   instance = "DapperJackArena" },
+        -- Destinos por POSICAO fixa (nao sao instancias do mapa). A posicao e o
+        -- ponto real do lugar (o motor so voa ate a posicao; rotacao nao e aplicada).
+        { label = "Cafe",                pos = Vector3.new(-379.38089, 73.6452713, 303.899628) },
+    },
+    Sea3 = {
+        -- Castle on Sea e um ponto fixo do Sea 3 (posicao confirmada pelo usuario).
+        { label = "Castle on Sea",       pos = Vector3.new(-5436.60986, 500, -3000) },
+    },
 }
 
--- A lista publica de rotulos, na ordem. O backend monta o dropdown daqui.
-Feature.islands = {}
-for _, entry in ipairs(SEA2_ISLANDS) do
-    Feature.islands[#Feature.islands + 1] = entry.label
+-- O mar padrao quando o jogo ainda nao disse em qual estamos. Sea 2 e o padrao
+-- historico (era o unico mar com lista ate agora).
+local DEFAULT_SEA = "Sea2"
+
+-- Normaliza o que o jogo devolve (ReplicatedStorage.Util.Realm vai de 1 a 3) para
+-- a chave da lista ("Sea1"/"Sea2"/"Sea3"). Aceita 1, "1", "Sea1", "sea 1", etc.
+local function normalizeSea(value)
+    if value == nil then return nil end
+    local n = tonumber(value)
+    if not n then
+        n = tonumber(tostring(value):match("(%d+)"))
+    end
+    if n and n >= 1 and n <= 3 then return "Sea" .. n end
+    return nil
 end
+
+Feature.SeaIslands = SEA_ISLANDS
+Feature.DEFAULT_SEA = DEFAULT_SEA
+
+-- A lista publica de rotulos do MAR ATIVO, na ordem. O backend monta o dropdown
+-- daqui; trocar o mar (SetSea) troca esta lista.
+function Feature:IslandLabels(sea)
+    local list = SEA_ISLANDS[normalizeSea(sea) or self.CurrentSea or DEFAULT_SEA] or {}
+    local labels = {}
+    for _, entry in ipairs(list) do
+        labels[#labels + 1] = entry.label
+    end
+    return labels
+end
+
+-- A lista ativa (o array de entradas) do mar corrente.
+function Feature:_ActiveList()
+    return SEA_ISLANDS[self.CurrentSea or DEFAULT_SEA] or {}
+end
+
+-- O mar que a lista esta mostrando agora.
+Feature.CurrentSea = DEFAULT_SEA
 
 -- Acha a instancia da ilha em workspace.Map.<instancia>. Devolve a instancia ou
 -- nil (se a pasta nao existir ou a ilha nao estiver no mapa).
@@ -165,9 +221,15 @@ function Feature.new(options)
     options = options or {}
     local self = setmetatable({}, Feature)
     self.Enabled = false
-    -- A ilha escolhida no dropdown, pelo rotulo ("Snow Mountain"). Comeca na
-    -- primeira da lista para o dropdown ter um valor inicial valido.
-    self.Selected = options.selected or SEA2_ISLANDS[1].label
+    -- O mar corrente: define qual lista o dropdown mostra. O backend chama
+    -- SetSea com o mar que o jogo reportou (ReplicatedStorage.Util.Realm); sem
+    -- isso, fica no padrao.
+    self.CurrentSea = normalizeSea(options.sea) or DEFAULT_SEA
+    -- A entrada escolhida no dropdown, pelo rotulo. Comeca na primeira da lista
+    -- ATIVA para o dropdown ter um valor inicial valido (ou nil se o mar nao tem
+    -- lista ainda).
+    local first = self:_ActiveList()[1]
+    self.Selected = options.selected or (first and first.label) or nil
     -- So teleporta com o toggle ligado. Trocar a ilha com o toggle ligado voa de
     -- novo; desligado, so guarda.
     self.ToggleOn = false
@@ -185,16 +247,33 @@ function Feature.new(options)
     return self
 end
 
+-- Troca o mar mostrado. Se a selecao corrente nao existir no mar novo, cai na
+-- primeira entrada do mar (ou nil se o mar ainda nao tem lista). Nao teleporta
+-- sozinho: quem decide voar e o toggle/chamada de Select. Devolve os rotulos do
+-- mar novo, para o backend reconstruir o dropdown.
+function Feature:SetSea(sea)
+    local normalized = normalizeSea(sea)
+    if not normalized then return self:IslandLabels() end
+    if normalized == self.CurrentSea then return self:IslandLabels() end
+    self.CurrentSea = normalized
+    if not self:EntryFor(self.Selected) then
+        local first = self:_ActiveList()[1]
+        self.Selected = first and first.label or nil
+    end
+    return self:IslandLabels()
+end
+
 function Feature:SetTeleport(motor)
     self.Teleport = motor
     return self.Teleport ~= nil
 end
 
--- O rotulo -> a entrada da lista (com `instance` ou `pos`). Devolve nil se o
--- rotulo nao for de um destino conhecido.
+-- O rotulo -> a entrada da lista DO MAR ATIVO (com `instance` ou `pos`). Devolve
+-- nil se o rotulo nao for de um destino conhecido deste mar.
 function Feature:EntryFor(label)
-    local wanted = tostring(label or ""):lower()
-    for _, entry in ipairs(SEA2_ISLANDS) do
+    if not label then return nil end
+    local wanted = tostring(label):lower()
+    for _, entry in ipairs(self:_ActiveList()) do
         if entry.label:lower() == wanted then return entry end
     end
     return nil

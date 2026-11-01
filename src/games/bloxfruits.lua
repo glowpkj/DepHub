@@ -91,9 +91,33 @@ if not LocalPlayer then
     return false
 end
 
+-- Em qual mar o jogador esta. O jogo expoe isso em ReplicatedStorage.Util.Realm
+-- (getCurrentSeaAsync), o MESMO caminho que o script antigo usava para escolher o
+-- tubo da raid. E por mar que a lista de ilhas do Travel e escolhida: Sea 1, 2 e 3
+-- tem mapas diferentes. Se o jogo nao disser, cai em Sea 2 (o padrao historico).
+-- Resolvido uma vez no load (o mar nao muda durante a sessao sem rejoin).
+local function detectSea()
+    local ok, sea = pcall(function()
+        local replicated = game:GetService("ReplicatedStorage")
+        local util = replicated and replicated:FindFirstChild("Util")
+        local realm = util and util:FindFirstChild("Realm")
+        if not realm then return nil end
+        local module = require(realm)
+        if type(module) ~= "table" then return nil end
+        local getter = module.getCurrentSeaAsync
+        if type(getter) ~= "function" then return nil end
+        return getter(module)
+    end)
+    if not ok or sea == nil then return nil end
+    return sea
+end
+
+local CURRENT_SEA = detectSea()
+
 local State = {
     Destroyed = false,
     Version = VERSION,
+    Sea = CURRENT_SEA,
     Features = {},
     Instances = {},
     Infra = {},
@@ -179,6 +203,9 @@ function State:SetFeature(name, enabled)
                 teleport = self.Infra.teleport,
                 combat = self.Instances.bladhits,
                 state = self,
+                -- O mar atual: a feature de ilhas escolhe a lista de destinos
+                -- daqui (Sea 1 / 2 / 3 tem ilhas e pontos fixos diferentes).
+                sea = CURRENT_SEA,
             }
             local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
@@ -329,15 +356,21 @@ local PANELS = {
         icon = "rocket",
         tabIcon = "rocket",
         build = function(section, instance)
-            -- O dropdown lista as ilhas do Sea 2 (confirmadas pelo usuario). A
-            -- selecao NAO teleporta sozinha: e gate do toggle. Trocar a ilha com
-            -- o toggle ligado voa de novo.
-            local islands = {}
+            -- O dropdown lista as ilhas DO MAR ATUAL (Sea 1 / 2 / 3 tem mapas
+            -- diferentes). A selecao NAO teleporta sozinha: e gate do toggle.
+            -- Trocar a ilha com o toggle ligado voa de novo.
+            --
+            -- A lista vem da FABRICA (Feature:IslandLabels), que sabe o mar. Se a
+            -- feature ja foi instanciada, ela manda (CurrentSea); senao, monta do
+            -- mar detectado no load.
             local factory = State.Features.islands
-            if factory and type(factory.islands) == "table" then
+            local islands = {}
+            if factory and type(factory.IslandLabels) == "function" then
+                islands = factory:IslandLabels((State.Instances.islands and State.Instances.islands.CurrentSea) or CURRENT_SEA)
+            elseif factory and type(factory.islands) == "table" then
                 islands = factory.islands
             end
-            local selected = islands[1] or "Snow Mountain"
+            local selected = islands[1]
             -- O handle do toggle: a chegada precisa desligar ESTE controle
             -- (programaticamente), nao so a flag interna. SetValue dispara o
             -- callback, que por sua vez chama SetEnabled(false) -- um unico

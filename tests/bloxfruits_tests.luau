@@ -29,6 +29,17 @@ local function bfContext(placeId, gameId)
     local netFolder = Instance.new("Folder"); netFolder.Name = "Net"; netFolder.Parent = modules
     local attack = Instance.new("RemoteEvent"); attack.Name = "RE/RegisterAttack"; attack.Parent = netFolder
     local hit = Instance.new("RemoteEvent"); hit.Name = "RE/RegisterHit"; hit.Parent = netFolder
+    -- O jogo diz o mar em ReplicatedStorage.Util.Realm (getCurrentSeaAsync). Aqui
+    -- ele responde Sea 2 por padrao; um teste pode trocar ctx.RealmSea antes de
+    -- carregar o backend para exercitar outro mar.
+    local util = Instance.new("Folder"); util.Name = "Util"; util.Parent = rstorage
+    local realm = Instance.new("ModuleScript"); realm.Name = "Realm"; realm.Parent = util
+    ctx.RealmSea = 2
+    -- Nao substituir realm._props: ele guarda ClassName/Name/Parent. So adicionar
+    -- o slot Module (o payload que o require do harness chama).
+    realm._props.Module = function()
+        return { getCurrentSeaAsync = function() return ctx.RealmSea end }
+    end
     return ctx, modules
 end
 
@@ -389,15 +400,21 @@ do
     local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
     local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
 
-    -- A lista publica dos destinos (o backend monta o dropdown dela): as 12
-    -- ilhas do Sea 2 por instancia, mais o Cafe por posicao fixa.
-    check(type(Islands.islands) == "table" and #Islands.islands == 13, "a feature publica as 12 ilhas + o Cafe")
-    check(Islands.islands[1] == "Snow Mountain", "a primeira ilha da lista e Snow Mountain")
-    check(Islands.islands[13] == "Cafe", "o Cafe e o ultimo destino da lista")
+    -- A lista publica de destinos e POR MAR. O Sea 2 (mar padrao) tem as 12
+    -- ilhas por instancia mais o Cafe por posicao fixa; o Sea 3 tem o Castle on
+    -- Sea por posicao fixa.
+    local sea2 = Islands:IslandLabels("Sea2")
+    check(type(sea2) == "table" and #sea2 == 13, "o Sea 2 tem as 12 ilhas + o Cafe")
+    check(sea2[1] == "Snow Mountain", "a primeira ilha do Sea 2 e Snow Mountain")
+    check(sea2[13] == "Cafe", "o Cafe e o ultimo destino do Sea 2")
 
-    local islands = Islands.new({ teleport = motor })
+    local sea3 = Islands:IslandLabels("Sea3")
+    check(type(sea3) == "table" and #sea3 == 1 and sea3[1] == "Castle on Sea", "o Sea 3 tem o Castle on Sea")
+
+    local islands = Islands.new({ teleport = motor, sea = 2 })
     check(islands.ToggleOn == false, "o toggle comeca desligado")
-    check(islands.Selected == "Snow Mountain", "a selecao comeca na primeira ilha")
+    check(islands.CurrentSea == "Sea2", "a feature comeca no mar passado (Sea 2)")
+    check(islands.Selected == "Snow Mountain", "a selecao comeca na primeira ilha do mar")
 
     -- A pasta do mapa e a ilha real.
     local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
@@ -445,6 +462,28 @@ do
     check(islands.LastStatus:find("arrived at Cafe"), "a chegada ao Cafe e detectada pela posicao")
     islands:SetEnabled(false)
     motor:Cancel()
+
+    -- POR MAR: trocar o mar troca a lista. No Sea 3 so existe o Castle on Sea,
+    -- um destino por POSICAO fixa (nao ha instancia no mapa com esse nome). A
+    -- selecao do mar antigo nao vale no mar novo.
+    local castlePosition = Vector3.new(-5436.60986, 500, -3000)
+    local sea3Labels = islands:SetSea(3)
+    check(islands.CurrentSea == "Sea3", "SetSea troca o mar corrente")
+    check(#sea3Labels == 1 and sea3Labels[1] == "Castle on Sea", "o Sea 3 lista so o Castle on Sea")
+    check(islands.Selected == "Castle on Sea", "a selecao cai na primeira entrada do mar novo")
+    check(islands:Select("Snow Mountain") == false, "ilha do Sea 2 nao existe no Sea 3")
+    check(islands:Select("Castle on Sea") == true, "Castle on Sea e aceito no Sea 3")
+    check(islands:SetEnabled(true) == true, "armar o voo pro Castle on Sea e aceito")
+    check(motor:IsFlying() == true, "o Castle on Sea voa mesmo sem instancia no mapa (destino por posicao)")
+    check(islands.LastStatus:find("Castle on Sea"), "reporta que esta voando pro Castle on Sea")
+    local castleRoot = ctx.Player.Character:FindFirstChild("HumanoidRootPart")
+    castleRoot.Position = castlePosition
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(islands.LastStatus:find("arrived at Castle on Sea"), "a chegada ao Castle on Sea e detectada pela posicao")
+    islands:SetEnabled(false)
+    motor:Cancel()
+    islands:SetSea(2)
+    check(islands.CurrentSea == "Sea2", "voltar pro Sea 2 restaura a lista do Sea 2")
 
     -- Sem motor de teleporte, ligar recusa.
     local bare = Islands.new()
@@ -629,6 +668,24 @@ do
 
     state:Destroy()
     check(next(state.Infra) == nil, "destroy derruba a infra junto")
+end
+
+-- A lista de ilhas do Travel e POR MAR: quando o jogo diz que o jogador esta no
+-- Sea 3, o dropdown monta com os destinos do Sea 3 (Castle on Sea), nao com as
+-- ilhas do Sea 2.
+do
+    local ctx = bfContext(994732206, 994732206)
+    ctx.RealmSea = 3
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    -- Instancia a feature com o mar que o backend detectou.
+    check(state.Sea == 3 or state.Sea == "3" or state.Sea == "Sea3", "o backend detecta o Sea 3 (veio: " .. tostring(state.Sea) .. ")")
+    check(state:SetFeature("islands", true), "a feature de ilhas sobe no Sea 3")
+    local feature = state:GetFeature("islands")
+    check(feature ~= nil and feature.CurrentSea == "Sea3", "a feature fica no mar detectado (Sea 3)")
+    check(feature.Selected == "Castle on Sea", "a selecao cai no Castle on Sea do Sea 3")
+
+    state:Destroy()
 end
 
 -- O mesmo backend servido pela outra rota (PlaceId do Sea 1) tem que se
