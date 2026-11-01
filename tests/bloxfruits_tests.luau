@@ -389,9 +389,11 @@ do
     local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
     local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
 
-    -- A lista publica das ilhas (o backend monta o dropdown dela).
-    check(type(Islands.islands) == "table" and #Islands.islands == 12, "a feature publica as 12 ilhas do Sea 2")
+    -- A lista publica dos destinos (o backend monta o dropdown dela): as 12
+    -- ilhas do Sea 2 por instancia, mais o Cafe por posicao fixa.
+    check(type(Islands.islands) == "table" and #Islands.islands == 13, "a feature publica as 12 ilhas + o Cafe")
     check(Islands.islands[1] == "Snow Mountain", "a primeira ilha da lista e Snow Mountain")
+    check(Islands.islands[13] == "Cafe", "o Cafe e o ultimo destino da lista")
 
     local islands = Islands.new({ teleport = motor })
     check(islands.ToggleOn == false, "o toggle comeca desligado")
@@ -426,6 +428,23 @@ do
 
     -- Rotulo desconhecido nao entra.
     check(islands:Select("Nao Existe") == false, "ilha desconhecida e recusada")
+
+    -- Cafe: destino por POSICAO fixa. Nao ha instancia no mapa chamada Cafe, mas
+    -- ele voa mesmo assim -- porque o destino e um Vector3, nao uma instancia.
+    local cafePosition = Vector3.new(-379.38089, 73.6452713, 303.899628)
+    check(islands:Select("Cafe") == true, "Cafe e um destino aceito")
+    check(islands.Selected == "Cafe", "a selecao do Cafe foi memorizada")
+    check(islands:SetEnabled(true) == true, "armar o voo pro Cafe e aceito")
+    check(motor:IsFlying() == true, "o Cafe voa mesmo sem instancia no mapa (destino por posicao)")
+    check(islands.LastStatus:find("Cafe"), "reporta que esta voando pro Cafe")
+    -- A vigia de chegada mirou a POSICAO do Cafe (nao uma instancia): mover o
+    -- personagem pra la dispara a chegada.
+    local cafeRoot = ctx.Player.Character:FindFirstChild("HumanoidRootPart")
+    cafeRoot.Position = cafePosition
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(islands.LastStatus:find("arrived at Cafe"), "a chegada ao Cafe e detectada pela posicao")
+    islands:SetEnabled(false)
+    motor:Cancel()
 
     -- Sem motor de teleporte, ligar recusa.
     local bare = Islands.new()

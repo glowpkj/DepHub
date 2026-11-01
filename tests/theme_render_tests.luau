@@ -228,6 +228,15 @@ do
     check(type(window.Notify) == "function", "the window exposes Notify")
     check(type(window.SelectTab) == "function", "the window exposes SelectTab")
 
+    -- The library reads its starting size from Default.UISize. Prove the value
+    -- the shell writes is a well-formed UDim2 the library can offset from (a
+    -- malformed one would make the window zero-sized / off-screen).
+    do
+        local defaultSize = library.Default.UISize
+        check(type(defaultSize) == "table" and type(defaultSize.X) == "table" and type(defaultSize.X.Offset) == "number",
+            "Default.UISize is a UDim2 with numeric offsets")
+    end
+
     local tab = window:MakeTab({Title = "Home"})
     check(type(tab) == "table", "MakeTab returns a tab")
     check(tab.IS_A_TAB == true, "the tab marks itself as a tab")

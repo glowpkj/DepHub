@@ -9823,10 +9823,12 @@ local LocalPlayer = Players.LocalPlayer
 -- NAO tem motor proprio: usa o teleporte geral (options.teleport, a infra) por
 -- injecao, igual a fruta faz. Um motor de voo no script, nao dois.
 --
--- O destino e a INSTANCIA real no mapa (workspace.Map.<Nome>), nao uma
--- coordenada chumbada: isso nao quebra quando o mapa muda e usa exatamente os
+-- O destino e, por padrao, a INSTANCIA real no mapa (workspace.Map.<Nome>), nao
+-- uma coordenada chumbada: isso nao quebra quando o mapa muda e usa exatamente os
 -- nomes que o usuario confirmou. Se a instancia nao existir (mar errado, ilha
--- fora do mapa), ele AVISA em vez de voar pro vazio.
+-- fora do mapa), ele AVISA em vez de voar pro vazio. Alguns destinos que nao sao
+-- instancia do mapa (ex.: Cafe) usam uma POSICAO fixa (Vector3) na mesma lista --
+-- o resto do fluxo (gate do toggle, vigia de chegada, auto-desligar) e igual.
 --
 -- Gate de verdade: selecionar no dropdown NAO teleporta. So vai se o toggle
 -- estiver ligado. Trocar a ilha com o toggle ligado voa de novo; com ele
@@ -9855,10 +9857,16 @@ local MAP_CONTAINER = "Map"
 -- "do lado da ilha" sem confundir com passar por cima dela.
 local ARRIVAL_DISTANCE = 25
 
--- As ilhas do Sea 2 (o usuario confirmou: todas as ilhas dele sao do Sea 2).
--- A chave e o rotulo que aparece no dropdown; o valor e o NOME DA INSTANCIA em
--- workspace.Map. Alguns rotulos bonitos nao batem com o nome do mapa (ex.:
--- Ghost Ship -> GhostShip), por isso a tabela explicita em vez de deduzir.
+-- Os destinos do dropdown de teleporte. Cada entrada tem um `label` (o rotulo
+-- que aparece) e UM tipo de destino:
+--   * `instance = "NomeNoMapa"` -- a INSTANCIA real em workspace.Map.<Nome>. Usado
+--     pelas ilhas: nao quebra quando o mapa muda de posicao e usa os nomes que o
+--     usuario confirmou.
+--   * `pos = Vector3.new(x,y,z)` -- uma POSICAO fixa no mundo. Usado por lugares
+--     que NAO sao uma instancia do mapa (ex.: Cafe, um ponto dentro de uma
+--     cidade). A posicao vem do CFrame real do lugar (convertido pra Vector3).
+-- A tabela e explicita em vez de deduzida porque alguns rotulos bonitos nao
+-- batem com o nome do mapa (ex.: Ghost Ship -> GhostShip).
 local SEA2_ISLANDS = {
     { label = "Snow Mountain",       instance = "SnowMountain" },
     { label = "Indra Island",        instance = "IndraIsland" },
@@ -9872,6 +9880,10 @@ local SEA2_ISLANDS = {
     { label = "Dressrosa",           instance = "Dressrosa" },
     { label = "Darkbeard Arena",     instance = "DarkbeardArena" },
     { label = "Dapper Jack Arena",   instance = "DapperJackArena" },
+    -- Destinos por POSICAO fixa (nao sao instancias do mapa). A posicao e o
+    -- CFrame real do lugar, reduzido ao Vector3 do ponto (o motor so voa ate a
+    -- posicao; a rotacao nao e aplicada).
+    { label = "Cafe",                pos = Vector3.new(-379.38089, 73.6452713, 303.899628) },
 }
 
 -- A lista publica de rotulos, na ordem. O backend monta o dropdown daqui.
@@ -9983,18 +9995,23 @@ function Feature:SetTeleport(motor)
     return self.Teleport ~= nil
 end
 
--- O rotulo -> o nome da instancia. Devolve nil se o rotulo nao for de ilha
--- conhecida.
-function Feature:InstanceNameFor(label)
+-- O rotulo -> a entrada da lista (com `instance` ou `pos`). Devolve nil se o
+-- rotulo nao for de um destino conhecido.
+function Feature:EntryFor(label)
     local wanted = tostring(label or ""):lower()
     for _, entry in ipairs(SEA2_ISLANDS) do
-        if entry.label:lower() == wanted then return entry.instance end
+        if entry.label:lower() == wanted then return entry end
     end
     return nil
 end
 
 -- O voo de verdade. So acontece com o toggle ligado; e chamado pelo go() e
 -- toda vez que a selecao muda com o toggle ja ligado.
+--
+-- Destino por INSTANCIA: acha em workspace.Map e manda o motor perseguir a
+-- instancia (GoToInstance), com o alvo da vigia sendo a posicao dela. Destino
+-- por POSICAO: manda o motor direto pra posicao (GoTo) e a vigia usa a mesma.
+-- Nos dois casos a vigia mede a MESMA coisa que o motor persegue.
 function Feature:Go()
     local motor = self.Teleport
     if not motor then
@@ -10002,16 +10019,31 @@ function Feature:Go()
         self.LastError = "sem motor de teleporte"
         return false
     end
-    local instanceName = self:InstanceNameFor(self.Selected)
-    if not instanceName then
+    local entry = self:EntryFor(self.Selected)
+    if not entry then
         self.LastStatus = ("unknown island: %s"):format(tostring(self.Selected))
         return false
     end
-    local island = self:IslandInstance(instanceName)
+
+    -- Destino por posicao fixa (ex.: Cafe): vai direto pro ponto.
+    if entry.pos then
+        local ok = pcall(function() motor:GoTo(entry.pos) end)
+        if not ok then
+            self.LastStatus = "teleport failed"
+            self.LastError = "falha no voo"
+            return false
+        end
+        self.LastStatus = ("flying to %s"):format(self.Selected)
+        self:_WatchArrival(self.Selected, entry.pos)
+        return true
+    end
+
+    -- Destino por instancia no mapa (as ilhas).
+    local island = self:IslandInstance(entry.instance)
     if not island then
-        -- A ilha nao esta no mapa agora (mar errado, ilha removida). Avisa em
-        -- vez de voar pro vazio -- o objetivo e o jogador entender o porque.
-        self.LastStatus = ("not in map: workspace.Map.%s"):format(instanceName)
+        -- A instancia nao esta no mapa agora (mar errado, ilha removida). Avisa
+        -- em vez de voar pro vazio -- o objetivo e o jogador entender o porque.
+        self.LastStatus = ("not in map: workspace.Map.%s"):format(tostring(entry.instance))
         return false
     end
     local ok = pcall(function() motor:GoToInstance(island) end)
@@ -10021,9 +10053,6 @@ function Feature:Go()
         return false
     end
     self.LastStatus = ("flying to %s"):format(self.Selected)
-    -- So agora (depois do Go deu certo) a vigia de chegada e armada: assim ela
-    -- nunca dispara antes do voo comecar. O alvo e a posicao da MESMA instancia
-    -- que o motor vai perseguir.
     self:_WatchArrival(self.Selected, self:InstancePosition(island))
     return true
 end
@@ -10031,8 +10060,7 @@ end
 -- O usuario escolheu uma ilha. So teleporta se o toggle estiver ligado (o gate
 -- que o usuario pediu); se estiver desligado, so memoriza a escolha.
 function Feature:Select(label)
-    local instanceName = self:InstanceNameFor(label)
-    if not instanceName then return false end
+    if not self:EntryFor(label) then return false end
     self.Selected = label
     if self.ToggleOn then return self:Go() end
     return true
@@ -22568,6 +22596,45 @@ Diag:Module("demon-ui window", true, "janela criada")
 log("Window built; loading backend...")
 
 env.__DEPHUB.DemonUI = window
+
+-- TEMP DIAG (remove before release): report the real, built window state so a
+-- run in a real executor can tell us WHY nothing is on screen. Runs by default
+-- during this diagnosis; each line is prefixed "[DepHub][PROBE]".
+pcall(function()
+    local lib = window.Library
+    local win = window.Window
+    local parent = (gethui and gethui()) or (game:GetService("CoreGui"))
+    local sg = parent and parent:FindFirstChild("redz-library-v5")
+    report("[DepHub][PROBE] ScreenGui found: " .. tostring(sg ~= nil) ..
+        " enabled=" .. tostring(sg and sg.Enabled) ..
+        " parent=" .. tostring(sg and sg.Parent and sg.Parent.Name))
+    report("[DepHub][PROBE] window object present: " .. tostring(win ~= nil))
+    if lib and lib.Default and lib.Default.UISize then
+        local s = lib.Default.UISize
+        report("[DepHub][PROBE] Default.UISize = " .. tostring(s.X and s.X.Offset) .. "x" .. tostring(s.Y and s.Y.Offset))
+    end
+    local cam = workspace and workspace.CurrentCamera
+    report("[DepHub][PROBE] camera ViewportSize = " .. tostring(cam and cam.ViewportSize))
+    if sg then
+        local frame
+        for _, c in ipairs(sg:GetChildren()) do
+            if c:IsA("GuiObject") then frame = c break end
+        end
+        if not frame then
+            report("[DepHub][PROBE] NO GuiObject child on the ScreenGui (window frame missing)")
+        else
+            report("[DepHub][PROBE] frame " .. frame.ClassName .. "/" .. frame.Name ..
+                " visible=" .. tostring(frame.Visible) ..
+                " size=" .. tostring(frame.Size and frame.Size.X and frame.Size.X.Offset) .. "x" .. tostring(frame.Size and frame.Size.Y and frame.Size.Y.Offset) ..
+                " absSize=" .. tostring(frame.AbsoluteSize and frame.AbsoluteSize.X) .. "x" .. tostring(frame.AbsoluteSize and frame.AbsoluteSize.Y) ..
+                " absPos=" .. tostring(frame.AbsolutePosition))
+        end
+        local scale = sg:FindFirstChild("Scale")
+        if scale then
+            report("[DepHub][PROBE] UIScale.Scale = " .. tostring(scale.Scale))
+        end
+    end
+end)
 env.__DEPHUB.UI = window
 
 -- The UI kit every backend uses to build its part of the shell in the standard
@@ -22741,7 +22808,31 @@ env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
 -- The one line the console sees on a healthy load.
 log("Backend loaded. DepHub v" .. VERSION .. " ready.")
-pcall(print, "DepHub v" .. VERSION)
+
+-- TEMP DIAG (remove before release): re-probe the window AFTER the backend built
+-- its tabs, so we see the final state the player should be looking at.
+pcall(function()
+    local win2 = env.__DEPHUB.DemonUI
+    local lib = win2 and win2.Library
+    local parent = (gethui and gethui()) or (game:GetService("CoreGui"))
+    local sg = parent and parent:FindFirstChild("redz-library-v5")
+    if not sg then report("[DepHub][PROBE-2] ScreenGui gone after backend"); return end
+    local frame
+    for _, c in ipairs(sg:GetChildren()) do
+        if c:IsA("GuiObject") then frame = c break end
+    end
+    if frame then
+        report("[DepHub][PROBE-2] frame visible=" .. tostring(frame.Visible) ..
+            " absSize=" .. tostring(frame.AbsoluteSize and frame.AbsoluteSize.X) .. "x" .. tostring(frame.AbsoluteSize and frame.AbsoluteSize.Y) ..
+            " childCount=" .. tostring(#sg:GetChildren()))
+    else
+        report("[DepHub][PROBE-2] no window frame after backend")
+    end
+    if lib and lib.Toggle then
+        report("[DepHub][PROBE-2] library:Toggle present (can force-show with __DEPHUB_TOGGLE())")
+    end
+end)
+print("DepHub v" .. VERSION)
 
 task.defer(function()
     if env[STATE_KEY] ~= session or session.status ~= "success" then return end

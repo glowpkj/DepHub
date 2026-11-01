@@ -511,6 +511,45 @@ Diag:Module("demon-ui window", true, "janela criada")
 log("Window built; loading backend...")
 
 env.__DEPHUB.DemonUI = window
+
+-- TEMP DIAG (remove before release): report the real, built window state so a
+-- run in a real executor can tell us WHY nothing is on screen. Runs by default
+-- during this diagnosis; each line is prefixed "[DepHub][PROBE]".
+pcall(function()
+    local lib = window.Library
+    local win = window.Window
+    local parent = (gethui and gethui()) or (game:GetService("CoreGui"))
+    local sg = parent and parent:FindFirstChild("redz-library-v5")
+    report("[DepHub][PROBE] ScreenGui found: " .. tostring(sg ~= nil) ..
+        " enabled=" .. tostring(sg and sg.Enabled) ..
+        " parent=" .. tostring(sg and sg.Parent and sg.Parent.Name))
+    report("[DepHub][PROBE] window object present: " .. tostring(win ~= nil))
+    if lib and lib.Default and lib.Default.UISize then
+        local s = lib.Default.UISize
+        report("[DepHub][PROBE] Default.UISize = " .. tostring(s.X and s.X.Offset) .. "x" .. tostring(s.Y and s.Y.Offset))
+    end
+    local cam = workspace and workspace.CurrentCamera
+    report("[DepHub][PROBE] camera ViewportSize = " .. tostring(cam and cam.ViewportSize))
+    if sg then
+        local frame
+        for _, c in ipairs(sg:GetChildren()) do
+            if c:IsA("GuiObject") then frame = c break end
+        end
+        if not frame then
+            report("[DepHub][PROBE] NO GuiObject child on the ScreenGui (window frame missing)")
+        else
+            report("[DepHub][PROBE] frame " .. frame.ClassName .. "/" .. frame.Name ..
+                " visible=" .. tostring(frame.Visible) ..
+                " size=" .. tostring(frame.Size and frame.Size.X and frame.Size.X.Offset) .. "x" .. tostring(frame.Size and frame.Size.Y and frame.Size.Y.Offset) ..
+                " absSize=" .. tostring(frame.AbsoluteSize and frame.AbsoluteSize.X) .. "x" .. tostring(frame.AbsoluteSize and frame.AbsoluteSize.Y) ..
+                " absPos=" .. tostring(frame.AbsolutePosition))
+        end
+        local scale = sg:FindFirstChild("Scale")
+        if scale then
+            report("[DepHub][PROBE] UIScale.Scale = " .. tostring(scale.Scale))
+        end
+    end
+end)
 env.__DEPHUB.UI = window
 
 -- The UI kit every backend uses to build its part of the shell in the standard
@@ -684,7 +723,31 @@ env[STATE_KEY].status = "success"
 env[STATE_KEY].finishedAt = os.clock()
 -- The one line the console sees on a healthy load.
 log("Backend loaded. DepHub v" .. VERSION .. " ready.")
-pcall(print, "DepHub v" .. VERSION)
+
+-- TEMP DIAG (remove before release): re-probe the window AFTER the backend built
+-- its tabs, so we see the final state the player should be looking at.
+pcall(function()
+    local win2 = env.__DEPHUB.DemonUI
+    local lib = win2 and win2.Library
+    local parent = (gethui and gethui()) or (game:GetService("CoreGui"))
+    local sg = parent and parent:FindFirstChild("redz-library-v5")
+    if not sg then report("[DepHub][PROBE-2] ScreenGui gone after backend"); return end
+    local frame
+    for _, c in ipairs(sg:GetChildren()) do
+        if c:IsA("GuiObject") then frame = c break end
+    end
+    if frame then
+        report("[DepHub][PROBE-2] frame visible=" .. tostring(frame.Visible) ..
+            " absSize=" .. tostring(frame.AbsoluteSize and frame.AbsoluteSize.X) .. "x" .. tostring(frame.AbsoluteSize and frame.AbsoluteSize.Y) ..
+            " childCount=" .. tostring(#sg:GetChildren()))
+    else
+        report("[DepHub][PROBE-2] no window frame after backend")
+    end
+    if lib and lib.Toggle then
+        report("[DepHub][PROBE-2] library:Toggle present (can force-show with __DEPHUB_TOGGLE())")
+    end
+end)
+print("DepHub v" .. VERSION)
 
 task.defer(function()
     if env[STATE_KEY] ~= session or session.status ~= "success" then return end
