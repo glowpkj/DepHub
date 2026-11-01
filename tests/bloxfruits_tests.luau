@@ -250,8 +250,124 @@ do
     fruit:Destroy()
 end
 
--- A raid e auto-contida e reusa DUAS pecas por injecao: o teleporte (pra ir ao
--- tubo) e a blade hit (pra limpar as waves). Sem cada uma ela degrada de um jeito
+-- O auto complete e o SEGUNDO toggle da raid, e faz uma coisa so: terminar uma
+-- raid que ja esta rolando. Nao compra chip, nao cria raid, nao aperta botao --
+-- acha as ilhas em workspace.Map.RaidMap, vai na mais perto e recalcula.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Raid = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "raid.lua"])()
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+
+    -- Personagem posicionado na origem.
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+
+    local raid = Raid.new({ teleport = motor })
+    check(raid.AutoComplete == false, "o auto complete comeca desligado")
+
+    -- Sem RaidMap no workspace: nao ha ilha nenhuma, e ele reporta isso.
+    check(raid:RaidMap() == nil, "sem raid rolando nao ha RaidMap")
+    check(raid:NearestIsland() == nil, "sem RaidMap nao ha ilha mais perto")
+    check(raid:CompleteStep() == false, "sem RaidMap o passo de completar recusa")
+
+    -- A raid comeca: workspace.Map.RaidMap aparece com as ilhas.
+    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
+    local raidMap = Instance.new("Folder"); raidMap.Name, raidMap.Parent = "RaidMap", map
+    check(raid:RaidMap() == raidMap, "acha o RaidMap em workspace.Map")
+
+    -- Tres ilhas em distancias diferentes da origem.
+    local i1 = Instance.new("Model"); i1.Name, i1.Parent = "RaidIsland1", raidMap
+    local i1p = Instance.new("Part"); i1p.Name, i1p.Position, i1p.Parent = "Floor", Vector3.new(0, 0, 50), i1
+    local i2 = Instance.new("Model"); i2.Name, i2.Parent = "RaidIsland2", raidMap
+    local i2p = Instance.new("Part"); i2p.Name, i2p.Position, i2p.Parent = "Floor", Vector3.new(0, 0, 500), i2
+    local i3 = Instance.new("Model"); i3.Name, i3.Parent = "RaidIsland3", raidMap
+    local i3p = Instance.new("Part"); i3p.Name, i3p.Position, i3p.Parent = "Floor", Vector3.new(0, 0, 200), i3
+
+    check(#raid:RaidIslands() == 3, "as ilhas da raid sao os Models dentro do RaidMap")
+
+    -- A mais perto da origem e a ilha 1 (50 studs).
+    local nearest = raid:NearestIsland()
+    check(nearest == i1, "a ilha mais perto e escolhida (distancia)")
+
+    -- Terminou a ilha 1: movendo o jogador pra perto da ilha 3, ela passa a ser
+    -- a mais perto -- o recalculo e o ponto do "vai pra proxima".
+    root.Position = Vector3.new(0, 0, 180)
+    check(raid:NearestIsland() == i3, "o recalculo escolhe a ilha mais perto da posicao ATUAL")
+
+    -- Dentro do RaidMap, o passo de completar acha a ilha e voa pra la. O jogador
+    -- volta pra origem pra a distancia (200 studs) valer o voo.
+    root.Position = Vector3.new(0, 0, 0)
+    check(raid:CompleteStep() == true, "com RaidMap o passo de completar acha a ilha")
+    check(motor:IsFlying() == true, "o passo de completar voa ate a ilha")
+    motor:Cancel()
+
+    -- Perto da ilha (menos de 40 studs) ele NAO reinicia o voo -- so fica
+    -- batendo. Reiniciar de perto travaria o personagem vibrando no lugar.
+    root.Position = Vector3.new(0, 0, 190)
+    motor:Cancel()
+    check(raid:CompleteStep() == true, "perto da ilha o passo de completar ainda roda")
+    check(motor:IsFlying() == false, "perto da ilha nao reinicia o voo")
+
+    -- Auto complete sem motor de teleporte recusa.
+    local bare = Raid.new()
+    check(bare:SetAutoComplete(true) == false and bare.AutoComplete == false, "sem teleporte o auto complete recusa")
+
+    -- O toggle liga e desliga a thread sem explodir.
+    check(raid:SetAutoComplete(true) == true, "com teleporte o auto complete liga")
+    check(raid:SetAutoComplete(false) == true, "o auto complete desliga")
+    check(raid.AutoComplete == false, "depois de desligar nao esta mais ativo")
+
+    raid:Destroy()
+    bare:Destroy()
+end
+
+-- O auto complete LIGA a blade hit quando ela existe, e DESLIGA ela ao desligar
+-- o toggle -- mas so se foi o proprio complete que a ligou (nao mexe na blade
+-- hit que o jogador ligou por fora).
+do
+    local ctx = bfContext(994732206, 994732206)
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+    local Raid = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "raid.lua"])()
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+    local map = Instance.new("Folder"); map.Name, map.Parent = "Map", ctx.Services.Workspace
+    local raidMap = Instance.new("Folder"); raidMap.Name, raidMap.Parent = "RaidMap", map
+    local island = Instance.new("Model"); island.Name, island.Parent = "RaidIsland1", raidMap
+    local floor = Instance.new("Part"); floor.Name, floor.Position, floor.Parent = "Floor", Vector3.new(0, 0, 300), island
+
+    -- Uma blade hit de verdade, com os remotes resolvidos.
+    local BladeHit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "bladhits.lua"])()
+    local blade = BladeHit.new()
+    check(blade:ResolveRemotes(), "a blade hit resolve os remotes pra o complete dirigir")
+
+    local raid = Raid.new({ teleport = motor, combat = blade })
+    check(blade:IsEnabled() == false, "a blade hit comeca desligada")
+    check(raid:CompleteStep() == true, "o passo de completar acha a ilha")
+    check(blade:IsEnabled() == true, "o auto complete liga a blade hit")
+    check(raid.AttackEnabled == true, "o complete marca que foi ELE que ligou o ataque")
+
+    -- Desligar o auto complete derruba o ataque que ele ligou.
+    raid:SetAutoComplete(false)
+    check(blade:IsEnabled() == false, "desligar o auto complete desliga a blade hit que ele ligou")
+    check(raid.AttackEnabled == false, "a marca de ataque ligado some")
+
+    -- Se a blade hit ja estava ligada por fora, o complete nao a derruba.
+    check(blade:Enable() == true, "a blade hit e ligada por fora")
+    raid:CompleteStep()
+    check(raid.AttackEnabled == false, "o complete nao reivindica um ataque que ja estava ligado")
+    raid:SetAutoComplete(false)
+    check(blade:IsEnabled() == true, "a blade hit do jogador continua ligada")
+
+    blade:Destroy()
+    raid:Destroy()
+end
+
+-- A raid e auto-contida e reusa DUAS pecas por injecao: o teleporte (pra ir ao-- tubo) e a blade hit (pra limpar as waves). Sem cada uma ela degrada de um jeito
 -- especifico -- sem teleporte recusa; sem blade hit entra mas nao ataca. Este
 -- bloco carrega ela sozinha e exercita a API publica.
 do

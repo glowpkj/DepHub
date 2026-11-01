@@ -406,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.20)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.21)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 808 checks):
+FEITO / FUNCIONANDO (verificado offline, 834 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -544,7 +544,7 @@ GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
 - O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
   CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
-ARQUITETURA DO BLOX FRUITS (v0.1.20) -- features proprias, uma por arquivo:
+ARQUITETURA DO BLOX FRUITS (v0.1.21) -- features proprias, uma por arquivo:
 - O usuario pegou a arvore do Blox Fruits de open source e decidiu montar o
   script dele com as features uma a uma, cada coisa no lugar certo. O molde:
   src/games/features/bloxfruits/<nome>.lua, UMA feature por arquivo.
@@ -675,6 +675,30 @@ RAID (features/bloxfruits/raid.lua) -- auto raid (v0.1.20):
   Os waits vieram do original e sao os unicos que mudam o comportamento do laco.
 - ARMADILHA: a blade hit e do usuario tambem -- pode estar ligada por ele. O
   Disable da raid para o loop e desconecta o evento, mas NAO e dono da blade hit.
+
+AUTO COMPLETE RAID -- o SEGUNDO toggle da raid (v0.1.21):
+- Faz UMA coisa: TERMINAR uma raid que ja esta rolando. NAO compra chip, NAO
+  chama o NPC, NAO aperta botao de tubo, NAO cria raid. Se a raid ainda nao
+  comecou, ele nao faz nada -- quem comeca e o Auto raid (o outro toggle).
+- Le as ilhas em workspace.Map.RaidMap (os Models/BaseParts dentro dele). A
+  posicao de uma ilha sai do GetPivot (Model) ou do .Position (BasePart).
+- "Inteligente" = DISTANCIA, e so isso: acha a ilha mais perto do jogador AGORA,
+  voa pra la, deixa a blade hit matar os bixos, e RECALCULA -- a proxima e a
+  nova mais perto. Ele nao guarda ordem; recalcular a cada passo e o que faz ele
+  avancar 1 -> 2 -> 3 naturalmente.
+- NAO filtra por dono: se a ilha de outro jogador aparecer no SEU RaidMap, ela
+  conta como qualquer outra. Foi o que o usuario pediu ("mais perto, apenas
+  isso"). Se algum dia virar problema, o filtro entra aqui.
+- PERTO NAO REXECUTA (limite de 40 studs): se o jogador ja esta colado na ilha,
+  ele NAO reemite o voo. Reiniciar o tween a cada passo travaria o personagem
+  vibrando no lugar (Go cancela o voo anterior antes de comecar o novo).
+- O toggle LIGA a blade hit quando chega numa ilha, e DESLIGA ao desligar --
+  mas so se foi ELE que ligou (AttackEnabled marca isso). Blade hit que o
+  jogador ligou por fora fica ligada. Mesma regra do Auto raid.
+- Logica que NAO existe de proposito: ele nao detecta "estou numa raid" por
+  evento (o Raids OnClientEvent pode nao chegar). Ele simplesmente olha se ha
+  RaidMap; sem RaidMap, nao ha ilha, e ele reporta "no raid map (not in a
+  raid?)". Mais simples e nao depende de evento nenhum.
 
 PAINEL POR FEATURE (v0.1.19): o backend monta o painel de uma tabela PANELS
 (categoria, aba, secao, controles por feature) em vez de hardcodar uma feature.

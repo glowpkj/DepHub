@@ -76,6 +76,9 @@ function Feature.new(options)
     local self = setmetatable({}, Feature)
     self.Enabled = false
     self.InRaid = false
+    self.AutoComplete = false
+    self.AttackEnabled = false
+    self.Threads = {}
     self.ChipBought = false
     self.Thread = nil
     self.RaidEvent = nil
@@ -104,6 +107,17 @@ end
 function Feature:_hrp()
     local character = LocalPlayer and LocalPlayer.Character
     return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+-- Tarefa nomeada (o auto complete roda em thread propria, separada do loop do
+-- auto raid, porque sao dois toggles independentes).
+function Feature:_spawn(name, body)
+    self.Threads[name] = task.spawn(body)
+end
+
+function Feature:_cancel(name)
+    local thread = self.Threads[name]
+    if thread then pcall(task.cancel, thread); self.Threads[name] = nil end
 end
 
 -- O evento que o servidor usa pra dizer que a raid comecou/terminou. E ele que
@@ -275,6 +289,124 @@ function Feature:ClearStep()
     return true
 end
 
+-- --- Auto complete raid ---------------------------------------------------
+-- O SEGUNDO toggle. Nao compra, nao cria, nao aperta botao: so TERMINA uma raid
+-- que ja esta rolando. Acha as ilhas em workspace.Map.RaidMap, vai na mais perto
+-- dele agora, mata os bixos e recalcula -- proxima mais perto, e assim por
+-- diante. Nao filtra por dono: o filtro e distancia pura. (Se a raid de outro
+-- jogador aparecer no SEU RaidMap, ela entra como qualquer outra -- se isso
+-- virar problema, o filtro entra depois.)
+
+local RAID_MAP_PATH = { "Map", "RaidMap" }
+
+-- A pasta das ilhas da raid, se a raid estiver rolando. workspace.Map.RaidMap.
+function Feature:RaidMap()
+    local map = workspace:FindFirstChild("Map")
+    if not map then return nil end
+    return map:FindFirstChild("RaidMap")
+end
+
+-- As ilhas da raid: os Models dentro do RaidMap. A ilha onde o jogador esta
+-- tambem conta (ele escolhe a mais perto, sem excluir a atual).
+function Feature:RaidIslands()
+    local raidMap = self:RaidMap()
+    if not raidMap then return {} end
+    local islands = {}
+    for _, child in ipairs(raidMap:GetChildren()) do
+        if child:IsA("Model") or child:IsA("BasePart") then
+            islands[#islands + 1] = child
+        end
+    end
+    return islands
+end
+
+-- Posicao de uma ilha. Model usa o pivot (funciona mesmo sem PrimaryPart);
+-- BasePart usa .Position direto.
+local function islandPosition(island)
+    if island:IsA("BasePart") then return island.Position end
+    local ok, pivot = pcall(function() return island:GetPivot().Position end)
+    if ok and pivot then return pivot end
+    return island.PrimaryPart and island.PrimaryPart.Position or nil
+end
+
+-- A ilha mais perto do jogador AGORA. E o coracao do "inteligente": ele nao
+-- guarda ordem, recalcula cada passo a partir de onde o personagem esta --
+-- terminou uma, a proxima passa a ser a mais perto.
+function Feature:NearestIsland()
+    local root = self:_hrp()
+    if not root then return nil end
+    local best, bestDistance
+    for _, island in ipairs(self:RaidIslands()) do
+        local position = islandPosition(island)
+        if position then
+            local distance = (position - root.Position).Magnitude
+            if not bestDistance or distance < bestDistance then
+                best, bestDistance = island, distance
+            end
+        end
+    end
+    return best, bestDistance
+end
+
+-- Um passo do auto complete: acha a ilha mais perto, voa pra la e garante o
+-- ataque ligado. Nao espera o voo terminar aqui -- o loop chama de novo e o
+-- NearestIsland recalcula; como o Go cancela o voo anterior, chamar em passo
+-- curto so reinicia o mesmo destino, que fica a cada vez mais perto.
+function Feature:CompleteStep()
+    local motor = self.Teleport
+    if not motor then
+        self.LastStatus = "no teleport motor"
+        return false
+    end
+    local island, distance = self:NearestIsland()
+    if not island then
+        self.LastStatus = "no raid map (not in a raid?)"
+        return false
+    end
+    self.AttackEnabled = self.AttackEnabled or false
+    local combat = self.Combat
+    if combat and not combat:IsEnabled() then
+        if combat:Enable() then self.AttackEnabled = true end
+    end
+    -- So voa se ainda estiver longe: perto da ilha, o voo a cada passo brigaria
+    -- com a fisica e travaria o personagem vibrando no lugar.
+    local root = self:_hrp()
+    if root and distance and distance > 40 then
+        pcall(function()
+            local position = islandPosition(island)
+            if position then motor:Go(position + Vector3.new(0, 8, 0)) end
+        end)
+    end
+    self.LastStatus = ("raid: %s (%dm)"):format(tostring(island.Name), math.floor(distance or 0))
+    return true
+end
+
+function Feature:SetAutoComplete(on)
+    self.AutoComplete = on == true
+    if not self.AutoComplete then
+        self:_cancel("complete")
+        -- Desliga junto o ataque que ESTE toggle ligou (nao mexe se o jogador
+        -- ligou a blade hit por fora).
+        if self.AttackEnabled and self.Combat then
+            pcall(function() self.Combat:Disable() end)
+            self.AttackEnabled = false
+        end
+        return true
+    end
+    if not self.Teleport then
+        self.LastError = "sem motor de teleporte"
+        self.AutoComplete = false
+        return false
+    end
+    self:_spawn("complete", function()
+        while self.AutoComplete do
+            pcall(function() self:CompleteStep() end)
+            task.wait(0.5)
+        end
+    end)
+    return true
+end
+
 -- --- Ciclo de vida --------------------------------------------------------
 
 function Feature:Enable()
@@ -324,6 +456,7 @@ function Feature:Disable()
     -- O ataque foi ligado por nos: desligue so se o raid o ligou. A blade hit e
     -- do usuario tambem -- pode estar ligada por ele.
     self:DisconnectRaidEvent()
+    self:SetAutoComplete(false)
     self.LastStatus = "idle"
     return true
 end

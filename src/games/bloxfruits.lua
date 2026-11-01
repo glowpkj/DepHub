@@ -324,7 +324,24 @@ local PANELS = {
             section:CreateDropdown("Raid element", State.RaidElements, "Flame", function(choice)
                 if State.Instances.raid then State.Instances.raid:SetElement(choice) end
             end)
-            section:CreateParagraph("Auto raid", "Buys the Microchip, flies to the raid tube, presses the button and clears the waves with the blade hit.")
+            section:CreateToggle("Auto complete raid", false, function(value)
+                if value then
+                    -- Terminar uma raid so precisa do teleporte e da blade hit:
+                    -- nada de chip, nada de NPC. Mas a blade hit tem que existir
+                    -- pra ser injetada (o complete liga ela quando chega).
+                    if State.Instances.bladhits == nil then State:SetFeature("bladhits", true) end
+                    if not State:SetFeature("raid", true) then
+                        instance.Notify("Auto complete raid", "Teleport motor ausente.")
+                        return
+                    end
+                    if not State.Instances.raid:SetAutoComplete(true) then
+                        instance.Notify("Auto complete raid", "Teleport motor ausente.")
+                        return
+                    end
+                end
+                if not value and State.Instances.raid then State.Instances.raid:SetAutoComplete(false) end
+            end)
+            section:CreateParagraph("Auto raid", "Buys the Microchip, flies to the raid tube and presses the button. Auto complete finishes a raid already running -- nearest island, then the next.")
         end,
     },
 }

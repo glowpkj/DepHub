@@ -170,6 +170,18 @@ function methods:FindFirstChild(name) for _, child in ipairs(self._children) do 
 function methods:FindFirstChildWhichIsA(class) return self:FindFirstChildOfClass(class) end
 function methods:GetDescendants() local result={}; for _,child in ipairs(self:GetChildren()) do result[#result+1]=child; for _,descendant in ipairs(child:GetDescendants()) do result[#result+1]=descendant end end; return result end
 function methods:FindFirstChildOfClass(class) for _, child in ipairs(self._children) do if child:IsA(class) then return child end end end
+-- Model:GetPivot(). The harness has no transform hierarchy, so the pivot is the
+-- first BasePart's position (what a raid island's floor gives you). Real Roblox
+-- derives it from the model's bounding box; the position is what tests assert.
+function methods:GetPivot()
+    for _, child in ipairs(self:GetChildren()) do
+        if child:IsA("BasePart") then return {Position = child.Position} end
+    end
+    for _, descendant in ipairs(self:GetDescendants()) do
+        if descendant:IsA("BasePart") then return {Position = descendant.Position} end
+    end
+    return {Position = Vector3.new(0, 0, 0)}
+end
 function methods:WaitForChild(name) return assert(self:FindFirstChild(name), "Unexpected wait: " .. name) end
 function methods:IsA(class) return class == self.ClassName or class=="BasePart" and (self.ClassName=="Part" or self.ClassName=="MeshPart") end
 function methods:IsDescendantOf(ancestor)
