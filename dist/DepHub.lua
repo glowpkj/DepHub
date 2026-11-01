@@ -9026,6 +9026,7 @@ local FEATURE_MODULES = {
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
     {name = "player", page = "Player", section = "PLAYER", toggle = "Speed multiplier"},
+    {name = "fps", page = "Player", section = "PERFORMANCE", toggle = "FPS boost"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -10610,6 +10611,36 @@ local PANELS = {
             section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, and Flashstep cooldown (0 = ready). Stun is kept at 0.")
         end,
     },
+    fps = {
+        page = "Player",
+        section = "PERFORMANCE",
+        category = "Player",
+        icon = "rocket",
+        tabIcon = "user",
+        build = function(section, instance)
+            -- FPS boost: o unico controle. Ele desliga o que o JOGO renderiza e
+            -- custa quadro (sombras, luzes/particulas, pos-processamento, reflexo
+            -- da agua), guardando cada valor pra devolver no desligamento. Nao
+            -- toca em nada de jogabilidade -- so visual.
+            --
+            -- Aqui o toggle E o liga/desliga da feature (nao um knob dentro de
+            -- uma feature sempre ligada): ligar sobe a feature e aplica o boost,
+            -- desligar derruba a feature -- que no Disable devolve o mundo.
+            local function applyBoost(value)
+                State:SetFeature("fps", value == true)
+                if value == true and State.Instances.fps then
+                    State.Instances.fps:SetBoost(true)
+                end
+            end
+            local boostToggle = section:CreateToggle("FPS boost", State.Config.fpsBoost == true, function(value)
+                applyBoost(value)
+                State.Config.fpsBoost = value == true
+            end)
+            State:RegisterConfig("fpsBoost", applyBoost, boostToggle)
+
+            section:CreateParagraph("Performance", "Turns off what the game draws and costs frames -- shadows, lights, particles, post effects and water reflection -- to raise FPS. Reversible: turning it off restores everything, and it never touches gameplay (no parts, NPCs or remotes).")
+        end,
+    },
     -- CONFIG: os botoes de salvar/carregar. Nao e uma feature (nao tem toggle
     -- nem modulo por tras): e o unico lugar que grava e devolve todas as
     -- escolhas do painel. Por isso `alwaysShow` -- o loop de UI o constroi
@@ -11579,6 +11610,294 @@ function Feature:Destroy()
     self:Disable()
     self.RegisterAttack = nil
     self.RegisterHit = nil
+end
+
+return Feature
+
+]],
+    ["src/games/features/bloxfruits/fps.lua"] = [[
+local game = game
+local type = type
+local pcall = pcall
+local ipairs = ipairs
+local pairs = pairs
+
+local Lighting = game:GetService("Lighting")
+local Workspace = game:GetService("Workspace")
+local Terrain = Workspace and Workspace:FindFirstChildOfClass("Terrain")
+
+-- Performance -- aliviar o que o JOGO renderiza, sem mexer nas features.
+--
+-- O que come FPS no Blox Fruits e o render do mapa: sombras dinamicas, luzes,
+-- efeitos de pos-processamento (bloom/raio de sol/desfoque), particulas, beams,
+-- a agua com reflexo. Isso e o custo dominante -- muito mais do que o proprio
+-- script, cujos loops sao poucos e leves.
+--
+-- Cada alavanca aqui e REVERSIVEL: guarda o valor original e devolve no
+-- desligamento. Nada e destruido -- so desativado -- entao ligar e desligar nao
+-- deixa o mapa mutilado.
+--
+-- Um objeto que nasce DEPOIS e pego por evento (Workspace/Lighting
+-- .DescendantAdded), nao por varredura periodica: a varredura completa roda UMA
+-- vez, no ligar; daqui pra frente o jogo avisa o que apareceu. Assim nao ha
+-- caminhada do mapa inteiro repetida (que num mapa de Blox Fruits custaria
+-- justamente os quadros que o boost tenta devolver) nem custo por frame.
+--
+-- Nao toca em nada que a jogabilidade use: nao remove parts do mapa, nao mexe em
+-- NPC, nao mexe em remote, nao muda a fisica. So o que e puramente visual.
+
+local Feature = {}
+Feature.__index = Feature
+
+-- As classes de EFEITO DECORATIVO escondidas. Sao coisas que so desenham (nao
+-- tem colisao, nao carregam logica de jogo) e todas expoem `Enabled`, entao
+-- esconder so devolve FPS.
+local EFFECT_CLASSES = {
+    "ParticleEmitter", "Trail", "Beam", "Smoke", "Fire", "Sparkles",
+    "PointLight", "SpotLight", "SurfaceLight",
+}
+
+-- As classes de efeito por classe -- um Set para a checagem por instance ser
+-- O(1) em vez de varrer a lista a cada objeto do mapa.
+local EFFECT_SET = {}
+for _, className in ipairs(EFFECT_CLASSES) do EFFECT_SET[className] = true end
+
+-- Os efeitos de pos-processamento da Lighting: cada um custa um passe na GPU.
+-- Desativar devolve quadro.
+local POST_FX_CLASSES = {
+    "BlurEffect", "SunRaysEffect", "BloomEffect", "DepthOfFieldEffect",
+    "ColorCorrectionEffect",
+}
+
+local POST_FX_SET = {}
+for _, className in ipairs(POST_FX_CLASSES) do POST_FX_SET[className] = true end
+
+-- Guarda um valor original so UMA vez por instance (idempotente: rodar de novo
+-- sobre o mesmo alvo nao empilha).
+local function remember(map, instance, value)
+    if map[instance] == nil then map[instance] = value end
+end
+
+-- Um objeto nasceu (ou a Lighting mudou): se ele for de uma classe que a feature
+-- desliga, aplica agora. Este e o caminho que pega efeitos NOVOS sem varrer o
+-- mapa inteiro de tempos em tempos -- a varredura completa roda uma vez so, no
+-- ligar, e daqui pra frente o jogo avisa o que nasceu.
+function Feature:_OnDescendantAdded(item)
+    if not self.BoostOn then return end
+    if type(item) ~= "table" and type(item) ~= "userdata" then return end
+    local ok, className = pcall(function() return item.ClassName end)
+    if not ok then return end
+    if EFFECT_SET[className] then
+        self:_DisableEffect(item)
+    elseif POST_FX_SET[className] then
+        self:_DisablePostFx(item)
+    else
+        -- Part nova: tira a sombra dela tambem (o sol nao projeta mais). IsA
+        -- cobre toda subclasse de BasePart de uma vez (Wedge, Truss, Mesh...).
+        local okPart, isPart = pcall(function() return item:IsA("BasePart") end)
+        if okPart and isPart and item.CastShadow then
+            remember(self.SavedShadowParts, item, item.CastShadow)
+            pcall(function() item.CastShadow = false end)
+        end
+    end
+end
+
+-- Desliga UM efeito decorativo (Enabled = false), guardando o original. Usado
+-- pela varredura inicial e pelo DescendantAdded.
+function Feature:_DisableEffect(item)
+    if item.Enabled == nil then return end
+    remember(self.SavedEffects, item, item.Enabled)
+    pcall(function() item.Enabled = false end)
+end
+
+-- Desliga UM efeito de pos-processamento da Lighting.
+function Feature:_DisablePostFx(item)
+    remember(self.SavedPostFx, item, item.Enabled)
+    pcall(function() item.Enabled = false end)
+end
+
+function Feature.new(options)
+    options = options or {}
+    local self = setmetatable({}, Feature)
+    self.Enabled = false
+    -- As conexoes do DescendantAdded (Workspace e Lighting) enquanto o boost
+    -- esta ligado. Sao poucas e de vida curta: nascem no SetBoost(true) e morrem
+    -- no SetBoost(false) -- nao ha nada escutando com o boost desligado.
+    self.Connections = {}
+    -- O estado que a feature mexeu, pra devolver exatamente como estava. Os
+    -- mapas guardam instance -> valor original; restauram no disable.
+    self.SavedShadowParts = {}   -- BasePart -> CastShadow original
+    self.SavedEffects = {}       -- efeito -> Enabled original
+    self.SavedPostFx = {}        -- efeito de Lighting -> Enabled original
+    self.SavedLighting = {}      -- propriedades soltas (GlobalShadows, agua)
+    -- O que esta ligado (a unica alavanca).
+    self.BoostOn = false
+    return self
+end
+
+-- --- Alavancas -------------------------------------------------------------
+-- Cada uma e idempotente: chamar de novo com o mesmo alvo nao empilha (o valor
+-- original so e guardado na primeira vez).
+
+-- 1) Sombras dinamicas: o maior custo isolado do render. Lighting.GlobalShadows
+--    desliga as sombras globais; o CastShadow por part desliga as sombras que o
+--    sol projeta daquela peca.
+function Feature:_ApplyShadows()
+    if type(Lighting.GlobalShadows) == "boolean" then
+        remember(self.SavedLighting, "GlobalShadows", Lighting.GlobalShadows)
+        pcall(function() Lighting.GlobalShadows = false end)
+    end
+    local ok, descendants = pcall(function() return Workspace:GetDescendants() end)
+    if not ok or type(descendants) ~= "table" then return end
+    for _, item in ipairs(descendants) do
+        if item:IsA("BasePart") and item.CastShadow then
+            remember(self.SavedShadowParts, item, item.CastShadow)
+            pcall(function() item.CastShadow = false end)
+        end
+    end
+end
+
+-- 2) Efeitos decorativos (particulas, beams, fogo, fumaca, luzes). Esconder
+--    devolve o custo de desenho deles sem tocar em nada de logica.
+function Feature:_ApplyEffects()
+    local ok, descendants = pcall(function() return Workspace:GetDescendants() end)
+    if not ok or type(descendants) ~= "table" then return end
+    for _, item in ipairs(descendants) do
+        if type(item) == "table" or type(item) == "userdata" then
+            local okClass, className = pcall(function() return item.ClassName end)
+            if okClass and EFFECT_SET[className] then self:_DisableEffect(item) end
+        end
+    end
+end
+
+-- 3) Pos-processamento da Lighting (bloom, raio de sol, desfoque...). Cada um e
+--    um passe de tela cheia na GPU.
+function Feature:_ApplyPostFx()
+    local ok, children = pcall(function() return Lighting:GetChildren() end)
+    if not ok or type(children) ~= "table" then return end
+    for _, child in ipairs(children) do
+        if type(child) == "table" or type(child) == "userdata" then
+            local okClass, className = pcall(function() return child.ClassName end)
+            if okClass and POST_FX_SET[className] then self:_DisablePostFx(child) end
+        end
+    end
+end
+
+-- 4) Terreno: a agua com reflexo e a decoracao sao caras. Reduz o que da sem
+--    remover a agua (que a jogabilidade usa pra nadar).
+function Feature:_ApplyTerrain()
+    if not Terrain then return end
+    pcall(function()
+        if type(Terrain.WaterReflectance) == "number" then
+            remember(self.SavedLighting, "WaterReflectance", Terrain.WaterReflectance)
+            Terrain.WaterReflectance = 0
+        end
+        if type(Terrain.WaterWaveSize) == "number" then
+            remember(self.SavedLighting, "WaterWaveSize", Terrain.WaterWaveSize)
+            Terrain.WaterWaveSize = 0
+        end
+        if type(Terrain.Decoration) == "boolean" then
+            remember(self.SavedLighting, "TerrainDecoration", Terrain.Decoration)
+            Terrain.Decoration = false
+        end
+    end)
+end
+
+function Feature:_ApplyAll()
+    self:_ApplyShadows()
+    self:_ApplyEffects()
+    self:_ApplyPostFx()
+    self:_ApplyTerrain()
+end
+
+-- --- Reversao --------------------------------------------------------------
+
+-- Devolve tudo que foi mexido e zera os mapas. So reescreve em quem ainda esta
+-- vivo (Parent); quem morreu no meio do caminho nao precisa (e nao da) voltar.
+function Feature:_RestoreAll()
+    for item, value in pairs(self.SavedShadowParts) do
+        if item.Parent then pcall(function() item.CastShadow = value end) end
+    end
+    for item, value in pairs(self.SavedEffects) do
+        if item.Parent then pcall(function() item.Enabled = value end) end
+    end
+    for item, value in pairs(self.SavedPostFx) do
+        if item.Parent then pcall(function() item.Enabled = value end) end
+    end
+    pcall(function()
+        if self.SavedLighting.GlobalShadows ~= nil then Lighting.GlobalShadows = self.SavedLighting.GlobalShadows end
+        if self.SavedLighting.WaterReflectance ~= nil and Terrain then Terrain.WaterReflectance = self.SavedLighting.WaterReflectance end
+        if self.SavedLighting.WaterWaveSize ~= nil and Terrain then Terrain.WaterWaveSize = self.SavedLighting.WaterWaveSize end
+        if self.SavedLighting.TerrainDecoration ~= nil and Terrain then Terrain.Decoration = self.SavedLighting.TerrainDecoration end
+    end)
+    self.SavedShadowParts = {}
+    self.SavedEffects = {}
+    self.SavedPostFx = {}
+    self.SavedLighting = {}
+end
+
+-- --- Controles -------------------------------------------------------------
+
+-- Escuta o que nasce no Workspace e na Lighting enquanto o boost esta ligado. E
+-- o que substitui a varredura periodica: o jogo avisa o objeto novo e a feature
+-- desliga na hora, sem caminhar o mapa inteiro de novo.
+function Feature:_Listen()
+    if self.Connections[1] then return end
+    local okWs, wsConn = pcall(function()
+        return Workspace.DescendantAdded:Connect(function(item) self:_OnDescendantAdded(item) end)
+    end)
+    if okWs then self.Connections[#self.Connections + 1] = wsConn end
+    local okLight, lightConn = pcall(function()
+        return Lighting.DescendantAdded:Connect(function(item) self:_OnDescendantAdded(item) end)
+    end)
+    if okLight then self.Connections[#self.Connections + 1] = lightConn end
+end
+
+function Feature:_Unlisten()
+    for _, connection in ipairs(self.Connections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    self.Connections = {}
+end
+
+-- O toggle do FPS boost. Ligado: aplica tudo uma vez e passa a escutar o que
+-- nasce depois. Desligado: para de escutar e devolve o mapa ao estado original.
+function Feature:SetBoost(on)
+    on = on == true
+    if on == self.BoostOn then return true end
+    self.BoostOn = on
+    if not on then
+        self:_Unlisten()
+        self:_RestoreAll()
+        return true
+    end
+    self:_ApplyAll()
+    self:_Listen()
+    return true
+end
+
+-- --- Ciclo de vida ---------------------------------------------------------
+
+function Feature:Enable()
+    if self.Enabled then return true end
+    self.Enabled = true
+    return true
+end
+
+function Feature:Disable()
+    self.Enabled = false
+    self:SetBoost(false)
+    return true
+end
+
+function Feature:IsEnabled()
+    return self.Enabled == true
+end
+
+function Feature:Destroy()
+    self:SetBoost(false)
+    self.Enabled = false
+    self:_Unlisten()
 end
 
 return Feature
@@ -12854,6 +13173,11 @@ local TARGET_GRACE = 0.75
 -- A cor do beam (do script original, Color3.fromRGB(120, 50, 200) -- roxo escuro).
 local BEAM_COLOR = Color3.fromRGB(120, 50, 200)
 
+-- Quantas vezes o Heartbeat ainda tenta resolver os remotes que faltam. Com o
+-- aim ligado antes do Net do jogo existir, isto cobre uns bons segundos de
+-- tentativas; depois para -- nao fica re-tentando 60x/s pra sempre.
+local REMOTE_RESOLVE_RETRIES = 120
+
 -- Os limites do alcance, como o usuario pediu: minimo 500, padrao 500, maximo
 -- 1000. O slider e montado pelo backend com estes numeros.
 Feature.MIN_RANGE = 500
@@ -12917,6 +13241,11 @@ function Feature.new(options)
     self.Beam = nil
     self.LocalAttachment = nil
     self.TargetAttachment = nil
+    -- As closures hoistadas dos handlers de frame e o contador de tentativas de
+    -- re-resolver os remotes. Zerados no new; o Enable os (re)arma.
+    self._selectStep = nil
+    self._updateBeam = nil
+    self._remoteRetries = 0
     return self
 end
 
@@ -13309,29 +13638,41 @@ function Feature:Enable()
 
     -- O remote do clique (M1/ar). Se nao achar, o aim das skills segue normal.
     self:ResolveRemotes()
+    -- Quantas vezes ainda vale tentar re-resolver os remotes que faltam. Antes
+    -- isto tentava TODO frame, sem teto: se um remote nunca aparecesse (nome
+    -- diferente, remoto removido), ficaria 60 tentativas/s pra sempre. Agora
+    -- tenta por um instante e para -- se os dois resolverem antes, para na hora.
+    self._remoteRetries = REMOTE_RESOLVE_RETRIES
 
     -- O indicador visual nasce aqui e morre no Disable.
     self:_CreateBeam()
 
     -- A selecao de alvo roda no Heartbeat (nao no RenderStepped: a mira e logica,
-    -- nao precisa desenhar nada).
-    self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function()
+    -- nao precisa desenhar nada). As closures de pcall sao HOISTADAS (criadas uma
+    -- vez, nao a cada frame): alocar duas closures por frame era lixo de GC a
+    -- toa num loop que roda 60x/s.
+    local function selectStep()
         if not self.Enabled then return end
-        pcall(function() self:_SelectStep() end)
+        pcall(self._SelectStep, self)
         -- Os remotes (RegisterHit/RegisterAttack) podem ainda nao existir quando
-        -- o aim liga (o jogo monta o Net depois). Tenta de novo ate achar os
-        -- dois, pra o CLIQUE e o gatilho do golpe serem pegos tambem.
-        if self.RegisterHit == nil or self.RegisterAttack == nil then
-            pcall(function() self:ResolveRemotes() end)
+        -- o aim liga (o jogo monta o Net depois). Tenta mais algumas vezes pra o
+        -- CLIQUE e o gatilho do golpe serem pegos -- mas com teto.
+        if self._remoteRetries > 0 and (self.RegisterHit == nil or self.RegisterAttack == nil) then
+            self._remoteRetries = self._remoteRetries - 1
+            pcall(self.ResolveRemotes, self)
         end
-    end)
+    end
+    self._selectStep = selectStep
+    self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(selectStep)
 
     -- O beam segue a cada frame: liga a tua HRP a do alvo, ou esconde quando nao
     -- ha alvo / a excecao esta ativa.
-    self.Connections[#self.Connections + 1] = RunService.RenderStepped:Connect(function()
+    local function updateBeam()
         if not self.Enabled then return end
-        pcall(function() self:_UpdateBeam() end)
-    end)
+        pcall(self._UpdateBeam, self)
+    end
+    self._updateBeam = updateBeam
+    self.Connections[#self.Connections + 1] = RunService.RenderStepped:Connect(updateBeam)
 
     -- Teclas de excecao: segurar larga o aim; soltar conta o grace.
     self.Connections[#self.Connections + 1] = UserInputService.InputBegan:Connect(function(io)
@@ -13363,6 +13704,11 @@ function Feature:Disable()
     self.RegisterAttack = nil
     self.HitId = nil
     self.LastAttackAt = 0
+    -- Solta as closures dos handlers (elas fechavam sobre o self; mantendo-as
+    -- aqui o self nunca seria coletado depois de um Disable).
+    self._selectStep = nil
+    self._updateBeam = nil
+    self._remoteRetries = 0
     return true
 end
 
@@ -24416,7 +24762,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known. The island teleport toggle now really stops the teleport: turning it off (or anything tied to it) cancels the flight in progress -- the motor's tween is cancelled so the character stops being dragged, the arrival watcher is disarmed, and collision is restored -- instead of only refusing to start new flights and letting the current one finish. The teleport motor is lighter per frame: the noclip pass no longer walks Character:GetDescendants() every Heartbeat (the heavy part of the flight loop); the BasePart list is cached and rebuilt only when the character changes (respawn), so the normal frame just zeroes velocity and flips CanCollide on a short cached array. Saving the panel config is also hardened: the file API is read from both the chunk globals and getgenv() (an executor that publishes only one used to fall back to memory in silence, which is the "it does not save" the user hit), the Save reads the file back after writing and only reports success when the bytes are really there, and a failed Save now names the real reason (no file API, writefile refused, or the file did not come back) instead of a generic "session only".
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Silent aim also gained a Debug logs switch in its section: turn it on and every attack that goes out prints, in the console, the remote name and the type of each argument it carries -- so if an attack still does not take the target, the print shows exactly what that attack sends instead of guessing. The click's slot index was corrected to where the game actually puts the part (the first argument of the call is the remote itself). Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects. Blox Fruits also gains silent aim click support: the left-click/mouse attack, which the game sends through its RegisterHit remote with the target part in the argument after the remote itself, is redirected to the locked target's HumanoidRootPart the same way the keyboard skills are -- no target, the click goes out untouched. A Debug logs switch on the Silent aim section prints, in the console, the name and argument types of every outgoing attack remote (rate-limited per remote), so if an attack still does not take the target the print shows what that attack actually sends on the user's executor instead of guessing. And the panel config is now saved and loaded: the commands in every control are recorded, Save config writes them to DepHub_BloxFruits_config.json through the executor's file API (kept in memory when the executor has none) and Load config puts them back, applying to both the live state and the on-screen controls. The config is also loaded automatically on start, so a saved setup comes back without pressing anything. Silent aim now lands the hit instead of only aiming: the debug prints showed the natural click does not send the game's RegisterHit from the client on this build, and rewriting the position argument of the skill remotes alone does not guarantee the hit -- so when the game opens a swing (RegisterAttack), the aim fires a RegisterHit directly at the locked target's HumanoidRootPart, which is the path that actually registers damage (the same one the blade hit uses). It reuses the hitId the game already sent (or generates one in the same format when none was seen yet), fires it out of band so it does not re-enter the hook, and caps it at one forged hit per swing. The debug print now shows the real remote name, the Instance name in the part slot and the actual Vector3 coordinates, so an attack can be identified instead of showing just "RemoteEvent". The CONFIG section gains an Auto execute toggle: turned on, the hub re-runs itself after the next teleport through the executor's queue_on_teleport, so the script comes back up without pasting it again; it is saved like the rest, so a saved on re-queues on the next start, and an executor without queue_on_teleport says so instead of pretending it turned on. The fruit ESP gets a clearer look and a tracer: the highlight is a brighter fill with a white outline drawn always-on-top so a fruit stands out from the ground, the label shows the fruit name and the distance in the fruit's own yellow, and a new Fruit tracer toggle -- separate from Fruit ESP, since highlight and distance still come with the ESP -- draws a yellow beam from your character to each fruit, created per fruit on enable and destroyed on disable. The Fruit tracer choice is saved with the rest of the panel. The silent aim Debug logs switch and its console prints are gone, since they did their job and the natural click path is now known. The island teleport toggle now really stops the teleport: turning it off (or anything tied to it) cancels the flight in progress -- the motor's tween is cancelled so the character stops being dragged, the arrival watcher is disarmed, and collision is restored -- instead of only refusing to start new flights and letting the current one finish. The teleport motor is lighter per frame: the noclip pass no longer walks Character:GetDescendants() every Heartbeat (the heavy part of the flight loop); the BasePart list is cached and rebuilt only when the character changes (respawn), so the normal frame just zeroes velocity and flips CanCollide on a short cached array. Saving the panel config is also hardened: the file API is read from both the chunk globals and getgenv() (an executor that publishes only one used to fall back to memory in silence, which is the "it does not save" the user hit), the Save reads the file back after writing and only reports success when the bytes are really there, and a failed Save now names the real reason (no file API, writefile refused, or the file did not come back) instead of a generic "session only". Blox Fruits gains an FPS boost on the Player tab. One toggle turns off what the game draws and costs the most frames -- dynamic shadows (Lighting.GlobalShadows and the CastShadow of the map's parts), decorative effects (particles, trails, beams, smoke, fire, sparkles and point/spot/surface lights), the screen-space post effects on Lighting (bloom, sun rays, blur, depth of field, colour correction) and the terrain's water reflection and decoration. It is fully reversible: every value is remembered and put back when you turn it off, nothing is deleted, it never touches gameplay (no parts removed, no NPCs, no remotes, no physics), and it does not walk the map on a timer -- the full scan runs once when you turn it on and anything created afterwards is caught by the Workspace/Lighting DescendantAdded event, so it costs nothing per frame. Also, the script's own per-frame cost is lighter when the aim is on: the silent aim no longer allocates two closures every frame in its Heartbeat/RenderStepped handlers, and its retry to find the game's attack remotes is now bounded instead of running sixty times a second forever if a remote never shows up.
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.

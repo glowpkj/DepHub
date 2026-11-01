@@ -582,9 +582,18 @@ local function sandbox(placeId, gameId)
     for _, name in ipairs({"Button1Down", "Button1Up", "MouseMove", "KeyPress", "CaptureController", "ClickButton1", "MoveMouseRel"}) do
         vuser[name] = function() end
     end
+    -- Lighting is a real Instance double (not a plain table): the FPS feature
+    -- reads/writes Lighting.GlobalShadows and walks Lighting:GetChildren() for
+    -- post-processing effects. Terrain lives as a child of Workspace (the FPS
+    -- feature finds it with FindFirstChildOfClass and lowers water reflection).
+    local lighting = Instance.new("Lighting")
+    lighting.GlobalShadows = true
+    local wsInstance = Instance.new("Workspace")
+    local terrain = Instance.new("Terrain")
+    terrain.Parent = wsInstance
     local services = {Players=players, RunService=run, UserInputService=input, TeleportService=teleport,
         TweenService=tween, VirtualInputManager=vim, VirtualUser=vuser,
-        Workspace=Instance.new("Workspace"), Teams=Instance.new("Teams"), Lighting={},
+        Workspace=wsInstance, Teams=Instance.new("Teams"), Lighting=lighting,
         ReplicatedStorage=Instance.new("ReplicatedStorage"), TextChatService=Instance.new("TextChatService"), HttpService={}}
     -- Minimal JSON codec for config round-trips: the config is flat scalars plus
     -- at most one level of nesting (keys, bounty), which is all this needs to

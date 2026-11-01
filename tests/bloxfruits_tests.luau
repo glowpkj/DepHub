@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "silentaim", "fruit", "islands", "player"}
+local FEATURES = {"bladhits", "silentaim", "fruit", "islands", "player", "fps"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -160,7 +160,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "fruit" or name == "islands" or name == "player", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "fruit" or name == "islands" or name == "player" or name == "fps", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -1391,4 +1391,122 @@ do
     check(state.Features.bladhits ~= nil, "a blade hit carrega na rota do Sea 1")
     check(state.Infra.teleport ~= nil, "o motor de teleporte carrega na rota do Sea 1")
     check(ctx.State.__DEPHUB.BloxFruits == state, "o contrato do loader aponta pro backend")
+end
+
+
+-- FPS / Performance: a feature mexe SO no visual que o JOGO renderiza e que
+-- custa quadro -- sombras, luzes/particulas, pos-processamento, reflexo da
+-- agua. Tudo REVERSIVEL: guarda o valor original e devolve no desligar. Nada de
+-- jogabilidade e tocado. O teste monta um mundo com esses objetos, liga o boost,
+-- confere que cada alavanca agiu, e desliga conferindo a volta exata.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Factory = sources[FEATURE_PREFIX .. "fps.lua"]
+    local Fps = ctx.Env.loadstring(Factory)()
+    check(type(Fps) == "table" and type(Fps.new) == "function", "a feature de FPS carrega sozinha e publica new()")
+
+    local ws = ctx.Services.Workspace
+    local lighting = ctx.Services.Lighting
+    -- Sombras: o jogo liga GlobalShadows por padrao; uma part com CastShadow.
+    lighting.GlobalShadows = true
+    local part = Instance.new("Part"); part.Name, part.Parent = "MapPart", ws
+    part.CastShadow = true
+    -- Efeito decorativo: um ParticleEmitter com Enabled.
+    local emitter = Instance.new("ParticleEmitter"); emitter.Name, emitter.Parent = "Sparks", part
+    emitter.Enabled = true
+    -- Pos-processamento na Lighting.
+    local bloom = Instance.new("BloomEffect"); bloom.Name, bloom.Parent = "Bloom", lighting
+    bloom.Enabled = true
+    -- Terreno: reflexo da agua.
+    local terrain = ws:FindFirstChildOfClass("Terrain")
+    check(terrain ~= nil, "o harness expoe o Terrain do Workspace")
+    terrain.WaterReflectance = 0.8
+
+    local feature = Fps.new()
+    check(feature:Enable() == true and feature:IsEnabled() == true, "a feature liga")
+    check(feature:SetBoost(true) == true, "o boost aceita ligar")
+
+    -- Cada alavanca agiu.
+    check(lighting.GlobalShadows == false, "o boost desliga as sombras globais")
+    check(part.CastShadow == false, "o boost tira o CastShadow das parts")
+    check(emitter.Enabled == false, "o boost esconde o ParticleEmitter")
+    check(bloom.Enabled == false, "o boost desliga o Bloom (pos-processamento)")
+    check(terrain.WaterReflectance == 0, "o boost zera o reflexo da agua")
+
+    -- O boost escuta o que nasce depois (DescendantAdded), em vez de varrer o
+    -- mapa de tempos em tempos -- sem custo por frame.
+    check(#feature.Connections == 2, "o boost conecta DescendantAdded no Workspace e na Lighting")
+
+    -- Um efeito NOVO nasce com o boost ligado: o evento o pega na hora, sem
+    -- perder o original de quem ja estava aceso.
+    local late = Instance.new("Fire"); late.Name, late.Parent = "LateFire", part
+    late.Enabled = true
+    ws.DescendantAdded:Fire(late)
+    check(late.Enabled == false, "um efeito que nasce depois e pego pelo DescendantAdded")
+    check(feature.SavedEffects[late] == true, "o original do efeito novo e guardado")
+
+    -- Uma part NOVA tambem tem a sombra tirada pelo mesmo evento.
+    local latePart = Instance.new("Part"); latePart.Name, latePart.Parent = "LatePart", ws
+    latePart.CastShadow = true
+    ws.DescendantAdded:Fire(latePart)
+    check(latePart.CastShadow == false, "uma part nova tem o CastShadow tirado pelo evento")
+
+    -- Desligar devolve TUDO ao estado original.
+    check(feature:SetBoost(false) == true, "o boost aceita desligar")
+    check(lighting.GlobalShadows == true, "desligar devolve as sombras globais")
+    check(part.CastShadow == true, "desligar devolve o CastShadow")
+    check(emitter.Enabled == true, "desligar devolve o ParticleEmitter")
+    check(late.Enabled == true, "desligar devolve o efeito que nasceu depois")
+    check(latePart.CastShadow == true, "desligar devolve o CastShadow da part nova")
+    check(bloom.Enabled == true, "desligar devolve o Bloom")
+    check(terrain.WaterReflectance == 0.8, "desligar devolve o reflexo da agua")
+    check(#feature.Connections == 0, "desligar solta as conexoes de DescendantAdded")
+
+    -- Idempotencia: ligar de novo e uma nova passada limpa os mapas -- nada
+    -- empilha e o segundo desligar ainda devolve o original.
+    feature:SetBoost(true)
+    check(lighting.GlobalShadows == false, "religar reaplica")
+    feature:SetBoost(false)
+    check(lighting.GlobalShadows == true, "o segundo desligar ainda devolve o original")
+
+    -- Disable tambem desliga o boost (nao deixa o mundo mutilado atras).
+    feature:SetBoost(true)
+    feature:Disable()
+    check(feature:IsEnabled() == false, "o Disable desliga a feature")
+    check(lighting.GlobalShadows == true, "o Disable devolve o mundo (o boost sai junto)")
+
+    feature:Destroy()
+end
+
+-- FPS pelo painel: o toggle "FPS boost" liga a feature e aplica o boost; a
+-- escolha entra na config como fpsBoost e volta no round-trip.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    local labels = {}
+    for _, control in ipairs(ui.Library._Controls) do
+        labels[control.Kind .. ":" .. tostring(control.Label)] = control
+    end
+    local boostToggle = labels["toggle:FPS boost"]
+    check(boostToggle ~= nil, "o painel monta o toggle FPS boost")
+
+    boostToggle.Handle:SetValue(true)
+    check(state:GetToggle("fps") == true, "o toggle do painel liga a feature de FPS")
+    check(state.Instances.fps ~= nil and state.Instances.fps:IsEnabled() == true, "a feature liga pelo toggle")
+    check(state.Instances.fps.BoostOn == true, "o toggle do painel aplica o boost")
+    check(state.Config.fpsBoost == true, "mexer no FPS boost grava no Config")
+
+    -- Desligar pelo painel devolve o mundo (o boost sai junto).
+    boostToggle.Handle:SetValue(false)
+    check(state:GetToggle("fps") == false, "o toggle do painel desliga")
+    check(state.Instances.fps.BoostOn == false, "desligar pelo painel tira o boost")
+
+    -- Config: a chave fpsBoost volta pelo arquivo como as outras.
+    state.Config.fpsBoost = true
+    ctx.Env.writefile("DepHub_BloxFruits_config.json", state:EncodeConfig())
+    local parsed = state:ReadConfig()
+    check(parsed.fpsBoost == true, "o fpsBoost sobrevive ao round-trip da config")
+
+    state:Destroy()
 end

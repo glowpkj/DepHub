@@ -56,6 +56,7 @@ local FEATURE_MODULES = {
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
     {name = "player", page = "Player", section = "PLAYER", toggle = "Speed multiplier"},
+    {name = "fps", page = "Player", section = "PERFORMANCE", toggle = "FPS boost"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -888,6 +889,36 @@ local PANELS = {
             State:RegisterConfig("flashstep", applyFlashstep, flashHandle)
 
             section:CreateParagraph("Player", "Local player only: speed multiplier (game default 2.3), Unbreakable, water walk, and Flashstep cooldown (0 = ready). Stun is kept at 0.")
+        end,
+    },
+    fps = {
+        page = "Player",
+        section = "PERFORMANCE",
+        category = "Player",
+        icon = "rocket",
+        tabIcon = "user",
+        build = function(section, instance)
+            -- FPS boost: o unico controle. Ele desliga o que o JOGO renderiza e
+            -- custa quadro (sombras, luzes/particulas, pos-processamento, reflexo
+            -- da agua), guardando cada valor pra devolver no desligamento. Nao
+            -- toca em nada de jogabilidade -- so visual.
+            --
+            -- Aqui o toggle E o liga/desliga da feature (nao um knob dentro de
+            -- uma feature sempre ligada): ligar sobe a feature e aplica o boost,
+            -- desligar derruba a feature -- que no Disable devolve o mundo.
+            local function applyBoost(value)
+                State:SetFeature("fps", value == true)
+                if value == true and State.Instances.fps then
+                    State.Instances.fps:SetBoost(true)
+                end
+            end
+            local boostToggle = section:CreateToggle("FPS boost", State.Config.fpsBoost == true, function(value)
+                applyBoost(value)
+                State.Config.fpsBoost = value == true
+            end)
+            State:RegisterConfig("fpsBoost", applyBoost, boostToggle)
+
+            section:CreateParagraph("Performance", "Turns off what the game draws and costs frames -- shadows, lights, particles, post effects and water reflection -- to raise FPS. Reversible: turning it off restores everything, and it never touches gameplay (no parts, NPCs or remotes).")
         end,
     },
     -- CONFIG: os botoes de salvar/carregar. Nao e uma feature (nao tem toggle

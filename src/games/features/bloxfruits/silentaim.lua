@@ -76,6 +76,11 @@ local TARGET_GRACE = 0.75
 -- A cor do beam (do script original, Color3.fromRGB(120, 50, 200) -- roxo escuro).
 local BEAM_COLOR = Color3.fromRGB(120, 50, 200)
 
+-- Quantas vezes o Heartbeat ainda tenta resolver os remotes que faltam. Com o
+-- aim ligado antes do Net do jogo existir, isto cobre uns bons segundos de
+-- tentativas; depois para -- nao fica re-tentando 60x/s pra sempre.
+local REMOTE_RESOLVE_RETRIES = 120
+
 -- Os limites do alcance, como o usuario pediu: minimo 500, padrao 500, maximo
 -- 1000. O slider e montado pelo backend com estes numeros.
 Feature.MIN_RANGE = 500
@@ -139,6 +144,11 @@ function Feature.new(options)
     self.Beam = nil
     self.LocalAttachment = nil
     self.TargetAttachment = nil
+    -- As closures hoistadas dos handlers de frame e o contador de tentativas de
+    -- re-resolver os remotes. Zerados no new; o Enable os (re)arma.
+    self._selectStep = nil
+    self._updateBeam = nil
+    self._remoteRetries = 0
     return self
 end
 
@@ -531,29 +541,41 @@ function Feature:Enable()
 
     -- O remote do clique (M1/ar). Se nao achar, o aim das skills segue normal.
     self:ResolveRemotes()
+    -- Quantas vezes ainda vale tentar re-resolver os remotes que faltam. Antes
+    -- isto tentava TODO frame, sem teto: se um remote nunca aparecesse (nome
+    -- diferente, remoto removido), ficaria 60 tentativas/s pra sempre. Agora
+    -- tenta por um instante e para -- se os dois resolverem antes, para na hora.
+    self._remoteRetries = REMOTE_RESOLVE_RETRIES
 
     -- O indicador visual nasce aqui e morre no Disable.
     self:_CreateBeam()
 
     -- A selecao de alvo roda no Heartbeat (nao no RenderStepped: a mira e logica,
-    -- nao precisa desenhar nada).
-    self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function()
+    -- nao precisa desenhar nada). As closures de pcall sao HOISTADAS (criadas uma
+    -- vez, nao a cada frame): alocar duas closures por frame era lixo de GC a
+    -- toa num loop que roda 60x/s.
+    local function selectStep()
         if not self.Enabled then return end
-        pcall(function() self:_SelectStep() end)
+        pcall(self._SelectStep, self)
         -- Os remotes (RegisterHit/RegisterAttack) podem ainda nao existir quando
-        -- o aim liga (o jogo monta o Net depois). Tenta de novo ate achar os
-        -- dois, pra o CLIQUE e o gatilho do golpe serem pegos tambem.
-        if self.RegisterHit == nil or self.RegisterAttack == nil then
-            pcall(function() self:ResolveRemotes() end)
+        -- o aim liga (o jogo monta o Net depois). Tenta mais algumas vezes pra o
+        -- CLIQUE e o gatilho do golpe serem pegos -- mas com teto.
+        if self._remoteRetries > 0 and (self.RegisterHit == nil or self.RegisterAttack == nil) then
+            self._remoteRetries = self._remoteRetries - 1
+            pcall(self.ResolveRemotes, self)
         end
-    end)
+    end
+    self._selectStep = selectStep
+    self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(selectStep)
 
     -- O beam segue a cada frame: liga a tua HRP a do alvo, ou esconde quando nao
     -- ha alvo / a excecao esta ativa.
-    self.Connections[#self.Connections + 1] = RunService.RenderStepped:Connect(function()
+    local function updateBeam()
         if not self.Enabled then return end
-        pcall(function() self:_UpdateBeam() end)
-    end)
+        pcall(self._UpdateBeam, self)
+    end
+    self._updateBeam = updateBeam
+    self.Connections[#self.Connections + 1] = RunService.RenderStepped:Connect(updateBeam)
 
     -- Teclas de excecao: segurar larga o aim; soltar conta o grace.
     self.Connections[#self.Connections + 1] = UserInputService.InputBegan:Connect(function(io)
@@ -585,6 +607,11 @@ function Feature:Disable()
     self.RegisterAttack = nil
     self.HitId = nil
     self.LastAttackAt = 0
+    -- Solta as closures dos handlers (elas fechavam sobre o self; mantendo-as
+    -- aqui o self nunca seria coletado depois de um Disable).
+    self._selectStep = nil
+    self._updateBeam = nil
+    self._remoteRetries = 0
     return true
 end
 

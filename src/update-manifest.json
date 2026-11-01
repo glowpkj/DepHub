@@ -1,6 +1,6 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-01T06:32:07.693Z",
+  "generatedAt": "2026-11-01T06:41:35.536Z",
   "commit": "local",
   "version": "0.1.27",
   "games": {
@@ -29,7 +29,7 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "f647f9110ace037e01560531c4ac344c13868206c4774c4638a9cfba55910ddd",
+      "version": "1bac7d59d4ce2329ad620e43885536dc86f70aaa3fb31a55ba680a3c9fb6ed7a",
       "commit": "local",
       "files": [
         "DepHub.lua",
@@ -44,6 +44,7 @@
         "src/games/features/bloxfruits/islands.lua",
         "src/games/features/bloxfruits/silentaim.lua",
         "src/games/features/bloxfruits/player.lua",
+        "src/games/features/bloxfruits/fps.lua",
         "src/games/features/bloxfruits/teleport.lua",
         "src/games/updates/994732206.txt",
         "src/core/updater.lua",
@@ -152,7 +153,7 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "b5a9ae6c80e906d05f24ba87b7fc675957d832c6eebf2f526b3e9aa31b8d2d50",
+      "version": "c46ba22bcf6c96625229585a02f60398488121ec52a4d350bf34ac634dfa9a4e",
       "commit": "local",
       "files": [
         "DepHub.lua",
@@ -167,6 +168,7 @@
         "src/games/features/bloxfruits/islands.lua",
         "src/games/features/bloxfruits/silentaim.lua",
         "src/games/features/bloxfruits/player.lua",
+        "src/games/features/bloxfruits/fps.lua",
         "src/games/features/bloxfruits/teleport.lua",
         "src/games/updates/85211729168715.txt",
         "src/core/updater.lua",
