@@ -239,8 +239,10 @@ do
 end
 
 -- No executor debug library (an executor without getupvalue/setupvalue): the
--- bypass cannot apply, so the feature reports unavailable -- but it must NOT
--- error, and the backend must keep running with everything else intact.
+-- bypass cannot apply, so the feature reports unavailable -- but the IMPULSE must
+-- still work. This was the bug: the impulse used to be gated on the CA, which was
+-- only assigned when the patch succeeded, so a missing debug library killed the
+-- impulse too. The impulse depends only on the game's own CA.State.Jumped.
 do
     local ctx = sandbox(1316421563, 1316421563)
     ctx:MountUI()
@@ -253,11 +255,70 @@ do
     local actionsModule = Instance.new("ModuleScript")
     actionsModule.Name = "CharacterActions"; actionsModule._props.Module = ca; actionsModule.Parent = scriptFolder
 
+    -- A character with a root the impulse writes to.
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    local hrp = Instance.new("Part"); hrp.Name, hrp.Parent = "HumanoidRootPart", character
+    hrp.AssemblyLinearVelocity = Vector3.new(1, 0, 2)
+    ctx.Player.Character = character
+
     local state = ctx:Run("src/games/volleyball42.lua")
     local ok, err = state:SetJumpEnabled(true)
     check(ok == false, "without the debug library the bypass reports failure instead of erroring")
     check(type(err) == "string" and err:find("debug", 1, true) ~= nil, "the failure names the missing primitive")
     check(state.Destroyed == false, "the backend keeps running when the bypass cannot apply")
+
+    -- The impulse still has to fire: the CA is resolved independently.
+    check(state.Jump.CA ~= nil, "the CA is resolved even when the patch cannot apply")
+    state:SetJumpImpulse(50)
+    ca.State.Jumped = true
+    ctx.Services.RunService.Heartbeat:Fire(0.05)
+    ctx:FlushSpawned()
+    local base = math.sqrt(2 * 196.2 * ((50 * 50) / (2 * 196.2)))
+    check(math.abs(hrp.AssemblyLinearVelocity.Y - base * 1.5) < 0.5,
+        "with no bypass the impulse still raises the jump (50% = 1.5x)")
+    check(hrp.AssemblyLinearVelocity.X == 1 and hrp.AssemblyLinearVelocity.Z == 2,
+        "the impulse keeps the horizontal velocity")
+
+    state:Destroy()
+end
+
+-- The hub now loads instantly, so CharacterActions may not have replicated when
+-- the feature starts. The feature must RETRY: once the module appears, the
+-- impulse arms without needing a reload or a toggle flip.
+do
+    local ctx = sandbox(1316421563, 1316421563)
+    ctx:MountUI()
+
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    local hrp = Instance.new("Part"); hrp.Name, hrp.Parent = "HumanoidRootPart", character
+    hrp.AssemblyLinearVelocity = Vector3.new(0, 0, 0)
+    ctx.Player.Character = character
+
+    local state = ctx:Run("src/games/volleyball42.lua")
+    state:SetJumpEnabled(true)
+    check(state.Jump.CA == nil, "with CharacterActions absent, the CA starts nil")
+    check(state.JumpEnabled == true, "the feature is still armed for the impulse")
+
+    -- The module streams in after the toggle was already on.
+    local ca = {State = {Jumped = false}, Jump = function() return "NoJump" end}
+    local root = Instance.new("Folder"); root.Name = "guilhermealone1"; root.Parent = ctx.Services.Workspace
+    local scriptFolder = Instance.new("Folder"); scriptFolder.Name = "CharacterScript"; scriptFolder.Parent = root
+    local actionsModule = Instance.new("ModuleScript")
+    actionsModule.Name = "CharacterActions"; actionsModule._props.Module = ca; actionsModule.Parent = scriptFolder
+
+    -- Enough frames for the retry to resolve the CA.
+    for _ = 1, 32 do ctx.Services.RunService.Heartbeat:Fire(0.05) end
+    check(state.Jump.CA ~= nil, "the retry resolves the CA once it appears")
+
+    -- Now a jump boosts normally.
+    state:SetJumpImpulse(100)
+    ca.State.Jumped = true
+    ctx.Services.RunService.Heartbeat:Fire(0.05)
+    ctx:FlushSpawned()
+    local base = math.sqrt(2 * 196.2 * ((50 * 50) / (2 * 196.2)))
+    check(math.abs(hrp.AssemblyLinearVelocity.Y - base * 2) < 0.5,
+        "after the late resolve, the impulse boosts the jump")
+
     state:Destroy()
 end
 
