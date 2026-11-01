@@ -11520,6 +11520,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- Silent Aim -- o aimbot silencioso do Blox Fruits, no molde proprio.
@@ -11633,6 +11634,8 @@ function Feature.new(options)
     self.OriginalNamecall = nil
     self.Metatable = nil
     self.Hooked = false
+    -- O remote do CLIQUE (M1/ar): RegisterHit. Redirecionado pro alvo no slot 1.
+    self.RegisterHit = nil
     -- O indicador visual: o Beam + as duas Attachments (na tua HRP e na do
     -- alvo). Criados no Enable, destruidos no Disable/Destroy.
     self.Beam = nil
@@ -11661,6 +11664,29 @@ end
 function Feature:_MyPosition()
     local hrp = root(LocalPlayer and LocalPlayer.Character)
     return hrp and hrp.Position or Vector3.new(0, 0, 0)
+end
+
+-- A HumanoidRootPart do alvo travado, ou nil. E o que o CLIQUE manda no slot 1
+-- do RegisterHit (o M1/ar do BF manda a PART do alvo, nao a posicao).
+function Feature:_TargetRoot()
+    if not self.TargetName then return nil end
+    local target = Players:FindFirstChild(self.TargetName)
+    if not target then return nil end
+    return root(target.Character)
+end
+
+-- Resolve os remotes de ataque do BF. O CLIQUE (M1/ar) e o RegisterHit: ele
+-- manda (part, {}, nil, hitId). As SKILLS mandam a posicao no slot 2 de outros
+-- remotes. Sem achar o RegisterHit, o aim das skills continua funcionando e so
+-- o clique nao e redirecionado -- nao e fatal.
+function Feature:ResolveRemotes()
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
+    if not net then return false end
+    local hit = net:FindFirstChild("RE/RegisterHit")
+    if not hit then return false end
+    self.RegisterHit = hit
+    return true
 end
 
 -- O jogador mais proximo dentro do alcance. nil se nao ha ninguem (ou sem
@@ -11797,6 +11823,22 @@ function Feature:InstallHook()
             local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
 
             if isRemote then
+                -- O CLIQUE (M1/ar) sai pelo RegisterHit com a PART do alvo no
+                -- slot 1: (part, {}, nil, hitId). Aqui o aim redireciona essa
+                -- part pra HumanoidRootPart do alvo travado, sem encostar nos
+                -- outros slots (o hitId do slot 4 continua o do jogo). So o
+                -- proprio RegisterHit e tocado -- qualquer outro remote sai
+                -- intacto por este ramo.
+                if self_.RegisterHit ~= nil and args[1] == self_.RegisterHit then
+                    local targetRoot = self_:_TargetRoot()
+                    if targetRoot ~= nil then
+                        args[2] = targetRoot
+                    end
+                    return original(unpack(args))
+                end
+
+                -- As SKILLS de teclado mandam a POSICAO no slot 2. Reescrito
+                -- como no script original.
                 local arg2Str = tostring(args[2])
                 local isBool = (arg2Str == "true" or arg2Str == "false")
 
@@ -11938,6 +11980,9 @@ function Feature:Enable()
     self.ExceptionHeld = false
     self.ExceptionTime = 0
 
+    -- O remote do clique (M1/ar). Se nao achar, o aim das skills segue normal.
+    self:ResolveRemotes()
+
     -- O indicador visual nasce aqui e morre no Disable.
     self:_CreateBeam()
 
@@ -11981,6 +12026,7 @@ function Feature:Disable()
     self:_ClearTarget()
     self:_DestroyBeam()
     self:RemoveHook()
+    self.RegisterHit = nil
     return true
 end
 
@@ -22978,7 +23024,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). A beam (the original's dark purple, camera-facing) draws from your character to the current target so you can see who the aim is on -- it appears only while there is a target and no exception key is held, and it is created on enable and destroyed on disable together with the hook. The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Silent aim also stops fighting the camera: the hook rewrites the position argument only when that argument really is a position (a Vector3 or CFrame), never a boolean or anything else, so an unrelated call -- the camera brushing a part, a character call -- passes through untouched instead of being rewritten with the target's coordinates, which was what pushed the player off their own character while the aim was on. Blox Fruits also gains a Player tab, for your own character only. It sets the character's own attributes: a Speed multiplier slider (the game's default is 2.3), an Unbreakable toggle (sets UnbreakableAll true and keeps it true if the game tries to clear it), a Water walk toggle (WaterWalking), and a Flashstep cooldown slider (0 = always ready, 1 = normal cooldown). Stun is kept at 0 -- it is a NumberValue the game puts on your character, and 1 is what stuns you, so the feature rewrites it back to 0 whenever the game sets it. Everything rebinds when you respawn, and disabling puts the character back to the game's own values. The game's skill cooldowns are left exactly as they are. Silent aim also holds its target hard now: once it is locked on a player it stays there -- a nearby player who is only a little closer no longer pulls the aim away, and a frame where the target's character is gone (death, respawn, dash) no longer drops the lock. It keeps the same target across that instant instead of jumping to someone else, which is what made it feel like the aim kept leaving the fight; it only switches when the current target is really gone or another player is much closer. Silent aim now covers the click too: the game's click attack (left mouse / auto-click) goes out as RegisterHit with the target part in slot 1, not a position in slot 2 like the keyboard skills, so the aim now redirects that part to the locked target's HumanoidRootPart and leaves the other slots (the hit id) untouched. Click and skills both land on the target now. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects.
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.

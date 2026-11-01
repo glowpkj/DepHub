@@ -9,6 +9,7 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- Silent Aim -- o aimbot silencioso do Blox Fruits, no molde proprio.
@@ -122,6 +123,8 @@ function Feature.new(options)
     self.OriginalNamecall = nil
     self.Metatable = nil
     self.Hooked = false
+    -- O remote do CLIQUE (M1/ar): RegisterHit. Redirecionado pro alvo no slot 1.
+    self.RegisterHit = nil
     -- O indicador visual: o Beam + as duas Attachments (na tua HRP e na do
     -- alvo). Criados no Enable, destruidos no Disable/Destroy.
     self.Beam = nil
@@ -150,6 +153,29 @@ end
 function Feature:_MyPosition()
     local hrp = root(LocalPlayer and LocalPlayer.Character)
     return hrp and hrp.Position or Vector3.new(0, 0, 0)
+end
+
+-- A HumanoidRootPart do alvo travado, ou nil. E o que o CLIQUE manda no slot 1
+-- do RegisterHit (o M1/ar do BF manda a PART do alvo, nao a posicao).
+function Feature:_TargetRoot()
+    if not self.TargetName then return nil end
+    local target = Players:FindFirstChild(self.TargetName)
+    if not target then return nil end
+    return root(target.Character)
+end
+
+-- Resolve os remotes de ataque do BF. O CLIQUE (M1/ar) e o RegisterHit: ele
+-- manda (part, {}, nil, hitId). As SKILLS mandam a posicao no slot 2 de outros
+-- remotes. Sem achar o RegisterHit, o aim das skills continua funcionando e so
+-- o clique nao e redirecionado -- nao e fatal.
+function Feature:ResolveRemotes()
+    local modules = ReplicatedStorage:FindFirstChild("Modules")
+    local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
+    if not net then return false end
+    local hit = net:FindFirstChild("RE/RegisterHit")
+    if not hit then return false end
+    self.RegisterHit = hit
+    return true
 end
 
 -- O jogador mais proximo dentro do alcance. nil se nao ha ninguem (ou sem
@@ -286,6 +312,22 @@ function Feature:InstallHook()
             local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
 
             if isRemote then
+                -- O CLIQUE (M1/ar) sai pelo RegisterHit com a PART do alvo no
+                -- slot 1: (part, {}, nil, hitId). Aqui o aim redireciona essa
+                -- part pra HumanoidRootPart do alvo travado, sem encostar nos
+                -- outros slots (o hitId do slot 4 continua o do jogo). So o
+                -- proprio RegisterHit e tocado -- qualquer outro remote sai
+                -- intacto por este ramo.
+                if self_.RegisterHit ~= nil and args[1] == self_.RegisterHit then
+                    local targetRoot = self_:_TargetRoot()
+                    if targetRoot ~= nil then
+                        args[2] = targetRoot
+                    end
+                    return original(unpack(args))
+                end
+
+                -- As SKILLS de teclado mandam a POSICAO no slot 2. Reescrito
+                -- como no script original.
                 local arg2Str = tostring(args[2])
                 local isBool = (arg2Str == "true" or arg2Str == "false")
 
@@ -427,6 +469,9 @@ function Feature:Enable()
     self.ExceptionHeld = false
     self.ExceptionTime = 0
 
+    -- O remote do clique (M1/ar). Se nao achar, o aim das skills segue normal.
+    self:ResolveRemotes()
+
     -- O indicador visual nasce aqui e morre no Disable.
     self:_CreateBeam()
 
@@ -470,6 +515,7 @@ function Feature:Disable()
     self:_ClearTarget()
     self:_DestroyBeam()
     self:RemoveHook()
+    self.RegisterHit = nil
     return true
 end
 

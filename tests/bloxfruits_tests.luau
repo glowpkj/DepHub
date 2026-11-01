@@ -802,8 +802,49 @@ do
     ctx:RemovePlayers()
 end
 
--- Sem getrawmetatable/newcclosure (executor que nao expoe), o Enable RECUSA em
--- vez de fingir que liga um aim que nao faz nada.
+-- Silent aim no CLIQUE (M1/ar): o RegisterHit do BF manda a PART do alvo no slot
+-- 1 -- (part, {}, nil, hitId). O aim troca essa part pela HumanoidRootPart do
+-- alvo travado, sem tocar nos outros slots (o hitId do slot 4 continua o do jogo).
+do
+    local ctx = bfContext(994732206, 994732206)
+    local feature = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000 })
+    local myChar = Instance.new("Model"); myChar.Name, myChar.Parent = "Character", ctx.Player
+    local myHrp = Instance.new("Part"); myHrp.Name, myHrp.Parent = "HumanoidRootPart", myChar
+    myHrp.Position = Vector3.new(0, 0, 0)
+    ctx.Player.Character = myChar
+
+    check(feature:Enable() == true, "o Enable resolve o RegisterHit do clique")
+    check(feature.RegisterHit ~= nil, "o RegisterHit do clique foi encontrado")
+
+    local target = ctx:AddPlayer("ClickTarget", Vector3.new(50, 0, 0))
+    feature:_SelectStep()
+    check(feature.TargetName == "ClickTarget", "o clique tem um alvo travado")
+
+    -- O clique do jogo: RegisterHit:FireServer(minhaPart, {}, nil, hitId). Aqui
+    -- disparamos PELO hook (__namecall) pra ele interceptar como no jogo.
+    local mineRoot = Instance.new("Part"); mineRoot.Name = "Sword"
+    ctx:FireRemote(feature.RegisterHit, "FireServer", mineRoot, {}, nil, "hit-id-123")
+
+    local fired = feature.RegisterHit.Fired[#feature.RegisterHit.Fired]
+    check(fired[1] == target.Character:FindFirstChild("HumanoidRootPart"), "o clique foi redirecionado pra HRP do alvo (slot 1)")
+    check(type(fired[2]) == "table" and next(fired[2]) == nil, "o slot 2 do clique continua a tabela vazia (intacto)")
+    check(fired[4] == "hit-id-123", "o hitId do clique (slot 4) nao foi tocado")
+
+    -- Sem alvo travado: o clique sai intacto (o aim nao inventa alvo).
+    feature.TargetLostAt = os.clock() - 100
+    feature.TargetName = nil
+    feature.TargetPosition = nil
+    local somePart = Instance.new("Part"); somePart.Name = "SomePart"
+    ctx:FireRemote(feature.RegisterHit, "FireServer", somePart, {}, nil, "hit-id-9")
+    local fired2 = feature.RegisterHit.Fired[#feature.RegisterHit.Fired]
+    check(fired2[1] == somePart, "sem alvo o clique sai com a part original")
+
+    feature:Disable()
+    feature:Destroy()
+    ctx:RemovePlayers()
+end
+
+
 do
     local ctx = bfContext(994732206, 994732206)
     -- Um env sem os primitivos: o __index esconde getrawmetatable/newcclosure
