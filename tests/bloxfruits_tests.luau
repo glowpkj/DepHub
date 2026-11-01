@@ -677,6 +677,55 @@ do
     state:Destroy()
 end
 
+-- O BUG, de ponta a ponta pelo painel: ligar o toggle voa; desligar NO MEIO DO VOO
+-- para o voo na hora; e re-aplicar a config (o que um tab rebuild / auto-load faz)
+-- com o toggle ja desligado NAO pode re-voar. Era o "desligo e ele continua
+-- teleportando".
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(type(state) == "table", "o backend sobe com o painel montado")
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+
+    local islandToggle = nil
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Island teleport" then islandToggle = control.Handle end
+    end
+    check(islandToggle ~= nil, "o painel registra o toggle Island teleport")
+
+    -- Liga: o voo comeca.
+    islandToggle:SetValue(true)
+    local motor = state.Infra.teleport
+    check(motor:IsFlying() == true, "ligar o toggle inicia o voo")
+
+    -- Desliga no MEIO do voo: o voo TEM que parar na hora.
+    islandToggle:SetValue(false)
+    check(motor:IsFlying() == false, "desligar o toggle no meio do voo PARA o teleporte")
+    check(state.Instances.islands.ToggleOn == false, "a feature desarmou")
+    check(state.Config.islandOn == false, "o config registra desligado (nao re-liga no load)")
+
+    -- Re-aplicar a config (tab rebuild/auto-load) com o toggle desligado NAO voa.
+    state:ApplyConfig(state.Config)
+    check(motor:IsFlying() == false, "re-aplicar a config com o toggle desligado NAO re-voa")
+
+    -- E uma troca de ilha depois de desligar tambem nao voa (so memoriza).
+    local dropdown = nil
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "dropdown" and control.Label == "Island" then dropdown = control.Handle end
+    end
+    if dropdown and type(dropdown.SetValue) == "function" then
+        dropdown:SetValue("Cafe")
+        check(motor:IsFlying() == false, "trocar a ilha depois de desligar NAO re-voa")
+    end
+
+    state:Destroy()
+end
+
 -- A feature de fruta e auto-contida e usa o motor de teleporte por INJECAO:
 -- ela nao tem teleporte proprio. Sem motor ainda funciona para ESP/store; so o
 -- grab recusa. Este bloco carrega ela sozinha e exercita a API publica.
@@ -934,6 +983,52 @@ do
     fruit:Destroy()
 end
 
+-- O BUG DO USUARIO: "desativo o toggle de teleporte e ele continua teleportando".
+-- No grab de fruta, desligar o toggle so cancelava o LOOP; o tween do voo corrente
+-- seguia arrastando o personagem ate a ultima fruta. O motor e COMPARTILHADO, entao
+-- quem o dirige tem que devolve-lo ao desligar. Aqui: um grab em andamento tem que
+-- PARAR quando o toggle desliga -- e o Disable da feature inteira tambem.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Fruit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "fruit.lua"])()
+
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    ctx.Player.Character = character
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), character
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = character
+    local spawned = Instance.new("Model"); spawned.Name, spawned.Parent = "Fruit", ctx.Services.Workspace
+    Instance.new("Part"); local body = Instance.new("Part"); body.Name, body.Position, body.Parent = "FruitPart", Vector3.new(0, 0, 500), spawned
+
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+    motor:Enable()
+    local fruit = Fruit.new()
+    fruit:SetTeleport(motor)
+    fruit:Enable()
+
+    -- Um passo de grab: voa ate a fruta.
+    check(fruit:CollectNearestOnce() == true, "o grab inicia o voo")
+    check(motor:IsFlying() == true, "o personagem esta voando ate a fruta")
+
+    -- Desligar o toggle do grab (o que o usuario faz) PARA o voo na hora.
+    fruit:SetGrab(false)
+    check(fruit.GrabEnabled == false, "o toggle do grab fica desligado")
+    check(motor:IsFlying() == false, "desligar o grab CANCELA o voo em andamento (nada de continuar teleportando)")
+
+    -- E nada re-voa: um novo passo nao acontece com o grab desligado (o loop parou).
+    root.Position = Vector3.new(0, 0, 0)
+    check(motor:IsFlying() == false, "com o grab desligado, nada re-voa")
+
+    -- Disable da feature inteira tambem devolve o motor (um voo em curso para).
+    fruit:SetGrab(true)
+    check(fruit:CollectNearestOnce() == true, "re-ligado, o grab voa de novo")
+    check(motor:IsFlying() == true, "ha um voo em andamento")
+    fruit:Disable()
+    check(motor:IsFlying() == false, "Disable da feature tambem cancela o voo (o motor e compartilhado)")
+
+    fruit:Destroy()
+    motor:Destroy()
+end
+
 -- Auto random fruit: rola a gacha (Zioles) pelo RemoteFunction RF/GachaNetworkRF
 -- no mesmo Modules.Net. O payload e {Context="Purchase", BoxName="ZiolesGacha"};
 -- o retorno com um numero (o cooldown) e respeitado; desligar para o thread.
@@ -1058,6 +1153,17 @@ do
     check(motor:IsFlying() == false, "desligar o toggle CANCELA o voo em andamento (para de teleportar)")
     check(islands._arrivalConnection == nil, "desligar o toggle desarma a vigia de chegada")
 
+    -- Depois de desligar, NADA re-voa: nem uma selecao (que o backend faz num
+    -- re-render/tab rebuild), nem um Heartbeat atrasado. Era o "continua
+    -- teleportando" -- um Select tardio com ToggleOn verdadeiro re-voava.
+    root.Position = Vector3.new(0, 0, 0)
+    check(islands:Select("Kingdom of Rose") == true, "selecionar depois de desligar e aceito (so memoriza)")
+    check(motor:IsFlying() == false, "depois de desligar, selecionar NAO re-voa")
+    check(islands:Select("Cafe") == true, "outra selecao depois de desligar tambem e aceita")
+    check(motor:IsFlying() == false, "e continua sem re-voar")
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(motor:IsFlying() == false, "um Heartbeat atrasado nao ressuscita o voo")
+
     -- Rotulo desconhecido nao entra.
     check(islands:Select("Nao Existe") == false, "ilha desconhecida e recusada")
 
@@ -1177,6 +1283,14 @@ do
     root.Position = snowPos
     ctx.Services.RunService.Heartbeat:Fire()
     check(#arrivals == 1, "mexer depois de chegar nao re-dispara a chegada")
+
+    -- Vigia MORTA nao dispara: armar de novo, desligar no meio do voo, e chegar
+    -- no alvo depois NAO pode contar como chegada (o voo nao existe mais).
+    check(islands:SetEnabled(true) == true, "re-arma o voo")
+    islands:SetEnabled(false)
+    root.Position = snowPos
+    ctx.Services.RunService.Heartbeat:Fire()
+    check(#arrivals == 1, "depois de desligar, chegar no alvo nao dispara chegada (vigia morta)")
 
     islands:Destroy()
     motor:Destroy()
@@ -1886,6 +2000,39 @@ do
     check(tp:Cancel() == true, "Cancel devolve o estado de cada parte")
     check(root.CanCollide == true, "a parte que era colidivel volta colidivel")
     check(accessory.CanCollide == false, "a parte que ja era nao-colidivel volta nao-colidivel (nao vira true)")
+
+    -- PEDIDO DO USUARIO: "desligo o toggle e ele continua teleportando". O bug
+    -- tinha duas causas no motor:
+    --  (1) cancelar o tween nao zerava a velocidade residual do voo (200 studs/s)
+    --      -- o personagem seguia escorregando depois do Cancel;
+    --  (2) no cliente real `Tween:Cancel()` DISPARA `Completed` na hora, entao o
+    --      handler roda dentro do Cancel (reentrancia).
+    -- Este teste modela as duas: a velocidade tem que ir a zero, e um Completed
+    -- disparado por Cancel nao pode reentrar nem ressuscitar o voo.
+    root.CanCollide = true
+    local tweenA = tp:Go(Vector3.new(0, 0, 100))
+    check(tweenA ~= nil, "novo voo para testar o cancelamento de verdade")
+    ctx.Services.RunService.Heartbeat:Fire()  -- monta o cache, tira o noclip
+    root.AssemblyLinearVelocity = Vector3.new(0, 0, 200)  -- velocidade do voo
+    check(tp:Cancel() == true, "Cancel para o voo em andamento")
+    check(tp:IsFlying() == false, "Cancel zera o tween (nao ha mais voo)")
+    check(root.AssemblyLinearVelocity.Z == 0, "Cancel ZERA a velocidade residual (o personagem para no lugar)")
+    check(tweenA.Cancelled == true, "Cancel cancela o tween de verdade")
+    -- Cancel e idempotente: chamar duas vezes nao estoura nem re-liga nada.
+    check(tp:Cancel() == true, "Cancel e idempotente (segunda chamada segura)")
+    check(tp:IsFlying() == false, "segundo Cancel nao ressuscita o voo")
+
+    -- O voo "chegar" (Completed de verdade) tambem para a velocidade residual e
+    -- devolve a colisao -- sem escorregar ao pousar.
+    root.CanCollide = true
+    local tweenB = tp:Go(Vector3.new(0, 0, 100))
+    check(tweenB ~= nil, "novo voo para testar a chegada (Completed real)")
+    ctx.Services.RunService.Heartbeat:Fire()
+    root.AssemblyLinearVelocity = Vector3.new(0, 0, 200)
+    tweenB:Finish()  -- o voo chegou
+    check(tp:IsFlying() == false, "ao chegar, o tween termina e nao ha mais voo")
+    check(root.AssemblyLinearVelocity.Z == 0, "ao chegar, a velocidade residual tambem e zerada")
+    check(root.CanCollide == true, "ao chegar, a colisao volta")
 
     check(tp:SetSpeed(150) and tp.Speed == 150, "SetSpeed aplica uma velocidade valida")
     check(tp:SetSpeed(0) == false, "SetSpeed rejeita zero")

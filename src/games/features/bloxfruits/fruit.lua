@@ -381,7 +381,18 @@ end
 
 function Feature:SetGrab(on)
     self.GrabEnabled = on == true
-    if not self.GrabEnabled then self:_cancel("grab"); return true end
+    if not self.GrabEnabled then
+        -- Desligar o grab para o LOOP -- e TAMBEM o voo em andamento. Sem o
+        -- Cancel, o loop parava de VOAR de novo mas o tween corrente seguia
+        -- arrastando o personagem ate a ultima fruta: "desliguei o toggle e ele
+        -- continua teleportando". O motor e COMPARTILHADO (ilha, fruta), entao
+        -- cada consumidor tem que devolver ele ao desligar.
+        if self.Teleport and type(self.Teleport.Cancel) == "function" then
+            pcall(self.Teleport.Cancel, self.Teleport)
+        end
+        self:_cancel("grab")
+        return true
+    end
     self:_spawn("grab", function()
         while self.GrabEnabled do
             local done = pcall(function() return self:CollectNearestOnce() end)
@@ -555,6 +566,11 @@ function Feature:Disable()
     self:_cancel("grab")
     self:_cancel("store")
     self:_cancel("random")
+    -- Desligar a feature inteira tambem devolve o motor: um voo do grab em
+    -- andamento para no lugar, em vez de seguir arrastando o personagem.
+    if self.Teleport and type(self.Teleport.Cancel) == "function" then
+        pcall(self.Teleport.Cancel, self.Teleport)
+    end
     return true
 end
 

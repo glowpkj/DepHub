@@ -58,6 +58,9 @@ function Teleport.new(options)
     self.ArrivalOffset = options.arrivalOffset or Vector3.new(0, 5, 0)
     self.Tween = nil
     self._heartbeat = nil
+    -- Guarda de reentrancia do Cancel: no cliente real `Tween:Cancel()` dispara
+    -- `Completed` na hora, entao o handler roda dentro do Cancel. Ver Cancel().
+    self._cancelling = false
     -- Cache do noclip por character: a lista de BaseParts so e reconstruida
     -- quando o character muda (respawn). Ver Enable() para o porque.
     self._noclipParts = nil
@@ -97,16 +100,46 @@ function Teleport:_RestoreCollision()
     end
 end
 
--- Cancela o voo corrente, se houver. Chamado antes de todo Go novo (um so
--- tween por vez) e no Disable/Destroy. Tambem para o arrasto na hora: o
--- personagem para de seguir o tween e a colisao volta -- e o que faz "desligar
--- o toggle parar de teleportar de verdade".
+-- Cancela o voo corrente, se houver, e PARA o personagem no lugar.
+--
+-- Chamado antes de todo Go novo (um so tween por vez) e no Disable/Destroy --
+-- e por TODA feature que dirige o motor quando ela desliga (ilha, grab de
+-- fruta). Era aqui o bug do "desliguei o toggle e ele continua teleportando":
+-- cancelar o tween nao bastava, porque
+--   (1) no cliente real, `Tween:Cancel()` DISPARA `Completed` (com
+--       PlaybackState = Cancelled) na hora, entao o handler do Completed roda
+--       DENTRO deste pcall -- sem guarda, isso era reentrancia;
+--   (2) o tween cancelado deixa a velocidade residual do voo (200 studs/s) no
+--       AssemblyLinearVelocity, e como o Heartbeat so zera a velocidade
+--       enquanto `self.Tween` existe, ninguem mais a zerava: o personagem
+--       seguia "voando" sozinho depois de cancelar.
+-- Por isso o Cancel agora zera o tween, ZERA a velocidade na hora e devolve a
+-- colisao -- o personagem para ONDE ESTA, sem escorregar. A guarda de
+-- reentrancia (`_cancelling`) impede que o Completed disparado pelo Cancel
+-- reentre neste metodo.
 function Teleport:Cancel()
-    if self.Tween then
-        pcall(function() self.Tween:Cancel() end)
-        self.Tween = nil
+    if self._cancelling then return true end
+    self._cancelling = true
+    local tween = self.Tween
+    -- Zera o tween ANTES de cancelar: assim o handler de Completed (que o
+    -- cliente real dispara dentro do :Cancel()) ve `self.Tween ~= tween` e nao
+    -- mexe em nada -- o cancelamento e comandado daqui, um dono so.
+    self.Tween = nil
+    if tween then
+        pcall(function() tween:Cancel() end)
+    end
+    -- Para o arrasto de verdade: sem isto a fisica carrega a velocidade do voo.
+    local root = self._root
+    if not root then
+        local character = LocalPlayer and LocalPlayer.Character
+        root = character and character:FindFirstChild("HumanoidRootPart")
+    end
+    if root then
+        pcall(function() root.AssemblyLinearVelocity = Vector3.zero end)
+        pcall(function() root.AssemblyAngularVelocity = Vector3.zero end)
     end
     self:_RestoreCollision()
+    self._cancelling = false
     return true
 end
 
@@ -137,9 +170,20 @@ function Teleport:Go(position, offset)
     )
     self.Tween = tween
     tween.Completed:Connect(function()
-        if self.Tween == tween then self.Tween = nil end
-        -- Chegou: devolve a colisao (o voo a tinha tirado).
-        self:_RestoreCollision()
+        -- So o voo CORRENTE zera o estado. Um Cancel ja zerou self.Tween, entao
+        -- um Completed disparado por Cancel (o cliente real faz isso) nao mexe
+        -- em nada aqui -- quem cancelou e o dono do estado. Um Completed de
+        -- verdade (o voo chegou) encontra self.Tween == tween e finaliza.
+        if self.Tween == tween then
+            self.Tween = nil
+            -- Chegou: devolve a colisao e para a velocidade residual (o voo voa
+            -- a 200 studs/s; ao pousar, sem isto o personagem escorregava).
+            local landed = root
+            if landed and landed.Parent then
+                pcall(function() landed.AssemblyLinearVelocity = Vector3.zero end)
+            end
+            self:_RestoreCollision()
+        end
     end)
     tween:Play()
     return tween

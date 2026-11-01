@@ -185,6 +185,11 @@ function Feature:_WatchArrival(label, targetPosition)
     self:_StopWatching()
     if not targetPosition then return end
     if not RunService then return end
+    -- O alvo e gravado ANTES de conectar: o handler le campos de self, e uma
+    -- conexao nunca deve existir apontando pra um alvo que ainda nao foi setado.
+    self._arrivalLabel = label
+    self._arrivalTarget = targetPosition
+    local target = targetPosition
     -- Heartbeat e um RBXScriptSignal, NAO uma tabela Lua. Checar
     -- type(RunService.Heartbeat) == "table" era falso no Roblox (o typeof e
     -- "RBXScriptSignal") e por isso a vigia nunca conectava -- a chegada nunca
@@ -192,9 +197,13 @@ function Feature:_WatchArrival(label, targetPosition)
     -- conectar e a propria validacao: pcall + o evento conectado.
     local ok, connection = pcall(function()
         return RunService.Heartbeat:Connect(function()
+            -- O voo pode ter sido desarmado entre o Connect e este frame (o
+            -- usuario desligou o toggle): nao dispara chegada de um voo que nao
+            -- existe mais.
+            if not self.ToggleOn then return end
             local position = self:RootPosition()
             if not position then return end
-            local distance = (position - self._arrivalTarget).Magnitude
+            local distance = (position - target).Magnitude
             if distance <= ARRIVAL_DISTANCE then
                 local arrived = self._arrivalLabel
                 self:_StopWatching()
@@ -208,10 +217,13 @@ function Feature:_WatchArrival(label, targetPosition)
             end
         end)
     end)
-    if not ok or not connection then return end
-    self._arrivalLabel = label
-    self._arrivalTarget = targetPosition
-    self._arrivalConnection = connection
+    if ok and connection then
+        self._arrivalConnection = connection
+    else
+        -- Nao conectou: nao deixa alvo pendurado (a proxima chamada recomeca).
+        self._arrivalLabel = nil
+        self._arrivalTarget = nil
+    end
 end
 
 function Feature:_StopWatching()
@@ -250,6 +262,8 @@ function Feature.new(options)
     self._arrivalConnection = nil
     self._arrivalLabel = nil
     self._arrivalTarget = nil
+    -- Guarda de reentrancia do Go (ver Go): um Go nunca reentra em si mesmo.
+    self._flying = false
     return self
 end
 
@@ -292,10 +306,21 @@ end
 -- vigia de chegada mede a mesma coisa que o motor persegue. A lista atual e toda
 -- por posicao (ver SEA_ISLANDS), entao este e o unico caminho.
 function Feature:Go()
+    -- Guarda de reentrancia: a chegada (OnArrive) desliga o toggle pelo
+    -- SetValue, que cai no applyIslandOn(false) do backend e chama SetEnabled
+    -- de novo. Se isso acontecesse dentro de um Go em curso, a selecao podia
+    -- reentrar e re-voar. Com a guarda, um Go nunca reentra em si mesmo.
+    if self._flying then return false end
     local motor = self.Teleport
     if not motor then
         self.LastStatus = "no teleport motor"
         self.LastError = "sem motor de teleporte"
+        return false
+    end
+    -- Sem o toggle armado, nao voa -- ponto. Isto fecha o gate de novo mesmo se
+    -- alguem chamar Go direto (o Select ja checa, mas o Go e publico).
+    if not self.ToggleOn then
+        self.LastStatus = "idle"
         return false
     end
     local entry = self:EntryFor(self.Selected)
@@ -304,10 +329,12 @@ function Feature:Go()
         return false
     end
 
+    self._flying = true
     -- Captura o SEGUNDO retorno do pcall: o pcall so diz que nao lancou; o motor
     -- pode devolver nil (sem character/HRP) sem erro nenhum. Sem olhar esse
     -- retorno, a feature armava a vigia e dizia "flying" sem voo.
     local ok, started = pcall(function() return motor:GoTo(entry.pos) end)
+    self._flying = false
     if not ok then
         self.LastStatus = "teleport failed"
         self.LastError = "falha no voo"
@@ -316,6 +343,12 @@ function Feature:Go()
     if started == nil then
         self.LastStatus = "character not ready"
         self.LastError = "sem personagem"
+        return false
+    end
+    -- O voo pode ter sido cancelado no meio (o motor devolveu o tween, mas algo
+    -- cancelou antes de chegarmos aqui): nao arma a vigia pra um voo que acabou.
+    if not motor:IsFlying() then
+        self.LastStatus = "idle"
         return false
     end
     self.LastStatus = ("flying to %s"):format(self.Selected)
@@ -347,7 +380,10 @@ function Feature:SetEnabled(on)
         self.LastStatus = "idle"
         -- Para o voo corrente: cancela o tween do motor (o personagem parou de
         -- ser arrastado) e desarma a vigia de chegada. Sem isto o voo continuava
-        -- ate o fim mesmo com o toggle desligado.
+        -- ate o fim mesmo com o toggle desligado. O cancelamento roda SEMPRE
+        -- (nao so quando havia um voo nosso em andamento): desligar o toggle tem
+        -- que estancar o motor mesmo que o voo tenha sido disparado por outra
+        -- feature que compartilha o mesmo motor -- "desligar = parar".
         if self.Teleport and type(self.Teleport.Cancel) == "function" then
             pcall(self.Teleport.Cancel, self.Teleport)
         end

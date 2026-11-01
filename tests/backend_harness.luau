@@ -641,10 +641,42 @@ local function sandbox(placeId, gameId)
         -- The mock keeps the target object and the goal table so tests can assert
         -- WHERE a flight is headed (the teleport motor's whole contract), not
         -- just that Play was called.
+        --
+        -- FAITHFUL to the real client's Tween: `:Cancel()` FIRES `Completed`
+        -- (with PlaybackState = Cancelled), and a tween can be Completed only
+        -- once. The old mock made Cancel a silent no-op on Completed, which hid
+        -- the real bug: the motor's `Completed` handler runs during Cancel, so
+        -- any `self.Tween = nil` bookkeeping has to survive it. The signal is a
+        -- real multi-connection event so a tween can carry more than one listener.
         local handle = {Instance=object, Info=info, Goal=goal, Playing=false,
             Play=function(self) self.Playing = true end,
-            Cancel=function(self) self.Playing = false; self.Cancelled = true end,
-            Completed={Connect=function() end}}
+            Cancel=function(self)
+                if self.Finished then return end
+                self.Finished = true
+                self.Playing = false
+                self.Cancelled = true
+                self.PlaybackState = "Cancelled"
+                self.CompletedEvent:Fire("Cancelled")
+            end,
+            CompletedEvent=signal()}
+        handle.Completed = {
+            Connect=function(_, fn)
+                local connection = handle.CompletedEvent:Connect(fn)
+                -- A tween created (and already Completed) fires to a late
+                -- listener immediately, like the real client.
+                if handle.Finished then fn(handle.PlaybackState) end
+                return connection
+            end,
+        }
+        -- Test helper (not part of the real API): finish the tween as if it ran
+        -- to completion, firing every Completed listener once.
+        handle.Finish = function(self)
+            if self.Finished then return end
+            self.Finished = true
+            self.Playing = false
+            self.PlaybackState = "Completed"
+            self.CompletedEvent:Fire("Completed")
+        end
         return handle
     end}
     local vim = {}
