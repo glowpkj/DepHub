@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "fruit"}
+local FEATURES = {"bladhits", "fruit", "raid"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -72,6 +72,7 @@ do
     local factory = state.Features.bladhits
     check(type(factory) == "table" and type(factory.new) == "function", "a blade hit e carregada pelo backend")
     check(state.Features.fruit ~= nil, "a feature de fruta e carregada pelo backend")
+    check(state.Features.raid ~= nil, "a feature de raid e carregada pelo backend")
     check(type(state.Errors) == "table" and #state.Errors == 0, "as features carregam sem erro")
 
     -- Nada liga sozinho: o painel abre sem instanciar a feature.
@@ -111,6 +112,15 @@ do
     check(state.Instances.fruit.Teleport == state.Infra.teleport, "o motor e o mesmo objeto da infra")
     state:SetToggle("fruit", false)
 
+    -- A raid instancia pelo proprio toggle e recebe TANTO o motor de teleporte
+    -- quanto a blade hit (o ataque e injetado, nao reimplementado). Sem a blade
+    -- hit instanciada antes, o raid nasce sem motor de ataque.
+    check(state.Instances.raid == nil, "a raid nao instancia so pelo load")
+    check(state:SetToggle("raid", true), "ligar o toggle instancia a raid")
+    check(state.Instances.raid.Teleport == state.Infra.teleport, "a raid recebeu o motor de teleporte")
+    check(state.Instances.raid.Combat == state.Instances.bladhits, "a raid recebeu a blade hit como motor de ataque")
+    state:SetToggle("raid", false)
+
     local status = state:GetStatus()
     check(status.TogglesOn == 1, "status conta so a blade hit ligada")
     check(status.Infra.teleport ~= nil, "status lista o teleporte na infra, fora da contagem")
@@ -143,7 +153,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "teleport" or name == "fruit", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "teleport" or name == "fruit" or name == "raid", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -162,7 +172,7 @@ do
     local names = {}
     for _, tab in ipairs(ui.Library._Tabs) do names[tab.Name] = true end
     check(names["Combat"] == true, "a aba Combat e criada para a blade hit")
-    check(names["Fruit"] == true, "a aba Fruit e criada para a feature de fruta")
+    check(names["Farm"] == true, "a aba Farm e criada para fruta e raid")
 end
 
 -- A feature de fruta e auto-contida e usa o motor de teleporte por INJECAO:
@@ -238,6 +248,110 @@ do
     fruit:SetSkip("")
 
     fruit:Destroy()
+end
+
+-- A raid e auto-contida e reusa DUAS pecas por injecao: o teleporte (pra ir ao
+-- tubo) e a blade hit (pra limpar as waves). Sem cada uma ela degrada de um jeito
+-- especifico -- sem teleporte recusa; sem blade hit entra mas nao ataca. Este
+-- bloco carrega ela sozinha e exercita a API publica.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Raid = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "raid.lua"])()
+    check(type(Raid) == "table" and type(Raid.new) == "function", "a raid carrega sozinha e publica new()")
+    check(#Raid.elements == 20 and Raid.elements[1] == "Flame", "a lista de elementos veio do original")
+
+    -- Sem motor de teleporte o Enable recusa: nao ha como ir ao tubo.
+    local bare = Raid.new()
+    check(bare.Teleport == nil and bare.Combat == nil, "sem injecao as duas pecas sao nil")
+    check(bare:Enable() == false, "a raid recusa sem motor de teleporte")
+
+    -- Com o teleporte (mas sem blade hit): liga, mas nao limpa wave.
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+    bare:SetSea("Sea2")
+    bare.Teleport = motor
+    check(bare:Enable() == true, "com teleporte a raid liga")
+    check(bare:ClearStep() == false, "sem blade hit injetada a raid nao limpa wave")
+    bare:Disable()
+
+    -- O elemento e trocavel, e trocar invalida o chip comprado.
+    check(bare:SetElement("Dough") and bare.Element == "Dough", "SetElement troca o elemento")
+    check(bare:SetElement("") == false, "SetElement rejeita vazio")
+    bare.ChipBought, bare.ChipElement = true, "Flame"
+    bare:SetElement("Ice")
+    check(bare.ChipBought == false, "trocar de elemento invalida o chip comprado")
+
+    check(bare:SetStartWait(3) and bare.StartWait == 3, "SetStartWait aplica um valor valido")
+    check(bare:SetStartWait(-1) == false, "SetStartWait rejeita negativo")
+    check(bare:SetChipWait(2) and bare.ChipWait == 2, "SetChipWait aplica um valor valido")
+
+    -- O mar decide o tubo; sem informacao de jogo, cai no Sea 2.
+    local sea2 = bare:Location()
+    check(type(sea2) == "table" and sea2.tube ~= nil and sea2.button ~= nil, "Location devolve tubo e botao")
+    check(sea2.tube.Z == -4767.7, "sem informacao de mar o tubo e o do Sea 2")
+    bare:SetSea("Sea3")
+    check(bare:Location().tube.Z == -2816.5, "SetSea troca o tubo pro do Sea 3")
+
+    -- Enable/Disable ciclam e limpam o estado.
+    check(bare:Disable() and bare:IsEnabled() == false, "Enable/Disable ciclam")
+    check(bare.InRaid == false, "Disable sai do estado de raid")
+    bare:Destroy()
+end
+
+-- A raid contra um mundo com o NPC, o botao e a blade hit: o chip e achado e
+-- equipado, o botao e disparado, e a blade hit vira o motor de ataque. E o ciclo
+-- que importa -- sem remotes reais, mas com as instancias que o jogo entrega.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Raid = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "raid.lua"])()
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+
+    -- Remotes do NPC de raid e do evento de raid.
+    local rstorage = ctx.Services.ReplicatedStorage
+    local remotes = Instance.new("Folder"); remotes.Name = "Remotes"; remotes.Parent = rstorage
+    local comm = Instance.new("RemoteFunction"); comm.Name = "CommF_"; comm.Parent = remotes
+    local raids = Instance.new("RemoteEvent"); raids.Name = "Raids"; raids.Parent = remotes
+
+    -- Personagem com Humanoid (pra equipar o chip).
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+
+    -- O chip esta na mochila.
+    local backpack = Instance.new("Backpack"); backpack.Name, backpack.Parent = "Backpack", ctx.Player
+    local chip = Instance.new("Tool"); chip.Name, chip.Parent = "Microchip", backpack
+
+    local raid = Raid.new({ teleport = motor })
+    check(raid:ChipTool() == chip, "a raid acha o Microchip na mochila")
+    check(raid:ChipEquipped() == false, "o chip ainda nao esta equipado")
+    check(raid:EquipChip() == true, "a raid equipa o Microchip")
+    check(raid:ChipEquipped() == true, "depois de EquipChip o chip esta na mao")
+
+    -- O evento de raid controla o estado "dentro da raid". O servidor entrega
+    -- StartTimer/Finished pelo OnClientEvent (o cliente so escuta).
+    check(raid:ConnectRaidEvent() == true, "a raid se conecta ao evento Raids")
+    raids.OnClientEvent:Fire("StartTimer")
+    check(raid.InRaid == true, "StartTimer poe a raid em estado de limpeza")
+    raids.OnClientEvent:Fire("Finished")
+    check(raid.InRaid == false, "Finished tira a raid do estado de limpeza")
+    raid:DisconnectRaidEvent()
+    check(raid.RaidConnection == nil, "Disconnect limpa a conexao do evento")
+
+    -- O botao: um ProximityPrompt no tubo e disparado pelo TriggerNear.
+    local fired = 0
+    ctx.Env.fireproximityprompt = function() fired = fired + 1 end
+    local loc = raid:Location()
+    local button = Instance.new("Part"); button.Name, button.Position, button.Parent = "RaidButton", loc.button, ctx.Services.Workspace
+    local prompt = Instance.new("ProximityPrompt"); prompt.Parent = button
+    check(raid:TriggerNear(loc.button) >= 1, "TriggerNear acha e dispara o prompt do botao")
+    check(fired >= 1, "fireproximityprompt foi chamado no botao")
+    ctx.Env.fireproximityprompt = nil
+
+    -- Sem blade hit injetada, o ClearStep recusa em vez de atacar sozinho.
+    check(raid:ClearStep() == false, "a raid nao ataca sem motor de ataque")
+    check(raid.LastStatus == "no attack motor injected", "a raid reporta que falta o motor de ataque")
+
+    raid:Destroy()
 end
 
 -- O motor de teleporte e infraestrutura: carrega e instancia sozinho (sem

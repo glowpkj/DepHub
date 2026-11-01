@@ -519,3 +519,71 @@ do
     motor:Cancel()
     fruit:Destroy()
 end
+
+-- The raid feature and the blade hit together: the integration the user asked
+-- for. The raid does NOT roll its own attack -- it drives the blade hit it was
+-- handed, and once the server says the raid started it starts clearing waves.
+do
+    local ctx = sandbox(2753915549, 994732206)
+    ctx.Responses[BF_FEATURE_PREFIX .. "bladhits.lua"] = sources[BF_FEATURE_PREFIX .. "bladhits.lua"]
+    ctx.Responses[BF_FEATURE_PREFIX .. "raid.lua"] = sources[BF_FEATURE_PREFIX .. "raid.lua"]
+
+    -- Remotes the blade hit resolves, and the raid's own Raids event.
+    local rstorage = ctx.Services.ReplicatedStorage
+    local modules = Instance.new("Folder"); modules.Name = "Modules"; modules.Parent = rstorage
+    local netFolder = Instance.new("Folder"); netFolder.Name = "Net"; netFolder.Parent = modules
+    local attack = Instance.new("RemoteEvent"); attack.Name = "RE/RegisterAttack"; attack.Parent = netFolder
+    local hit = Instance.new("RemoteEvent"); hit.Name = "RE/RegisterHit"; hit.Parent = netFolder
+    local remotes = Instance.new("Folder"); remotes.Name = "Remotes"; remotes.Parent = rstorage
+    local raids = Instance.new("RemoteEvent"); raids.Name = "Raids"; raids.Parent = remotes
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Health, humanoid.Parent = 100, char
+
+    -- A live enemy for the blade hit to swing at.
+    local enemies = Instance.new("Folder"); enemies.Name, enemies.Parent = "Enemies", ctx.Services.Workspace
+    local enemy = Instance.new("Model"); enemy.Name, enemy.Parent = "Bandit", enemies
+    local enemyHumanoid = Instance.new("Humanoid"); enemyHumanoid.Health, enemyHumanoid.Parent = 100, enemy
+    local enemyRoot = Instance.new("Part"); enemyRoot.Name, enemyRoot.Position, enemyRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 4), enemy
+
+    local BladeHit = ctx.Env.loadstring(sources[BF_FEATURE_PREFIX .. "bladhits.lua"])()
+    local blade = BladeHit.new()
+    check(blade:ResolveRemotes(), "a blade hit resolve os remotes para a raid dirigir")
+
+    local Raid = ctx.Env.loadstring(sources[BF_FEATURE_PREFIX .. "raid.lua"])()
+    local raid = Raid.new({ combat = blade })
+
+    -- O raid nao ataca por conta propria: o ataque mora na blade hit injetada,
+    -- nao numa copia dentro do raid.
+    check(raid.Combat == blade, "o raid usa a blade hit injetada como motor de ataque no lugar de um proprio")
+
+    -- O servidor diz que a raid comecou: a blade hit e ligada pelo raid, e o
+    -- mesmo remotes que a blade hit resolve viram o ataque.
+    check(raid:ConnectRaidEvent() == true, "a raid escuta o evento Raids")
+    raids.OnClientEvent:Fire("StartTimer")
+    check(raid.InRaid == true, "StartTimer poe o raid em limpeza")
+    check(raid:ClearStep() == true, "dentro da raid o ClearStep liga o ataque")
+    check(blade:IsEnabled() == true, "o raid ligou a blade hit injetada")
+    check(raid.LastStatus == "clearing waves", "o raid reporta que esta limpando")
+
+    -- O ataque realmente dispara nos remotes reais (o raid dirigiu um motor que
+    -- existe, nao um stub).
+    check(blade:AttackNearest(), "a blade hit dirigida pelo raid ataca o alvo")
+    check(#(attack.Fired or {}) >= 1, "o RegisterAttack recebeu o golpe disparado pelo raid")
+    check(#(hit.Fired or {}) >= 1, "o RegisterHit recebeu o golpe disparado pelo raid")
+
+    -- Desligar o raid desconecta o evento e para o estado; nao explode.
+    raid:Disable()
+    check(raid:IsEnabled() == false and raid.InRaid == false, "Disable tira o raid do estado de limpeza")
+    check(raid.RaidConnection == nil, "Disable desconecta o evento Raids")
+
+    -- Sem ataque injetado, o raid reporta em vez de atacar por conta propria.
+    local bareRaid = Raid.new()
+    check(bareRaid:ClearStep() == false and bareRaid.LastStatus == "no attack motor injected", "sem ataque injetado o raid nao ataca sozinho")
+
+    blade:Destroy()
+    raid:Destroy()
+    bareRaid:Destroy()
+end
