@@ -108,6 +108,12 @@ function Feature.new(options)
     self.MaxRange = math.clamp(tonumber(options.range) or Feature.DEFAULT_RANGE, Feature.MIN_RANGE, Feature.MAX_RANGE)
     -- As teclas que SUPRIMEM o aim (rotulos). Comeca em F, como o original.
     self.Exceptions = options.exceptions or { "F" }
+    -- Modo debug: imprime cada remote de ataque que sai (nome + tipo de cada
+    -- slot) num rate-limit, pra o usuario ver o que o CLIQUE realmente manda no
+    -- executor dele. Ligado por options.debug ou Feature:SetDebug(true).
+    self.Debug = options.debug == true
+    self.DebugRemote = nil      -- ultimo remote logado (pra nao spammar)
+    self.DebugAt = 0
     -- Estado da mira.
     self.Target = nil            -- Player alvo
     self.TargetName = nil
@@ -312,12 +318,28 @@ function Feature:InstallHook()
             local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
 
             if isRemote then
+                -- DEBUG: quando ligado, imprime o que o remote manda. Serve pra
+                -- ver no executor o que o CLIQUE do BF realmente envia (nome do
+                -- remote + tipo de cada slot), em vez de adivinhar os indices.
+                -- Rate-limited por remote pra nao inundar o console.
+                if self_.Debug then
+                    local now = os.clock()
+                    if self_.DebugRemote ~= args[1] or (now - self_.DebugAt) > 1.0 then
+                        self_.DebugRemote = args[1]
+                        self_.DebugAt = now
+                        local parts = {}
+                        for i = 1, #args do
+                            parts[#parts + 1] = i .. "=" .. (typeof and typeof(args[i]) or type(args[i]))
+                        end
+                        print("[SILENT AIM DEBUG] remote=" .. tostring(args[1]) .. " method=" .. tostring(method) .. " | " .. table.concat(parts, ", "))
+                    end
+                end
+
                 -- O CLIQUE (M1/ar) sai pelo RegisterHit com a PART do alvo no
-                -- slot 1: (part, {}, nil, hitId). Aqui o aim redireciona essa
-                -- part pra HumanoidRootPart do alvo travado, sem encostar nos
-                -- outros slots (o hitId do slot 4 continua o do jogo). So o
-                -- proprio RegisterHit e tocado -- qualquer outro remote sai
-                -- intacto por este ramo.
+                -- slot 2: (part, {}, nil, hitId) -- args[1] e o proprio remote.
+                -- Aqui o aim redireciona essa part pra HumanoidRootPart do alvo
+                -- travado, sem encostar nos outros slots (o hitId continua o do
+                -- jogo). So o proprio RegisterHit e tocado.
                 if self_.RegisterHit ~= nil and args[1] == self_.RegisterHit then
                     local targetRoot = self_:_TargetRoot()
                     if targetRoot ~= nil then
@@ -459,6 +481,13 @@ function Feature:SetExceptions(labels)
     return true
 end
 
+-- Liga/desliga os prints de debug (o que cada remote de ataque manda).
+function Feature:SetDebug(on)
+    self.Debug = on == true
+    if self.Debug then print("[SILENT AIM DEBUG] ligado -- ataque (clique/skill) vai imprimir os slots.") end
+    return true
+end
+
 function Feature:Enable()
     if self.Enabled then return true end
     if not self:InstallHook() then
@@ -480,6 +509,11 @@ function Feature:Enable()
     self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function()
         if not self.Enabled then return end
         pcall(function() self:_SelectStep() end)
+        -- O RegisterHit pode ainda nao existir quando o aim liga (o jogo monta o
+        -- Net depois). Tenta de novo ate achar, pra o CLIQUE ser pego tambem.
+        if self.RegisterHit == nil then
+            pcall(function() self:ResolveRemotes() end)
+        end
     end)
 
     -- O beam segue a cada frame: liga a tua HRP a do alvo, ou esconde quando nao

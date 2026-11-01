@@ -213,6 +213,7 @@ function State:SetFeature(name, enabled)
                 -- o toggle ainda desligado; a escolha nao se perde).
                 range = self.PendingSilentAimRange,
                 exceptions = self.PendingSilentAimExceptions,
+                debug = self.PendingSilentAimDebug,
                 -- A aba Player nasce com o multiplicador de velocidade que o
                 -- painel ja marcou (o slider aplica mesmo sem reabrir o painel).
                 speed = self.PendingPlayerSpeed,
@@ -290,6 +291,7 @@ function State:Destroy()
     -- A escolha do painel guardada antes de ligar nao sobrevive ao unload.
     self.PendingSilentAimRange = nil
     self.PendingSilentAimExceptions = nil
+    self.PendingSilentAimDebug = nil
     self.PendingPlayerSpeed = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
@@ -365,6 +367,13 @@ local PANELS = {
             end)
 
             section:CreateParagraph("Silent aim", "Redirects your attack position to the nearest player. Hold an exception key to release the aim.")
+
+            -- Debug: imprime no console o que cada ataque (clique/skill) manda,
+            -- pra diagnosticar por que um ataque nao pega o alvo.
+            section:CreateToggle("Debug logs", false, function(value)
+                if State.Instances.silentaim then State.Instances.silentaim:SetDebug(value) end
+                State.PendingSilentAimDebug = value
+            end)
         end,
     },
     fruit = {

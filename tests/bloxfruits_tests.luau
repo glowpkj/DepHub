@@ -228,6 +228,7 @@ do
     check(rangeSlider ~= nil, "o painel registra o slider Range")
     check(rangeSlider.Min == 500 and rangeSlider.Max == 1000, "o slider vai de 500 a 1000")
     check(rangeSlider.Value == 500, "o padrao do slider e 500")
+    check(labels["toggle:Debug logs"] ~= nil, "o painel registra o toggle Debug logs")
 
     -- O toggle do painel liga a feature pelo mesmo caminho do backend.
     aimToggle.Handle:SetValue(true)
@@ -838,6 +839,14 @@ do
     ctx:FireRemote(feature.RegisterHit, "FireServer", somePart, {}, nil, "hit-id-9")
     local fired2 = feature.RegisterHit.Fired[#feature.RegisterHit.Fired]
     check(fired2[1] == somePart, "sem alvo o clique sai com a part original")
+
+    -- O DEBUG nao pode quebrar o hook: ligar, disparar um ataque, e a chamada
+    -- continua chegando (o print e so observacao).
+    check(feature:SetDebug(true) == true, "o modo debug liga")
+    local debugPart = Instance.new("Part"); debugPart.Name = "DebugPart"
+    ctx:FireRemote(feature.RegisterHit, "FireServer", debugPart, {}, nil, "dbg")
+    check(feature.RegisterHit.Fired[#feature.RegisterHit.Fired][4] == "dbg", "com debug ligado o ataque continua chegando")
+    feature:SetDebug(false)
 
     feature:Disable()
     feature:Destroy()
