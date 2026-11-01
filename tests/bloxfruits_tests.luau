@@ -971,6 +971,59 @@ do
     ctx:RemovePlayers()
 end
 
+-- Silent aim no GOLPE: quando RegisterAttack abre o golpe, o aim dispara um
+-- RegisterHit no HumanoidRootPart do alvo travado -- o caminho que de fato
+-- registra dano no BF (o mesmo da blade hit). A POSICAO reescrita nos outros
+-- remotes sozinha nao garante o acerto em PvP; o RegisterHit garante.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local feature = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])().new({ range = 1000 })
+    local myChar = Instance.new("Model"); myChar.Name, myChar.Parent = "Character", ctx.Player
+    local myHrp = Instance.new("Part"); myHrp.Name, myHrp.Parent = "HumanoidRootPart", myChar
+    myHrp.Position = Vector3.new(0, 0, 0)
+    ctx.Player.Character = myChar
+
+    check(feature:Enable() == true, "o Enable resolve os remotes do golpe")
+    check(feature.RegisterAttack ~= nil, "o RegisterAttack foi encontrado")
+
+    local target = ctx:AddPlayer("HitTarget", Vector3.new(40, 0, 0))
+    feature:_SelectStep()
+    check(feature.TargetName == "HitTarget", "o golpe tem alvo travado")
+
+    -- O jogo abre o golpe: RegisterAttack:FireServer(0.4, combo). Pelo hook.
+    -- `Fired` so nasce no primeiro FireServer, entao le com fallback.
+    local function hitCount()
+        return #(feature.RegisterHit.Fired or {})
+    end
+    local before = hitCount()
+    ctx:FireRemote(feature.RegisterAttack, "FireServer", 0.4, 1)
+    -- O RegisterHit forjado sai via task.spawn: o harness registra o corpo e o
+    -- teste decide quando rodar (FlushSpawned).
+    ctx:FlushSpawned()
+
+    local forged = nil
+    for index = before + 1, hitCount() do
+        forged = feature.RegisterHit.Fired[index]
+    end
+    check(forged ~= nil, "o golpe disparou um RegisterHit no alvo")
+    if forged then
+        check(forged[1] == target.Character:FindFirstChild("HumanoidRootPart"), "o RegisterHit forjado aponta pro HRP do alvo")
+        check(forged[4] ~= nil and tostring(forged[4]) ~= "", "o RegisterHit forjado leva um hitId (nao vazio)")
+    end
+
+    -- Com a excecao ativa (tecla F segurada), o golpe NAO forja hit.
+    feature.ExceptionHeld = true
+    feature.ExceptionTime = os.clock()
+    local before2 = hitCount()
+    ctx:FireRemote(feature.RegisterAttack, "FireServer", 0.4, 2)
+    ctx:FlushSpawned()
+    check(hitCount() == before2, "com a excecao ativa o golpe nao forja RegisterHit")
+
+    feature:Disable()
+    feature:Destroy()
+    ctx:RemovePlayers()
+end
+
 
 do
     local ctx = bfContext(994732206, 994732206)

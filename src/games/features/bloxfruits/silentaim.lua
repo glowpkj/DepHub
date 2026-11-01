@@ -131,6 +131,15 @@ function Feature.new(options)
     self.Hooked = false
     -- O remote do CLIQUE (M1/ar): RegisterHit. Redirecionado pro alvo no slot 1.
     self.RegisterHit = nil
+    -- O remote que abre o golpe (RegisterAttack): quando ele sai, o aim dispara
+    -- um RegisterHit no alvo travado, registrando o dano nele.
+    self.RegisterAttack = nil
+    -- O ultimo hitId visto no RegisterHit do jogo (4. argumento). Reaproveitado
+    -- no RegisterHit que o aim forja -- o servidor so aceita hit com hitId
+    -- valido, entao mandar um forjado sem o do jogo seria ignorado.
+    self.HitId = nil
+    -- Anti-spam: nao disparar o RegisterHit forjado mais de uma vez por golpe.
+    self.LastAttackAt = 0
     -- O indicador visual: o Beam + as duas Attachments (na tua HRP e na do
     -- alvo). Criados no Enable, destruidos no Disable/Destroy.
     self.Beam = nil
@@ -170,10 +179,27 @@ function Feature:_TargetRoot()
     return root(target.Character)
 end
 
+-- O hitId pro RegisterHit forjado. Prefere o ultimo capturado de um RegisterHit
+-- real do jogo (o formato que o servidor ja aceitou); sem nenhum ainda, gera um
+-- no mesmo formato que o script antigo usava quando nao tinha captura
+-- (UserId + algo unico) -- o hitId do BF e um nonce do CLIENTE, nao um token do
+-- servidor, entao um gerado aqui e valido.
+function Feature:_HitId()
+    if self.HitId ~= nil then return self.HitId end
+    local me = LocalPlayer
+    local userId = me and tostring(me.UserId) or "0"
+    return userId:sub(2, 4) .. tostring(os.clock()):gsub("%D", ""):sub(-4)
+end
+
 -- Resolve os remotes de ataque do BF. O CLIQUE (M1/ar) e o RegisterHit: ele
 -- manda (part, {}, nil, hitId). As SKILLS mandam a posicao no slot 2 de outros
 -- remotes. Sem achar o RegisterHit, o aim das skills continua funcionando e so
 -- o clique nao e redirecionado -- nao e fatal.
+--
+-- RegisterAttack tambem e resolvido: e o "comeco do golpe" (FireServer(0.4,
+-- combo)). E o gatilho pra RE-REGISTRAR o hit no alvo (ver InstallHook): quando
+-- o golpe comeca, o aim dispara um RegisterHit no alvo travado -- o caminho que
+-- de fato registra dano no BF (o mesmo que a blade hit usa).
 function Feature:ResolveRemotes()
     local modules = ReplicatedStorage:FindFirstChild("Modules")
     local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
@@ -181,6 +207,7 @@ function Feature:ResolveRemotes()
     local hit = net:FindFirstChild("RE/RegisterHit")
     if not hit then return false end
     self.RegisterHit = hit
+    self.RegisterAttack = net:FindFirstChild("RE/RegisterAttack")
     return true
 end
 
@@ -327,11 +354,29 @@ function Feature:InstallHook()
                     if self_.DebugRemote ~= args[1] or (now - self_.DebugAt) > 1.0 then
                         self_.DebugRemote = args[1]
                         self_.DebugAt = now
+                        -- O NOME real do remote (nao o ClassName): sem isso o
+                        -- print so dizia "RemoteEvent" e nao dava pra saber QUAL
+                        -- remote de ataque era. FullName da o caminho inteiro.
+                        local name = "?"
+                        pcall(function() name = args[1].Name end)
                         local parts = {}
                         for i = 1, #args do
-                            parts[#parts + 1] = i .. "=" .. (typeof and typeof(args[i]) or type(args[i]))
+                            local v = args[i]
+                            local shown = typeof and typeof(v) or type(v)
+                            -- Pra Instance, mostra o Name entre parenteses; pra
+                            -- Vector3, as coordenadas -- e o que diz se o slot e
+                            -- mesmo a posicao e pra onde aponta.
+                            if typeof and typeof(v) == "Instance" then
+                                local n = "?"; pcall(function() n = v.Name end)
+                                shown = "Instance(" .. n .. ")"
+                            elseif typeof and typeof(v) == "Vector3" then
+                                shown = ("Vector3(%.0f,%.0f,%.0f)"):format(v.X, v.Y, v.Z)
+                            elseif typeof and typeof(v) == "string" then
+                                shown = "string(" .. tostring(v) .. ")"
+                            end
+                            parts[#parts + 1] = i .. "=" .. shown
                         end
-                        print("[SILENT AIM DEBUG] remote=" .. tostring(args[1]) .. " method=" .. tostring(method) .. " | " .. table.concat(parts, ", "))
+                        print("[SILENT AIM DEBUG] remote=" .. tostring(name) .. " method=" .. tostring(method) .. " | " .. table.concat(parts, ", "))
                     end
                 end
 
@@ -341,11 +386,45 @@ function Feature:InstallHook()
                 -- travado, sem encostar nos outros slots (o hitId continua o do
                 -- jogo). So o proprio RegisterHit e tocado.
                 if self_.RegisterHit ~= nil and args[1] == self_.RegisterHit then
+                    -- Guarda o hitId (4. argumento) -- e o token que o servidor
+                    -- validou no golpe; o RegisterHit forjado abaixo reusa ele.
+                    if args[4] ~= nil then self_.HitId = args[4] end
                     local targetRoot = self_:_TargetRoot()
                     if targetRoot ~= nil then
                         args[2] = targetRoot
                     end
                     return original(unpack(args))
+                end
+
+                -- O GOLPE ABRIU (RegisterAttack:FireServer(0.4, combo)). Este e
+                -- o ponto em que o aim REGISTRA o dano no alvo: dispara um
+                -- RegisterHit no HumanoidRootPart do alvo travado, que e o
+                -- caminho que de fato acerta no BF (o mesmo da blade hit). A
+                -- POSICAO reescrita nos outros remotes sozinha nao garante o
+                -- acerto -- o RegisterHit garante.
+                if self_.RegisterAttack ~= nil and args[1] == self_.RegisterAttack then
+                    local root = original(unpack(args))
+                    local self2 = self_
+                    -- Fora do __namecall (task.spawn): disparar o FireServer
+                    -- aqui dentro re-entraria no proprio gancho de forma
+                    -- sincrona logo apos o original. Spawnado, ele sai pelo
+                    -- caminho normal no proximo passo do scheduler.
+                    if not self2:IsExceptionActive() then
+                        local now = os.clock()
+                        -- No maximo um RegisterHit forjado a cada 20ms (o golpe
+                        -- abre uma vez; RegisterAttack pode repetir rapido).
+                        if (now - self2.LastAttackAt) > 0.02 then
+                            local targetRoot = self2:_TargetRoot()
+                            if targetRoot ~= nil then
+                                self2.LastAttackAt = now
+                                local hitRemote, hitId = self2.RegisterHit, self2:_HitId()
+                                task.spawn(function()
+                                    pcall(function() hitRemote:FireServer(targetRoot, {}, nil, hitId) end)
+                                end)
+                            end
+                        end
+                    end
+                    return root
                 end
 
                 -- As SKILLS de teclado mandam a POSICAO no slot 2. Reescrito
@@ -509,9 +588,10 @@ function Feature:Enable()
     self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function()
         if not self.Enabled then return end
         pcall(function() self:_SelectStep() end)
-        -- O RegisterHit pode ainda nao existir quando o aim liga (o jogo monta o
-        -- Net depois). Tenta de novo ate achar, pra o CLIQUE ser pego tambem.
-        if self.RegisterHit == nil then
+        -- Os remotes (RegisterHit/RegisterAttack) podem ainda nao existir quando
+        -- o aim liga (o jogo monta o Net depois). Tenta de novo ate achar os
+        -- dois, pra o CLIQUE e o gatilho do golpe serem pegos tambem.
+        if self.RegisterHit == nil or self.RegisterAttack == nil then
             pcall(function() self:ResolveRemotes() end)
         end
     end)
@@ -550,6 +630,9 @@ function Feature:Disable()
     self:_DestroyBeam()
     self:RemoveHook()
     self.RegisterHit = nil
+    self.RegisterAttack = nil
+    self.HitId = nil
+    self.LastAttackAt = 0
     return true
 end
 
