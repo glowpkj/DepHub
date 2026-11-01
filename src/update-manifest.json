@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-01T16:11:08.928701+00:00",
-  "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
-  "version": "0.1.27",
+  "generatedAt": "2026-11-01T16:20:43.774560+00:00",
+  "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
+  "version": "0.1.28",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "25f4e4eb214e9bb855d747f42e1dc7fb3327c8a145737c46d197a40d19bb1a62",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "4abac2ad35456e0b40e63aff5294f46a3892f2125991e7f6650bd59cc0074019",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "f68eba9c3f9369a64a1dbbee2a836cc5969ce731e0ce70b00d33eed559322574",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "1adf66e42a16907c2323c2c1bc6b6439d6fa8f6016befe0d8ec62235e646aac8",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -47,6 +47,7 @@
         "src/games/features/bloxfruits/islands.lua",
         "src/games/features/bloxfruits/silentaim.lua",
         "src/games/features/bloxfruits/player.lua",
+        "src/games/features/bloxfruits/esp.lua",
         "src/games/features/bloxfruits/teleport.lua",
         "src/games/updates/994732206.txt",
         "src/core/updater.lua",
@@ -55,8 +56,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "0aa7e8de40760fa71aaebc020b08d9adb36085f1c5702561b53ccf99c1c0743a",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "f02e0a188e172d828dc64155ff9c780f1cdfd391a72f40296445214e4b67b311",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -75,8 +76,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "52c85624278b535c9be54121a9316b89ff30516bd8611eee56a6a068861e4aa4",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "b2b10ce001da03854909a586db3445dbe910181261f29d555fbdd21df5fcd522",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -97,8 +98,8 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "2c7d3b42c4a4ffcd763a23ae601a3db9881fe25a190c33173185e7ef1fd6ec6d",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "60499d57c6ea9fcbaf1983b942a7c3549b59be075f8594df78945df092d0b620",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -115,8 +116,8 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "1449790db8fe4830c4031315ae340e346559ca8fb9f4eeaa85079a30f98af4b7",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "4bce6aadfdd6bd094007589697282bb9e965aa6da552e732e66c58163754ee95",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -133,8 +134,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "216e9de705d376d3c49553af959cf60befa42b8eb8d6b047b8d2d139b26af54c",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "6826745fa2a88d369cba9b5e34a64c8a6aa5fe2237a55dd0a076222851a81ae7",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -160,8 +161,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "417b59342f3667925d817788baa6e2d8799ed37acb617c553d2fb8b42c24181b",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "d6d6d2c4ccbc6efd7aeb90037d407962059306dde466faa407dcf3ca650f234b",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -177,6 +178,7 @@
         "src/games/features/bloxfruits/islands.lua",
         "src/games/features/bloxfruits/silentaim.lua",
         "src/games/features/bloxfruits/player.lua",
+        "src/games/features/bloxfruits/esp.lua",
         "src/games/features/bloxfruits/teleport.lua",
         "src/games/updates/85211729168715.txt",
         "src/core/updater.lua",
@@ -185,8 +187,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "f2a5ed9e049597b6decea4fd39bb0e38007beb304920be1dbb4b3981c1f2eea8",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "4e70f970707296fd35461939e330c152997abaef09bd9a7da58a27512f0456e5",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -215,8 +217,8 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "eee85a0c18d36b53422e97b89a4b19000c8be20749bf156c58f104924bbed2a1",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "0094cdca5530ad350195e317c2c6f7f4f84fb060c5c413e57de91a7e76fcf254",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -233,8 +235,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "8b64bc30d8ab71d376ec5e2fd0f200100d570f5ed1313ef212dd9d8d84a59911",
-      "commit": "99db4d7e6f38ca9f0134c24c93bc146b336f9f5f",
+      "version": "0c38e84056d890e514500dca12dd2e9f88c3e4ddf6ebe2f65676ff3cc6b7f48c",
+      "commit": "8e6dee8a4c3f1f9289b2988f74adcfe6575591b5",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -256,6 +258,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "8e6dee8",
+      "Date": "2026-11-01T13:20:26-03:00",
+      "Changes": [
+        "fix: dropdowns select and show their choice, add player ESP + player info capture"
+      ]
+    },
     {
       "Version": "99db4d7",
       "Date": "2026-11-01T13:10:54-03:00",
@@ -282,13 +291,6 @@
       "Date": "2026-11-01T12:35:38-03:00",
       "Changes": [
         "feat(bloxfruits): add Auto random fruit (fruit gacha roll)"
-      ]
-    },
-    {
-      "Version": "cb3d030",
-      "Date": "2026-11-01T12:16:26-03:00",
-      "Changes": [
-        "fix(core): real JSON codec, config schema/migration, input Set handle"
       ]
     }
   ]
