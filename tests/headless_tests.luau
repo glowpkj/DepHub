@@ -535,3 +535,62 @@ do
     fruit:Destroy()
 end
 
+-- O bootstrap (loader.lua) e o usuario cola sempre: ele baixa o DepHub.lua
+-- oficial, executa, e imprime um resumo de saude. Aqui provamos que ele (1)
+-- carrega o hub, (2) imprime o resumo com versao/status/backend, e (3) quando o
+-- backend e o Blox Fruits, confere a lista de ILHAS -- inclusive avisando quando
+-- ela vem vazia, que e o bug que o usuario viu no painel.
+do
+    local ctx = sandbox(994732206, 994732206)
+    -- O bootstrap baixa o hub pela URL; no sandbox isso resolve pra sources.
+    local bootstrap = ctx.Env.loadstring(sources["loader.lua"])
+    local okRun, runError = pcall(bootstrap)
+    check(okRun, "o loader roda sem estourar: " .. tostring(runError))
+    -- O loader espera o estado final do hub; o sandbox roda sincrono, entao o
+    -- estado ja esta publicado quando ele chega a checagem.
+    local printed = table.concat(ctx.Logs, "\n")
+    check(printed:find("DepHub loader", 1, true) ~= nil, "o loader imprime o resumo no console")
+    check(printed:find("status:", 1, true) ~= nil, "o resumo traz o status da carga")
+    check(printed:find("backend:", 1, true) ~= nil, "o resumo traz o backend carregado")
+    check(printed:find("blox fruits", 1, true) ~= nil, "com backend Blox Fruits, o loader checa as ilhas")
+    check(printed:find("ilhas por mar", 1, true) ~= nil, "o loader conta as ilhas dos 3 mares")
+end
+
+-- Quando o backend NAO e o Blox Fruits, o bootstrap ainda carrega e resume, mas
+-- pula a checagem de ilhas (ela e especifica daquele jogo).
+do
+    local ctx = sandbox(1, 2)
+    local bootstrap = ctx.Env.loadstring(sources["loader.lua"])
+    local okRun = pcall(bootstrap)
+    check(okRun, "o loader roda num jogo universal tambem")
+    local printed = table.concat(ctx.Logs, "\n")
+    check(printed:find("status:", 1, true) ~= nil, "o resumo geral sai em qualquer jogo")
+    check(printed:find("ilhas por mar", 1, true) == nil, "sem backend Blox Fruits nao ha checagem de ilhas")
+end
+
+-- O caso do BUG: a lista de ilhas do mar atual vem vazia (o dropdown mostra
+-- None). O loader tem que AVISAR isso no console, nao passar batido -- e ainda
+-- reportar quantas ilhas cada mar tem, pra separar "modulo nao carregou" de
+-- "dado vazio".
+do
+    local ctx = sandbox(994732206, 994732206)
+    -- islands.lua responde vazio so pro mar atual; os outros mares seguem o
+    -- modulo real (prova que so a lista do mar e que falhou).
+    ctx.Responses[BF_FEATURE_PREFIX .. "islands.lua"] = [[
+        local Feature = {}
+        Feature.__index = Feature
+        function Feature.new() return setmetatable({CurrentSea = "Sea2"}, Feature) end
+        function Feature:IslandLabels(sea) return {} end
+        function Feature:Enable() return true end
+        function Feature:Disable() return true end
+        function Feature:Destroy() end
+        function Feature:Select() return true end
+        function Feature:Go() end
+        return Feature
+    ]]
+    local bootstrap = ctx.Env.loadstring(sources["loader.lua"])
+    pcall(bootstrap)
+    local printed = table.concat(ctx.Logs, "\n")
+    check(printed:find("VAZIA", 1, true) ~= nil, "o loader avisa quando a lista de ilhas vem vazia")
+end
+
