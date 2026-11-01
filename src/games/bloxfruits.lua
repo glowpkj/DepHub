@@ -301,14 +301,46 @@ end
 
 -- Registra como a chave volta ao vivo: a funcao de aplicar (o mesmo corpo do
 -- callback) e, opcionalmente, o handle do controle -- para o Load tambem mexer
--- no que esta na tela, nao so no estado. Chamado pelo painel no build.
+-- no que esta na tela, nao so o estado. Chamado pelo painel no build.
 function State:RegisterConfig(key, apply, handle)
     self.ConfigApply[#self.ConfigApply + 1] = { key = key, apply = apply, handle = handle }
     return apply
 end
 
+-- A linha que RELIGA este script. O executor a re-executa quando convem (o
+-- queue_on_teleport), entao o DepHub sobe de novo sozinho. Usa o mesmo
+-- source ref do run atual (via env.__DEPHUB.SourceRef/SourceBaseURL), pra
+-- religar a mesma build que o usuario esta rodando.
+function State:SelfExecLine()
+    local shared = env.__DEPHUB
+    local loaderState = env.__DEPHUB_LOADER_STATE
+    local ref = (shared and shared.SourceRef)
+        or (type(loaderState) == "table" and loaderState.SourceRef)
+        or "main"
+    local base = (shared and shared.SourceBaseURL) or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+    if not base:match("/$") then base = base .. "/" end
+    return ('loadstring(game:HttpGet("%sDepHub.lua"))("%s")'):format(base, ref)
+end
 
-
+-- Liga/desliga o auto-execute. Ligado, enfileira a re-execucao no executor
+-- (queue_on_teleport), que re-sobe o DepHub depois do proximo teleporte. Sem o
+-- executor expor queue_on_teleport, avisa em vez de fingir que ligou.
+--
+-- Devolve true se o auto-execute ficou ativo de fato.
+function State:SetAutoExec(on)
+    on = on == true
+    if not on then
+        if type(queue_on_teleport) == "function" then pcall(queue_on_teleport, "") end
+        return true
+    end
+    if type(queue_on_teleport) ~= "function" then
+        self.LastError = "executor sem queue_on_teleport"
+        return false
+    end
+    local ok = pcall(queue_on_teleport, self:SelfExecLine())
+    if not ok then self.LastError = "queue_on_teleport recusou" end
+    return ok
+end
 
 -- Carrega cada feature e guarda a fabrica. Nenhum init ainda: o modulo so
 -- instancia quando o toggle liga, para o painel abrir sem ligar nada sozinho.
@@ -828,6 +860,21 @@ local PANELS = {
         tabIcon = "user",
         alwaysShow = true,
         build = function(section, instance)
+            -- Auto execute: ligado, o DepHub se re-executa sozinho (via
+            -- queue_on_teleport) depois do proximo teleporte -- o script volta a
+            -- subir sem o usuario colar de novo. Persiste como os outros knobs.
+            local function applyAutoExec(value)
+                local ok = State:SetAutoExec(value)
+                if value and not ok then
+                    instance.Notify("Auto execute", State.LastError or "This executor has no queue_on_teleport.")
+                end
+            end
+            local autoToggle = section:CreateToggle("Auto execute", State.Config.autoexec == true, function(value)
+                applyAutoExec(value)
+                State.Config.autoexec = value == true
+            end)
+            State:RegisterConfig("autoexec", applyAutoExec, autoToggle)
+
             section:CreateButton("Save config", function()
                 local ok = State:SaveConfig()
                 if ok then
@@ -844,7 +891,7 @@ local PANELS = {
                     instance.Notify("Config", "Nothing saved yet.")
                 end
             end)
-            section:CreateParagraph("Config", "Save your panel settings to a file and load them back on any session.")
+            section:CreateParagraph("Config", "Save your panel settings to a file and load them back on any session. Auto execute re-runs the script by itself after a teleport.")
         end,
     },
     -- RAID: parked. O Auto raid e o Auto complete nao estavam do jeito que o

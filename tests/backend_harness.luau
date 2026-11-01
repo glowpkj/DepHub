@@ -889,6 +889,11 @@ local function sandbox(placeId, gameId)
         return out
     end
     env.appendfile = function(name, data) fs[name] = (fs[name] or "") .. tostring(data) end
+    -- queue_on_teleport: executors use it to re-run a script after a teleport.
+    -- The auto-execute toggle records the queued script so a test can assert the
+    -- self re-exec line was handed to it (and that disabling clears it).
+    context.QueuedTeleportScript = nil
+    env.queue_on_teleport = function(script) context.QueuedTeleportScript = script end
     context.Env = env
     context.Sources = sources
     -- Core modules that the loader always fetches are served straight from the

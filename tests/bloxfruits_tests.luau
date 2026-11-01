@@ -293,6 +293,46 @@ do
     check(state.Instances.silentaim ~= nil and state.Instances.silentaim.MaxRange == 777, "o Load aplica o range na feature instanciada")
 end
 
+-- Auto execute: um toggle que faz o DepHub se re-executar sozinho depois do
+-- proximo teleporte (queue_on_teleport). Ligado, entrega a linha de reload ao
+-- executor; desligado, limpa. Sem o executor expor a API, recusa honestamente.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    local autoControl = nil
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Auto execute" then autoControl = control end
+    end
+    check(autoControl ~= nil, "o bloco CONFIG monta o toggle Auto execute")
+
+    -- Ligar entrega uma linha de reload ao queue_on_teleport.
+    autoControl.Handle:SetValue(true)
+    check(type(ctx.QueuedTeleportScript) == "string" and #ctx.QueuedTeleportScript > 0, "ligar o auto execute enfileira o reload")
+    check(ctx.QueuedTeleportScript:find("DepHub.lua", 1, true) ~= nil, "a linha enfileirada carrega o DepHub.lua")
+    check(state.Config.autoexec == true, "o auto execute grava no Config")
+
+    -- Desligar limpa o que estava enfileirado.
+    autoControl.Handle:SetValue(false)
+    check(ctx.QueuedTeleportScript == "", "desligar o auto execute limpa o reload enfileirado")
+
+    -- Sem queue_on_teleport (executor sem a API), ligar recusa.
+    ctx.Env.queue_on_teleport = nil
+    check(state:SetAutoExec(true) == false, "sem queue_on_teleport o auto execute recusa")
+end
+
+-- Auto execute persiste: salvo ligado, o painel volta a enfileirar o reload
+-- sozinho no proximo start.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"autoexec":true}'
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(state.Config.autoexec == true, "o auto execute salvo volta no Config")
+    check(type(ctx.QueuedTeleportScript) == "string" and ctx.QueuedTeleportScript:find("DepHub.lua", 1, true) ~= nil, "com auto execute salvo, o start ja enfileira o reload")
+end
+
 -- Auto-load: com uma config ja no disco, o painel abre com ela aplicada ("so
 -- salvar e gg" -- o usuario nao clica em Load toda sessao).
 do
