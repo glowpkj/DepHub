@@ -44,6 +44,7 @@ local FRUIT_NAMES = {
 -- INFRA_MODULES e nao aparece no painel.
 local FEATURE_MODULES = {
     {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
+    {name = "silentaim", page = "Combat", section = "SILENT AIM", toggle = "Silent aim"},
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
 }
@@ -206,6 +207,11 @@ function State:SetFeature(name, enabled)
                 -- O mar atual: a feature de ilhas escolhe a lista de destinos
                 -- daqui (Sea 1 / 2 / 3 tem ilhas e pontos fixos diferentes).
                 sea = CURRENT_SEA,
+                -- O silent aim nasce com o alvo/alcance que o painel ja marcou
+                -- antes de ligar (o usuario pode ajustar o slider e as teclas com
+                -- o toggle ainda desligado; a escolha nao se perde).
+                range = self.PendingSilentAimRange,
+                exceptions = self.PendingSilentAimExceptions,
             }
             local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
@@ -277,6 +283,9 @@ function State:Destroy()
         if type(instance.Destroy) == "function" then pcall(instance.Destroy, instance) end
         self.Infra[name] = nil
     end
+    -- A escolha do painel guardada antes de ligar nao sobrevive ao unload.
+    self.PendingSilentAimRange = nil
+    self.PendingSilentAimExceptions = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruitsOwn == self then env.__DEPHUB.BloxFruitsOwn = nil end
@@ -309,6 +318,48 @@ local PANELS = {
                 if not value then instance.Backend:SetFeature("bladhits", false) end
             end)
             section:CreateParagraph("Blade hits", "Auto-swing at every enemy in range using the game's attack remotes.")
+        end,
+    },
+    silentaim = {
+        page = "Combat",
+        section = "SILENT AIM",
+        category = "Combat",
+        icon = "crosshair",
+        tabIcon = "crosshair",
+        build = function(section, instance)
+            local factory = State.Features.silentaim
+            local keys = (factory and type(factory.exceptionKeys) == "table") and factory.exceptionKeys or { "Z", "X", "C", "V", "F" }
+            local minRange = (factory and factory.MIN_RANGE) or 500
+            local maxRange = (factory and factory.MAX_RANGE) or 1000
+            local defaultRange = (factory and factory.DEFAULT_RANGE) or 500
+
+            -- Silent aim: liga/desliga. Se o executor nao expoe o gancho de
+            -- metatable, o Enable recusa -- avisa em vez de ligar um no-op.
+            section:CreateToggle("Silent aim", false, function(value)
+                if value and not State:SetFeature("silentaim", true) then
+                    instance.Notify("Silent aim", "Unsupported executor (needs getrawmetatable).")
+                end
+                if not value then State:SetFeature("silentaim", false) end
+            end)
+
+            -- As teclas que SUPRIMEM o aim: segurar qualquer uma delas larga o
+            -- alvo. Multi-dropdown (marca/desmarca), comecando em F (o padrao).
+            section:CreateMultiDropdown("Exception keys", keys, { "F" }, function(selected)
+                if State.Instances.silentaim then
+                    State.Instances.silentaim:SetExceptions(selected)
+                else
+                    -- Ainda nao instanciada: guarda a escolha pra quando ligar.
+                    State.PendingSilentAimExceptions = selected
+                end
+            end)
+
+            -- Range: minimo 500, padrao 500, maximo 1000.
+            section:CreateSlider("Range", minRange, maxRange, defaultRange, function(value)
+                if State.Instances.silentaim then State.Instances.silentaim:SetRange(value) end
+                State.PendingSilentAimRange = value
+            end)
+
+            section:CreateParagraph("Silent aim", "Redirects your attack position to the nearest player. Hold an exception key to release the aim.")
         end,
     },
     fruit = {

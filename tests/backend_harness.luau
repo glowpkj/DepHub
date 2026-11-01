@@ -119,14 +119,17 @@ local function typeof(value)
     if type(value) == "table" and value.__color then return "Color3" end
     if type(value) == "table" and value.__vector then return "Vector3" end
     if type(value) == "table" and value.__cframe then return "CFrame" end
+    -- Instance doubles are plain tables; the engine reports "Instance" for them,
+    -- and features that guard a remote with typeof(x) == "Instance" (the silent
+    -- aim hook does) depend on that. The _props.ClassName tag is the marker.
+    if type(value) == "table" and type(value._props) == "table" and value._props.ClassName then return "Instance" end
     return builtinTypeof(value)
 end
 -- GUI-only members the harness rejects on non-GUI instances (see __newindex).
 -- Position is deliberately absent: it is a real BasePart property.
 local GUI_ONLY_MEMBERS = {Visible = true, BackgroundColor3 = true, TextSize = true, Text = true, ZIndex = true}
 local GUI_CLASSES = {Frame = true, TextButton = true, TextLabel = true, ImageLabel = true, ScrollingFrame = true, ScreenGui = true}
-local methods, instanceMeta = {}, {}
-function instanceMeta:__index(key)
+local methods, instanceMeta = {}, {}function instanceMeta:__index(key)
     -- An own value (set by a feature or by an executor-style hook) wins over
     -- the shared method table, so per-instance overrides are observable.
     local own = self._props[key]
@@ -210,6 +213,21 @@ function methods:InvokeServer(...)
     self.Invoked = self.Invoked or {}
     self.Invoked[#self.Invoked + 1] = {...}
     return nil
+end
+-- The base __namecall the engine always provides: dispatch a method-style call
+-- to the instance's own closure. A feature that installs its own __namecall
+-- (via getrawmetatable(game)) chains to this one as `original`, exactly as the
+-- real executor hook does -- so the hook can rewrite args and still forward.
+-- The current method name lives in a module-level slot the test driver sets,
+-- mirroring the engine's `getnamecallmethod()`.
+local namecallMethod = nil
+function instanceMeta:__namecall(...)
+    local method = namecallMethod
+    local impl = self._props[method]
+    if type(impl) == "function" then return impl(self, ...) end
+    local shared = methods[method]
+    if shared then return shared(self, ...) end
+    error(tostring(method) .. " is not a valid member of " .. tostring(self._props.ClassName), 2)
 end
 local Instance = {}
 -- Every double created, so executor-style hooking can locate the Instance that
@@ -380,7 +398,7 @@ local function NewWindow()
         return handle
     end
     function library:AddSlider(_, label, min, max, default, _, callback)
-        library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Callback = callback}
+        library._Controls[#library._Controls + 1] = {Kind = "slider", Label = label, Min = min, Max = max, Value = default, Callback = callback}
         return {Kind = "slider", Value = default}
     end
     function library:AddDropdown(_, label, options, index, callback, multi)
@@ -496,8 +514,20 @@ local function sandbox(placeId, gameId)
     player.Idled = signal()
     player.ChildAdded, player.ChildRemoved = signal(), signal()
     local players = {LocalPlayer=player, PlayerAdded=signal(), PlayerRemoving=signal()}
-    function players:GetPlayers() return {player} end
-    function players:FindFirstChild(name) if player.Name == name then return player end end
+    -- Test-only: register another player (with a character holding a
+    -- HumanoidRootPart) so features that scan players:GetPlayers() -- e.g. silent
+    -- aim's nearest-target search -- have someone to find. The entry carries the
+    -- distance helper a test sets up via AddPlayer below.
+    players.Extra = {}
+    function players:GetPlayers()
+        local list = {player}
+        for _, extra in ipairs(self.Extra) do list[#list + 1] = extra end
+        return list
+    end
+    function players:FindFirstChild(name)
+        if player.Name == name then return player end
+        for _, extra in ipairs(self.Extra) do if extra.Name == name then return extra end end
+    end
     function players:GetPlayerFromCharacter(character)
         for _, candidate in ipairs(players:GetPlayers()) do if candidate.Character == character then return candidate end end
     end
@@ -623,7 +653,7 @@ local function sandbox(placeId, gameId)
     -- Workspace physics/query surface used by prediction and movement features.
     services.Workspace.Gravity = 196.2
     function services.Workspace:Raycast() return nil end
-    local context = {State={}, Logs={}, Requests={}, Responses={}, Deferred={}, Spawned={}, Services=services, Player=player, Instances=INSTANCES}
+    local context = {State={}, Logs={}, Requests={}, Responses={}, Deferred={}, Spawned={}, Services=services, Player=player, Instances=INSTANCES, NamecallMethod=nil}
     local game = {PlaceId=placeId or 1, GameId=gameId or 2, JobId="job"}
     function game:GetService(name) return assert(services[name], "Unexpected service " .. name) end
     function game:IsLoaded() return true end
@@ -685,6 +715,19 @@ local function sandbox(placeId, gameId)
             handle.Instance._props[handle.Name] = handle.Original
             return handle.Original
         end,
+        -- Metamethod hooking, as an executor exposes it. Instances share ONE
+        -- metatable (instanceMeta), so getrawmetatable(game) hands it back and a
+        -- __namecall installed there sees every method-style call -- exactly the
+        -- surface the silent aim hook rewrites. setreadonly is advisory here (the
+        -- double is never actually locked), and newcclosure returns the function
+        -- unchanged, which is enough for the hook's behaviour to be observable.
+        getrawmetatable=function(target)
+            if target == game then return instanceMeta end
+            return getmetatable(target)
+        end,
+        setreadonly=function() return true end,
+        newcclosure=function(fn) return fn end,
+        getnamecallmethod=function() return namecallMethod end,
         task={wait=function() end, cancel=function() end,
             defer=function(fn, ...) context.Deferred[#context.Deferred + 1] = {Fn=fn, Args={...}} end,
             -- task.delay is scheduled as deferred work so tests can run it with
@@ -725,6 +768,25 @@ local function sandbox(placeId, gameId)
         instance._props[name] = fn
         return fn
     end
+    -- Register another player with a live character at `position`, so a feature
+    -- that scans players (silent aim's nearest target) can find it. Returns the
+    -- Player; `context:RemovePlayers()` clears them between tests.
+    function context:AddPlayer(name, position)
+        local target = Instance.new("Player")
+        target.Name = name
+        target.CharacterAdded, target.CharacterRemoving = signal(), signal()
+        local character = Instance.new("Model"); character.Name, character.Parent = "Character", target
+        local hrp = Instance.new("Part"); hrp.Name, hrp.Parent = "HumanoidRootPart", character
+        hrp.Position = position or Vector3.new(0, 0, 0)
+        local humanoid = Instance.new("Humanoid"); humanoid.Parent = character
+        humanoid.Health = 100
+        target.Character = character
+        context.Services.Players.Extra[#context.Services.Players.Extra + 1] = target
+        return target, character
+    end
+    function context:RemovePlayers()
+        context.Services.Players.Extra = {}
+    end
     function context:FlushDeferred()
         local pending = self.Deferred
         self.Deferred = {}
@@ -737,6 +799,26 @@ local function sandbox(placeId, gameId)
         local pending = self.Spawned
         self.Spawned = {}
         for _, call in ipairs(pending) do call.Fn(unpack(call.Args)) end
+    end
+    -- Emulate the client's method-style dispatch for a remote: `remote:FireServer(...)`.
+    -- In the real client that goes through the shared instance metatable's
+    -- __namecall. So if a feature installed a __namecall hook (the silent aim
+    -- does, via getrawmetatable(game)), it is the hook that runs and the remote
+    -- sees exactly what it forwarded -- which is how a test proves the position
+    -- was rewritten. Without a hook, the remote's own closure runs, as normal.
+    -- Returns nothing; inspect `remote.Fired` / `remote.Invoked` for what landed.
+    function context:FireRemote(remote, method, ...)
+        local hook = instanceMeta.__namecall
+        if type(hook) == "function" then
+            namecallMethod = method
+            local ok, err = pcall(hook, remote, ...)
+            namecallMethod = nil
+            if not ok then error(err, 2) end
+            return
+        end
+        local impl = remote._props[method]
+        assert(type(impl) == "function", "remote has no " .. tostring(method))
+        return impl(remote, ...)
     end
     function context:Provide(path, value)
         self.Responses[path] = 'return _provided[' .. string.format('%q', path) .. ']'

@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "fruit", "islands"}
+local FEATURES = {"bladhits", "silentaim", "fruit", "islands"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -84,7 +84,7 @@ do
     check(type(factory) == "table" and type(factory.new) == "function", "a blade hit e carregada pelo backend")
     check(state.Features.fruit ~= nil, "a feature de fruta e carregada pelo backend")
     check(state.Features.raid == nil, "a raid parkeada nao e carregada pelo backend")
-    check(type(state.Errors) == "table" and #state.Errors == 0, "as features carregam sem erro")
+    check(type(state.Errors) == "table" and #state.Errors == 0, "as features carregam sem erro: " .. table.concat(state.Errors, "; "))
 
     -- Nada liga sozinho: o painel abre sem instanciar a feature.
     check(state.Instances.bladhits == nil, "a blade hit nao instancia so pelo load")
@@ -160,7 +160,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "teleport" or name == "fruit" or name == "islands", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "fruit" or name == "islands", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -215,6 +215,29 @@ do
     keepDropdown.Handle:Select("Leopard", true)
     check(fruit.Keep["leopard"] == true, "escolher Leopard no dropdown entra na store keep list")
     state:SetFeature("fruit", false)
+
+    -- Silent aim: um toggle, um dropdown de teclas de excecao (Z X C V F) e um
+    -- slider de alcance (500 a 1000). O toggle dirige o mesmo caminho do backend.
+    local aimToggle = labels["toggle:Silent aim"]
+    local exceptionDown = labels["dropdown:Exception keys"]
+    local rangeSlider = labels["slider:Range"]
+    check(aimToggle ~= nil, "o painel registra o toggle Silent aim")
+    check(exceptionDown ~= nil and exceptionDown.MultiSelect == true, "as teclas de excecao sao um dropdown de selecao multipla")
+    check(#exceptionDown.Options == 5, "o dropdown lista as 5 teclas")
+    check(exceptionDown.Options[1] == "Z" and exceptionDown.Options[5] == "F", "as teclas sao Z X C V F")
+    check(rangeSlider ~= nil, "o painel registra o slider Range")
+    check(rangeSlider.Min == 500 and rangeSlider.Max == 1000, "o slider vai de 500 a 1000")
+    check(rangeSlider.Value == 500, "o padrao do slider e 500")
+
+    -- O toggle do painel liga a feature pelo mesmo caminho do backend.
+    aimToggle.Handle:SetValue(true)
+    check(state:GetToggle("silentaim") == true, "o toggle do painel liga o silent aim")
+    check(state.Instances.silentaim ~= nil and state.Instances.silentaim:IsEnabled() == true, "a feature liga pelo toggle")
+    -- A feature nasce com F marcada (o padrao) e o alcance de 500 do painel.
+    check(state.Instances.silentaim.MaxRange == 500, "a feature nasce com o alcance padrao do slider (500)")
+    aimToggle.Handle:SetValue(false)
+    check(state:GetToggle("silentaim") == false, "o toggle do painel desliga o silent aim")
+    check(state.Instances.silentaim:IsEnabled() == false, "a feature desliga pelo toggle")
 end
 
 -- Chegada desliga o toggle SOZINHO, pelo caminho do backend: ligar o toggle do
@@ -593,6 +616,112 @@ do
 
     islands:Destroy()
     motor:Destroy()
+end
+
+-- Silent aim: escolhe o jogador mais proximo e reescreve a POSICAO (arg 2) de
+-- todo remote de saida pelo gancho de __namecall (o mecanismo do script do
+-- usuario). Segurar uma tecla de excecao larga o aim; soltar conta um grace. O
+-- Disable PRECISA devolver o __namecall original -- sem isso o game ficaria com
+-- o gancho pendurado.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local SilentAim = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])()
+
+    -- O dono: um character com HumanoidRootPart na origem.
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local myRoot = Instance.new("Part"); myRoot.Name, myRoot.Position, myRoot.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local myHumanoid = Instance.new("Humanoid"); myHumanoid.Parent = char
+
+    -- Um remote de verdade, para o gancho interceptar e o teste ler o que saiu.
+    local remotes = ctx.Services.ReplicatedStorage
+    local attack = Instance.new("RemoteEvent"); attack.Name, attack.Parent = "RE/RegisterAttack", remotes
+
+    -- As teclas de excecao e os limites de alcance que o usuario pediu.
+    check(#SilentAim.exceptionKeys == 5, "as 5 teclas de excecao estao publicadas")
+    check(SilentAim.exceptionKeys[1] == "Z" and SilentAim.exceptionKeys[5] == "F", "as teclas sao Z X C V F, nessa ordem")
+    check(SilentAim.MIN_RANGE == 500 and SilentAim.DEFAULT_RANGE == 500 and SilentAim.MAX_RANGE == 1000, "o alcance e 500 (min e padrao) a 1000 (max)")
+
+    -- O alcance e preso a [500, 1000], mesmo se pedirem fora.
+    local feature = SilentAim.new({ range = 99999 })
+    check(feature.MaxRange == 1000, "o alcance acima do maximo e preso em 1000")
+    feature:SetRange(10)
+    check(feature.MaxRange == 500, "o alcance abaixo do minimo e preso em 500")
+    feature:SetRange(750)
+    check(feature.MaxRange == 750, "o alcance no meio e aceito")
+
+    -- Sem getrawmetatable/newcclosure o Enable recusa (nao liga um no-op). O
+    -- harness expoe as duas, entao aqui ele LIGA -- e o gancho e de verdade.
+    check(feature:Enable() == true, "o Enable instala o gancho de __namecall")
+
+    -- Dois alvos: um a 100 studs, outro a 300. O mais proximo vence.
+    local near = ctx:AddPlayer("NearTarget", Vector3.new(100, 0, 0))
+    local far = ctx:AddPlayer("FarTarget", Vector3.new(300, 0, 0))
+
+    -- Um passo da selecao escolhe o alvo (normalmente no Heartbeat; aqui,
+    -- chamando o passo direto para o teste nao depender de clock).
+    feature:_SelectStep()
+    check(feature.TargetName == "NearTarget", "escolhe o jogador mais proximo")
+
+    -- COM alvo: o remote sai com a posicao do alvo no slot 2, em vez da que o
+    -- jogo mandou. E o coracao do silent aim.
+    ctx:FireRemote(attack, "FireServer", "some-position")
+    check(attack.Fired ~= nil and #attack.Fired == 1, "o remote registrou um disparo")
+    check(attack.Fired[1][1] == near.Character:FindFirstChild("HumanoidRootPart").Position, "a posicao enviada foi trocada pela do alvo")
+
+    -- O alvo se move: o proximo passo le a posicao nova.
+    near.Character:FindFirstChild("HumanoidRootPart").Position = Vector3.new(120, 5, 0)
+    feature:_SelectStep()
+    check(feature.TargetPosition == Vector3.new(120, 5, 0), "a posicao do alvo e relida a cada passo")
+
+    -- Segurar a tecla de excecao (F) larga o aim: o remote sai com a posicao
+    -- ORIGINAL, sem reescrita.
+    ctx.Services.UserInputService.InputBegan:Fire({KeyCode = Enum.KeyCode.F})
+    check(feature:IsExceptionActive() == true, "segurar a tecla de excecao ativa a supressao")
+    ctx:FireRemote(attack, "FireServer", "original-position")
+    check(attack.Fired[2][1] == "original-position", "com a excecao ativa o remote sai intacto")
+
+    -- Soltar conta o grace: ainda largado por um instante.
+    ctx.Services.UserInputService.InputEnded:Fire({KeyCode = Enum.KeyCode.F})
+    check(feature:IsExceptionActive() == true, "logo apos soltar, o grace ainda mantem a supressao")
+
+    -- Uma tecla que NAO esta na lista de excecao nao suprime.
+    feature:SetExceptions({ "Z", "X", "C", "V", "F" })
+    ctx.Services.UserInputService.InputBegan:Fire({KeyCode = Enum.KeyCode.G})
+    check(feature.ExceptionHeld == false, "uma tecla fora da lista nao suprime o aim")
+
+    -- Um remote com booleano no slot 2 nao e tocado (reescrever quebraria).
+    feature.ExceptionTime = -100
+    feature:_SelectStep()
+    ctx:FireRemote(attack, "FireServer", true)
+    check(attack.Fired[#attack.Fired][1] == true, "um remote com booleano no slot 2 fica intacto")
+
+    -- Disable devolve o __namecall original: o game nao fica com o gancho.
+    check(feature:Disable() == true, "o Disable desliga")
+    check(feature.Hooked == false, "o gancho foi removido")
+    ctx:FireRemote(attack, "FireServer", "depois-do-disable")
+    check(attack.Fired[#attack.Fired][1] == "depois-do-disable", "depois do Disable o remote sai normal de novo")
+
+    feature:Destroy()
+    ctx:RemovePlayers()
+end
+
+-- Sem getrawmetatable/newcclosure (executor que nao expoe), o Enable RECUSA em
+-- vez de fingir que liga um aim que nao faz nada.
+do
+    local ctx = bfContext(994732206, 994732206)
+    -- Um env sem os primitivos: o __index esconde getrawmetatable/newcclosure
+    -- (devolve nil), e todo o resto cai no env real.
+    local hide = {getrawmetatable = true, newcclosure = true, setreadonly = true, getnamecallmethod = true}
+    local bare = setmetatable({}, {__index = function(_, key)
+        if hide[key] then return nil end
+        return ctx.Env[key]
+    end})
+    local chunk = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "silentaim.lua"])
+    setfenv(chunk, bare)
+    local feature = chunk().new({})
+    check(feature:Enable() == false, "sem getrawmetatable o Enable recusa")
+    check(feature:IsEnabled() == false, "a feature fica desligada quando recusa")
 end
 
 -- O motor de teleporte e infraestrutura: carrega e instancia sozinho (sem

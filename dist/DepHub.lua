@@ -9014,6 +9014,7 @@ local FRUIT_NAMES = {
 -- INFRA_MODULES e nao aparece no painel.
 local FEATURE_MODULES = {
     {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
+    {name = "silentaim", page = "Combat", section = "SILENT AIM", toggle = "Silent aim"},
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
 }
@@ -9176,6 +9177,11 @@ function State:SetFeature(name, enabled)
                 -- O mar atual: a feature de ilhas escolhe a lista de destinos
                 -- daqui (Sea 1 / 2 / 3 tem ilhas e pontos fixos diferentes).
                 sea = CURRENT_SEA,
+                -- O silent aim nasce com o alvo/alcance que o painel ja marcou
+                -- antes de ligar (o usuario pode ajustar o slider e as teclas com
+                -- o toggle ainda desligado; a escolha nao se perde).
+                range = self.PendingSilentAimRange,
+                exceptions = self.PendingSilentAimExceptions,
             }
             local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
@@ -9247,6 +9253,9 @@ function State:Destroy()
         if type(instance.Destroy) == "function" then pcall(instance.Destroy, instance) end
         self.Infra[name] = nil
     end
+    -- A escolha do painel guardada antes de ligar nao sobrevive ao unload.
+    self.PendingSilentAimRange = nil
+    self.PendingSilentAimExceptions = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruitsOwn == self then env.__DEPHUB.BloxFruitsOwn = nil end
@@ -9279,6 +9288,48 @@ local PANELS = {
                 if not value then instance.Backend:SetFeature("bladhits", false) end
             end)
             section:CreateParagraph("Blade hits", "Auto-swing at every enemy in range using the game's attack remotes.")
+        end,
+    },
+    silentaim = {
+        page = "Combat",
+        section = "SILENT AIM",
+        category = "Combat",
+        icon = "crosshair",
+        tabIcon = "crosshair",
+        build = function(section, instance)
+            local factory = State.Features.silentaim
+            local keys = (factory and type(factory.exceptionKeys) == "table") and factory.exceptionKeys or { "Z", "X", "C", "V", "F" }
+            local minRange = (factory and factory.MIN_RANGE) or 500
+            local maxRange = (factory and factory.MAX_RANGE) or 1000
+            local defaultRange = (factory and factory.DEFAULT_RANGE) or 500
+
+            -- Silent aim: liga/desliga. Se o executor nao expoe o gancho de
+            -- metatable, o Enable recusa -- avisa em vez de ligar um no-op.
+            section:CreateToggle("Silent aim", false, function(value)
+                if value and not State:SetFeature("silentaim", true) then
+                    instance.Notify("Silent aim", "Unsupported executor (needs getrawmetatable).")
+                end
+                if not value then State:SetFeature("silentaim", false) end
+            end)
+
+            -- As teclas que SUPRIMEM o aim: segurar qualquer uma delas larga o
+            -- alvo. Multi-dropdown (marca/desmarca), comecando em F (o padrao).
+            section:CreateMultiDropdown("Exception keys", keys, { "F" }, function(selected)
+                if State.Instances.silentaim then
+                    State.Instances.silentaim:SetExceptions(selected)
+                else
+                    -- Ainda nao instanciada: guarda a escolha pra quando ligar.
+                    State.PendingSilentAimExceptions = selected
+                end
+            end)
+
+            -- Range: minimo 500, padrao 500, maximo 1000.
+            section:CreateSlider("Range", minRange, maxRange, defaultRange, function(value)
+                if State.Instances.silentaim then State.Instances.silentaim:SetRange(value) end
+                State.PendingSilentAimRange = value
+            end)
+
+            section:CreateParagraph("Silent aim", "Redirects your attack position to the nearest player. Hold an exception key to release the aim.")
         end,
     },
     fruit = {
@@ -11122,6 +11173,340 @@ function Feature:Destroy()
     self:Disable()
     self.Teleport = nil
     self.OnArrive = nil
+end
+
+return Feature
+
+]],
+    ["src/games/features/bloxfruits/silentaim.lua"] = [[
+local game = game
+local type = type
+local pcall = pcall
+local tostring = tostring
+local tonumber = tonumber
+local unpack = unpack or table.unpack
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- Silent Aim -- o aimbot silencioso do Blox Fruits, no molde proprio.
+--
+-- Portado do script do usuario (v3.4). O que ele faz: escolhe o jogador MAIS
+-- PROXIMO dentro do alcance e, se segurar a tecla de "excecao" (F, por padrao),
+-- nao mexe em nada; fora disso, intercepta todo remote de saida (FireServer /
+-- InvokeServer) e troca o segundo argumento (a posicao) pela posicao do alvo.
+-- Assim o servidor acha que voce mirou nele, sem a mira visual mudar.
+--
+-- O olho do silent aim e o __namecall da metatable do game (getrawmetatable +
+-- newcclosure) -- o mesmo mecanismo do script original. Sem isso nao ha silent
+-- aim de verdade; e por ser gancho de metatable, o Disable PRECISA devolver o
+-- __namecall original, senao o game fica com o gancho pendurado (a regra do
+-- repo: ligar tem que desligar de verdade). Por isso o hook e instalado no
+-- Enable e removido no Disable/Destroy.
+--
+-- Sem UI e sem toggle proprio: quem monta o painel e o backend (o toggle "Silent
+-- aim", o dropdown de excecoes e o slider de alcance). Aqui so vive a logica.
+--
+-- Self-contained: faz os proprios game:GetService e nao depende do DepHub. O
+-- hook e opcional -- se o executor nao expoe getrawmetatable/newcclosure, o
+-- Enable recusa em vez de fingir que liga.
+
+local Feature = {}
+Feature.__index = Feature
+
+-- As teclas de excecao que o usuario confirmou. Segurar QUALQUER uma delas faz o
+-- silent aim largar o alvo (nao reescreve a posicao) -- util quando voce quer
+-- usar a tecla no jogo sem o aim atrapalhar.
+local EXCEPTION_KEYS = {
+    { label = "Z", key = Enum.KeyCode.Z },
+    { label = "X", key = Enum.KeyCode.X },
+    { label = "C", key = Enum.KeyCode.C },
+    { label = "V", key = Enum.KeyCode.V },
+    { label = "F", key = Enum.KeyCode.F },
+}
+
+-- Quando a tecla de excecao e solta, o silent aim continua largado por um
+-- instante (grace), pra um toque rapido na tecla nao "piscar" a mira. Do script
+-- original (ExceptionGrace = 1.0).
+local EXCEPTION_GRACE = 1.0
+
+-- O fator de "grude": uma vez escolhido um alvo, so troca quando aparece um
+-- mais perto por esta margem (do script original, StickyFactor = 0.2). Evita a
+-- mira pular entre dois jogadores de distancia parecida.
+local STICKY_FACTOR = 0.2
+
+-- Os limites do alcance, como o usuario pediu: minimo 500, padrao 500, maximo
+-- 1000. O slider e montado pelo backend com estes numeros.
+Feature.MIN_RANGE = 500
+Feature.MAX_RANGE = 1000
+Feature.DEFAULT_RANGE = 500
+
+Feature.ExceptionKeys = EXCEPTION_KEYS
+
+-- Os rotulos das teclas de excecao, na ordem. O backend monta o dropdown daqui.
+Feature.exceptionKeys = {}
+for _, entry in ipairs(EXCEPTION_KEYS) do
+    Feature.exceptionKeys[#Feature.exceptionKeys + 1] = entry.label
+end
+
+-- O rotulo ("F") -> a tecla (Enum.KeyCode.F). nil se nao for uma tecla conhecida.
+local function keyForLabel(label)
+    if label == nil then return nil end
+    local wanted = tostring(label):upper()
+    for _, entry in ipairs(EXCEPTION_KEYS) do
+        if entry.label:upper() == wanted then return entry.key end
+    end
+    return nil
+end
+
+function Feature.new(options)
+    options = options or {}
+    local self = setmetatable({}, Feature)
+    self.Enabled = false
+    -- O alcance em studs. Preso a [MIN, MAX]; o padrao e o minimo (500).
+    self.MaxRange = math.clamp(tonumber(options.range) or Feature.DEFAULT_RANGE, Feature.MIN_RANGE, Feature.MAX_RANGE)
+    -- As teclas que SUPRIMEM o aim (rotulos). Comeca em F, como o original.
+    self.Exceptions = options.exceptions or { "F" }
+    -- Estado da mira.
+    self.Target = nil            -- Player alvo
+    self.TargetName = nil
+    self.TargetPosition = nil    -- Vector3 do alvo no ultimo frame
+    self.TargetDistance = nil
+    -- Estado da excecao (tecla segurada / grace).
+    self.ExceptionHeld = false
+    self.ExceptionTime = 0
+    -- Conexoes (Heartbeat do alvo + InputBegan/Ended das teclas).
+    self.Connections = {}
+    -- O gancho da metatable: guarda o __namecall original pra restaurar.
+    self.OriginalNamecall = nil
+    self.Metatable = nil
+    self.Hooked = false
+    return self
+end
+
+-- A posicao do HumanoidRootPart agora, ou nil.
+local function root(character)
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+-- A posicao do HumanoidRootPart de um player, ou nil se nao ha character vivo.
+local function playerPosition(player)
+    if not player or player == LocalPlayer then return nil end
+    local character = player.Character
+    local hrp = root(character)
+    if not hrp then return nil end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.Health <= 0 then return nil end
+    return hrp.Position
+end
+
+-- O jogador mais proximo dentro do alcance. nil se nao ha ninguem (ou sem
+-- character proprio).
+function Feature:FindNearest()
+    local myRoot = root(LocalPlayer and LocalPlayer.Character)
+    if not myRoot then return nil, nil end
+    local origin = myRoot.Position
+    local nearest, nearestDist = nil, math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        local position = playerPosition(player)
+        if position then
+            local distance = (position - origin).Magnitude
+            if distance <= self.MaxRange and distance < nearestDist then
+                nearest, nearestDist = player, distance
+            end
+        end
+    end
+    return nearest, nearestDist
+end
+
+-- A tecla esta na lista de excecao do usuario?
+function Feature:IsExceptionKey(keyCode)
+    for _, label in ipairs(self.Exceptions) do
+        if keyForLabel(label) == keyCode then return true end
+    end
+    return false
+end
+
+-- O aim esta largado agora? (tecla segurada, ou grace depois de soltar)
+function Feature:IsExceptionActive()
+    if self.ExceptionHeld then return true end
+    return (os.clock() - self.ExceptionTime) < EXCEPTION_GRACE
+end
+
+-- --- O gancho (o olho do silent aim) ----------------------------------------
+
+-- Instala o gancho de __namecall. Guarda o original pra restaurar depois.
+-- Devolve true se instalou. Sem getrawmetatable/newcclosure (executor que nao
+-- expoe) devolve false -- o Enable entao recusa, em vez de ligar um no-op.
+function Feature:InstallHook()
+    if self.Hooked then return true end
+    if type(getrawmetatable) ~= "function" or type(newcclosure) ~= "function" then
+        return false
+    end
+    local mt = getrawmetatable(game)
+    if not mt then return false end
+    local original = mt.__namecall
+    if type(original) ~= "function" then return false end
+
+    self.Metatable = mt
+    self.OriginalNamecall = original
+    -- A metatable e protegida (readonly); liberar antes de escrever.
+    if type(setreadonly) == "function" then pcall(setreadonly, mt, false) end
+
+    local self_ = self
+    mt.__namecall = newcclosure(function(...)
+        local method = getnamecallmethod()
+        -- So mexe em chamadas de saida pro servidor.
+        if method == "FireServer" or method == "InvokeServer" then
+            local args = { ... }
+            -- args[1] e o proprio remote; so age se ele parecer um remote.
+            local remote = args[1]
+            if typeof(remote) == "Instance"
+                and (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then
+                -- O segundo argumento e a posicao. Nao mexe quando ha alvo nulo,
+                -- quando o aim esta em excecao, ou quando arg2 e booleano (alguns
+                -- remotes usam bool no slot 2; reescrever quebraria o comando).
+                local target = self_.TargetPosition
+                local arg2 = args[2]
+                if target ~= nil
+                    and not self_:IsExceptionActive()
+                    and not (arg2 == true or arg2 == false) then
+                    args[2] = target
+                end
+            end
+            return original(unpack(args))
+        end
+        return original(...)
+    end)
+    self.Hooked = true
+    return true
+end
+
+-- Restaura o __namecall original. Sem isso o game ficaria com o gancho pendurado.
+function Feature:RemoveHook()
+    if not self.Hooked then return end
+    self.Hooked = false
+    if self.Metatable and self.OriginalNamecall then
+        pcall(function()
+            if type(setreadonly) == "function" then pcall(setreadonly, self.Metatable, false) end
+            self.Metatable.__namecall = self.OriginalNamecall
+        end)
+    end
+    self.Metatable = nil
+    self.OriginalNamecall = nil
+end
+
+-- --- Selecao de alvo --------------------------------------------------------
+
+function Feature:_ClearTarget()
+    self.Target = nil
+    self.TargetName = nil
+    self.TargetPosition = nil
+    self.TargetDistance = nil
+end
+
+-- Um passo da selecao (roda no Heartbeat). Escolhe o mais proximo; uma vez com
+-- alvo, so troca se aparecer outro mais perto pela margem de grude.
+function Feature:_SelectStep()
+    local target, distance = self:FindNearest()
+    if not target then
+        self:_ClearTarget()
+        return
+    end
+    if self.TargetName ~= target.Name then
+        -- Sem alvo ainda: pega o mais proximo. Com alvo: so troca se o novo
+        -- estiver bem mais perto (sticky).
+        if self.TargetDistance == nil or distance < (self.TargetDistance * (1 - STICKY_FACTOR)) then
+            self.Target = target
+            self.TargetName = target.Name
+            self.TargetDistance = distance
+        end
+    else
+        self.Target = target
+        self.TargetDistance = distance
+    end
+    -- Atualiza a posicao do alvo a cada passo (e o que o hook reescreve).
+    local current = Players:FindFirstChild(self.TargetName)
+    self.TargetPosition = playerPosition(current)
+    if not self.TargetPosition then
+        -- Alvo morreu/saiu: solta pra reescolher no proximo passo.
+        self:_ClearTarget()
+    end
+end
+
+-- --- Ciclo de vida ---------------------------------------------------------
+
+function Feature:SetRange(value)
+    value = tonumber(value)
+    if not value then return false end
+    self.MaxRange = math.clamp(value, Feature.MIN_RANGE, Feature.MAX_RANGE)
+    return true
+end
+
+-- As teclas de excecao (rotulos). Aceita uma tabela; filtra pro que existe.
+function Feature:SetExceptions(labels)
+    local list = {}
+    for _, label in ipairs(type(labels) == "table" and labels or {}) do
+        if keyForLabel(label) then list[#list + 1] = tostring(label):upper() end
+    end
+    self.Exceptions = list
+    return true
+end
+
+function Feature:Enable()
+    if self.Enabled then return true end
+    if not self:InstallHook() then
+        self.LastError = "sem getrawmetatable/newcclosure"
+        return false
+    end
+    self.Enabled = true
+    self.ExceptionHeld = false
+    self.ExceptionTime = 0
+
+    -- A selecao de alvo roda no Heartbeat (nao no RenderStepped: a mira e logica,
+    -- nao precisa desenhar nada).
+    self.Connections[#self.Connections + 1] = RunService.Heartbeat:Connect(function()
+        if not self.Enabled then return end
+        pcall(function() self:_SelectStep() end)
+    end)
+
+    -- Teclas de excecao: segurar larga o aim; soltar conta o grace.
+    self.Connections[#self.Connections + 1] = UserInputService.InputBegan:Connect(function(io)
+        if self:IsExceptionKey(io.KeyCode) then
+            self.ExceptionHeld = true
+            self.ExceptionTime = os.clock()
+        end
+    end)
+    self.Connections[#self.Connections + 1] = UserInputService.InputEnded:Connect(function(io)
+        if self:IsExceptionKey(io.KeyCode) then
+            self.ExceptionHeld = false
+            self.ExceptionTime = os.clock()
+        end
+    end)
+
+    return true
+end
+
+function Feature:Disable()
+    self.Enabled = false
+    for _, connection in ipairs(self.Connections) do
+        pcall(function() connection:Disconnect() end)
+    end
+    self.Connections = {}
+    self:_ClearTarget()
+    self:RemoveHook()
+    return true
+end
+
+function Feature:IsEnabled()
+    return self.Enabled == true
+end
+
+function Feature:Destroy()
+    self:Disable()
+    self.Exceptions = nil
 end
 
 return Feature
@@ -22109,7 +22494,7 @@ AOTR: restored combat/autofarm (Titan Ripper, Skill Autofarm, Classic Autofarm, 
 
 ]],
     ["src/games/updates/994732206.txt"] = [[
-0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects.
+0.1.27 | The panel is smaller, the icons are the library's own, and the open/close toggle is the library's. The window no longer grows with the screen: RedzLib scaled everything by ViewportSize.Y/450, so on a 1080p screen the panel was multiplied ~2.26x and a 600x420 window rendered at 1356x949 -- almost the whole screen. The scale now uses a fixed reference height (900) clamped to 0.75..1.25, so the panel renders at about its declared size (~1.13x, roughly 678x474 on 1080p) and stays the same size on any screen. Tab and category icons are now names looked up in the library's own icon catalogue (the real RedzLib Icons.lua, 818 names -> asset ids, vendored as src/core/redz-icons.lua) instead of emojis: ask for "swords", "apple" or "rocket" and you get the library's real icon; ask for a name the catalogue does not have and the tab simply has no icon, instead of showing a stray glyph. The open/close key (N) is now bound through the library's own Window:NewMinimizer instead of the shell's hand-rolled listener. Blox Fruits Travel gains a Cafe destination: it is a position, not a map instance, so picking Cafe flies straight to the Cafe coordinates (no instance lookup, no rotation applied). The Travel island list is now per sea: Sea 1, Sea 2 and Sea 3 have different maps, so the dropdown shows only the destinations of the sea the game reports (ReplicatedStorage.Util.Realm) -- Cafe on Sea 2, Castle on Sea on Sea 3 (also a fixed position), instead of mixing them. Blox Fruits gains Silent aim on the Combat tab, ported from the script the user was building separately: it picks the nearest player in range and rewrites the position argument of every outgoing remote, so the server believes you aimed at them without the camera moving. It is one toggle, a multi-select dropdown of the keys that release the aim (Z X C V F, F by default -- hold any of them and the aim lets go), and a Range slider (500 to 1000, default 500). The hook is installed on enable and fully removed on disable, so the game never keeps it dangling; if the executor does not expose the metatable primitives the toggle refuses instead of turning on a no-op. Also, the fruit tab drops the two distance sliders: fruit ESP and grab now have unlimited range, with no configurable limit, so a fruit is never ignored just because it is far -- the scan still only does the same cheap existence/validity checks. Skip list and Store keep list are multi-select fruit dropdowns built from the game's own fruit-name list: pick fruits by name, no typing, no duplicates, remove by unchecking, and the choices drive exactly the same skip/keep the old text fields did. Under the hood, three events that never worked now do: Heartbeat (island arrival), RenderStepped (dashboard FPS) and InputBegan (open/close key) were checked with `type(x) == "table"`, but Roblox events are RBXScriptSignal, not tables, so the checks were always false and the connections never happened -- they are now pcall-guarded connects.
 0.1.26 | The whole interface now renders on RedzLib, the vendored library in the repo (src/dephubv2lib.lua). The old theme was retired and the shared shell was rewritten as a thin adapter over RedzLib, so every game keeps the same tabs, sections and controls it had before -- look and behaviour did not change, only what draws them. Two things are visible: the open/close key is still N (the shell binds it itself, because RedzLib has no key binding of its own), and group rows now stack their controls vertically instead of side by side (RedzLib has no horizontal container; the controls are all still there, just one under the other). Blox Fruits island teleport also stops disarming by hand: once the character actually reaches the island you picked, that toggle turns itself off. It only flips on real arrival at that flight's destination (25 studs of the island), never starts early and never fires again after you have landed.
 0.1.25 | Blox Fruits gains Island Teleport, a new Travel tab. Turn the toggle on, pick an island from the dropdown, and the character flies there. The toggle is a real gate: selecting an island while it is off only remembers the choice, and switching islands while it is on flies again. The destination is the real instance in the map (workspace.Map.<Name>) rather than a hardcoded coordinate, so it does not break when the map changes and it uses exactly the names the user confirmed; if the island is not in the map it says so instead of flying into empty space. The list is the Sea 2 set the user provided: Snow Mountain, Indra Island, Ice Castle, Green Bit, Grave Island, Ghost Ship Interior, Ghost Ship, Forgotten Island, Fishmen, Dressrosa, Darkbeard Arena and Dapper Jack Arena. It has no motor of its own -- it uses the shared teleport by injection, like the fruit feature does. No sliders.
 0.1.24 | Blox Fruits fruit detection fixed for the fruits the game spawns. The feature only ever looked at Tools, but a fruit the game spawns into the map is a Model named Fruit/fruit with no Handle -- the Handle (and the ProximityPrompt) only appears once a player touches it. So a spawned fruit never got ESP and the grab never flew, while a fruit dropped by another player (which IS a Tool) worked -- exactly what the user reported. Detection now accepts both shapes: a Tool with OriginalName/Handle, and a Model (or Part) whose name is Fruit-like. ESP also stops orphaning its highlight: the fruit part can change while the fruit exists, and the old code reused the entry and left the adorner pointing at a dead part, which was the glitch the user saw; it now re-targets the adorner when the part changes. The grabbed spawned fruit is reached by flying onto it -- touching it is what makes the game turn the Model into a collectible Tool, so the grab does not refuse just because there is no prompt yet.
