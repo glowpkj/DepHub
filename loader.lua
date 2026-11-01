@@ -3,10 +3,15 @@
 
   Cole ESTE script no executor, sempre. Ele:
 
-    1. baixa e executa o DepHub.lua oficial (com fallback de host igual ao
-       loader do proprio hub);
-    2. espera o backend subir;
-    3. imprime no console um resumo curto -- versao, host, executor, qual
+    1. baixa o DepHub.lua oficial (com fallback de host igual ao loader do
+       proprio hub);
+    2. ESPERA o jogo carregar 100% e o seu PERSONAGEM spawnar (HumanoidRootPart
+       + Humanoid vivo) antes de subir o hub -- assim nenhuma feature age antes
+       de voce ter spawnado direito (o "teleportou pra fruta antes de eu
+       spawnar" que chamava atencao). Espera generica: vale para todo jogo;
+    3. executa o DepHub.lua;
+    4. espera o backend subir;
+    5. imprime no console um resumo curto -- versao, host, executor, qual
        backend/modo carregou -- e todo erro de carga que o backend reportou.
 
   O console SEMPRE recebe o resumo, para qualquer jogo: e o mesmo bootstrap
@@ -82,6 +87,92 @@ end
 if type(loadstring) ~= "function" then
     loud("este executor nao tem loadstring -- nao da pra carregar o hub.")
     return
+end
+
+-- ---------------------------------------------------------------------------
+-- Espera o JOGO e o PERSONAGEM carregarem 100% antes de subir o hub.
+--
+-- Sem isso, o hub montava e ligava as features no primeiro frame disponivel --
+-- e uma feature que age sozinha (teleporte pra fruta, por exemplo) disparava
+-- ANTES de o personagem ter spawnado direito, o que e feio e chama atencao.
+-- O wait e generico (nao depende de jogo nenhum): vale para Blox Fruits, MM2,
+-- TSB, universal, qualquer um, porque usa so a API do proprio Roblox.
+--
+--   1) game:IsLoaded() -- a lista de instancias terminou de replicar;
+--   2) LocalPlayer existe, tem Character, e o Character tem HumanoidRootPart
+--      e um Humanoid vivo (Health > 0 e nao morto). E o "spawnei de verdade".
+--
+-- Se o executor nao expoe `game` (raro), ou o jogo nao carga em `timeout`, o
+-- loader NAO trava pra sempre: avisa e segue, pra nunca deixar o usuario sem o
+-- hub por causa da espera.
+-- ---------------------------------------------------------------------------
+local function hasGame()
+    return type(game) == "table" and type(game.IsLoaded) == "function"
+end
+
+local function isGameLoaded()
+    if hasGame() then
+        local ok, loaded = pcall(game.IsLoaded, game)
+        if ok and loaded == true then return true end
+    end
+    -- Fallback: sem IsLoaded, aceita quando o Workspace ja tem filhos (o mapa
+    -- comecou a entrar). Nao e tao preciso quanto o IsLoaded, mas evita esperar
+    -- pra sempre num executor que nao expoe o metodo.
+    local ws = type(game) == "table" and type(game.GetService) == "function"
+        and select(2, pcall(game.GetService, game, "Workspace")) or nil
+    if type(ws) == "table" and type(ws.GetChildren) == "function" then
+        local ok, kids = pcall(ws.GetChildren, ws)
+        if ok and type(kids) == "table" and #kids > 0 then return true end
+    end
+    return false
+end
+
+local function isCharacterReady()
+    local players = type(game) == "table" and type(game.GetService) == "function"
+        and select(2, pcall(game.GetService, game, "Players")) or nil
+    if type(players) ~= "table" then return false end
+    local player = players.LocalPlayer
+    if player == nil then return false end
+    local character = player.Character
+    if character == nil then return false end
+    if character:FindFirstChild("HumanoidRootPart") == nil then return false end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid == nil then return false end
+    local ok, health = pcall(function() return humanoid.Health end)
+    if not ok or type(health) ~= "number" or health <= 0 then return false end
+    return true
+end
+
+-- Espera os dois. Devolve (jogoPronto, personagemPronto). Cada um tem o proprio
+-- deadline, para um jogo em que o personagem demora nao consumir o tempo do
+-- outro. Alem do relogio, um TETO de iteracoes: se `task.wait` for no-op (num
+-- sandbox, ou num executor quebrado), o loop ainda termina em vez de girar
+-- para sempre.
+local function waitForLoad(seconds)
+    local budget = math.max(1, math.floor((seconds or 30) * 10))  -- ticks de 0,1s
+    local deadline = os.clock() + (seconds or 30)
+    -- Relogio E teto: o loop para no primeiro que chegar (carga real, deadline
+    -- de tempo, ou o teto de iteracoes).
+    local function waitBounded(predicate)
+        local ticks = 0
+        while ticks < budget and os.clock() < deadline do
+            if predicate() then return true end
+            task.wait(0.1)
+            ticks = ticks + 1
+        end
+        return predicate()
+    end
+    return waitBounded(isGameLoaded), waitBounded(isCharacterReady)
+end
+
+say("esperando o jogo e o personagem carregarem...")
+local gameReady, characterReady = waitForLoad(45)
+if gameReady and characterReady then
+    say("jogo carregado e personagem pronto -- subindo o hub.")
+elseif gameReady then
+    loud("o jogo carregou mas o personagem nao spawnou em 45s -- subindo o hub assim mesmo.")
+else
+    loud("o jogo nao reportou carga completa em 45s -- subindo o hub assim mesmo.")
 end
 
 local chunk, compileError = loadstring(source)

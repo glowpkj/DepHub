@@ -555,7 +555,8 @@ do
     -- no default (nao monta codigo com o conteudo hostil).
     ctx.State.__DEPHUB.SourceBaseURL = 'https://raw.githubusercontent.com/glowpkj/DepHub/main/"\n'
     local badBase2 = state:SelfExecLine()
-    check(badBase2 == 'loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/main/DepHub.lua"))("main")', "base com aspas/quebra de linha cai no default seguro")
+    check(badBase2:find('loadstring(game:HttpGet("https://raw.githubusercontent.com/glowpkj/DepHub/main/DepHub.lua"))("main")', 1, true) ~= nil,
+        "base com aspas/quebra de linha cai no default seguro")
 end
 
 -- Auto-load: com uma config ja no disco, o painel abre com ela aplicada ("so
@@ -2053,5 +2054,107 @@ do
     check(state:SetAutoExec(true) == true, "com a API so no getgenv() o auto execute liga")
     check(type(captured) == "string" and captured:find("DepHub.lua", 1, true) ~= nil, "o reload foi enfileirado mesmo assim")
 
+    state:Destroy()
+end
+
+-- A sequencia EXATA do usuario: ligar o auto execute numa sessao, desligar,
+-- salvar, e reabrir. O arquivo tem que guardar `false`, e a proxima sessao tem
+-- que abrir com o toggle DESLIGADO e NAO enfileirar nenhum reload. Antes disso o
+-- usuario via o auto execute voltar sozinho e o script rodar de novo sozinho.
+--
+-- O queue_on_teleport aqui e modelado como o dos executores reais: ele ACUMULA
+-- (a chamada mais recente substitui o pendente, e "" limpa). Se o codigo
+-- dependesse de "a ultima chamada ganha" sem realmente limpar, o reload antigo
+-- seguiria pendente e dispararia no proximo teleporte.
+do
+    -- Sessao 1: liga, desliga, salva.
+    local ctxA = bfContext(994732206, 994732206)
+    local uiA = ctxA:MountUI()
+    local pending = nil
+    -- Modelo fiel: guardar o ULTIMO enfileirado (o executor roda o pendente).
+    ctxA.Env.queue_on_teleport = function(script) pending = script end
+    local stateA = ctxA:Run("src/games/bloxfruits.lua")
+
+    local autoA
+    for _, control in ipairs(uiA.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Auto execute" then autoA = control end
+    end
+    check(autoA ~= nil, "sessao 1: o toggle Auto execute existe")
+
+    autoA.Handle:SetValue(true)
+    check(pending ~= nil and pending:find("DepHub.lua", 1, true) ~= nil, "sessao 1: ligar enfileira o reload")
+    autoA.Handle:SetValue(false)
+    check(pending == "", "sessao 1: desligar limpa o pendente")
+    check(stateA.Config.autoexec == false, "sessao 1: desligar grava false no Config")
+
+    -- Salvar como o botao Save faz.
+    check(stateA:SaveConfig() == true, "sessao 1: Save grava o arquivo")
+
+    -- O arquivo salvo tem que carregar autoexec=false (nao o valor antigo, nao
+    -- ausente). Este e o ponto que o usuario via voltar errado.
+    local savedText = ctxA.Files["DepHub_BloxFruits_config.json"]
+    check(type(savedText) == "string" and savedText:find('"autoexec":false', 1, true) ~= nil,
+        "o arquivo salvo carrega autoexec=false: " .. tostring(savedText))
+    stateA:Destroy()
+
+    -- Sessao 2 (mudar de servidor): le o MESMO arquivo. O toggle tem que abrir
+    -- DESLIGADO e NADA pode ser enfileirado.
+    local ctxB = bfContext(994732206, 994732206)
+    local uiB = ctxB:MountUI()
+    ctxB.Files["DepHub_BloxFruits_config.json"] = savedText
+    local pendingB = "SENTINELA"
+    ctxB.Env.queue_on_teleport = function(script) pendingB = script end
+    local stateB = ctxB:Run("src/games/bloxfruits.lua")
+
+    local autoB
+    for _, control in ipairs(uiB.Library._Controls) do
+        if control.Kind == "toggle" and control.Label == "Auto execute" then autoB = control end
+    end
+    check(autoB ~= nil and autoB.Handle.Value == false, "sessao 2: o toggle abre DESLIGADO pelo salvo")
+    check(pendingB ~= "SENTINELA" and (pendingB == nil or pendingB == ""),
+        "sessao 2: o start NAO enfileira reload nenhum (auto execute desligado)")
+    stateB:Destroy()
+end
+
+-- O executor pode carregar a fila de uma sessao ANTERIOR para o novo servidor (o
+-- queue_on_teleport sobrevive ao rejoin em varios deles). Mesmo SEM arquivo salvo
+-- (primeira vez, ou config ainda nao gravada), o start com auto execute desligado
+-- tem que LIMPAR essa fila -- senao o script sobe sozinho. Antes o clear so
+-- rodava se o arquivo tivesse a chave autoexec, entao uma fila velha passava.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    -- Sem arquivo: nada salvo, entao nenhuma chave autoexec pra "aplicar".
+    local pending = "loadstring(game:HttpGet('...'))()"  -- fila herdada da sessao anterior
+    ctx.Env.queue_on_teleport = function(script) pending = script end
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    check(state ~= nil, "sem arquivo salvo o backend ainda sobe")
+    check(pending == "", "start sem arquivo limpa a fila herdada de reload (auto execute desligado)")
+    state:Destroy()
+end
+
+-- A linha de reload enfileirada carrega um GUARD: ela mesma le a config salva e
+-- so re-sobe o hub se `autoexec` estiver true. E isso que faz "desligado" ficar
+-- desligado mesmo quando uma linha antiga ainda esta pendente no executor.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local ui = ctx:MountUI()
+    local captured = nil
+    ctx.Env.queue_on_teleport = function(script) captured = script end
+    local state = ctx:Run("src/games/bloxfruits.lua")
+    state:SetAutoExec(true)
+    check(type(captured) == "string", "ligar entrega a linha ao queue_on_teleport")
+    check(captured:find("autoexec", 1, true) ~= nil, "a linha enfileirada checa a config salva (guard)")
+    check(captured:find("DepHub.lua", 1, true) ~= nil, "e ainda assim re-sobe o hub quando estiver ligado")
+
+    -- E o guard montado roda de verdade: com autoexec=false salvo, ele retorna
+    -- sem chamar o loadstring interno (que e o que re-sobe o hub).
+    ctx.Files["DepHub_BloxFruits_config.json"] = '{"autoexec":false}'
+    local executed = false
+    -- Substitui game:HttpGet pra marcar se o loadstring INTERNO chegou a rodar.
+    ctx.Env.game.HttpGet = function() executed = true; return "return true" end
+    local okGuard = pcall(ctx.Env.loadstring(captured))
+    check(not executed,
+        "com autoexec=false salvo o guard bloqueia a re-execucao (" .. tostring(okGuard) .. ")")
     state:Destroy()
 end

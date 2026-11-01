@@ -302,7 +302,31 @@ function State:SelfExecLine()
     local base = safeBase(shared and shared.SourceBaseURL)
         or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
     if not base:match("/$") then base = base .. "/" end
-    return ('loadstring(game:HttpGet("%sDepHub.lua"))("%s")'):format(base, ref)
+    local qline = ('loadstring(game:HttpGet("%sDepHub.lua"))("%s")'):format(base, ref)
+
+    -- Sem API de arquivo o guard nao tem o que ler: monta so a linha de reload.
+    local fileApi = self:FileApi()
+    if not fileApi or not self.Store or not self.Store.file then return qline end
+
+    -- AUTO-EXECUTE GUARDADO: a linha enfileirada NAO roda cega. Antes de re-subir
+    -- o hub, ela le o arquivo de config salvo e so continua se `autoexec` estiver
+    -- true. Por que: o queue_on_teleport pode SOBREVIVER a troca de servidor /
+    -- rejoin (o executor guarda o ultimo chunk), entao desligar o toggle e salvar
+    -- nao bastava -- a linha velha ainda pendia e re-executava o script sozinho.
+    -- Com o guard, "desligado" fica desligado de verdade: mesmo uma linha antiga
+    -- que o executor ainda tenha guardada se recusa a rodar. O nome do arquivo
+    -- passa por %q (a mesma validacao de ref/base), entao uma aspa ou barra nao
+    -- quebra a sintaxe do chunk.
+    local guard = ([[
+local __ok = pcall(function()
+    if type(readfile) ~= "function" or type(isfile) ~= "function" then return end
+    if isfile(%q) ~= true then return end
+    local __text = tostring(readfile(%q))
+    if not __text:find('"autoexec":true', 1, true) then error("autoexec off") end
+end)
+if not __ok then return end
+]]):format(tostring(self.Store.file), tostring(self.Store.file))
+    return guard .. qline
 end
 
 -- Liga/desliga o auto-execute. Ligado, enfileira a re-execucao no executor
@@ -1062,6 +1086,16 @@ if type(visual) == "table" and type(visual.CreateTab) == "function" then
     -- usuario nao clica em Load toda sessao.
     if type(saved) == "table" then
         pcall(function() State:ApplyConfig(saved) end)
+    end
+
+    -- Auto execute DESLIGADO no start: limpa qualquer reload que o executor
+    -- ainda tenha em fila de uma sessao anterior (o queue_on_teleport sobrevive a
+    -- troca de servidor/rejoin em varios executores). Antes isso so acontecia se o
+    -- arquivo salvo TIVESSE a chave `autoexec`; sem a chave (ou sem arquivo) a
+    -- fila velha seguia pendente e o script subia sozinho -- o "ligou sozinho"
+    -- que o usuario viu. Aqui e incondicional: se nao esta ligado, desarma.
+    if State.Config.autoexec ~= true then
+        pcall(function() State:SetAutoExec(false) end)
     end
 end
 

@@ -594,3 +594,39 @@ do
     check(printed:find("VAZIA", 1, true) ~= nil, "o loader avisa quando a lista de ilhas vem vazia")
 end
 
+-- O loader espera o jogo e o PERSONAGEM carregarem antes de subir o hub. Sem
+-- isso, uma feature que age sozinha (teleporte pra fruta) disparava antes do
+-- spawn. Aqui: com o personagem pronto, o hub sobe logo depois da espera.
+do
+    local ctx = sandbox(994732206, 994732206)
+    -- Monta um personagem pronto (HumanoidRootPart + Humanoid vivo) no jogador.
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    local root = Instance.new("Part"); root.Name, root.Parent = "HumanoidRootPart", char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+    humanoid._props.Health = 100
+    ctx.Player.Character = char
+
+    local bootstrap = ctx.Env.loadstring(sources["loader.lua"])
+    local okRun = pcall(bootstrap)
+    check(okRun, "o loader roda com o personagem pronto")
+    local printed = table.concat(ctx.Logs, "\n")
+    check(printed:find("personagem pronto", 1, true) ~= nil,
+        "o loader confirma que jogo e personagem carregaram antes de subir o hub")
+    check(printed:find("status:", 1, true) ~= nil, "e o hub sobe normalmente depois da espera")
+end
+
+-- Sem personagem (ainda spawnando), o loader NAO trava: ele espera, avisa, e
+-- sobe o hub assim mesmo -- nunca deixa o usuario sem o hub por causa da espera.
+do
+    local ctx = sandbox(994732206, 994732206)
+    -- Sem Character no jogador.
+    local started = os.clock()
+    local bootstrap = ctx.Env.loadstring(sources["loader.lua"])
+    local okRun = pcall(bootstrap)
+    local elapsed = os.clock() - started
+    check(okRun, "o loader nao estoura sem personagem")
+    check(elapsed < 20, ("o loader nao trava esperando o personagem (%.1fs)"):format(elapsed))
+    local printed = table.concat(ctx.Logs, "\n")
+    check(printed:find("status:", 1, true) ~= nil, "e ainda assim sobe o hub")
+end
+
