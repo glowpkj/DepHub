@@ -406,14 +406,14 @@ tarefa nao pede.
 
 
 --------------------------------------------------------------------------------
-11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.18)
+11. ESTADO ATUAL (retrato honesto - 2026-10-31, v0.1.19)
 --------------------------------------------------------------------------------
 
 Este documento define o ALVO. Este retrato reflete a migracao para categorias
 concluida, o passe de UI em ingles, o conserto da altura das secoes + VStack/
 HStack, o console limpo do loader e o recomeco do Volleyball 4.2.
 
-FEITO / FUNCIONANDO (verificado offline, 732 checks):
+FEITO / FUNCIONANDO (verificado offline, 760 checks):
 - Shell compartilhado (abas, secoes, toggles, sliders, dropdowns, busca,
   temas, notificacoes, Dashboard).
 - Loader com roteamento por PlaceId E GameId, tab Dashboard, atualizador.
@@ -543,7 +543,7 @@ GATILHO NO INSTANTE DA ACAO (Auto Set Aim, v0.1.04):
 - O harness deriva Part.Position do Part.CFrame (BasePart real faz o mesmo) e o
   CFrame double tem LookVector/Unit, entao o giro e testavel de verdade.
 
-ARQUITETURA DO BLOX FRUITS (v0.1.18) -- features proprias, uma por arquivo:
+ARQUITETURA DO BLOX FRUITS (v0.1.19) -- features proprias, uma por arquivo:
 - O usuario pegou a arvore do Blox Fruits de open source e decidiu montar o
   script dele com as features uma a uma, cada coisa no lugar certo. O molde:
   src/games/features/bloxfruits/<nome>.lua, UMA feature por arquivo.
@@ -620,6 +620,32 @@ TELEPORT (features/bloxfruits/teleport.lua) -- INFRA, a peca que todas usam:
   foi chamado; sem o objeto e o CFrame do tween o teste nao prova que o voo VAI
   pro lugar certo. O mock de TweenService no harness guarda Instance/Goal pra
   isso ser assertavel.
+
+FRUIT (features/bloxfruits/fruit.lua) -- Grab + ESP + Store (v0.1.19):
+- Portado do parked/fruits.lua, mas SO a parte de fruta. O que estava misturado
+  la (gacha, dealer, awakening, baus) fica de fora -- se for trazido, e noutra
+  feature.
+- O ponto e a INTEGRACAO: a fruta NAO tem teleporte proprio. Ela recebe o motor
+  geral como contexto na criacao (options.teleport, que o backend passa) e usa
+  tp:GoToInstance(handle da fruta). Era assim no original tambem (fruits chamava
+  o modulo de teleporte). Sem motor, ESP e store ainda funcionam; so o grab
+  recusa. A blade hit e a fruta compartilham UM teleporte, testado.
+- Grab: acha a fruta no chao mais perto (um Tool em Workspace com OriginalName
+  e Handle), voa ate ela e dispara a ProximityPrompt com fireproximityprompt.
+- ESP: Highlight + BillboardGui com nome e distancia, mapa de adornos mantido
+  entre frames e limpo no disable. EspRange 0 = toda fruta.
+- Store: guarda as frutas carregadas via CommF_ StoreFruit, respeitando a lista
+  "nunca guardar". So Tool com "-" no OriginalName conta (fruta), nao espada.
+- Listas de skip/keep por prefixo, case-insensitive ("dragon" acha
+  "Dragon-Dragon Fruit"). SetSkip/SetKeep aceitam texto ou tabela.
+- Injecao: o backend passa um context a TODA feature na criacao
+  ({teleport = infra.teleport, state = backend}). A feature decide se usa.
+
+PAINEL POR FEATURE (v0.1.19): o backend monta o painel de uma tabela PANELS
+(categoria, aba, secao, controles por feature) em vez de hardcodar uma feature.
+A categoria e sempre finalidade (Combat, Fruit), nunca nome de jogo -- a
+convencao da secao 4a continua valendo. Icone desconhecido cai no fallback do
+GetIcon, entao nao quebra.
 
 FEATURES PARKEADAS (v0.1.17) -- fora da pasta ativa, NADA apagado:
 - As features que o usuario tirou do Blox Fruits (as 14 que vieram de open

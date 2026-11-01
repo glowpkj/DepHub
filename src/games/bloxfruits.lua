@@ -31,6 +31,7 @@ local VERSION = "1.0.0"
 -- INFRA_MODULES e nao aparece no painel.
 local FEATURE_MODULES = {
     {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
+    {name = "fruit", page = "Fruit", section = "FRUIT", toggle = "Grab fruit"},
 }
 local INFRA_MODULES = {
     {name = "teleport"},
@@ -142,7 +143,14 @@ function State:SetFeature(name, enabled)
     if enabled then
         local instance = self.Instances[name]
         if not instance then
-            local ok, created = pcall(factory.new, {})
+            -- Toda feature recebe um contexto. Hoje so o motor de teleporte, que
+            -- e infra e qualquer coisa que se mova precisa. A feature decide se
+            -- usa (o ESP e o store da fruta funcionam sem ele; so o grab voa).
+            local context = {
+                teleport = self.Infra.teleport,
+                state = self,
+            }
+            local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
                 self.LastError = "new " .. name .. ": " .. tostring(created)
                 report("BloxFruits: " .. self.LastError)
@@ -224,25 +232,87 @@ env.__DEPHUB.BloxFruitsOwn = State
 
 -- Painel: a UI e construida pelo proprio backend, com a shell compartilhada,
 -- para o script nao depender do adapter nem de um frontend externo.
+--
+-- Cada feature traz o proprio bloco de UI. O backend so posiciona (categoria,
+-- aba, secao) e cria os controles que a feature declarou -- sem o backend
+-- conhecer knob por knob. A categoria e sempre finalidade (Combat, Fruit), nao
+-- nome de jogo, como manda a convencao.
+local PANELS = {
+    bladhits = {
+        page = "Combat",
+        section = "BLADE HITS",
+        category = "Combat",
+        icon = "swords",
+        build = function(section, instance)
+            section:CreateToggle("Blade hits", false, function(value)
+                if value and not instance.Backend:SetFeature("bladhits", true) then
+                    instance.Notify("Blade hits", "Remotes nao encontrados (Modules.Net).")
+                end
+                if not value then instance.Backend:SetFeature("bladhits", false) end
+            end)
+            section:CreateParagraph("Blade hits", "Auto-swing at every enemy in range using the game's attack remotes.")
+        end,
+    },
+    fruit = {
+        page = "Fruit",
+        section = "FRUIT",
+        category = "Fruit",
+        icon = "cherry",
+        build = function(section, instance)
+            section:CreateToggle("Fruit ESP", false, function(value)
+                while State.Instances.fruit == nil do task.wait() end
+                State.Instances.fruit:SetEsp(value)
+            end)
+            section:CreateSlider("ESP max distance", 0, 2000, 0, function(value)
+                if State.Instances.fruit then State.Instances.fruit:SetEspRange(value) end
+            end)
+            section:CreateToggle("Grab fruit", false, function(value)
+                if value and not State:SetFeature("fruit", true) then
+                    instance.Notify("Grab fruit", "Teleport motor ausente.")
+                    return
+                end
+                if not value then State:SetFeature("fruit", false) end
+                if State.Instances.fruit then State.Instances.fruit:SetGrab(value) end
+            end)
+            section:CreateSlider("Grab max distance", 0, 2000, 0, function(value)
+                if State.Instances.fruit then State.Instances.fruit:SetRange(value) end
+            end)
+            section:CreateToggle("Auto store fruit", false, function(value)
+                if State.Instances.fruit then State.Instances.fruit:SetStore(value) end
+            end)
+            section:CreateInput("Skip list", "Dragon, Rocket", "", function(text)
+                if State.Instances.fruit then State.Instances.fruit:SetSkip(text) end
+            end)
+            section:CreateInput("Store keep list", "never store these", "", function(text)
+                if State.Instances.fruit then State.Instances.fruit:SetKeep(text) end
+            end)
+        end,
+    },
+}
+
 local visual = env.__DEPHUB and env.__DEPHUB.UI or nil
 if type(visual) == "table" and type(visual.CreateTab) == "function" then
-    local pages = {}
+    local tabs = {}
+    local categories = {}
+    local helper = {
+        Backend = State,
+        Notify = function(title, body) visual:Notify(title, body) end,
+    }
     for _, entry in ipairs(FEATURE_MODULES) do
-        if State.Features[entry.name] then
-            local category = entry.page == "Combat" and "Combat" or "General"
-            visual:CreateCategory(category, category == "Combat" and "swords" or "layers")
-            local tab = pages[category .. "|" .. entry.page]
-            if tab == nil then tab = visual:CreateTab(entry.page, category, nil) or false; pages[category .. "|" .. entry.page] = tab end
+        local panel = PANELS[entry.name]
+        if panel and State.Features[entry.name] then
+            if not categories[panel.category] then
+                categories[panel.category] = true
+                visual:CreateCategory(panel.category, panel.icon)
+            end
+            local tab = tabs[panel.page]
+            if tab == nil then
+                tab = visual:CreateTab(panel.page, panel.category, nil) or false
+                tabs[panel.page] = tab
+            end
             if tab then
-                local section = tab:CreateSection(entry.section)
-                if section then
-                    section:CreateToggle(entry.toggle, false, function(value)
-                        if value and not State:SetFeature(entry.name, true) then
-                            visual:Notify("Blade hits", "Remotes nao encontrados (Modules.Net).")
-                        end
-                        if not value then State:SetFeature(entry.name, false) end
-                    end)
-                end
+                local section = tab:CreateSection(panel.section)
+                if section then panel.build(section, helper) end
             end
         end
     end

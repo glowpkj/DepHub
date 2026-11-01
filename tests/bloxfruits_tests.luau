@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits"}
+local FEATURES = {"bladhits", "fruit"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -71,7 +71,8 @@ do
 
     local factory = state.Features.bladhits
     check(type(factory) == "table" and type(factory.new) == "function", "a blade hit e carregada pelo backend")
-    check(type(state.Errors) == "table" and #state.Errors == 0, "a blade hit carrega sem erro")
+    check(state.Features.fruit ~= nil, "a feature de fruta e carregada pelo backend")
+    check(type(state.Errors) == "table" and #state.Errors == 0, "as features carregam sem erro")
 
     -- Nada liga sozinho: o painel abre sem instanciar a feature.
     check(state.Instances.bladhits == nil, "a blade hit nao instancia so pelo load")
@@ -101,6 +102,14 @@ do
     check(state:SetToggle("nao-existe", true) == false, "feature desconhecida e rejeitada")
     check(state:SetFeatureRange("nao-existe", 5) == false, "knob de feature desconhecida e rejeitado")
     check(state:SetToggle("teleport", true) == false, "o teleporte nao vira toggle")
+
+    -- A feature de fruta instancia pelo proprio toggle e recebe o motor de
+    -- teleporte (a injecao e o contrato que a faz voar ate a fruta).
+    check(state.Instances.fruit == nil, "a fruta nao instancia so pelo load")
+    check(state:SetToggle("fruit", true), "ligar o toggle instancia a fruta")
+    check(state.Instances.fruit.Teleport ~= nil, "a fruta recebeu o motor de teleporte na criacao")
+    check(state.Instances.fruit.Teleport == state.Infra.teleport, "o motor e o mesmo objeto da infra")
+    state:SetToggle("fruit", false)
 
     local status = state:GetStatus()
     check(status.TogglesOn == 1, "status conta so a blade hit ligada")
@@ -134,7 +143,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "teleport", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "teleport" or name == "fruit", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -153,6 +162,82 @@ do
     local names = {}
     for _, tab in ipairs(ui.Library._Tabs) do names[tab.Name] = true end
     check(names["Combat"] == true, "a aba Combat e criada para a blade hit")
+    check(names["Fruit"] == true, "a aba Fruit e criada para a feature de fruta")
+end
+
+-- A feature de fruta e auto-contida e usa o motor de teleporte por INJECAO:
+-- ela nao tem teleporte proprio. Sem motor ainda funciona para ESP/store; so o
+-- grab recusa. Este bloco carrega ela sozinha e exercita a API publica.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Fruit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "fruit.lua"])()
+    check(type(Fruit) == "table" and type(Fruit.new) == "function", "a fruta carrega sozinha e publica new()")
+
+    -- Sem motor: a feature sobe, aceita knobs, e o grab recusa.
+    local bare = Fruit.new()
+    check(bare:Enable() == true, "a fruta liga sem motor de teleporte")
+    check(bare.Teleport == nil, "sem motor injetado Teleport e nil")
+    check(bare:CollectNearestOnce() == false, "sem motor o grab recusa (nao ha como voar)")
+
+    -- Com o motor injetado.
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+    bare:SetTeleport(motor)
+    check(bare.Teleport == motor, "SetTeleport injeta o motor")
+    check(bare:SetRange(0) and bare.Range == 0, "SetRange aceita 0 (qualquer distancia)")
+    check(bare:SetRange(-1) == false, "SetRange rejeita negativo")
+    check(bare:SetEspRange(500) and bare.EspRange == 500, "SetEspRange aplica um alcance valido")
+
+    -- Listas de skip/keep por prefixo, case-insensitive.
+    bare:SetSkip("Dragon, Rocket")
+    check(bare.Skip["dragon"] == true and bare.Skip["rocket"] == true, "SetSkip parseia a lista")
+    bare:SetKeep("leopard")
+    check(bare.Keep["leopard"] == true, "SetKeep parseia a lista")
+
+    -- Os tres sub-toggles ligam e desligam sem explodir.
+    check(bare:SetGrab(true) and bare.GrabEnabled == true, "SetGrab liga o grab")
+    check(bare:SetGrab(false) and bare.GrabEnabled == false, "SetGrab desliga o grab")
+    check(bare:Enable() and bare:Disable() and bare:IsEnabled() == false, "Enable/Disable ciclam")
+    bare:Destroy()
+end
+
+-- A fruta no chao, de verdade: um Tool com OriginalName e Handle e achado; um
+-- Tool qualquer nao. E o NearestGroundFruit respeita range e skip.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Fruit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "fruit.lua"])()
+    local fruit = Fruit.new()
+
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    ctx.Player.Character = character
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), character
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = character
+
+    -- Uma fruta no chao.
+    local ground = Instance.new("Tool"); ground.Name = "Dragon-Dragon Fruit"; ground.Parent = ctx.Services.Workspace
+    ground:SetAttribute("OriginalName", "Dragon-Dragon Fruit")
+    local handle = Instance.new("Part"); handle.Name, handle.Position, handle.Parent = "Handle", Vector3.new(0, 0, 30), ground
+
+    -- Um Tool qualquer (uma espada) nao conta como fruta.
+    local sword = Instance.new("Tool"); sword.Name = "Sword"; sword.Parent = ctx.Services.Workspace
+    local blade = Instance.new("Part"); blade.Name, blade.Parent = "Handle", sword
+
+    local found = fruit:GroundFruits()
+    check(#found == 1 and found[1] == ground, "acha a fruta no chao e nao a espada")
+
+    local nearest, part = fruit:NearestGroundFruit()
+    check(nearest == ground and part == handle, "NearestGroundFruit acha a fruta e a Handle")
+
+    -- Fora do range nao entra.
+    fruit:SetRange(10)
+    check(fruit:NearestGroundFruit() == nil, "range curto esconde a fruta distante")
+    fruit:SetRange(0)
+
+    -- Na skip list, nao entra.
+    fruit:SetSkip("dragon")
+    check(fruit:NearestGroundFruit() == nil, "a skip list esconde a fruta pelo prefixo")
+    fruit:SetSkip("")
+
+    fruit:Destroy()
 end
 
 -- O motor de teleporte e infraestrutura: carrega e instancia sozinho (sem

@@ -484,3 +484,38 @@ do
     check(tp:IsEnabled() == false and tp:IsFlying() == false, "Disable para o voo e o loop")
     tp:Destroy()
 end
+
+-- The fruit feature and the teleport motor together: the integration the user
+-- asked for. The fruit finds a ground fruit and hands its Handle to the motor,
+-- which flies there. This is the whole point -- the fruit does NOT roll its own
+-- teleport, it calls the shared one.
+do
+    local ctx = sandbox(2753915549, 994732206)
+    ctx.Responses[BF_FEATURE_PREFIX .. "teleport.lua"] = sources[BF_FEATURE_PREFIX .. "teleport.lua"]
+    ctx.Responses[BF_FEATURE_PREFIX .. "fruit.lua"] = sources[BF_FEATURE_PREFIX .. "fruit.lua"]
+
+    local char = Instance.new("Model"); char.Name, char.Parent = "Character", ctx.Player
+    ctx.Player.Character = char
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), char
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = char
+
+    -- A fruit on the ground, far away, with a ProximityPrompt on it.
+    local ground = Instance.new("Tool"); ground.Name = "Leopard-Leopard Fruit"; ground.Parent = ctx.Services.Workspace
+    ground:SetAttribute("OriginalName", "Leopard-Leopard Fruit")
+    local handle = Instance.new("Part"); handle.Name, handle.Position, handle.Parent = "Handle", Vector3.new(0, 0, 800), ground
+    local prompt = Instance.new("ProximityPrompt"); prompt.Parent = handle
+
+    local Teleport = ctx.Env.loadstring(sources[BF_FEATURE_PREFIX .. "teleport.lua"])()
+    local motor = Teleport.new(); motor:Enable()
+    local Fruit = ctx.Env.loadstring(sources[BF_FEATURE_PREFIX .. "fruit.lua"])()
+    local fruit = Fruit.new({ teleport = motor })
+
+    check(fruit.Teleport == motor, "a fruta usa o motor injetado")
+    check(fruit:CollectNearestOnce() == true, "a fruta acha a fruta e dispara o voo")
+    check(motor:IsFlying() == true, "o motor de teleporte esta voando ate a fruta")
+    -- The flight target is the fruit handle, reached via GoToInstance.
+    check(motor.Tween ~= nil and motor.Tween.Goal.CFrame.Position.Z ~= 0, "o voo vai em direcao a fruta")
+
+    motor:Cancel()
+    fruit:Destroy()
+end
