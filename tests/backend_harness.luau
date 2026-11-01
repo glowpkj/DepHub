@@ -167,6 +167,7 @@ function instanceMeta:__newindex(key, value)
         self._props[key] = value
     end
 end
+function instanceMeta:__tostring() return self._props.ClassName end
 function methods:GetChildren() return table.clone(self._children) end
 function methods:GetFullName() return self.Parent and self.Parent:GetFullName().."."..self.Name or self.Name end
 function methods:FindFirstChild(name) for _, child in ipairs(self._children) do if child.Name == name then return child end end end

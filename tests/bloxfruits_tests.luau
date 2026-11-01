@@ -666,6 +666,7 @@ do
     -- COM alvo: o remote sai com a posicao do alvo no slot 2, em vez da que o
     -- jogo mandou. E o coracao do silent aim.
     ctx:FireRemote(attack, "FireServer", "some-position")
+    check(tostring(attack) == "RemoteEvent", "tostring de um remote devolve o nome da classe")
     check(attack.Fired ~= nil and #attack.Fired == 1, "o remote registrou um disparo")
     check(attack.Fired[1][1] == near.Character:FindFirstChild("HumanoidRootPart").Position, "a posicao enviada foi trocada pela do alvo")
 
@@ -707,6 +708,18 @@ do
     feature:_SelectStep()
     ctx:FireRemote(attack, "FireServer", true)
     check(attack.Fired[#attack.Fired][1] == true, "um remote com booleano no slot 2 fica intacto")
+
+    -- BLINDAGEM: o hook NUNCA pode quebrar a chamada do jogo. Sem alvo, um remote
+    -- ainda sai normal (o hook nao trava quando nao ha alvo).
+    ctx:RemovePlayers()
+    feature:_SelectStep()
+    check(feature.TargetName == nil, "sem jogadores nao ha alvo")
+    ctx:FireRemote(attack, "FireServer", "sem-alvo")
+    check(attack.Fired[#attack.Fired][1] == "sem-alvo", "sem alvo o remote sai intacto (hook nao trava a skill)")
+
+    -- E um metodo que NAO e Fire/Invoke passa direto, sem tocar em nada.
+    ctx:FireRemote(remotes, "GetChildren")
+    check(true, "um metodo que nao e Fire/Invoke passa pelo hook sem erro")
 
     -- Disable devolve o __namecall original: o game nao fica com o gancho.
     check(feature:Disable() == true, "o Disable desliga")

@@ -11308,14 +11308,14 @@ local function root(character)
     return character and character:FindFirstChild("HumanoidRootPart")
 end
 
--- A posicao do HumanoidRootPart de um player, ou nil se nao ha character vivo.
+-- A posicao do HumanoidRootPart de um player, ou nil se nao ha character/HRP.
+-- Mesma regra do script original: so exige Character + HumanoidRootPart (nao
+-- filtra por Health -- o original nao filtrava, e Health nem sempre e numero no
+-- executor; descartar alvo aqui mudaria o comportamento que ja funcionava).
 local function playerPosition(player)
     if not player or player == LocalPlayer then return nil end
-    local character = player.Character
-    local hrp = root(character)
+    local hrp = root(player.Character)
     if not hrp then return nil end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if humanoid and humanoid.Health <= 0 then return nil end
     return hrp.Position
 end
 
@@ -11429,28 +11429,46 @@ function Feature:InstallHook()
 
     local self_ = self
     mt.__namecall = newcclosure(function(...)
-        local method = getnamecallmethod()
-        -- So mexe em chamadas de saida pro servidor.
-        if method == "FireServer" or method == "InvokeServer" then
-            local args = { ... }
-            -- args[1] e o proprio remote; so age se ele parecer um remote.
-            local remote = args[1]
-            if typeof(remote) == "Instance"
-                and (remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction")) then
-                -- O segundo argumento e a posicao. Nao mexe quando ha alvo nulo,
-                -- quando o aim esta em excecao, ou quando arg2 e booleano (alguns
-                -- remotes usam bool no slot 2; reescrever quebraria o comando).
-                local target = self_.TargetPosition
-                local arg2 = args[2]
-                if target ~= nil
-                    and not self_:IsExceptionActive()
-                    and not (arg2 == true or arg2 == false) then
-                    args[2] = target
+        -- Captura os varargs FORA da closure do pcall (dentro dela nao ha `...`).
+        local packed = { ... }
+        -- Tudo que o hook faz e protegido: se QUALQUER coisa aqui der erro (um
+        -- executor estranho, um remote inesperado), o erro NAO pode vazar pra
+        -- chamada do jogo -- senao a skill inteira morre ("nada funciona"). Em
+        -- falha, cai no original(...) puro, como se o aim nao estivesse ligado.
+        local ok, result = pcall(function()
+            local method = getnamecallmethod()
+
+            local isFire = tostring(method) == "FireServer"
+            local isInvoke = tostring(method) == "InvokeServer"
+
+            if not (isFire or isInvoke) then
+                return original(unpack(packed))
+            end
+
+            local args = packed
+
+            -- Deteccao de remote IDENTICA ao script original do usuario: compara
+            -- o tostring do args[1] com o nome da classe. Era assim que o script
+            -- dele funcionava; trocar por typeof/IsA quebrou as skills (IsA pode
+            -- recursar pelo proprio __namecall e derrubar a chamada toda).
+            local arg1Str = tostring(args[1])
+            local isRemote = (arg1Str == "RemoteEvent" or arg1Str == "RemoteFunction")
+
+            if isRemote then
+                local arg2Str = tostring(args[2])
+                local isBool = (arg2Str == "true" or arg2Str == "false")
+
+                if not isBool and self_.TargetPosition ~= nil and not self_:IsExceptionActive() then
+                    args[2] = self_.TargetPosition
                 end
             end
+
             return original(unpack(args))
-        end
-        return original(...)
+        end)
+
+        if ok then return result end
+        -- O pcall protegeu o jogo, mas a chamada ainda tem que ir: reenvia intacta.
+        return original(unpack(packed))
     end)
     self.Hooked = true
     return true
