@@ -481,24 +481,58 @@ do
         return State.AutoSell ~= nil and State.AutoSell:IsEnabled()
     end
 
-    function FeatureContext.TrackExuSource(id, terreiroName)
-        if id == nil or type(terreiroName) ~= "string" then return end
-        local sourceMap = env.__DEPHUB_STEALANEXU_EXU_SOURCES
-        if type(sourceMap) ~= "table" then
-            sourceMap = {}
-            env.__DEPHUB_STEALANEXU_EXU_SOURCES = sourceMap
+    local sourceMap = env.__DEPHUB_STEALANEXU_EXU_SOURCES
+    if type(sourceMap) ~= "table" then
+        sourceMap = {}
+        env.__DEPHUB_STEALANEXU_EXU_SOURCES = sourceMap
+    end
+
+    function FeatureContext.ApplyExuSources(values)
+        if type(values) ~= "table" then return false end
+        local restored = {}
+        for id, terreiroName in pairs(values) do
+            if id ~= nil and type(terreiroName) == "string" and terreiroName ~= "" then
+                restored[tostring(id)] = terreiroName
+            end
         end
-        sourceMap[tostring(id)] = terreiroName
+        env.__DEPHUB_STEALANEXU_EXU_SOURCES = restored
+        sourceMap = restored
+        State.Config.exuSources = restored
+        return true
+    end
+
+    function FeatureContext.TrackExuSource(id, terreiroName)
+        if id == nil or type(terreiroName) ~= "string" or terreiroName == "" then return false end
+        local key = tostring(id)
+        if sourceMap[key] == terreiroName then return false end
+
+        sourceMap[key] = terreiroName
+        State.Config.exuSources = State.Config.exuSources or {}
+        State.Config.exuSources[key] = terreiroName
+        print("[StealAnExu] Exu source:", key, "=>", terreiroName, "| salvando na config.")
+        local saved = State:PersistIfAutoExec()
+        if not saved then
+            print("[StealAnExu] AVISO: origem do Exu ficou apenas em memoria:", State.LastConfigError or "falha ao salvar")
+        end
+        return true
     end
 
     function FeatureContext.TrackNewExuSources(before, after, terreiroName)
         local known = {}
         for _, id in ipairs(type(before) == "table" and before or {}) do known[tostring(id)] = true end
+        local added = 0
         for _, id in ipairs(type(after) == "table" and after or {}) do
-            if not known[tostring(id)] then FeatureContext.TrackExuSource(id, terreiroName) end
+            if not known[tostring(id)] then
+                if FeatureContext.TrackExuSource(id, terreiroName) then added += 1 end
+            end
         end
+        return added
     end
 end
+
+State:RegisterConfig("exuSources", function(value)
+    return FeatureContext.ApplyExuSources(value)
+end)
 
 function State:TeleportToBase()
     return FeatureContext.TeleportToBase(self)
@@ -696,9 +730,12 @@ do
                     applyAutoPlace
                 )
                 State:RegisterConfig("autoPlace", applyAutoPlace, placeToggle)
+                placeSection:CreateButton("Diagnose Auto Place", function()
+                    State.AutoPlace:Diagnose()
+                end)
                 placeSection:CreateParagraph(
                     "Auto Place",
-                    "Coloca Tools com ExuId cuja origem foi mapeada para os terreiros selecionados. Exus sem origem identificada sao ignorados; enquanto Auto Sell estiver ligado, Auto Place pausa para nao competir com a venda."
+                    "Coloca Tools com ExuId cuja origem foi mapeada para os terreiros selecionados. Use Diagnose Auto Place para ver setup, base, remote, inventario e origem de cada Exu. Exus sem origem identificada sao ignorados; enquanto Auto Sell estiver ligado, Auto Place pausa para nao competir com a venda."
                 )
             end
         end
