@@ -238,8 +238,27 @@ function AutoPlace:_nextPosition()
     return position
 end
 
+function AutoPlace:PendingCount()
+    local count = 0
+    for _, entry in ipairs(self:_inventoryTools()) do
+        if not self.Placed[entry.key] then
+            local source = self:_sourceTerreiro(entry.tool, entry.id)
+            if source and self.Terreiros[source] then count += 1 end
+        end
+    end
+    return count
+end
+
 function AutoPlace:PlaceOnce()
     if self.Destroyed then return 0, "feature destruida" end
+
+    if type(self.Ctx.IsAutoSellEnabled) == "function" then
+        local ok, enabled = pcall(self.Ctx.IsAutoSellEnabled)
+        if ok and enabled == true then
+            self.LastStatus = "paused for Auto Sell"
+            return 0, self.LastStatus
+        end
+    end
 
     local selectedCount = 0
     for _ in pairs(self.Terreiros) do selectedCount += 1 end
