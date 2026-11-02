@@ -120,8 +120,7 @@ do
         check(#ui.Library._Controls > 0, "TSB builds controls")
     end
 
-    -- Volleyball 4.2 is a skeleton plus one feature: the jump bypass/impulse
-    -- toggle. It registers exactly that one control pair.
+    -- Volleyball 4.2 exposes Jump Anywhere plus the Visual Character Direction ESP.
     do
         local ctx = sandbox(1316421563, 1316421563)
         ctx:MountUI()
@@ -130,12 +129,13 @@ do
         ctx:Run("src/games/volleyball42.lua")
         assertNoSeaCategories(ui.Library, "Volleyball42")
         assertNoBloxTabs(ui.Library, "Volleyball42")
-        check(#ui.Library._Controls == before + 2, "the Volleyball backend registers its one toggle and one slider")
+        check(#ui.Library._Controls == before + 3, "the Volleyball backend registers two toggles and one slider")
         local names = tabNames(ui.Library)
         local found = {}
         for _, name in ipairs(names) do found[name] = true end
         check(not found["Ball Predict"] and not found["Jump"] and not found["Collision"],
             "the removed Volleyball tabs are gone")
+        check(found["ESP"] and found["Movement"], "Volleyball exposes ESP and Movement tabs")
     end
 
     -- Universal
