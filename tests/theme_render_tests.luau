@@ -456,8 +456,7 @@ do
         check(multi.Opened == false, "clicar de novo FECHA o dropdown (Opened=false)")
     end
 
-    -- GEOMETRIA: com a pasta Dropdowns exposta, provamos que o popup que abriu
-    -- tem pai certo, esta visivel com altura > 0 e cai dentro da tela. Era
+    -- GEOMETRIA: com a pasta Dropdowns exposta, provamos que o popup que abriu    -- tem pai certo, esta visivel com altura > 0 e cai dentro da tela. Era
     -- exatamente o que faltava: o teste antigo so olhava GetElements().Dropdowns,
     -- que nunca existiu -- entao as assercoes de visibilidade eram puladas em
     -- silencio e o bug do popup passou.
@@ -529,6 +528,125 @@ do
             if kid.Visible then stillVisible = true end
         end
         check(not stillVisible, "ao fechar nenhum popup fica visivel na pasta Dropdowns")
+    end
+
+    -- CONTEUDO DO POPUP: o usuario reporta que o multi-dropdown (exception keys,
+    -- Skip/Keep) nao aparece, mas o dropdown SIMPLES (Island) funciona. Aqui
+    -- abrimos o popup do multi e conferimos que ele realmente renderiza LINHAS de
+    -- opcao (nao so um frame vazio) e que a posicao/tamanho fazem sentido.
+    do
+        local probe = tab:AddDropdown({Name = "ContentProbe", Options = {"Alpha", "Beta", "Gamma"}, Default = {"Alpha"}, MultiSelect = true})
+        local probeFolder = window:GetElements().Dropdowns
+        local probeRow = probe.VISIBLE_ELEMENT
+        probeRow.AbsolutePosition = {X = 1100, Y = 600}
+        probeRow.AbsoluteSize = {X = 300, Y = 24}
+        -- O CAMPO e o frame 150x18 dentro da linha.
+        local function findField(node)
+            for _, kid in ipairs(node._kids or {}) do
+                if kid.ClassName == "Frame" and (kid.Size and kid.Size.X.Offset or 0) >= 100
+                    and (kid.Size and kid.Size.Y.Offset or 0) <= 24 then
+                    return kid
+                end
+                local found = findField(kid)
+                if found then return found end
+            end
+            return nil
+        end
+        local probeField = findField(probeRow)
+        if probeField then
+            probeField.AbsolutePosition = {X = 1157, Y = 600}
+            probeField.AbsoluteSize = {X = 150, Y = 18}
+        end
+        probeRow.Activated:Fire()
+        check(probe.Opened == true, "o multi-dropdown de conteudo abre")
+
+        -- Conta as linhas de opcao dentro do popup: cada opcao e um TextButton
+        -- cujo TextLabel filho carrega o nome da opcao (o texto NAO fica no
+        -- TextButton em si -- fica no TextLabel; o probe antigo procurava no
+        -- lugar errado e contava zero).
+        local function countOptions(node, depth)
+            local count = 0
+            if depth > 6 then return 0 end
+            for _, kid in ipairs(node._kids or {}) do
+                if kid.ClassName == "TextLabel" then
+                    local t = kid.Text
+                    if t == "Alpha" or t == "Beta" or t == "Gamma" then count = count + 1 end
+                end
+                count = count + countOptions(kid, depth + 1)
+            end
+            return count
+        end
+        local popupChild
+        for _, kid in ipairs(probeFolder:GetChildren()) do
+            if kid.Visible then popupChild = kid end
+        end
+        local rendered = popupChild and countOptions(popupChild, 0) or 0
+        check(rendered >= 3, "o popup do multi-dropdown renderiza as 3 linhas de opcao [rendered=" .. tostring(rendered) .. "]")
+
+        probeRow.Activated:Fire()
+        check(probe.Opened == false, "o multi-dropdown de conteudo fecha")
+    end
+
+    -- MULTI vs SIMPLES pelo CAMPO: o usuario so ve o dropdown simples (Island)
+    -- funcionar. Os dois tem que abrir com o texto do default no campo, e o
+    -- restore (Clear + Add) tem que produzir a selecao pedida -- nao uma sobra da
+    -- anterior. A lib guarda a selecao num CONJUNTO interno que o CLEAR_DROPDOWN
+    -- nao zera; reaplicar uma config sobre uma selecao ja existente perderia
+    -- itens. Este teste trava isso.
+    do
+        local function fieldText(row)
+            local function findField(node)
+                for _, kid in ipairs(node._kids or {}) do
+                    if kid.ClassName == "Frame" and (kid.Size and kid.Size.X.Offset or 0) >= 100 then
+                        return kid
+                    end
+                    local f = findField(kid)
+                    if f then return f end
+                end
+                return nil
+            end
+            local field = findField(row)
+            if not field then return nil end
+            for _, kid in ipairs(field._kids or {}) do
+                if kid.ClassName == "TextLabel" then return kid.Text end
+            end
+            return nil
+        end
+
+        local single = tab:AddDropdown({Name = "SingleD", Options = {"One", "Two"}, Default = "One"})
+        check(fieldText(single.VISIBLE_ELEMENT) == "One", "o dropdown simples abre com o default no campo")
+
+        local mm = tab:AddDropdown({Name = "MultiD", Options = {"Alpha", "Beta", "Gamma"}, Default = {"Alpha"}, MultiSelect = true})
+        check(fieldText(mm.VISIBLE_ELEMENT) == "Alpha", "o multi-dropdown abre com o default no campo")
+
+        -- Restore: trocar a selecao de {Alpha} para {Beta, Gamma} tem que deixar
+        -- EXATAMENTE esses dois -- nem Alpha sobrando, nem vazio. O caminho real do
+        -- restore e Clear + Add + Select (o Add nao seleciona; o Select sim).
+        mm:Clear()
+        mm:Add("Beta")
+        mm:Add("Gamma")
+        if type(mm.Select) == "function" then
+            mm:Select("Beta", true)
+            mm:Select("Gamma", true)
+        end
+        -- O rotulo do campo e atualizado por um debounce de 100ms (task.delay), que
+        -- no harness e no-op; entao conferimos o ESTADO da selecao (a opcao marcada),
+        -- que e o que o rotulo vai refletir no jogo.
+        local function isSelected(handle, name)
+            for _, option in ipairs(handle.DROPDOWN_OPTIONS or {}) do
+                if option.Name == name then return option.Selected == true end
+            end
+            return false
+        end
+        check(isSelected(mm, "Beta") and isSelected(mm, "Gamma"),
+            "o restore marca as opcoes pedidas")
+        check(not isSelected(mm, "Alpha"),
+            "e NAO deixa sobra da selecao anterior (Alpha desmarcado)")
+
+        if type(mm.Select) == "function" then
+            mm:Select("Gamma", false)
+            check(not isSelected(mm, "Gamma"), "o Select(false) desmarca a opcao")
+        end
     end
 
     -- RESTORE (nivel da lib): reaplicar uma selecao salva com Clear + Add tem que

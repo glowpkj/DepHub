@@ -364,6 +364,32 @@ do
     check(state.Instances.fruit.TraceEnabled == false, "desligar o Fruit tracer desliga as linhas")
     state:SetFeature("fruit", false)
 
+    -- O bug que o usuario reportou: ligar/desligar o "Grab fruit" derrubava o
+    -- RESTO da feature de fruta (ESP, tracer, auto store). Causa: o off chamava
+    -- State:SetFeature("fruit", false), que roda Feature:Disable() -- e Disable
+    -- desliga o ESP e cancela store/random junto. Um toggle de knob so pode
+    -- mexer no proprio knob.
+    do
+        local grabControl = labels["toggle:Grab fruit"]
+        check(grabControl ~= nil, "o painel registra o toggle Grab fruit")
+        -- Liga um knob vizinho (Fruit ESP) e o proprio grab.
+        local espControl = labels["toggle:Fruit ESP"]
+        espControl.Handle:SetValue(true)
+        grabControl.Handle:SetValue(true)
+        check(state.Instances.fruit ~= nil and state.Instances.fruit.GrabEnabled == true, "ligar o Grab fruit liga o grab na feature")
+        check(state.Instances.fruit.EspEnabled == true, "ligar o Grab fruit nao desliga o Fruit ESP")
+
+        -- DESLIGAR o grab: o ESP, o store e o random tem que continuar vivos.
+        grabControl.Handle:SetValue(false)
+        check(state.Instances.fruit.GrabEnabled == false, "desligar o Grab fruit desliga so o grab")
+        check(state.Instances.fruit.EspEnabled == true, "desligar o Grab fruit NAO derruba o Fruit ESP")
+        check(state.Instances.fruit:IsEnabled() == true, "a feature de fruta continua habilitada com o ESP ligado")
+        -- E desligar o ESP tambem nao derruba nada mais.
+        espControl.Handle:SetValue(false)
+        check(state.Instances.fruit.EspEnabled == false, "desligar o Fruit ESP desliga o ESP")
+        state:SetFeature("fruit", false)
+    end
+
     -- Silent aim: um toggle, um dropdown de teclas de excecao (Z X C V F) e um
     -- slider de alcance (500 a 1000). O toggle dirige o mesmo caminho do backend.
     local aimToggle = labels["toggle:Silent aim"]

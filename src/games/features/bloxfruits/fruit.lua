@@ -208,6 +208,7 @@ function Feature:SetEsp(on)
         for _, entry in pairs(self.EspMap) do destroyEntry(entry) end
         self.EspMap = {}
         self:_cancel("esp")
+        self:_refresh()
         return true
     end
     self:_spawn("esp", function()
@@ -318,6 +319,7 @@ function Feature:SetEsp(on)
             task.wait(0.5)
         end
     end)
+    self:_refresh()
     return true
 end
 
@@ -391,6 +393,7 @@ function Feature:SetGrab(on)
             pcall(self.Teleport.Cancel, self.Teleport)
         end
         self:_cancel("grab")
+        self:_refresh()
         return true
     end
     self:_spawn("grab", function()
@@ -400,6 +403,7 @@ function Feature:SetGrab(on)
             task.wait(0.5)
         end
     end)
+    self:_refresh()
     return true
 end
 
@@ -431,13 +435,14 @@ end
 
 function Feature:SetStore(on)
     self.StoreEnabled = on == true
-    if not self.StoreEnabled then self:_cancel("store"); return true end
+    if not self.StoreEnabled then self:_cancel("store"); self:_refresh(); return true end
     self:_spawn("store", function()
         while self.StoreEnabled do
             pcall(function() self:StoreHeld() end)
             task.wait(self.StoreInterval)
         end
     end)
+    self:_refresh()
     return true
 end
 
@@ -476,7 +481,7 @@ end
 
 function Feature:SetRandom(on)
     self.RandomEnabled = on == true
-    if not self.RandomEnabled then self:_cancel("random"); return true end
+    if not self.RandomEnabled then self:_cancel("random"); self:_refresh(); return true end
     self:_spawn("random", function()
         while self.RandomEnabled do
             local ok, cooldown = pcall(function() return self:RollGacha() end)
@@ -490,6 +495,7 @@ function Feature:SetRandom(on)
             end
         end
     end)
+    self:_refresh()
     return true
 end
 
@@ -555,6 +561,22 @@ function Feature:Enable()
     if self.Enabled then return true end
     self.Enabled = true
     return true
+end
+
+-- Sincroniza o flag `Enabled` com os knobs. A feature hospeda quatro knobs
+-- independentes (ESP, tracer, grab, store, random); ela esta "ligada" enquanto
+-- QUALQUER um estiver. Sem isto, desligar um knob que chamava
+-- SetFeature("fruit", false) derrubava a feature inteira e os outros knobs
+-- (era o "desliguei o Grab fruit e o ESP parou"), e religar um knob num feature
+-- ja existente mas desabilitado deixava IsEnabled() == false.
+function Feature:_refresh()
+    local any = self.EspEnabled or self.GrabEnabled or self.StoreEnabled or self.RandomEnabled
+    if any then
+        self.Enabled = true
+    elseif self.Enabled then
+        self:Disable()
+    end
+    return self.Enabled
 end
 
 function Feature:Disable()

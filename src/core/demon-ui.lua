@@ -212,6 +212,11 @@ local function makeSection(adapter, tabHandle, title)
 
         -- The adapter's own restore path. The library has no SetValue for a
         -- multi-select dropdown, so restore is "clear then re-add each name".
+        -- `Add` only ADDS an option -- it does not mark it selected; the library
+        -- selects through its click path. So after re-adding, drive the selection
+        -- with `Select` (the library exposes it now). Without this the restore
+        -- moved nothing visible: the field kept the old selection (or went empty)
+        -- -- the "as listas nao mostram o que eu escolhi" the user reported.
         -- `Set` also drives the caller's callback: the config store prefers the
         -- handle's setter over the entry's `apply` whenever the handle can drive
         -- (`handle.Value ~= value` is always true here, since a multi handle has
@@ -222,8 +227,12 @@ local function makeSection(adapter, tabHandle, title)
                 pcall(function() handle:Clear() end)
                 selected = {}
                 for _, name in ipairs(type(names) == "table" and names or {}) do
-                    selected[tostring(name)] = true
-                    pcall(function() handle:Add(tostring(name)) end)
+                    local key = tostring(name)
+                    selected[key] = true
+                    pcall(function() handle:Add(key) end)
+                    if type(handle.Select) == "function" then
+                        pcall(function() handle:Select(key, true) end)
+                    end
                 end
                 if callback then callback(asArray()) end
             end

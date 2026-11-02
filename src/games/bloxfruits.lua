@@ -697,14 +697,17 @@ local PANELS = {
             State:RegisterConfig("fruitTrace", applyTrace, traceToggle)
 
             -- Grab: sem slider de distancia -- pega a fruta mais proxima de
-            -- qualquer distancia.
+            -- qualquer distancia. O toggle dirige SO o proprio knob: a feature
+            -- `fruit` tambem hospeda o Fruit ESP, o tracer, o auto store e o auto
+            -- random, entao desligar "Grab fruit" nao pode chamar
+            -- SetFeature("fruit", false) -- isso derrubava a feature inteira
+            -- (SetEsp(false), cancel de store/random) e tudo mais parava junto
+            -- ("desativo o Grab fruit e o ESP para de funcionar"). Ligar um knob
+            -- sobe a feature pelo ensureFruit; desligar so avisa a feature.
             local function applyGrab(value)
-                if value and not State:SetFeature("fruit", true) then
-                    instance.Notify("Grab fruit", "Teleport motor ausente.")
-                    return
-                end
-                if not value then State:SetFeature("fruit", false) end
-                if State.Instances.fruit then State.Instances.fruit:SetGrab(value) end
+                local feature = State.Instances.fruit
+                if value then feature = ensureFruit() end
+                if feature then feature:SetGrab(value) end
             end
             local grabToggle = section:CreateToggle("Grab fruit", State.Config.fruitGrab == true, function(value)
                 applyGrab(value)

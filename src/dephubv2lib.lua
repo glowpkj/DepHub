@@ -2799,6 +2799,32 @@ aZ()
 end
 end
 
+-- DepHub: selecao programatica. O handle so tinha Clear/Add, e o Add NAO marca
+-- a opcao -- a lib so a marca pelo caminho do CLIQUE (a_). O adapter restaurando
+-- uma config (Clear + Add) nao conseguia re-selecionar nada: marcava tudo como
+-- nao-escolhido e o campo ficava vazio (ou com sobra da selecao anterior). Este
+-- Select reproduz exatamente a logica do clique para marcar/desmarcar.
+aL.SELECT_DROPDOWN_OPTION=function(a8,a9)
+local a0_=aS[tostring(a8)]
+if not a0_ then return false end
+
+if aC then
+local want=(a9~=false)
+a0_.Selected=want
+aQ[a0_.Name]=want
+if a0_.Instance then X.SetOptionValue(a0_,want) end
+elseif a9~=false then
+a3(a0_)
+if a0_.Instance then X.SetOptionValue(a0_,true) end
+end
+
+aZ()
+return true
+end
+
+-- Alias publico usado pelo adapter (nome curto, igual ao do clique/experiencia).
+aL.Select=function(self,a8,a9) return self.SELECT_DROPDOWN_OPTION(a8,a9) end
+
 aL.REMOVE_DROPDOWN_OPTION=function(a8)
 local a9=aS[tostring(a8)]
 if a9 then
@@ -2813,6 +2839,14 @@ if a9.Instance then
 a9.Instance:Destroy()
 end
 
+-- DepHub: limpar tambem a SELECAO da opcao removida. O conjunto da selecao
+-- multipla (aQ) e o pendente (aP) nao eram zerados aqui: depois de um Clear, a
+-- selecao antiga sobrevivia ("Alpha" continuava marcada) e o proximo Add checava
+-- contra ela -- reaplicar uma config sobre um dropdown ja usado deixava a sobra
+-- da selecao anterior no campo em vez da nova. Era o "as listas de fruta / as
+-- exception keys nao mostram o que eu escolhi".
+aQ[a9.Name]=nil
+aP[a9.Name]=nil
 aS[a9.Name]=nil
 aR[a8]=nil
 end
@@ -2820,6 +2854,9 @@ end
 if aL.Opened then
 X.Clear()
 end
+
+-- Re-renderiza o campo/label com o conjunto agora vazio.
+aZ()
 end
 
 do
