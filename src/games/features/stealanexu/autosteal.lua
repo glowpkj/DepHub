@@ -14,11 +14,13 @@
 --     jogador "guarda" o Exu). A NUMERACAO Pen1/Pen2 muda por servidor, entao a
 --     base certa so se acha pelo atributo Owner == LocalPlayer.UserId.
 --
--- O CICLO de cada roubo (script de referencia do usuario, que funciona):
---   1) teleporta pro modelo do Exu (GetPivot().Position + Vector3.new(0,3,0));
---   2) task.wait(0.1);
---   3) dispara o prompt (HoldDuration=0 + InputHoldBegin/End) e volta pra base;
---   4) proximo Exu.
+-- O CICLO de cada roubo (script de referencia do usuario, versao atualizada):
+--   1) pega a posicao do Root do Exu (ref.Position) e teleporta +3 studs acima;
+--   2) abre o prompt: MaxActivationDistance=1000, HoldDuration=0,
+--      RequiresLineOfSight=false;
+--   3) task.wait(0.15) e dispara (InputHoldBegin/End, dentro de pcall);
+--   4) volta pra base, task.wait(0.1), proximo Exu.
+-- Prompt que ja sumiu (not prompt.Parent) e' pulado.
 --
 -- Enquanto roda, o personagem fica ANCORADO no ar e SEM colisao (noclip): sem
 -- gravidade, sem colisao, sem fisica brigando com o teleporte. Ao parar, tudo e
@@ -40,10 +42,10 @@ local LocalPlayer = Players.LocalPlayer
 local AutoSteal = {}
 AutoSteal.__index = AutoSteal
 
--- TEMPOS (iguais ao script de referencia que funciona):
---   SETTLE_WAIT -- task.wait(0.1) DEPOIS do teleporte, antes de disparar.
+-- TEMPOS (iguais ao script de referencia atualizado):
+--   SETTLE_WAIT -- task.wait(0.15) DEPOIS do teleporte, antes de disparar.
 --   POST_WAIT   -- task.wait(0.1) DEPOIS de disparar, antes de voltar pra base.
-local SETTLE_WAIT = 0.1
+local SETTLE_WAIT = 0.15
 local POST_WAIT = 0.1
 
 -- --- Debug ----------------------------------------------------------------
@@ -243,26 +245,30 @@ end
 
 -- --- Disparo do prompt ----------------------------------------------------
 
--- Rouba o Exu. MECANISMO (o script de referencia do usuario, que funciona):
+-- Rouba o Exu. MECANISMO (o script de referencia do usuario, versao atualizada):
 --
---     prompt.HoldDuration = 0        -- <- a peca-chave
---     prompt:InputHoldBegin()
---     prompt:InputHoldEnd()
+--     prompt.MaxActivationDistance = 1000   -- alcance absurdo, sempre "no range"
+--     prompt.HoldDuration = 0               -- hold completa NA HORA
+--     prompt.RequiresLineOfSight = false    -- ignora parede/obstrucao
+--     pcall(function()
+--         prompt:InputHoldBegin()
+--         prompt:InputHoldEnd()
+--     end)
 --
--- Com o HoldDuration zerado o hold completa NA HORA e o servidor aceita. O
--- HoldDuration original e' restaurado logo depois (sem residuo no prompt).
--- Se a versao do jogo/executor nao tiver InputHold*, cai no fireproximityprompt.
+-- As tres mudancas no prompt sao o que faz o servidor aceitar em qualquer Exu.
+-- O pcall protege o caso do prompt ter sido removido no meio. Se a versao do
+-- jogo/executor nao tiver InputHold*, cai no fireproximityprompt.
 local function stealPrompt(prompt)
     if not prompt then return false end
 
     if type(prompt.InputHoldBegin) == "function" then
-        local original = prompt.HoldDuration
+        pcall(function() prompt.MaxActivationDistance = 1000 end)
         pcall(function() prompt.HoldDuration = 0 end)
-        pcall(function() prompt:InputHoldBegin() end)
-        if type(prompt.InputHoldEnd) == "function" then
-            pcall(function() prompt:InputHoldEnd() end)
-        end
-        pcall(function() prompt.HoldDuration = original end)
+        pcall(function() prompt.RequiresLineOfSight = false end)
+        pcall(function()
+            prompt:InputHoldBegin()
+            prompt:InputHoldEnd()
+        end)
         return true
     end
 
@@ -276,22 +282,20 @@ end
 
 -- --- O passo de roubo -----------------------------------------------------
 
--- Um roubo, EXATAMENTE o script de referencia do usuario:
+-- Um roubo, EXATAMENTE o script de referencia atualizado:
 --
---     local pos = t.model:GetPivot().Position
+--     local pos = t.ref.Position
 --     hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
---     task.wait(0.1)
---     t.prompt.HoldDuration = 0
---     t.prompt:InputHoldBegin()
---     t.prompt:InputHoldEnd()
+--     task.wait(0.15)
+--     -- (abre o prompt e dispara)
 --     hrp.CFrame = originalPos
 --     task.wait(0.1)
 --
--- Sem skip, sem releitura, sem verificacao. Teleporta pro modelo, dispara, volta.
+-- `target`: {prompt, ref} (ref = o Root do Exu). Sem skip, sem releitura.
 function AutoSteal:_stealAt(target)
-    local model = target and target.model
     local prompt = target and target.prompt
-    if not model or not prompt then return false end
+    local ref = target and target.ref
+    if not prompt or not ref then return false end
 
     local anchor = self:PenAnchor()
     if not anchor then
@@ -300,15 +304,19 @@ function AutoSteal:_stealAt(target)
         return false
     end
 
-    -- Teleporta (o script de referencia).
-    local pos = model:GetPivot().Position
+    -- Teleporta pra CIMA do Root do Exu (ref.Position + 3 studs).
+    local pos = ref.Position
     self:TeleportTo(CFrame.new(pos + Vector3.new(0, 3, 0)))
-    debugLog(self, "teleportou pro Exu (", model.Name, ")")
+    debugLog(self, "teleportou pro Exu (", ref.Parent and ref.Parent.Name or "?", ")")
 
-    -- task.wait(0.1)
+    -- Abre o prompt ANTES de esperar (MaxActivationDistance=1000, HoldDuration=0,
+    -- RequiresLineOfSight=false) e deixa assentar.
+    pcall(function() prompt.MaxActivationDistance = 1000 end)
+    pcall(function() prompt.HoldDuration = 0 end)
+    pcall(function() prompt.RequiresLineOfSight = false end)
     task.wait(SETTLE_WAIT)
 
-    -- Ativa (o script de referencia).
+    -- Dispara (o script de referencia, dentro de pcall).
     stealPrompt(prompt)
     debugLog(self, "disparou o prompt")
 
@@ -321,9 +329,9 @@ end
 
 -- --- Auto Steal Exu (toggle) / Steal All (botao) --------------------------
 
--- O script de referencia, dentro do ciclo. Coleta a lista UMA vez, cicla por ela
--- (i = i % #targets + 1) e rouba um por um -- exatamente como o script que
--- funciona.
+-- O script de referencia atualizado, dentro do ciclo. Coleta a lista UMA vez
+-- ({prompt, ref}), cicla por ela (i = i % #targets + 1) e rouba um por um.
+-- Prompt que ja sumiu (not prompt.Parent) e' pulado.
 --
 -- `once = true`: uma passada (passa por cada alvo uma vez e para).
 -- `once = false`: ciclo infinito (como o script); `stop()` decide quando parar.
@@ -339,20 +347,22 @@ function AutoSteal:_runCycle(options)
         return 0
     end
 
-    -- Coleta todos os modelos com Root.ProximityPrompt (UMA vez, como o script).
+    -- Coleta todos os prompts (UMA vez, como o script): {prompt, ref = Root}.
     local targets = {}
     for _, child in ipairs(runtime:GetChildren()) do
         local root = child:FindFirstChild("Root")
         local prompt = root and root:FindFirstChild("ProximityPrompt")
         if prompt then
-            targets[#targets + 1] = {model = child, prompt = prompt}
+            targets[#targets + 1] = {prompt = prompt, ref = root}
         end
     end
+
+    debugLog(self, "Encontrados", #targets, "prompts")
 
     if #targets == 0 then
         self.LastError = "Nenhum ProximityPrompt encontrado em Runtime"
         self.LastStatus = "no targets"
-        debugLog(self, "Nenhum ProximityPrompt encontrado em Runtime")
+        debugLog(self, "Nenhum ProximityPrompt encontrado")
         return 0
     end
 
@@ -372,15 +382,19 @@ function AutoSteal:_runCycle(options)
         end
         local t = targets[index]
 
-        -- Teleporta / Ativa / Volta (o script de referencia).
-        self:_stealAt(t)
-        stole = stole + 1
-        if once and stole >= #targets then break end
-        if stop and stop() then break end
-
-        -- Proximo (cicla de volta ao 1o quando acaba).
-        i = i + 1
-        if stop and stop() then break end
+        -- Prompt que ja sumiu: pula (como o "continue" do script).
+        if not t.prompt or not t.prompt.Parent then
+            i = i + 1
+            if once and i > #targets then break end
+            if stop and stop() then break end
+        else
+            self:_stealAt(t)
+            stole = stole + 1
+            if once and stole >= #targets then break end
+            if stop and stop() then break end
+            i = i + 1
+            if stop and stop() then break end
+        end
     end
 
     debugLog(self, "=== fim do ciclo: passou por", stole, "Exus ===")

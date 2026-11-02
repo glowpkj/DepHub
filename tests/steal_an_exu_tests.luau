@@ -4,9 +4,9 @@
 -- the live game: the backend routes from its own ids, loads the feature from the
 -- repo, mounts the toggle + Steal All button, and the steal step finds the
 -- player's pen by the Owner attribute (never a fixed Pen1), teleports onto the
--- Runtime Exu Root, steals the prompt by zeroing the HoldDuration and firing the
--- hold (InputHoldBegin/End), restoring the HoldDuration after -- all without
--- erroring when the world is missing.
+-- Runtime Exu Root + 3 studs, widens the prompt (MaxActivationDistance=1000,
+-- HoldDuration=0, RequiresLineOfSight=false) and fires the hold
+-- (InputHoldBegin/End) -- all without erroring when the world is missing.
 local FEATURE_PREFIX = "src/games/features/stealanexu/"
 
 -- A real client always has a UserId on the LocalPlayer; the bare instance double
@@ -73,9 +73,10 @@ local function buildWorld(ctx, options)
         prompt.HoldDuration = 0.5
         prompt.MaxActivationDistance = 6.5
         -- The prompt exposes the hold API the real game does. The steal mechanism
-        -- (confirmed in game) zeroes HoldDuration, then InputHoldBegin + End, then
-        -- restores it. The doubles record each call and the HoldDuration value
-        -- seen AT THE MOMENT of InputHoldBegin, so the test can prove the zeroing.
+        -- (the updated reference) widens the prompt (MaxActivationDistance=1000,
+        -- HoldDuration=0, RequiresLineOfSight=false), then InputHoldBegin + End.
+        -- The doubles record each call and the HoldDuration value seen AT THE
+        -- MOMENT of InputHoldBegin, so the test can prove the zeroing.
         prompt.Hold = {began = 0, ended = 0, durationAtBegin = nil, restored = nil}
         prompt.InputHoldBegin = function(self)
             self.Hold.began = self.Hold.began + 1
@@ -161,16 +162,15 @@ do
     check(ctx.State.__DEPHUB.StealAnExu == nil, "destroy clears the published state")
 end
 
--- The steal step: find the pen by Owner (not Pen1), teleport onto the Exu model
--- (that is the reference script: model:GetPivot().Position + 3 studs up), steal the
--- prompt by zeroing the HoldDuration and firing InputHoldBegin/End (restoring the
--- HoldDuration), then return to the base.
+-- The steal step: find the pen by Owner (not Pen1), teleport onto the exu's Root
+-- (the reference script: ref.Position + 3 studs up), open the prompt
+-- (MaxActivationDistance=1000, HoldDuration=0, RequiresLineOfSight=false), fire
+-- InputHoldBegin/End, then return to the base.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
-    -- The exu model sits 3 studs off its Nest (its pivot is the Root, at y=3), so
-    -- the reference teleport (pivot + 3) lands at y=6 -- derived from the EXU, not
-    -- from the Nest (which is at y=0).
+    -- The exu Root sits 3 studs off its Nest (y=3), so the reference teleport
+    -- (Root + 3) lands at y=6 -- derived from the EXU, not the Nest (y=0).
     local world = buildWorld(ctx, {rootOffset = 3})
     local root = makeCharacter(ctx)
 
@@ -183,7 +183,7 @@ do
     check(anchor ~= nil and anchor.Position == Vector3.new(0, 50, 0), "the base anchor is the BadgeAnchor")
 
     -- Record where each teleport lands, so the test can prove the target is the
-    -- exu Root (y = 3 beside Nest1) and never the Nest (y = 0).
+    -- exu Root (y = 3 beside Nest1) plus 3, never the Nest (y = 0).
     local teleports = {}
     local originalTeleport = feature.TeleportTo
     feature.TeleportTo = function(self, cframe)
@@ -194,8 +194,9 @@ do
     local ok, stole = feature:StealOnce()
     check(ok == true and stole == 2, "StealOnce sweeps and counts every exu prompt (2)")
 
-    -- The prompt is ACTED ON by the working mechanism: HoldDuration is zeroed at
-    -- the moment InputHoldBegin fires, and the hold is closed (InputHoldEnd).
+    -- The prompt is ACTED ON by the working mechanism: the hold is opened and
+    -- closed (InputHoldBegin then InputHoldEnd), with HoldDuration zeroed at the
+    -- moment of the hold.
     local actedAll, zeroedAll = true, true
     for _, prompt in ipairs(world.fired) do
         if not (prompt.Hold.began >= 1 and prompt.Hold.ended >= 1) then actedAll = false end
@@ -204,20 +205,23 @@ do
     check(actedAll, "every reached prompt is held (InputHoldBegin then InputHoldEnd)")
     check(zeroedAll, "the steal zeroes HoldDuration before firing the hold")
 
-    -- No residue: the HoldDuration is restored to its original 0.5 after the steal.
-    local restoredAll = true
+    -- The prompt is WIDENED before the hold: infinite reach, no line-of-sight --
+    -- that is what makes the server accept the steal (the updated reference).
+    local widenedAll, losAll = true, true
     for _, prompt in ipairs(world.fired) do
-        if prompt.HoldDuration ~= 0.5 then restoredAll = false end
+        if prompt.MaxActivationDistance ~= 1000 then widenedAll = false end
+        if prompt.RequiresLineOfSight ~= false then losAll = false end
     end
-    check(restoredAll, "the steal restores the original HoldDuration (no residue)")
+    check(widenedAll, "the steal sets MaxActivationDistance to 1000")
+    check(losAll, "the steal disables RequiresLineOfSight")
 
-    -- The teleport lands on the exu's pivot (the Root, y=3) plus 3 studs up, so
-    -- y=6 -- it follows the exu, not the Nest (y=0). The reference mechanism.
+    -- The teleport lands on the exu Root (y=3) plus 3 studs up, so y=6 -- it
+    -- follows the exu, not the Nest (y=0). The updated reference mechanism.
     local landedOnExu = false
     for _, position in ipairs(teleports) do
         if position.Y == 6 then landedOnExu = true end
     end
-    check(landedOnExu, "the steal teleports onto the exu (pivot + 3 studs), not the Nest")
+    check(landedOnExu, "the steal teleports onto the exu Root + 3 studs, not the Nest")
 
     -- After the step the character is back at the base anchor (it started at 0,0,0
     -- and the anchor is at 0,50,0).
