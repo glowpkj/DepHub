@@ -624,6 +624,7 @@ local function sandbox(placeId, gameId)
     local player = Instance.new("Player")
     player.CharacterAdded, player.CharacterRemoving, player.CameraMaxZoomDistance = signal(), signal(), 128
     player.Idled = signal()
+    player.OnTeleport = signal()
     player.ChildAdded, player.ChildRemoved = signal(), signal()
     local players = {LocalPlayer=player, PlayerAdded=signal(), PlayerRemoving=signal()}
     -- Test-only: register another player (with a character holding a
@@ -645,9 +646,19 @@ local function sandbox(placeId, gameId)
     end
     local run = {RenderStepped=signal(), Stepped=signal(), Heartbeat=signal()}
     local input = {InputBegan=signal(), InputEnded=signal(), JumpRequest=signal()}
-    local teleport = {Calls=0}
-    function teleport:Teleport() self.Calls += 1 end
-    function teleport:TeleportToPlaceInstance() self.Calls += 1 end
+    local teleport = {Calls=0, TargetCalls={}, FallbackCalls={}, TeleportInitFailed=signal()}
+    function teleport:Teleport(placeId, targetPlayer)
+        self.Calls += 1
+        self.FallbackCalls[#self.FallbackCalls + 1] = {placeId=placeId, player=targetPlayer}
+    end
+    function teleport:TeleportToPlaceInstance(placeId, instanceId, targetPlayer)
+        self.Calls += 1
+        self.TargetCalls[#self.TargetCalls + 1] = {
+            placeId=placeId,
+            instanceId=instanceId,
+            player=targetPlayer,
+        }
+    end
     local tween = {Create=function(_, object, info, goal)
         -- The mock keeps the target object and the goal table so tests can assert
         -- WHERE a flight is headed (the teleport motor's whole contract), not
