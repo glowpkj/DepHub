@@ -312,6 +312,41 @@ do
     backend:Destroy()
 end
 
+-- An exu that already LEFT the Runtime (the server took/moved it) is skipped, not
+-- teleported to: the log showed the sweep burning steps on orphan "Root" parts of
+-- exus that were already gone. Driven directly (StealOnce).
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local world = buildWorld(ctx, {exuCount = 2})
+    local root = makeCharacter(ctx)
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoSteal
+
+    -- Take the FIRST exu out of the Runtime (as a successful steal would).
+    local gone = world.roots[1].Parent            -- the model that owns Root 1
+    gone.Parent = nil
+
+    local teleports = {}
+    local originalTeleport = feature.TeleportTo
+    feature.TeleportTo = function(self, cframe)
+        teleports[#teleports + 1] = cframe
+        return originalTeleport(self, cframe)
+    end
+
+    local ok, stole = feature:StealOnce()
+    feature.TeleportTo = originalTeleport
+
+    -- Only the exu still in the Runtime is reached; the orphan one is skipped.
+    check(ok == true and stole == 1, "the sweep skips an exu that left the Runtime (1 reached)")
+    check(world.fired[1].Hold.began == 0, "the gone exu's prompt is never fired")
+    check(world.fired[2].Hold.began == 1, "the exu still in the Runtime is fired")
+    check(root.Position == Vector3.new(0, 50, 0), "the step returns to the base anchor")
+
+    backend:Destroy()
+end
+
 -- Auto Upgrade: each toggle clicks the ClickDetector of MY pen (found by Owner,
 -- never Pen1), on its own board. Driven directly because the harness does not run
 -- spawned threads.

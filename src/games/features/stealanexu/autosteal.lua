@@ -339,6 +339,15 @@ function AutoSteal:_stealAt(target, options)
         return false
     end
 
+    -- O modelo ainda esta no Runtime? Se o servidor ja levou (roubado) ou moveu,
+    -- o alvo da lista virou um Root orfao -- teleportar pra ele nao rouba nada.
+    -- Pula, sem gastar tempo.
+    local runtime = Workspace:FindFirstChild("Runtime")
+    if runtime and target.model and target.model.Parent ~= runtime then
+        debugLog(self, label, "pulado:", target.model.Name, "(ja saiu do Runtime)")
+        return false
+    end
+
     -- 1) Teleporta pra CIMA do Root do Exu.
     self:TeleportTo(rootPart.CFrame)
     debugLog(self, label, "teleportou pro Root (", rootPart:GetFullName(), ")")
@@ -358,23 +367,24 @@ function AutoSteal:_stealAt(target, options)
     return true
 end
 
--- Um ciclo: passa por TODOS os Exus do Runtime, roubando um por um (cada um com
--- sua ida-e-volta pra base).
+-- Um ciclo: passa pelos Exus do Runtime, roubando um por um (cada um com sua
+-- ida-e-volta pra base). A cada passo RELÊ a lista: o servidor recicla/move os
+-- modelos, entao so os que AINDA estao no Runtime valem -- e os que chegaram
+-- depois tambem entram.
 function AutoSteal:StealOnce()
     if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
 
-    local exus = runtimeExus()
-    if #exus == 0 then
-        self.LastError = "nenhum Exu no Runtime"
-        debugLog(self, "ABORTA: workspace.Runtime sem Exus")
-        self.LastStatus = "no targets"
-        return false, 0
-    end
-
-    debugLog(self, "=== ciclo Auto Steal Exu (", tostring(#exus), "Exus) ===")
+    local done = {}
     local stole = 0
-    for index = 1, #exus do
-        self:_stealAt(exus[index], {
+    for index = 1, 200 do
+        local exus = runtimeExus()
+        local target = nil
+        for _, candidate in ipairs(exus) do
+            if not done[candidate.model] then target = candidate; break end
+        end
+        if not target then break end
+        done[target.model] = true
+        self:_stealAt(target, {
             label = "Exu" .. index,
             settleWait = SETTLE_WAIT,
             postHold = POST_HOLD_WAIT,
@@ -383,35 +393,44 @@ function AutoSteal:StealOnce()
         stole = stole + 1
     end
 
+    if stole == 0 then
+        self.LastError = "nenhum Exu no Runtime"
+        debugLog(self, "ABORTA: workspace.Runtime sem Exus novos")
+        self.LastStatus = "no targets"
+        return false, 0
+    end
+
     debugLog(self, "=== fim do ciclo: passou por", stole, "Exus ===")
     self.LastStatus = "stealing"
-    return stole > 0, stole
+    return true, stole
 end
 
 -- --- Steal All (botao) ----------------------------------------------------
 
 -- A passada do botao: os mesmos Exus do Runtime, do ultimo pro primeiro, mais
--- rapida. No fim volta pro CFrame de origem.
+-- rapida. Relê a lista a cada passo (o servidor recicla os modelos). No fim volta
+-- pro CFrame de origem.
 function AutoSteal:StealAll()
     if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
-
-    local exus = runtimeExus()
-    if #exus == 0 then
-        self.LastError = "nenhum Exu no Runtime"
-        debugLog(self, "ABORTA: workspace.Runtime sem Exus")
-        self.LastStatus = "no targets"
-        return false, 0
-    end
 
     local origin = self:PenAnchor()
     self.LastStatus = "stealing all"
     self.LastError = nil
-
-    debugLog(self, "=== Steal All (", tostring(#exus), "Exus) ===")
     local stole = 0
-    for index = #exus, 1, -1 do
-        self:_stealAt(exus[index], {
-            label = "Exu" .. index,
+
+    local done = {}
+    debugLog(self, "=== Steal All ===")
+    for index = 1, 200 do
+        local exus = runtimeExus()
+        -- Do ultimo pro primeiro: pega o ultimo ainda nao tentado.
+        local target = nil
+        for i = #exus, 1, -1 do
+            if not done[exus[i].model] then target = exus[i]; break end
+        end
+        if not target then break end
+        done[target.model] = true
+        self:_stealAt(target, {
+            label = "Exu" .. (#exus - index + 1),
             settleWait = ALL_SETTLE_WAIT,
             postHold = ALL_POST_HOLD_WAIT,
             validateWait = ALL_VALIDATE_WAIT,
