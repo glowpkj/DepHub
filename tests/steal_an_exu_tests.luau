@@ -157,7 +157,9 @@ do
 
     print("SAE_TEST: entry features passed")
     local labels = {}
-    for _, control in ipairs(ui.Library._Controls) do labels[control.Label] = control end
+    for _, control in ipairs(ui.Library._Controls) do
+        if control.Label ~= nil then labels[control.Label] = control end
+    end
     check(labels["Auto Steal Exu"] == nil, "the unfiltered Auto Steal toggle is removed")
     check(labels["Steal Exu Selection"] ~= nil and labels["Steal Exu Selection"].Kind == "toggle",
         "the panel has the selected-Terreiro steal toggle")
