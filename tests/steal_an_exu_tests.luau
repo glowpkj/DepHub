@@ -46,6 +46,7 @@ local function buildWorld(ctx, options)
     pen:SetAttribute("Owner", ctx.Player.UserId)
     pen:SetAttribute("Index", 4)
     local anchor = Instance.new("Part"); anchor.Name = "BadgeAnchor"; anchor.Parent = pen
+    anchor.Position = Vector3.new(0, 50, 0)
     anchor.CFrame = CFrame.new(0, 50, 0)
 
     -- The two upgrade boards the Auto Upgrade toggles click.
@@ -287,6 +288,7 @@ do
 
     local plaza = Instance.new("Folder"); plaza.Name = "Plaza"; plaza.Parent = ctx.Services.Workspace.Map
     local plazaPart = Instance.new("Part"); plazaPart.Name = "Part"; plazaPart.Parent = plaza
+    plazaPart.Position = Vector3.new(900, 10, 900)
     plazaPart.CFrame = CFrame.new(900, 10, 900)
     plazaPart.Size = Vector3.new(40, 2, 40)
     local sell = backend.Features.AutoSell
