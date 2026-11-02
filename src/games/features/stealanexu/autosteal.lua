@@ -7,6 +7,7 @@ local type = type
 local pcall = pcall
 local tostring = tostring
 local table = table
+local math = math
 
 local SETTLE_WAIT = 0.15
 local POST_WAIT = 0.1
@@ -40,7 +41,8 @@ local function debugLog(self, ...)
     end
 end
 
-function AutoSteal.new(ctx)
+function AutoSteal.new(ctx, options)
+    options = options or {}
     return setmetatable({
         Ctx = ctx or {},
         Enabled = false,
@@ -49,6 +51,8 @@ function AutoSteal.new(ctx)
         Destroyed = false,
         DebugLog = {},
         LastTargetCount = nil,
+        SelectedOnly = options.selectedOnly == true,
+        Terreiro = options.terreiro or "Terreiro1",
     }, AutoSteal)
 end
 
@@ -66,20 +70,32 @@ function AutoSteal:_root()
     return character and character:FindFirstChild("HumanoidRootPart") or nil
 end
 
-function AutoSteal:_targets()
-    local workspace = game:GetService("Workspace")
-    local runtime = workspace:FindFirstChild("Runtime")
-    if not runtime then
-        return nil, "workspace.Runtime nao encontrado"
+local function instancePosition(instance)
+    if not instance then return nil end
+
+    if instance:IsA("BasePart") then
+        return instance.Position
     end
 
+    if instance:IsA("Model") then
+        if instance.PrimaryPart then return instance.PrimaryPart.Position end
+        local ok, pivot = pcall(function() return instance:GetPivot() end)
+        if ok and pivot then return pivot.Position end
+    end
+
+    local ok, position = pcall(function() return instance.Position end)
+    return ok and position or nil
+end
+
+local function collectRuntimeTargets(runtime)
     local targets = {}
     local seen = {}
-    for _, child in ipairs(runtime:GetChildren()) do
-        local ref = child:FindFirstChild("Root")
+
+    for _, model in ipairs(runtime:GetChildren()) do
+        local ref = model:FindFirstChild("Root")
         if not ref then
             local ok, nested = pcall(function()
-                return child:FindFirstChild("Root", true)
+                return model:FindFirstChild("Root", true)
             end)
             if ok then ref = nested end
         end
@@ -92,13 +108,143 @@ function AutoSteal:_targets()
             if ok then prompt = nested end
         end
 
-        if prompt and not seen[prompt] then
+        local position = instancePosition(ref)
+        if prompt and ref and position and not seen[prompt] then
             seen[prompt] = true
-            targets[#targets + 1] = {prompt = prompt, ref = ref, model = child, runtime = runtime}
+            targets[#targets + 1] = {
+                prompt = prompt,
+                ref = ref,
+                model = model,
+                runtime = runtime,
+                position = position,
+            }
         end
     end
 
     return targets
+end
+
+local function numberedNameSort(a, b)
+    local aNumber = tonumber(a.Name:match("(%d+)$")) or math.huge
+    local bNumber = tonumber(b.Name:match("(%d+)$")) or math.huge
+    if aNumber == bNumber then return a.Name < b.Name end
+    return aNumber < bNumber
+end
+
+function AutoSteal.terreiros()
+    local workspace = game:GetService("Workspace")
+    local map = workspace:FindFirstChild("Map")
+    local folder = map and map:FindFirstChild("Terreiros")
+    local result = {}
+
+    if folder then
+        for _, terreiro in ipairs(folder:GetChildren()) do
+            if terreiro:FindFirstChild("Nests") then
+                result[#result + 1] = terreiro.Name
+            end
+        end
+    end
+
+    table.sort(result, function(a, b)
+        local aNumber = tonumber(a:match("(%d+)$")) or math.huge
+        local bNumber = tonumber(b:match("(%d+)$")) or math.huge
+        if aNumber == bNumber then return a < b end
+        return aNumber < bNumber
+    end)
+
+    if #result == 0 then
+        for index = 1, 9 do
+            result[#result + 1] = "Terreiro" .. index
+        end
+    end
+
+    return result
+end
+
+function AutoSteal:_selectedTargets(runtime)
+    local workspace = game:GetService("Workspace")
+    local map = workspace:FindFirstChild("Map")
+    local terreiros = map and map:FindFirstChild("Terreiros")
+    local terreiro = terreiros and terreiros:FindFirstChild(self.Terreiro)
+    local nestsFolder = terreiro and terreiro:FindFirstChild("Nests")
+
+    if not nestsFolder then
+        return {}, "Terreiro nao encontrado: " .. tostring(self.Terreiro)
+    end
+
+    local nests = {}
+    for _, nest in ipairs(nestsFolder:GetChildren()) do
+        local position = instancePosition(nest)
+        if position then
+            nests[#nests + 1] = {instance = nest, position = position}
+        end
+    end
+    table.sort(nests, function(a, b) return numberedNameSort(a.instance, b.instance) end)
+
+    local runtimeTargets = collectRuntimeTargets(runtime)
+    if #nests == 0 or #runtimeTargets == 0 then
+        return {}, nil
+    end
+
+    -- Associa cada Nest ao Exu mais proximo sem reutilizar o mesmo Exu duas vezes.
+    -- A ordenacao global por distancia evita que o primeiro Nest "roube" um Exu
+    -- que esta muito mais perto do Nest seguinte.
+    local pairsByDistance = {}
+    for nestIndex, nest in ipairs(nests) do
+        for targetIndex, target in ipairs(runtimeTargets) do
+            local delta = target.position - nest.position
+            pairsByDistance[#pairsByDistance + 1] = {
+                nestIndex = nestIndex,
+                targetIndex = targetIndex,
+                distance = delta.Magnitude,
+            }
+        end
+    end
+
+    table.sort(pairsByDistance, function(a, b)
+        if a.distance == b.distance then
+            if a.nestIndex == b.nestIndex then return a.targetIndex < b.targetIndex end
+            return a.nestIndex < b.nestIndex
+        end
+        return a.distance < b.distance
+    end)
+
+    local usedNests = {}
+    local usedTargets = {}
+    local assigned = {}
+
+    for _, pair in ipairs(pairsByDistance) do
+        if not usedNests[pair.nestIndex] and not usedTargets[pair.targetIndex] then
+            usedNests[pair.nestIndex] = true
+            usedTargets[pair.targetIndex] = true
+            assigned[pair.nestIndex] = runtimeTargets[pair.targetIndex]
+        end
+    end
+
+    local targets = {}
+    for nestIndex, nest in ipairs(nests) do
+        local target = assigned[nestIndex]
+        if target then
+            target.nestName = nest.instance.Name
+            targets[#targets + 1] = target
+        end
+    end
+
+    return targets
+end
+
+function AutoSteal:_targets()
+    local workspace = game:GetService("Workspace")
+    local runtime = workspace:FindFirstChild("Runtime")
+    if not runtime then
+        return nil, "workspace.Runtime nao encontrado"
+    end
+
+    if self.SelectedOnly then
+        return self:_selectedTargets(runtime)
+    end
+
+    return collectRuntimeTargets(runtime)
 end
 
 function AutoSteal:_alive(target)
@@ -241,6 +387,13 @@ function AutoSteal:SetEnabled(on)
         debugLog(self, "OFF")
     end
 
+    return true
+end
+
+function AutoSteal:SetTerreiro(name)
+    if type(name) ~= "string" or name == "" then return false end
+    self.Terreiro = name
+    self.LastTargetCount = nil
     return true
 end
 
