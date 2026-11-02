@@ -536,10 +536,9 @@ do
 end
 
 -- O bootstrap (loader.lua) e o usuario cola sempre: ele baixa o DepHub.lua
--- oficial, executa, e imprime um resumo de saude. Aqui provamos que ele (1)
--- carrega o hub, (2) imprime o resumo com versao/status/backend, e (3) quando o
--- backend e o Blox Fruits, confere a lista de ILHAS -- inclusive avisando quando
--- ela vem vazia, que e o bug que o usuario viu no painel.
+-- oficial e executa. Num load SAUDAVEL ele fica quieto -- a unica linha no
+-- console e "DepHub v<versao>", impressa pelo proprio hub. Nada de resumo com
+-- host/executor/backend: esse detalhe vive na aba Debug do painel.
 do
     local ctx = sandbox(994732206, 994732206)
     -- O bootstrap baixa o hub pela URL; no sandbox isso resolve pra sources.
@@ -549,23 +548,24 @@ do
     -- O loader espera o estado final do hub; o sandbox roda sincrono, entao o
     -- estado ja esta publicado quando ele chega a checagem.
     local printed = table.concat(ctx.Logs, "\n")
-    check(printed:find("DepHub loader", 1, true) ~= nil, "o loader imprime o resumo no console")
-    check(printed:find("status:", 1, true) ~= nil, "o resumo traz o status da carga")
-    check(printed:find("backend:", 1, true) ~= nil, "o resumo traz o backend carregado")
-    check(printed:find("blox fruits", 1, true) ~= nil, "com backend Blox Fruits, o loader checa as ilhas")
-    check(printed:find("ilhas por mar", 1, true) ~= nil, "o loader conta as ilhas dos 3 mares")
+    check(printed:find("[DepHub loader]", 1, true) == nil,
+        "o loader nao imprime resumo num load saudavel")
+    check(printed:find("resumo", 1, true) == nil, "nao ha mais o bloco de resumo")
+    check(printed:find("executor:", 1, true) == nil, "nao ha mais a linha de executor")
+    check(printed:find("blox fruits", 1, true) == nil, "nem a checagem de ilhas quando tudo esta ok")
 end
 
--- Quando o backend NAO e o Blox Fruits, o bootstrap ainda carrega e resume, mas
--- pula a checagem de ilhas (ela e especifica daquele jogo).
+-- Quando o backend NAO e o Blox Fruits, o bootstrap carrega e continua quieto:
+-- a checagem de ilhas (especifica daquele jogo) nao aparece, e nada mais e
+-- impresso no caminho feliz.
 do
     local ctx = sandbox(1, 2)
     local bootstrap = ctx.Env.loadstring(sources["loader.lua"])
     local okRun = pcall(bootstrap)
     check(okRun, "o loader roda num jogo universal tambem")
     local printed = table.concat(ctx.Logs, "\n")
-    check(printed:find("status:", 1, true) ~= nil, "o resumo geral sai em qualquer jogo")
     check(printed:find("ilhas por mar", 1, true) == nil, "sem backend Blox Fruits nao ha checagem de ilhas")
+    check(printed:find("[DepHub loader]", 1, true) == nil, "e o loader segue quieto")
 end
 
 -- O caso do BUG: a lista de ilhas do mar atual vem vazia (o dropdown mostra
@@ -597,7 +597,7 @@ end
 -- O loader NAO espera o jogo nem o personagem: o hub sobe na hora. Antes ele
 -- chamava waitForLoad(45), que segurava o hub por ate 45s -- o atraso exato que o
 -- usuario reclamou. Aqui: mesmo SEM personagem (ainda spawnando), o hub sobe
--- imediatamente e o console diz que nao ha espera de carregamento.
+-- imediatamente (e o console fica quieto no caminho feliz).
 do
     local ctx = sandbox(994732206, 994732206)
     -- Sem Character no jogador: se houvesse espera, isto bloquearia ate o teto.
@@ -607,9 +607,7 @@ do
     local elapsed = os.clock() - started
     check(okRun, "o loader roda sem estourar, mesmo sem personagem")
     local printed = table.concat(ctx.Logs, "\n")
-    check(printed:find("sem espera de carregamento", 1, true) ~= nil,
-        "o loader anuncia que sobe sem espera de carregamento")
-    check(printed:find("status:", 1, true) ~= nil, "o hub sobe imediatamente, sem esperar o personagem")
+    check(printed:find("[DepHub loader]", 1, true) == nil, "o loader fica quieto, sem anunciar espera")
     check(elapsed < 5, ("o loader nao espera o jogo carregar (%.2fs)"):format(elapsed))
 end
 
@@ -627,12 +625,12 @@ do
     local okRun = pcall(bootstrap)
     check(okRun, "o loader roda com o personagem pronto")
     local printed = table.concat(ctx.Logs, "\n")
-    -- O texto antigo ("personagem pronto") saiu junto com a espera; o novo e o
-    -- mesmo para qualquer estado do jogo.
-    check(printed:find("sem espera de carregamento", 1, true) ~= nil,
-        "o loader nao espera mesmo com o personagem pronto")
+    -- O texto antigo ("personagem pronto") saiu junto com a espera; o loader
+    -- agora e mudo no caminho feliz, para qualquer estado do jogo.
+    check(printed:find("sem espera de carregamento", 1, true) == nil,
+        "o loader nao imprime mais o anuncio de carga")
     check(printed:find("personagem pronto", 1, true) == nil,
         "o loader nao tem mais o ramo de espera do personagem")
-    check(printed:find("status:", 1, true) ~= nil, "e o hub sobe normalmente")
+    check(printed:find("[DepHub loader]", 1, true) == nil, "e fica quieto com o personagem pronto")
 end
 

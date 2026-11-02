@@ -10,16 +10,10 @@
        feature agir antes do personagem existir fica DENTRO de cada feature,
        como guarda por frame -- o loader nao bloqueia;
     3. espera o backend publicar o estado;
-    4. imprime no console um resumo curto -- versao, host, executor, qual
-       backend/modo carregou -- e todo erro de carga que o backend reportou.
-
-  O console SEMPRE recebe o resumo, para qualquer jogo: e o mesmo bootstrap
-  para Blox Fruits, MM2, TSB, Noon Piece, universal, etc. Se algo estiver
-  errado, ele aponta o ingrediente que falhou em vez de deixar voce adivinhar.
-
-  Quando o backend carregado for o Blox Fruits, ele confere tambem a lista de
-  ILHAS do Travel (a que aparece vazia no painel) e diz quantas carregaram por
-  mar -- a checagem extra so roda nesse jogo.
+    4. fica QUIETO no console num load saudavel: a unica linha e
+       "DepHub v<versao>". Todo o detalhe (host, executor, backend, contagem de
+       ilhas) fica na aba Debug do painel. Falhas reais continuam saindo por
+       warn -- um run quebrado nunca fica silencioso.
 
   Trocar de branch: passe a ref como primeiro argumento, ex.:
       loadstring(...)("dev")   -- ou edite a SOURCE_REF abaixo.
@@ -34,7 +28,6 @@ local HOSTS = {
     "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. SOURCE_REF .. "/",
 }
 
-local function say(message) pcall(print, "[DepHub loader] " .. tostring(message)) end
 local function loud(message) pcall(warn, "[DepHub loader] " .. tostring(message)) end
 
 -- Um GET que tenta todas as APIs de HTTP que o executor costuma expor.
@@ -77,7 +70,7 @@ end
 -- ---------------------------------------------------------------------------
 -- Carga
 -- ---------------------------------------------------------------------------
-local okFetch, source, usedBase = fetchLoader()
+local okFetch, source = fetchLoader()
 if not okFetch then
     loud("nao consegui baixar o DepHub.lua: " .. tostring(source))
     return
@@ -100,7 +93,7 @@ end
 -- features, como guarda por frame (cada uma so age quando o proprio personagem/
 -- alvo existe). O loader nao bloqueia mais nada -- sobe e pronto.
 -- ---------------------------------------------------------------------------
-say("subindo o hub (sem espera de carregamento)...")
+-- (silencioso: o hub imprime a linha de versao; nao anunciamos progresso.)
 
 local chunk, compileError = loadstring(source)
 if not chunk then
@@ -108,7 +101,6 @@ if not chunk then
     return
 end
 
-say("executando o hub (ref " .. SOURCE_REF .. ")...")
 local okRun, runResult = pcall(chunk, SOURCE_REF)
 if not okRun then
     loud("o hub estourou ao executar: " .. tostring(runResult))
@@ -135,92 +127,52 @@ end
 local env, loaderState = waitForHub(15)
 
 -- ---------------------------------------------------------------------------
--- Resumo (geral -- vale para qualquer jogo)
+-- Silencio no caminho feliz. O proprio hub imprime a unica linha que o
+-- jogador ve ("DepHub v<versao>"). Aqui so reportamos PROBLEMA: se o backend
+-- nao publicou estado, se a carga falhou, ou se a checagem extra do Blox Fruits
+-- achou a lista de ilhas vazia. Todo o detalhe (host, executor, backend,
+-- contagem por mar) fica na aba Debug do painel.
 -- ---------------------------------------------------------------------------
-say("----- resumo -----")
-say("versao: " .. tostring((loaderState and loaderState.Version) or "?")
-    .. "   host: " .. tostring(usedBase or "?")
-    .. "   ref: " .. SOURCE_REF)
-
-local executor = "?"
-pcall(function()
-    if type(identifyexecutor) == "function" then executor = identifyexecutor()
-    elseif type(getexecutorname) == "function" then executor = getexecutorname() end
-end)
-say("executor: " .. tostring(executor))
-
 if type(loaderState) ~= "table" then
     loud("o hub nao publicou estado em 15s -- provavelmente travou na carga.")
-    say("dica: veja as mensagens de warn acima, ou abra a aba Debug do painel.")
+    loud("dica: abra a aba Debug do painel para ver o detalhe.")
     return
 end
-
-say("status: " .. tostring(loaderState.status)
-    .. "   backend: " .. tostring(env.__DEPHUB and env.__DEPHUB.Mode or "?"))
 
 if loaderState.status == "failed" then
     loud("a carga FALHOU: " .. tostring(loaderState.error or "(sem motivo registrado)"))
 elseif loaderState.status == "unsupported" then
-    say("este jogo nao tem backend proprio e o universal esta desligado.")
+    loud("este jogo nao tem backend proprio e o universal esta desligado.")
 end
 
--- ---------------------------------------------------------------------------
--- Checagem EXTRA do Blox Fruits: a lista de ilhas do Travel.
--- So roda quando o backend carregado e o Blox Fruits; para os outros jogos
--- o resumo acima ja e o suficiente.
--- ---------------------------------------------------------------------------
-local function checkBloxFruits()
+-- Checagem EXTRA do Blox Fruits: a lista de ilhas do Travel. So roda nesse
+-- backend; se ela vier vazia, e o dropdown do Travel mostrando None -- avisa.
+do
     local ok, state = pcall(function() return env.__DEPHUB_BLOXFRUITS end)
-    if not ok or type(state) ~= "table" then return false end
-
-    say("blox fruits: mar detectado: " .. tostring(state.Sea or "(nenhum)"))
-
-    if state.Errors and #state.Errors > 0 then
-        loud("erros de carga do backend:")
-        for _, message in ipairs(state.Errors) do loud("  - " .. tostring(message)) end
-    else
-        say("blox fruits: erros de carga: nenhum")
-    end
-
-    local factory = state.Features and state.Features.islands
-    if type(factory) ~= "table" or type(factory.IslandLabels) ~= "function" then
-        loud("a feature de ILHAS nao carregou (islands.lua) -- o dropdown do Travel fica vazio.")
-        return true
-    end
-
-    local okLabels, labels = pcall(function() return factory:IslandLabels(state.Sea) end)
-    if not okLabels then
-        loud("IslandLabels estourou: " .. tostring(labels))
-    elseif type(labels) ~= "table" or #labels == 0 then
-        loud("a lista de ilhas do mar atual veio VAZIA -- e por isso o dropdown mostra None.")
-        if state.Sea == nil then
-            loud("o mar detectado e nil (ReplicatedStorage.Util.Realm nao respondeu).")
+    if ok and type(state) == "table" then
+        if state.Errors and #state.Errors > 0 then
+            for _, message in ipairs(state.Errors) do loud("erro de carga do backend: " .. tostring(message)) end
         end
-    else
-        say(("ilhas no mar atual (%s): %d -- ex.: %s")
-            :format(tostring(state.Sea), #labels, tostring(labels[1])))
-    end
 
-    -- Contagem por mar, do mesmo modulo, pra provar que os 3 mapas existem.
-    local counts = {}
-    for _, sea in ipairs({"Sea1", "Sea2", "Sea3"}) do
-        local okCount, seaLabels = pcall(function() return factory:IslandLabels(sea) end)
-        counts[#counts + 1] = sea .. "=" .. tostring(okCount and (#seaLabels) or "erro")
+        local factory = state.Features and state.Features.islands
+        if type(factory) ~= "table" or type(factory.IslandLabels) ~= "function" then
+            loud("a feature de ILHAS nao carregou (islands.lua) -- o dropdown do Travel fica vazio.")
+        else
+            local okLabels, labels = pcall(function() return factory:IslandLabels(state.Sea) end)
+            if not okLabels then
+                loud("IslandLabels estourou: " .. tostring(labels))
+            elseif type(labels) ~= "table" or #labels == 0 then
+                loud("a lista de ilhas do mar atual veio VAZIA -- e por isso o dropdown mostra None.")
+                if state.Sea == nil then
+                    loud("o mar detectado e nil (ReplicatedStorage.Util.Realm nao respondeu).")
+                end
+            end
+        end
     end
-    say("ilhas por mar: " .. table.concat(counts, "  "))
-    return true
 end
 
-local checkedBloxFruits = false
-pcall(function() checkedBloxFruits = checkBloxFruits() end)
-if not checkedBloxFruits and loaderState.status == "success" then
-    say("(jogo sem checagem extra -- resumo geral acima)")
-end
-
-say("------------------")
-
-if loaderState.status == "success" then
-    say("hub no ar. se um dropdown aparecer vazio, o detalhe esta nas linhas acima.")
-else
-    loud("a carga nao terminou bem -- mande este resumo pra quem mantem o hub.")
+-- Caminho feliz: NADA aqui. O hub ja imprimiu "DepHub v<versao>"; o loader so
+-- fala quando ha problema. Assim o console tem uma linha so num load saudavel.
+if loaderState.status ~= "success" then
+    loud("a carga nao terminou bem -- mande este aviso pra quem mantem o hub.")
 end
