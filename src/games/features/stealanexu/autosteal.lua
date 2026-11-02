@@ -17,6 +17,8 @@ local SCAN_WAIT = 0.25
 local EMPTY_WAIT = 0.6
 local CHARACTER_WAIT = 0.5
 local MOVEMENT_WAIT = 0.05
+local SOURCE_CONFIRM_WAIT = 0.18
+local TARGET_CACHE_TTL = 0.65
 
 local AutoSteal = {}
 AutoSteal.__index = AutoSteal
@@ -58,6 +60,9 @@ function AutoSteal.new(ctx, options)
         LastTargetCount = nil,
         SelectedOnly = options.selectedOnly ~= false,
         Terreiros = selected,
+        TargetCache = nil,
+        TargetCacheAt = 0,
+        TargetCacheKey = nil,
     }, AutoSteal)
 end
 
@@ -286,11 +291,35 @@ function AutoSteal:_targets()
     local workspace = game:GetService("Workspace")
     local runtime = workspace:FindFirstChild("Runtime")
     if not runtime then
+        self.TargetCache = nil
         return nil, "workspace.Runtime nao encontrado"
     end
 
     if self.SelectedOnly then
-        return self:_selectedTargets(runtime)
+        local now = os.clock()
+        local selectionKey = self:SelectionKey()
+        local cached = self.TargetCache
+        if cached and self.TargetCacheKey == selectionKey and now - self.TargetCacheAt < TARGET_CACHE_TTL then
+            local stillAlive = true
+            for _, target in ipairs(cached) do
+                if not self:_alive(target) then
+                    stillAlive = false
+                    break
+                end
+            end
+            if stillAlive then return cached end
+            self.TargetCache = nil
+        end
+
+        local targets, reason = self:_selectedTargets(runtime)
+        if targets then
+            self.TargetCache = targets
+            self.TargetCacheAt = now
+            self.TargetCacheKey = selectionKey
+        else
+            self.TargetCache = nil
+        end
+        return targets, reason
     end
 
     return collectRuntimeTargets(runtime)
@@ -367,31 +396,30 @@ function AutoSteal:_step(target, root, originalPos)
                 if target.exuId ~= nil and type(self.Ctx.TrackExuSource) == "function" then
                     local okTrack, result = pcall(self.Ctx.TrackExuSource, target.exuId, target.terreiroName)
                     if okTrack and result then tracked += 1 end
-                    debugLog(self, "ExuId do Runtime:", tostring(target.exuId),
-                        "=>", target.terreiroName, "| registro direto:", okTrack and result == true or false)
                 end
 
-                local deadline = os.clock() + 2.5
-                repeat
-                    task.wait(0.25)
-                    if type(self.Ctx.TrackNewExuSources) == "function" then
-                        local okAfter, after = pcall(getExuIds or function() return {} end)
-                        if okAfter and type(after) == "table" then
-                            local okTrack, added = pcall(self.Ctx.TrackNewExuSources, before, after, target.terreiroName)
-                            if okTrack then tracked += tonumber(added) or 0 end
-                        end
+                if type(getExuIds) == "function" and type(self.Ctx.TrackNewExuSources) == "function" then
+                    task.wait(SOURCE_CONFIRM_WAIT)
+                    local okAfter, after = pcall(getExuIds)
+                    if okAfter and type(after) == "table" then
+                        local okTrack, added = pcall(self.Ctx.TrackNewExuSources, before, after, target.terreiroName)
+                        if okTrack then tracked += tonumber(added) or 0 end
                     end
-                    if tracked > 0 then break end
-                until os.clock() >= deadline
+                elseif target.exuId == nil then
+                    task.wait(SOURCE_CONFIRM_WAIT)
+                end
 
                 if tracked > 0 then
-                    debugLog(self, tracked, "ExuId(s) vinculados ao", target.terreiroName)
-                else
-                    local okIds, currentIds = pcall(getExuIds or function() return {} end)
+                    local persist = self.Ctx.PersistExuSources
+                    if type(persist) == "function" then
+                        local okSave, saved = pcall(persist)
+                        if not okSave or saved == false then
+                            debugLog(self, "origem mapeada, mas a config nao foi persistida.")
+                        end
+                    end
+                elseif target.exuId == nil then
                     debugLog(self, "prompt acionado em", target.terreiroName,
-                        "mas nenhum novo Tool/ExuId apareceu no Backpack/Character.",
-                        "ExuId do Runtime =", tostring(target.exuId),
-                        "| inventario legivel =", okIds and type(currentIds) == "table")
+                        "sem ExuId no Runtime e sem novo Tool identificavel apos", SOURCE_CONFIRM_WAIT, "s.")
                 end
             end
         end
@@ -496,6 +524,8 @@ function AutoSteal:SetTerreiros(names)
     end
     self.Terreiros = selected
     self.LastTargetCount = nil
+    self.TargetCache = nil
+    self.TargetCacheKey = nil
     return true
 end
 
