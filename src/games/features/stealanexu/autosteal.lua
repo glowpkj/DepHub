@@ -63,6 +63,8 @@ function AutoSteal.new(ctx, options)
         TargetCache = nil,
         TargetCacheAt = 0,
         TargetCacheKey = nil,
+        SourceTrackQueue = {},
+        SourceTrackWorker = false,
     }, AutoSteal)
 end
 
@@ -354,6 +356,68 @@ function AutoSteal:_releaseMovement(acquired)
     end
 end
 
+function AutoSteal:_queueSourceTrack(before, terreiroName)
+    if not terreiroName or type(self.Ctx.InventoryExuIds) ~= "function"
+        or type(self.Ctx.TrackNewExuSources) ~= "function"
+    then
+        return false
+    end
+
+    self.SourceTrackQueue[#self.SourceTrackQueue + 1] = {
+        before = before or {},
+        terreiroName = terreiroName,
+        queuedAt = os.clock(),
+    }
+
+    if self.SourceTrackWorker then return true end
+    self.SourceTrackWorker = true
+
+    task.spawn(function()
+        while not self.Destroyed and #self.SourceTrackQueue > 0 do
+            local item = table.remove(self.SourceTrackQueue, 1)
+            local deadline = os.clock() + 2.5
+            local tracked = 0
+
+            repeat
+                task.wait(0.2)
+                if self.Destroyed then break end
+
+                local okIds, after = pcall(self.Ctx.InventoryExuIds)
+                if okIds and type(after) == "table" then
+                    local okTrack, added = pcall(
+                        self.Ctx.TrackNewExuSources,
+                        item.before,
+                        after,
+                        item.terreiroName
+                    )
+                    if okTrack then tracked += tonumber(added) or 0 end
+                end
+
+                if tracked > 0 then
+                    local persist = self.Ctx.PersistExuSources
+                    if type(persist) == "function" then
+                        local okSave, saved = pcall(persist)
+                        if not okSave or saved == false then
+                            debugLog(self, "origem mapeada em background, mas falhou ao salvar.")
+                        end
+                    end
+                    debugLog(self, tracked, "Tool(s) vinculada(s) em background ao", item.terreiroName)
+                    break
+                end
+            until os.clock() >= deadline
+
+            if tracked == 0 and not self.Destroyed then
+                debugLog(self, "nenhum novo ExuId apareceu para", item.terreiroName,
+                    "dentro da janela de confirmacao; roubo continuou sem esperar.")
+            end
+        end
+
+        self.SourceTrackWorker = false
+    end)
+
+    return true
+end
+
 function AutoSteal:_step(target, root, originalPos)
     if not self:_alive(target) then return false end
 
@@ -369,7 +433,7 @@ function AutoSteal:_step(target, root, originalPos)
 
     local before = {}
     local getExuIds = self.Ctx and self.Ctx.InventoryExuIds
-    if type(getExuIds) == "function" then
+    if target.terreiroName and target.exuId == nil and type(getExuIds) == "function" then
         local ok, ids = pcall(getExuIds)
         if ok and type(ids) == "table" then before = ids end
     end
@@ -392,34 +456,16 @@ function AutoSteal:_step(target, root, originalPos)
             prompt:InputHoldEnd()
 
             if target.terreiroName then
-                local tracked = 0
                 if target.exuId ~= nil and type(self.Ctx.TrackExuSource) == "function" then
-                    local okTrack, result = pcall(self.Ctx.TrackExuSource, target.exuId, target.terreiroName)
-                    if okTrack and result then tracked += 1 end
-                end
-
-                if type(getExuIds) == "function" and type(self.Ctx.TrackNewExuSources) == "function" then
-                    task.wait(SOURCE_CONFIRM_WAIT)
-                    local okAfter, after = pcall(getExuIds)
-                    if okAfter and type(after) == "table" then
-                        local okTrack, added = pcall(self.Ctx.TrackNewExuSources, before, after, target.terreiroName)
-                        if okTrack then tracked += tonumber(added) or 0 end
+                    local okTrack, changed = pcall(self.Ctx.TrackExuSource, target.exuId, target.terreiroName)
+                    if okTrack and changed and type(self.Ctx.PersistExuSources) == "function" then
+                        task.spawn(function()
+                            task.wait(0.1)
+                            pcall(self.Ctx.PersistExuSources)
+                        end)
                     end
-                elseif target.exuId == nil then
-                    task.wait(SOURCE_CONFIRM_WAIT)
-                end
-
-                if tracked > 0 then
-                    local persist = self.Ctx.PersistExuSources
-                    if type(persist) == "function" then
-                        local okSave, saved = pcall(persist)
-                        if not okSave or saved == false then
-                            debugLog(self, "origem mapeada, mas a config nao foi persistida.")
-                        end
-                    end
-                elseif target.exuId == nil then
-                    debugLog(self, "prompt acionado em", target.terreiroName,
-                        "sem ExuId no Runtime e sem novo Tool identificavel apos", SOURCE_CONFIRM_WAIT, "s.")
+                else
+                    self:_queueSourceTrack(before, target.terreiroName)
                 end
             end
         end
