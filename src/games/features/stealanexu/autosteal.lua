@@ -45,21 +45,22 @@ AutoSteal.__index = AutoSteal
 -- conforme o jogo responder.
 --
 -- Auto Steal Exu (toggle):
---   VALIDATE_WAIT   -- quanto esperar na base depois de disparar (o jogo confirmar
+--   VALIDATE_WAIT   -- quanto esperar na base depois de roubar (o jogo confirmar
 --                      o guardar) antes de ir pro proximo Exu.
 --   SETTLE_WAIT     -- quanto esperar parado em cima do Exu depois do teleporte,
---                      pro prompt assentar antes de disparar.
---   PROMPT_TIMEOUT  -- quanto esperar o Triggered do prompt ("ativou").
+--                      pro prompt assentar antes de segurar.
+--   POST_HOLD_WAIT  -- quanto ficar EM CIMA do Exu depois do InputHoldEnd, pro
+--                      servidor creditar o roubo antes de a gente sair de perto.
 local VALIDATE_WAIT = 1.5
 local SETTLE_WAIT = 0.25
-local PROMPT_TIMEOUT = 1.0
+local POST_HOLD_WAIT = 0.15
 
 -- Steal All (botao): mesma logica, so que mais apertada que o toggle (o usuario
 -- quer o botao "um pouco mais forte e rapido"). Ainda assim, folgada o bastante
 -- pra o servidor processar.
 local ALL_VALIDATE_WAIT = 0.8
 local ALL_SETTLE_WAIT = 0.2
-local ALL_PROMPT_TIMEOUT = 1.0
+local ALL_POST_HOLD_WAIT = 0.15
 -- Um respiro entre um Exu e o proximo, pra nao metralhar o servidor.
 local ALL_STEP_GAP = 0.15
 local ALL_TERREIRO_FROM = 9
@@ -335,10 +336,18 @@ end
 -- prompt pelo HoldDuration: InputHoldBegin -> espera -> InputHoldEnd. Foi assim
 -- que o teste [HoldTest2] modo 0 roubou de fato o Exu.
 --
--- Entao esta funcao faz o hold. Se a versao do jogo/executor nao tiver
--- InputHoldBegin/End, cai no fireproximityprompt (o antigo), pra nunca travar.
--- Devolve true se mandou o hold (ou o fire de fallback).
-local function stealPrompt(prompt)
+-- IMPORTANTE: o Triggered NAO diz nada. Ele dispara sempre (e' local), mesmo
+-- quando o servidor ignora. Por isso o resultado do roubo e' "o hold foi
+-- enviado e completado", nao "o Triggered apareceu".
+--
+-- `postHold`: quanto esperar DEPOIS do InputHoldEnd, ainda em cima do Exu, pra o
+-- servidor processar antes de a gente sair de perto (teleportar). Sem isso o
+-- servidor pode cortar o roubo no meio.
+--
+-- Se a versao do jogo/executor nao tiver InputHoldBegin/End, cai no
+-- fireproximityprompt (o antigo), pra nunca travar. Devolve true se mandou a
+-- acao (hold completo ou fire de fallback).
+local function stealPrompt(prompt, postHold)
     if not prompt then return false end
 
     local holdBegin = prompt.InputHoldBegin
@@ -346,11 +355,14 @@ local function stealPrompt(prompt)
     if type(holdBegin) == "function" and type(holdEnd) == "function" then
         local began = pcall(function() prompt:InputHoldBegin() end)
         if began then
-            -- Segura o tempo que o prompt pede (o jogo usa 0.5s).
+            -- Segura o tempo que o prompt pede (o jogo usa 0.5s) e ACOMPANHA ate
+            -- o fim antes de seguir.
             local hold = tonumber(prompt.HoldDuration) or 0.5
             if hold < 0.05 then hold = 0.05 end
             task.wait(hold)
             pcall(function() prompt:InputHoldEnd() end)
+            -- Respira em cima do Exu pro servidor creditar o roubo.
+            task.wait(postHold or 0)
             return true
         end
     end
@@ -359,6 +371,7 @@ local function stealPrompt(prompt)
     local fire = fireproximityprompt
     if type(fire) == "function" then
         local ok = pcall(fire, prompt)
+        task.wait(postHold or 0)
         return ok
     end
     return false
@@ -376,32 +389,6 @@ local function promptInRange(prompt, rootPosition)
     return true
 end
 
--- Escuta o Triggered do prompt (conectando ANTES do disparo, senao um trigger
--- sincrono passaria batido) e espera o sinal. Devolve uma funcao de espera e a
--- de limpeza. Sem Triggered pra escutar, assume OK (nao trava o loop).
-local function armPromptTrigger(prompt)
-    if not prompt then return function() return false end, function() end end
-    local triggered = false
-    local connection
-    local ok = pcall(function()
-        connection = prompt.Triggered:Connect(function() triggered = true end)
-    end)
-    if not ok then
-        return function() return true end, function() end
-    end
-    local function wait(timeout)
-        local deadline = os.clock() + timeout
-        while not triggered and os.clock() < deadline do
-            task.wait(0.05)
-        end
-        return triggered
-    end
-    local function cleanup()
-        pcall(function() if connection then connection:Disconnect() end end)
-    end
-    return wait, cleanup
-end
-
 -- --- O passo de roubo -----------------------------------------------------
 
 -- Um roubo. A CORRECAO do bug "nao pega": o Nest NAO fica sempre em cima do Exu
@@ -411,7 +398,7 @@ end
 --   2) teleporta pra CIMA do Root (dentro dos 6.5), nao pro Nest;
 --   3) SEGURA o prompt (InputHoldBegin/End) -- o fire instantaneo nao rouba;
 --   4) volta pra base pra validar.
--- options.validateWait / settleWait / promptTimeout / label: como antes.
+-- options.validateWait / settleWait / postHold / label: como antes.
 function AutoSteal:_stealAt(nestTarget, rootPosition, options)
     options = options or {}
     local label = options.label or "?"
@@ -455,26 +442,20 @@ function AutoSteal:_stealAt(nestTarget, rootPosition, options)
             string.format("%.1f", distance), "range=", tostring(range), ")")
     end
 
-    -- Escuta o Triggered ANTES de disparar (o trigger vem durante o hold).
-    local waitTriggered, cleanup = armPromptTrigger(prompt)
-
     -- 4) Rouba SEGURANDO o prompt (InputHoldBegin -> HoldDuration ->
-    --    InputHoldEnd). E' isso que o servidor aceita; o fire instantaneo nao.
-    local stolen = stealPrompt(prompt)
+    --    InputHoldEnd), e espera em cima do Exu (postHold) pro servidor creditar
+    --    ANTES de teleportar. O Triggered nao e' criterio: ele dispara sempre.
+    local stolen = stealPrompt(prompt, options.postHold or POST_HOLD_WAIT)
     debugLog(self, label, "4) hold(InputHoldBegin/End) ->", tostring(stolen),
         "HoldDuration=", tostring(prompt.HoldDuration))
 
-    local didFire = waitTriggered(options.promptTimeout or PROMPT_TIMEOUT)
-    cleanup()
-    debugLog(self, label, "5) Triggered (ativou) ->", tostring(didFire))
-
     -- 5) Volta pra base e espera pra o jogo confirmar o guardar.
     self:TeleportTo(anchor)
-    debugLog(self, label, "6) voltou pra base; validando por",
+    debugLog(self, label, "5) voltou pra base; validando por",
         tostring(options.validateWait or VALIDATE_WAIT), "s")
     task.wait(options.validateWait or VALIDATE_WAIT)
 
-    return didFire
+    return stolen
 end
 
 -- Um ciclo do Auto Steal Exu: varre os Nests do Terreiro escolhido, roubando um
@@ -498,7 +479,7 @@ function AutoSteal:StealOnce()
                 label = "Nest" .. index,
                 validateWait = VALIDATE_WAIT,
                 settleWait = SETTLE_WAIT,
-                promptTimeout = PROMPT_TIMEOUT,
+                postHold = POST_HOLD_WAIT,
             })
             if ok then stole = stole + 1 end
         else
@@ -548,7 +529,7 @@ function AutoSteal:StealAll()
                         label = "T" .. terreiroIndex .. ".Nest" .. nestIndex,
                         validateWait = ALL_VALIDATE_WAIT,
                         settleWait = ALL_SETTLE_WAIT,
-                        promptTimeout = ALL_PROMPT_TIMEOUT,
+                        postHold = ALL_POST_HOLD_WAIT,
                     })
                     if ok then stole = stole + 1 else skipped = skipped + 1 end
                     task.wait(ALL_STEP_GAP)
