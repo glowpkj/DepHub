@@ -478,6 +478,26 @@ do
     count = feature:RuntimeCount()
     check(count == 0, "Auto Hop sees that the Runtime Exu prompt has disappeared")
 
+    feature._serverCandidates = function()
+        return {{id = "next-public-server", playing = 2, maxPlayers = 8}}
+    end
+    feature.Enabled = true
+    local hopRequested = feature:Hop()
+    check(hopRequested == true, "Auto Hop requests a discovered public server")
+    check(ctx.Services.TeleportService.TargetCalls[1].instanceId == "next-public-server",
+        "Auto Hop sends the selected server JobId to TeleportService")
+    ctx.Player.OnTeleport:Fire("Enum.TeleportState.Started", ctx.Services.TeleportService and 103076400317371, "")
+    check(feature.TeleportStarted == true, "Auto Hop observes the real Player.OnTeleport Started event")
+    ctx.Services.TeleportService.TeleportInitFailed:Fire(
+        ctx.Player,
+        "Enum.TeleportResult.Failure",
+        "test failure",
+        103076400317371,
+        {}
+    )
+    check(feature.Hopping == false and feature.LastStatus == "teleport failed",
+        "Auto Hop resets and logs when TeleportInitFailed fires")
+
     backend:Destroy()
 end
 
