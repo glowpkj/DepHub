@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-02T22:14:47.194206+00:00",
-  "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+  "generatedAt": "2026-11-02T22:15:38.968178+00:00",
+  "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
   "version": "0.1.63",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "c388204db3a126046cf316fe2fc3df70ee49e6c5284fb39096d3d4e87f0f7006",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "b7fb19209e3c6f34f4d00757a18201b35574fe9077c15bda70eefd100a8e439d",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "7e9e3185563fd012b2d16cf99d9a8b8009b61095324e6ce4ebe1dff8527f5ecc",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "79a10a003704332b1e1079dc9f66931df2cf3d67981a64bb062272f73614ec94",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,8 +57,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "c0006b9be990e1d26f3ed018d57bb1fe93d4f6966d7686992acf0f5e9e0696c5",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "685f8ccbceba671d16d485d0a0c23ce8721910a8e507ce5d190d9e2a88c163d8",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -78,8 +78,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "885d9bbe0187b46f30f51da85ad6b98004b6670d44372db343c019d1a8529865",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "9b8acaae6bbd8a05667c777d181771d5647ffc8c7f594a683f9195c9c4097805",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -100,8 +100,8 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "a4206d335cc00831dd33cffe9f2a9f6a9b63761ca1ddbd4e35d626c32169f30c",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "e7a808196f776824d05ee62d634dccc95ea43b317375b7bb3471a21d03eaf3cf",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -118,8 +118,8 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "ef0dd054ec3621d3f17a8934bac2e75f638525b6d4b798f268f14a38c01e4095",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "45b83c8a9cdf69fcf7a81a0a4cbb7d0821cc63306e3cfe9b01317f548c94a1c7",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -136,8 +136,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "a760acb7f349051f0ce2cbdf077d6765de619ca421a5c3eb6d4c863c6ba5cb86",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "e0d2187f350cabc494674d7350f5d031dd91dc86eadeb8571f8e14c1adb24592",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -163,8 +163,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "0298c296f7046ed547d943317b9fb609e006e9c31d65a9195c887ab82bf9d487",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "b0f84e6ab99c4a4f03e1c8cd74f23ed3614a58d524c1c6b5ec105dc4290006fa",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -190,8 +190,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "7bb6674d53c576f4f06b576d6145a70b8c7db21e8ed548d6e02e78cb8c45cdc4",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "cbd1ef6cdc745ebabb59d6d3afd9c87b3bae618233cab2af1de2d09312959c31",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -220,8 +220,8 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "2c5a1bcf2e10f5882e6629fbc96a18af9508725698830620ff33db8f5fd48f06",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "6e6400e1af64361bd96ce1fdf79d03048478d38cc2017966cd0d27cfa3a1649e",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -238,8 +238,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "3947ccc40cb095cfcc20054e9024e65df41014e0aa438ef6057a7b0a49718af8",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "01809e9af023e455471056cc78b7f6abe1534bb14072fe366675397b3eed109a",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -261,8 +261,8 @@
     },
     "103076400317371": {
       "name": "Steal An Exu",
-      "version": "febeeeb4979187e4c3736fb4514a3554a79ee19a020cab91bcc83a05b9583077",
-      "commit": "1cdf1272b1a1dbae4b7c08d749fdec8b09217975",
+      "version": "e51f127aa3dcff90d644400a5bbaf4583bf189887d7703c3846cba356c12fc83",
+      "commit": "24b60a92874730c09345a8f765a6eb0e07078aa2",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -284,6 +284,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "24b60a9",
+      "Date": "2026-11-02T19:15:30-03:00",
+      "Changes": [
+        "Support Roblox userdata HttpService and fallback config envelopes"
+      ]
+    },
     {
       "Version": "1cdf127",
       "Date": "2026-11-02T19:14:39-03:00",
@@ -310,13 +317,6 @@
       "Date": "2026-11-02T19:12:40-03:00",
       "Changes": [
         "Document Auto Hop, Auto Execute and config persistence"
-      ]
-    },
-    {
-      "Version": "268bc5f",
-      "Date": "2026-11-02T19:12:37-03:00",
-      "Changes": [
-        "Bump loader version to 0.1.63"
       ]
     }
   ]
