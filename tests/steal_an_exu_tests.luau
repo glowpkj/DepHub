@@ -135,8 +135,8 @@ do
     for _, control in ipairs(ui.Library._Controls) do labels[control.Label] = control end
     check(labels["Auto Steal Exu"] ~= nil and labels["Auto Steal Exu"].Kind == "toggle",
         "the panel has the Auto Steal Exu toggle")
-    check(labels["Sell All Exus"] ~= nil and labels["Sell All Exus"].Kind == "button",
-        "the panel has the Sell All Exus button")
+    check(labels["Auto Sell Exus"] ~= nil and labels["Auto Sell Exus"].Kind == "toggle",
+        "the panel has the Auto Sell Exus toggle")
 
     -- Auto Upgrade: one toggle per board (base, tread), each a live feature.
     check(type(backend.Features.UpgradeBase) == "table", "the Auto Upgrade Base feature is registered")
@@ -312,77 +312,61 @@ do
     backend:Destroy()
 end
 
--- Auto Sell: find the "Vender Todos" clickable in the PlayerGui and click it.
---
--- The REAL structure (from the game log) is:
---
---     PlayerGui.Menus["Vender Todos"]        -- a FRAME (the container)
---     ...                                             .<GuiButton inside>
---
--- The old code assumed PlayerGui.Menus["Vender Todos"].Button WAS a GuiButton and
--- blew up ("MouseButton1Click is not a valid member of Frame"). So this test builds
--- the container as a FRAME and puts the real GuiButton INSIDE it -- the feature must
--- descend to the GuiButton and activate it, never index the Frame.
+-- Auto Sell: use the exact local GUI path and run as a toggle.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
     makeCharacter(ctx)
 
-    -- A clickable GuiButton double (records activations; exposes MouseButton1Click
-    -- like a real GuiButton so the firesignal path is exercised).
     local clicks = 0
     local guiButton = {
         Kind = "button",
-        ClassName = "TextButton",
-        IsA = function(_, c) return c == "GuiButton" or c == "TextButton" or c == "GuiObject" end,
-        GetFullName = function() return "PlayerGui.Menus.Vender Todos.Label" end,
-        -- A non-nil signal value: the feature must only touch this AFTER checking
-        -- the object actually has it (a Frame would error on the index).
+        ClassName = "ImageButton",
+        IsA = function(_, class) return class == "GuiButton" or class == "ImageButton" or class == "GuiObject" end,
+        GetFullName = function() return "PlayerGui.Menus.Vender Todos.Button.Face" end,
         MouseButton1Click = {Name = "MouseButton1Click"},
         Activate = function() clicks = clicks + 1 end,
     }
-    guiButton.FindFirstChild = function() end
-    guiButton.FindFirstChildWhichIsA = function() end
-    -- firesignal is the executor virtual-click: record it so we can prove the
-    -- feature fired the right signal on the GuiButton.
     local firedSignals = {}
-    ctx.Env.firesignal = function(signal) firedSignals[#firedSignals + 1] = signal end
+    ctx.Env.firesignal = function(signal)
+        firedSignals[#firedSignals + 1] = signal
+        clicks = clicks + 1
+    end
 
-    -- The container: a FRAME named "Vender Todos" (NOT a GuiButton). Indexing
-    -- MouseButton1Click on it must never happen -- mirror Roblox, where the index
-    -- errors ("MouseButton1Click is not a valid member of Frame").
-    local frame = setmetatable({
-        Kind = "frame",
-        ClassName = "Frame",
-        IsA = function(_, c) return c == "Frame" or c == "GuiObject" end,
-        GetFullName = function() return "PlayerGui.Menus.Vender Todos" end,
-    }, {
-        __index = function(_, key)
-            error(key .. " is not a valid member of Frame", 2)
-        end,
-    })
-    frame.FindFirstChild = function(_, name) if name == "Label" then return guiButton end end
-    frame.FindFirstChildWhichIsA = function(_, class) if class == "GuiButton" then return guiButton end end
+    local buttonFrame = Instance.new("Folder")
+    buttonFrame.Name = "Button"
+    buttonFrame.FindFirstChild = function(_, name)
+        if name == "Face" then return guiButton end
+    end
 
-    local menus = Instance.new("Folder"); menus.Name = "Menus"
-    menus.FindFirstChild = function(_, name) if name == "Vender Todos" then return frame end end
+    local panel = Instance.new("Folder")
+    panel.Name = "Vender Todos"
+    panel.FindFirstChild = function(_, name)
+        if name == "Button" then return buttonFrame end
+    end
+
+    local menus = Instance.new("Folder")
+    menus.Name = "Menus"
+    menus.FindFirstChild = function(_, name)
+        if name == "Vender Todos" then return panel end
+    end
 
     local playerGui = {}
-    playerGui.FindFirstChild = function(_, name) if name == "Menus" then return menus end end
+    playerGui.FindFirstChild = function(_, name)
+        if name == "Menus" then return menus end
+    end
     ctx.Player.PlayerGui = playerGui
 
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local sell = backend.Features.AutoSell
 
-    -- The feature must descend INTO the Frame and return the GuiButton -- and must
-    -- never index MouseButton1Click on the Frame (that is the crash we fixed).
-    check(sell:Button() == guiButton, "the sell feature descends into the Vender Todos Frame to the GuiButton")
+    check(sell:Button() == guiButton, "Auto Sell resolves the exact Button.Face GuiButton")
+    check(sell:Click(guiButton) == true, "Auto Sell activates the exact Face button")
+    check(firedSignals[1] == guiButton.MouseButton1Click, "Auto Sell fires Face MouseButton1Click")
+    check(clicks == 1, "Auto Sell sends one click")
 
-    local ok, count = sell:Sell()
-    check(ok == true and count >= 1, "Sell clicks the clickable and reports the sell")
-    -- The click lands by firing the GuiButton's MouseButton1Click (the virtual
-    -- click). Activate is only the fallback when no firesignal exists.
-    check(firedSignals[1] == guiButton.MouseButton1Click, "the sell fires the GuiButton's MouseButton1Click")
+    check(sell:SetEnabled(true) == true and sell:IsEnabled() == true, "Auto Sell toggle turns on")
+    check(sell:SetEnabled(false) == true and sell:IsEnabled() == false, "Auto Sell toggle turns off")
 
     backend:Destroy()
 end
@@ -398,7 +382,8 @@ do
     local button, reason = sell:Button()
     check(button == nil, "no sell button without a PlayerGui")
     check(type(reason) == "string", "a missing sell button records a reason")
-    check(sell:Sell() == false, "selling with no button is a no-op")
+    check(sell:SetEnabled(true) == true, "Auto Sell can be enabled while waiting for the GUI")
+    check(sell:SetEnabled(false) == true, "Auto Sell can be disabled while the GUI is missing")
 
     backend:Destroy()
 end
