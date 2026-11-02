@@ -78,7 +78,7 @@ local State = {
     Features = {},
     Store = configStore,
     Config = configStore and configStore.Values or {},
-    LastConfigError = configStore and nil or tostring(configStoreError or "config-store indisponivel"),
+    LastConfigError = not configStore and tostring(configStoreError or "config-store indisponivel") or nil,
     LastError = nil,
 }
 
@@ -125,6 +125,13 @@ function State:SaveConfig()
     local ok = self.Store:Save()
     self.LastConfigError = self.Store.LastError
     return ok
+end
+
+function State:PersistIfAutoExec()
+    if self.Config.autoexec == true then
+        return self:SaveConfig()
+    end
+    return true
 end
 
 function State:ReadConfig()
@@ -416,7 +423,9 @@ do
             if stealSection then
                 local function applyAutoSteal(value)
                     State.Config.autoSteal = value == true
-                    return State.AutoSteal:SetEnabled(value)
+                    local ok = State.AutoSteal:SetEnabled(value)
+                    State:PersistIfAutoExec()
+                    return ok
                 end
                 local handle = stealSection:CreateToggle("Auto Steal Exu", State.Config.autoSteal == true, applyAutoSteal)
                 State:RegisterConfig("autoSteal", applyAutoSteal, handle)
@@ -429,7 +438,9 @@ do
             if selectionSection then
                 local function applySelectedTerreiro(choice)
                     State.Config.selectedTerreiro = choice
-                    return State.AutoStealSelection:SetTerreiro(choice)
+                    local ok = State.AutoStealSelection:SetTerreiro(choice)
+                    State:PersistIfAutoExec()
+                    return ok
                 end
                 local defaultTerreiro = State.Config.selectedTerreiro or State.AutoStealSelection.Terreiro
                 local terreiroHandle = selectionSection:CreateDropdown(
@@ -442,7 +453,9 @@ do
 
                 local function applySelectedSteal(value)
                     State.Config.autoStealSelection = value == true
-                    return State.AutoStealSelection:SetEnabled(value)
+                    local ok = State.AutoStealSelection:SetEnabled(value)
+                    State:PersistIfAutoExec()
+                    return ok
                 end
                 local selectionHandle = selectionSection:CreateToggle(
                     "Steal Exu An Selection",
@@ -459,7 +472,9 @@ do
             if sellSection then
                 local function applyAutoSell(value)
                     State.Config.autoSell = value == true
-                    return State.AutoSell:SetEnabled(value)
+                    local ok = State.AutoSell:SetEnabled(value)
+                    State:PersistIfAutoExec()
+                    return ok
                 end
                 local handle = sellSection:CreateToggle("Auto Sell Exus", State.Config.autoSell == true, applyAutoSell)
                 State:RegisterConfig("autoSell", applyAutoSell, handle)
@@ -472,7 +487,9 @@ do
             if rebirthSection then
                 local function applyAutoRebirth(value)
                     State.Config.autoRebirth = value == true
-                    return State.AutoRebirth:SetEnabled(value)
+                    local ok = State.AutoRebirth:SetEnabled(value)
+                    State:PersistIfAutoExec()
+                    return ok
                 end
                 local handle = rebirthSection:CreateToggle("Auto Rebirth", State.Config.autoRebirth == true, applyAutoRebirth)
                 State:RegisterConfig("autoRebirth", applyAutoRebirth, handle)
@@ -486,7 +503,9 @@ do
                 if State.UpgradeBase then
                     local function applyUpgradeBase(value)
                         State.Config.upgradeBase = value == true
-                        return State.UpgradeBase:SetEnabled(value)
+                        local ok = State.UpgradeBase:SetEnabled(value)
+                        State:PersistIfAutoExec()
+                        return ok
                     end
                     local handle = upgradeSection:CreateToggle("Auto Upgrade Base", State.Config.upgradeBase == true, applyUpgradeBase)
                     State:RegisterConfig("upgradeBase", applyUpgradeBase, handle)
@@ -494,7 +513,9 @@ do
                 if State.UpgradeTread then
                     local function applyUpgradeTread(value)
                         State.Config.upgradeTread = value == true
-                        return State.UpgradeTread:SetEnabled(value)
+                        local ok = State.UpgradeTread:SetEnabled(value)
+                        State:PersistIfAutoExec()
+                        return ok
                     end
                     local handle = upgradeSection:CreateToggle("Auto Upgrade Esteira", State.Config.upgradeTread == true, applyUpgradeTread)
                     State:RegisterConfig("upgradeTread", applyUpgradeTread, handle)
@@ -509,6 +530,7 @@ do
                 local function applyAutoHop(value)
                     State.Config.autoHop = value == true
                     local ok = State.AutoHop:SetEnabled(value)
+                    State:PersistIfAutoExec()
                     if value and not State.Config.autoexec and type(env.__DEPHUB.UI) == "table" then
                         env.__DEPHUB.UI:Notify("Auto Hop Server", "Ative Auto Execute e salve a config para continuar farmando depois da troca de servidor.")
                     end
