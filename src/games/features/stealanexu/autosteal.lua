@@ -30,6 +30,8 @@ local type = type
 local pcall = pcall
 local tostring = tostring
 local math = math
+local table = table
+local select = select
 
 local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
@@ -38,14 +40,28 @@ local LocalPlayer = Players.LocalPlayer
 local AutoSteal = {}
 AutoSteal.__index = AutoSteal
 
--- Auto Steal Exu (toggle): o wait de validacao na base entre um Exu e outro (o
--- usuario pediu 1 segundo), e o timeout de espera do sinal "ativou".
-local VALIDATE_WAIT = 1.0
-local PROMPT_TIMEOUT = 0.5
+-- TEMPOS (calibraveis). O usuario reclamou que "nao pega os exu, acho que ta mto
+-- rapido", entao tudo aqui esta folgado de proposito -- da pra ir apertando
+-- conforme o jogo responder.
+--
+-- Auto Steal Exu (toggle):
+--   VALIDATE_WAIT   -- quanto esperar na base depois de disparar (o jogo confirmar
+--                      o guardar) antes de ir pro proximo Exu.
+--   SETTLE_WAIT     -- quanto esperar parado em cima do Exu depois do teleporte,
+--                      pro prompt assentar antes de disparar.
+--   PROMPT_TIMEOUT  -- quanto esperar o Triggered do prompt ("ativou").
+local VALIDATE_WAIT = 1.5
+local SETTLE_WAIT = 0.25
+local PROMPT_TIMEOUT = 1.0
 
--- Steal All (botao): mesma logica, mais forte e mais rapido -- validacao curta,
--- sem esperar o Nest inteiro, e tentativa de disparar de longe antes de piscar.
-local ALL_VALIDATE_WAIT = 0.35
+-- Steal All (botao): mesma logica, so que mais apertada que o toggle (o usuario
+-- quer o botao "um pouco mais forte e rapido"). Ainda assim, folgada o bastante
+-- pra o servidor processar.
+local ALL_VALIDATE_WAIT = 0.8
+local ALL_SETTLE_WAIT = 0.2
+local ALL_PROMPT_TIMEOUT = 1.0
+-- Um respiro entre um Exu e o proximo, pra nao metralhar o servidor.
+local ALL_STEP_GAP = 0.15
 local ALL_TERREIRO_FROM = 9
 local ALL_TERREIRO_TO = 1
 
@@ -53,6 +69,35 @@ local ALL_TERREIRO_TO = 1
 -- Nest1..8; mantemos como constantes para o dropdown e a varredura sairem daqui.
 AutoSteal.TERREIRO_COUNT = 9
 AutoSteal.NEST_COUNT = 8
+
+-- --- Debug ----------------------------------------------------------------
+-- Log de diagnostico por etapa. Vai pro console (print) e fica guardado em
+-- self.DebugLog pra inspecao. Desligavel com AutoSteal.DebugEnabled = false.
+AutoSteal.DebugEnabled = true
+local DEBUG_TAG = "[StealAnExu]"
+
+-- O env do hub (getgenv/_G), pra publicar o log no Debug do painel quando existir.
+local env = type(getgenv) == "function" and getgenv() or _G
+
+local function debugLog(self, ...)
+    local parts = {}
+    for index = 1, select("#", ...) do
+        parts[#parts + 1] = tostring(select(index, ...))
+    end
+    local message = DEBUG_TAG .. " " .. table.concat(parts, " ")
+    self.DebugLog = self.DebugLog or {}
+    self.DebugLog[#self.DebugLog + 1] = message
+    -- Mantem a lista curta (ultimas 200 linhas).
+    if #self.DebugLog > 200 then table.remove(self.DebugLog, 1) end
+    if AutoSteal.DebugEnabled then
+        print(message)
+        -- Tambem manda uma nota pro Debug do painel (se o modulo estiver la).
+        local diag = env.__DEPHUB and env.__DEPHUB.Diagnostics
+        if type(diag) == "table" and type(diag.Note) == "function" then
+            pcall(diag.Note, diag, message)
+        end
+    end
+end
 
 -- Os rotulos do dropdown de terreiro (Terreiro1..Terreiro9).
 function AutoSteal.terreiros()
@@ -79,7 +124,14 @@ function AutoSteal.new(options)
     self.Frozen = false
     self.OriginalAnchored = nil
     self.OriginalCollide = nil
+    -- Debug: historico de log desta sessao.
+    self.DebugLog = {}
     return self
+end
+
+-- O historico de debug (ultimas linhas). Util pra puxar do painel/console.
+function AutoSteal:Logs()
+    return self.DebugLog or {}
 end
 
 -- --- Helpers de mundo -----------------------------------------------------
@@ -231,12 +283,14 @@ end
 
 -- Liga noclip + congelamento. Idempotente.
 function AutoSteal:_enterStealState()
+    debugLog(self, "estado steal ON: noclip + ancorado (parado no ar)")
     self:_noclip(true)
     self:_freeze(true)
 end
 
 -- Restaura tudo: colisao e ancoragem originais. Idempotente.
 function AutoSteal:_leaveStealState()
+    debugLog(self, "estado steal OFF: colisao e ancoragem restauradas")
     self:_freeze(false)
     self:_noclip(false)
 end
@@ -313,47 +367,80 @@ end
 
 -- Um roubo: teleporta pro Exu, espera o prompt ficar no alcance, dispara,
 -- espera o "ativou", e volta pra base pra validar. Devolve true se disparou.
--- options.validateWait: quanto esperar na base (1s no toggle; menor no botao).
--- options.wide: tenta tambem o disparo de longe antes de piscar (mais forte).
+-- options.validateWait: quanto esperar na base depois de disparar.
+-- options.settleWait:   quanto esperar em cima do Exu depois do teleporte.
+-- options.promptTimeout:quanto esperar o Triggered ("ativou").
+-- options.wide:         tenta tambem o disparo de longe antes de piscar.
+-- options.label:        prefixo do log (ex.: "T9.Nest3").
 function AutoSteal:_stealAt(target, rootPosition, options)
     options = options or {}
+    local label = options.label or "?"
     local anchor = self:PenAnchor()
-    if not anchor then self.LastError = "base nao encontrada (Owner)"; return false end
+    if not anchor then
+        self.LastError = "base nao encontrada (Owner)"
+        debugLog(self, label, "ABORTA: base nao encontrada (Owner)")
+        return false
+    end
+
+    local position = rootPosition or target.Position
 
     -- 1) Teleporta pro Exu.
     self:TeleportTo(target)
+    debugLog(self, label, "1) teleportou pro Exu")
     task.wait()
 
     -- 2) O Exu do Runtime ali -> o prompt dele.
-    local _, prompt = nearestRuntimeExu(rootPosition or target.Position)
-
-    local didFire = false
-    if prompt then
-        -- Espera curtissima pro prompt entrar no alcance depois do teleporte.
-        local deadline = os.clock() + PROMPT_TIMEOUT
-        while not promptInRange(prompt, rootPosition or target.Position) and os.clock() < deadline do
-            task.wait(0.05)
-        end
-
-        -- Escuta o Triggered ANTES de disparar (o trigger pode ser sincrono).
-        local waitTriggered, cleanup = armPromptTrigger(prompt)
-
-        -- 3a) Mais forte: tenta de longe primeiro (instantaneo, sem depender do
-        --     alcance). Se o jogo revalidar no servidor, o disparo no alcance
-        --     abaixo cobre.
-        if options.wide then firePromptWide(prompt) end
-
-        -- 3b) Dispara normal, com o personagem em cima do Exu.
-        local fire = fireproximityprompt
-        if type(fire) == "function" then
-            pcall(fire, prompt)
-        end
-        didFire = waitTriggered(PROMPT_TIMEOUT)
-        cleanup()
+    local model, prompt = nearestRuntimeExu(position)
+    if not prompt then
+        debugLog(self, label, "2) sem prompt no Runtime perto (sem Exu aqui)")
+        self:TeleportTo(anchor)
+        task.wait(options.validateWait or VALIDATE_WAIT)
+        return false
     end
 
-    -- 4) Volta pra base e fica VALIDATE_WAIT pra o jogo confirmar o guardar.
+    local root = self:_root()
+    local rootPos = root and root.Position or position
+    local distance = (prompt.Parent.Position - rootPos).Magnitude
+    local range = prompt.MaxActivationDistance or 10
+    debugLog(self, label, "2) prompt achado; dist=", string.format("%.1f", distance),
+        "range=", tostring(prompt.MaxActivationDistance), "enabled=", tostring(prompt.Enabled))
+
+    -- Deixa o prompt assentar (corpo parado no ar em cima do Exu).
+    task.wait(options.settleWait or SETTLE_WAIT)
+
+    if not promptInRange(prompt, rootPos) then
+        debugLog(self, label, "AVISO: prompt fora do alcance mesmo em cima (dist=",
+            string.format("%.1f", distance), "range=", tostring(range), ")")
+    end
+
+    -- Escuta o Triggered ANTES de disparar (o trigger pode ser sincrono).
+    local waitTriggered, cleanup = armPromptTrigger(prompt)
+
+    -- 3a) Mais forte: tenta de longe primeiro (instantaneo, sem depender do
+    --     alcance). Se o jogo revalidar no servidor, o disparo no alcance
+    --     abaixo cobre.
+    if options.wide then
+        local wideOk = firePromptWide(prompt)
+        debugLog(self, label, "3a) disparo de longe ->", tostring(wideOk))
+    end
+
+    -- 3b) Dispara normal, com o personagem em cima do Exu.
+    local fire = fireproximityprompt
+    if type(fire) == "function" then
+        local firedOk = pcall(fire, prompt)
+        debugLog(self, label, "3b) fireproximityprompt ->", tostring(firedOk))
+    else
+        debugLog(self, label, "3b) fireproximityprompt INDISPONIVEL (executor sem essa funcao?)")
+    end
+
+    local didFire = waitTriggered(options.promptTimeout or PROMPT_TIMEOUT)
+    cleanup()
+    debugLog(self, label, "3c) Triggered (ativou) ->", tostring(didFire))
+
+    -- 4) Volta pra base e espera pra o jogo confirmar o guardar.
     self:TeleportTo(anchor)
+    debugLog(self, label, "4) voltou pra base; validando por",
+        tostring(options.validateWait or VALIDATE_WAIT), "s")
     task.wait(options.validateWait or VALIDATE_WAIT)
 
     return didFire
@@ -362,21 +449,33 @@ end
 -- Um ciclo do Auto Steal Exu: varre os Nests do Terreiro escolhido, roubando um
 -- por um (cada um com sua ida-e-volta pra base).
 function AutoSteal:StealOnce()
-    if not self:_root() then self.LastError = "sem personagem"; return false end
+    if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
     local nests = self:TerreiroNests()
-    if not nests then self.LastError = "terreiro nao encontrado: " .. tostring(self.Terreiro); return false end
+    if not nests then
+        self.LastError = "terreiro nao encontrado: " .. tostring(self.Terreiro)
+        debugLog(self, "ABORTA: Terreiro nao encontrado (", tostring(self.Terreiro), ")")
+        return false, 0
+    end
 
+    debugLog(self, "=== ciclo Auto Steal Exu (", tostring(self.Terreiro), ") ===")
     local stole = 0
     for index = 1, AutoSteal.NEST_COUNT do
         local nest = nests:FindFirstChild("Nest" .. index)
         local target = nest and nestPosition(nest)
         if target then
-            if self:_stealAt(target, target.Position, {validateWait = VALIDATE_WAIT}) then
-                stole = stole + 1
-            end
+            local ok = self:_stealAt(target, target.Position, {
+                label = "Nest" .. index,
+                validateWait = VALIDATE_WAIT,
+                settleWait = SETTLE_WAIT,
+                promptTimeout = PROMPT_TIMEOUT,
+            })
+            if ok then stole = stole + 1 end
+        else
+            debugLog(self, "Nest" .. index, "ausente")
         end
     end
 
+    debugLog(self, "=== fim do ciclo: roubou", stole, "de", tostring(AutoSteal.NEST_COUNT), "===")
     self.LastStatus = stole > 0 and "stealing" or "no targets"
     return stole > 0, stole
 end
@@ -387,32 +486,48 @@ end
 -- usuario), Nest1..8 em cada. Mesmo ciclo do toggle, so que mais rapido e com o
 -- disparo de longe antes de piscar. No fim volta pro CFrame de origem.
 function AutoSteal:StealAll()
-    if not self:_root() then self.LastError = "sem personagem"; return false end
+    if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
 
     local map = mapFolder()
     local terreiros = map and map:FindFirstChild("Terreiros")
-    if not terreiros then self.LastError = "Terreiros nao encontrados"; return false end
+    if not terreiros then
+        self.LastError = "Terreiros nao encontrados"
+        debugLog(self, "ABORTA: workspace.Map.Terreiros ausente")
+        return false, 0
+    end
 
     local origin = self:PenAnchor()
     self.LastStatus = "stealing all"
     self.LastError = nil
     local stole, skipped = 0, 0
 
+    debugLog(self, "=== Steal All: Terreiro" .. ALL_TERREIRO_FROM .. " -> Terreiro" .. ALL_TERREIRO_TO, "===")
+
     for terreiroIndex = ALL_TERREIRO_FROM, ALL_TERREIRO_TO, -1 do
         local terreiro = terreiros:FindFirstChild("Terreiro" .. terreiroIndex)
         local nests = terreiro and terreiro:FindFirstChild("Nests")
-        if nests then
+        if not nests then
+            debugLog(self, "Terreiro" .. terreiroIndex, "sem .Nests (pulado)")
+        else
             for nestIndex = 1, AutoSteal.NEST_COUNT do
                 local nest = nests:FindFirstChild("Nest" .. nestIndex)
                 local target = nest and nestPosition(nest)
                 if target then
                     local _, prompt = nearestRuntimeExu(target.Position)
                     if prompt then
-                        self:_stealAt(target, target.Position, {validateWait = ALL_VALIDATE_WAIT, wide = true})
-                        stole = stole + 1
+                        local ok = self:_stealAt(target, target.Position, {
+                            label = "T" .. terreiroIndex .. ".Nest" .. nestIndex,
+                            validateWait = ALL_VALIDATE_WAIT,
+                            settleWait = ALL_SETTLE_WAIT,
+                            promptTimeout = ALL_PROMPT_TIMEOUT,
+                            wide = true,
+                        })
+                        if ok then stole = stole + 1 else skipped = skipped + 1 end
                     else
                         skipped = skipped + 1
+                        debugLog(self, "T" .. terreiroIndex .. ".Nest" .. nestIndex, "sem Exu no Runtime")
                     end
+                    task.wait(ALL_STEP_GAP)
                 end
             end
         end
@@ -421,6 +536,7 @@ function AutoSteal:StealAll()
     -- Volta pra base no fim (tambem e onde o ultimo passo ja parou).
     if origin then self:TeleportTo(origin) end
 
+    debugLog(self, "=== fim do Steal All: roubou", stole, "pulou", skipped, "===")
     self.LastStatus = "idle"
     self.LastCounts = {stole = stole, skipped = skipped}
     return stole > 0, stole
@@ -429,14 +545,26 @@ end
 -- O botao chama isto: sobe a passada numa thread propria pra nao travar o
 -- clique, com noclip+congelamento ligados. Uma passada por vez.
 function AutoSteal:StartStealAll()
-    if self.Destroyed or self.AllThread then return false end
+    if self.Destroyed then
+        debugLog(self, "Steal All ignorado: feature destruida")
+        return false
+    end
+    if self.AllThread then
+        debugLog(self, "Steal All ignorado: ja tem uma passada rodando")
+        return false
+    end
+    debugLog(self, "Steal All iniciado (botao)")
     self:_enterStealState()
     self.AllThread = task.spawn(function()
         local ok, err = pcall(function() return self:StealAll() end)
-        if not ok then self.LastError = tostring(err) end
+        if not ok then
+            self.LastError = tostring(err)
+            debugLog(self, "Steal All ERRO:", tostring(err))
+        end
         -- So sai do estado de steal se o toggle do loop tambem nao estiver ligado.
         if not self.Enabled then self:_leaveStealState() end
         self.AllThread = nil
+        debugLog(self, "Steal All terminado")
     end)
     return true
 end
@@ -444,14 +572,19 @@ end
 -- --- Ciclo de vida --------------------------------------------------------
 
 function AutoSteal:_loop()
+    debugLog(self, "loop Auto Steal Exu iniciado (", tostring(self.Terreiro), ")")
     self:_enterStealState()
     while self.Enabled do
         local done, result = pcall(function() return self:StealOnce() end)
-        if not done then self.LastError = tostring(result) end
+        if not done then
+            self.LastError = tostring(result)
+            debugLog(self, "ciclo ERRO:", tostring(result))
+        end
     end
     -- Saiu do loop: se o botao nao estiver rodando, restaura tudo.
     if not self.AllThread then self:_leaveStealState() end
     self.Thread = nil
+    debugLog(self, "loop Auto Steal Exu parado")
 end
 
 function AutoSteal:SetEnabled(on)
