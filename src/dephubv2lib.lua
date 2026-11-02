@@ -1196,6 +1196,7 @@ Color="Colors.Background"
 -- (OutBox de notificacao, tela cheia e ja escalado); usar ele como pai base
 -- mantem o popup dentro do overlay correto e fora do fluxo de conteudo.
 local ar=createInstance("TextButton",aa,{
+ZIndex=1000,
 Size=UDim2.fromScale(1,1),
 BackgroundTransparency=1,
 Active=true,
@@ -1206,6 +1207,7 @@ Text=""
 ar.Visible=false
 
 local as=createInstance("Frame","Dropdown",ar,{
+ZIndex=1001,
 Size=UDim2.fromOffset(ap,100),
 Position=UDim2.fromOffset(50,50),
 Elements=aq,
@@ -1216,6 +1218,7 @@ BackgroundTransparency="BackgroundTransparency"
 })
 
 local at=createInstance("TextButton","Search",as,{
+ZIndex=1002,
 Position=UDim2.new(1,5,0,5),
 Size=UDim2.new(0,25,0,25),
 AutomaticSize=Enum.AutomaticSize.X,
@@ -1269,6 +1272,7 @@ Image="Icons.Search"
 })
 
 local au=createInstance("ScrollingFrame",as,{
+ZIndex=1002,
 Size=UDim2.new(1,-6,1,-6),
 Position=UDim2.fromScale(0.5,0.5),
 AnchorPoint=Vector2.new(0.5,0.5),
@@ -1537,6 +1541,7 @@ return a2 and a1:find(a0,1,true)~=nil end local a_=function(
 
 a_, a0)
 local a1=createInstance("TextButton",{
+ZIndex=1003,
 Size=UDim2.new(1,0,0,21),
 AutoButtonColor=false,
 Text="",
@@ -1548,6 +1553,7 @@ BackgroundColor3="Colors.Buttons.Default"
 },
 Childs={
 createInstance("Frame",{
+ZIndex=1004,
 Position=UDim2.new(0,1,0.5),
 Size=UDim2.new(0,4,0,4),
 BackgroundTransparency=1,
@@ -1560,6 +1566,7 @@ BackgroundColor3="Colors.Primary"
 }
 }),
 createInstance("TextLabel",{
+ZIndex=1004,
 Size=UDim2.fromScale(1,1),
 Position=UDim2.fromOffset(10,0),
 TextXAlignment=Enum.TextXAlignment.Left,
