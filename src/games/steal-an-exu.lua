@@ -129,6 +129,10 @@ local AutoSellModule, autoSellError = loadFeature("src/games/features/stealanexu
     return type(module.new) == "function"
 end)
 
+local AutoRebirthModule, autoRebirthError = loadFeature("src/games/features/stealanexu/autorebirth.lua", function(module)
+    return type(module.new) == "function"
+end)
+
 -- Contexto COMPARTILHADO das features: os helpers de mundo que as duas usam
 -- (achar a MINHA base pelo Owner, e navegar um caminho dentro dela). Fica aqui,
 -- num lugar so, pra nao duplicar a logica de Owner em cada feature.
@@ -199,6 +203,14 @@ else
     warn("[DepHub] Steal An Exu autosell unavailable: " .. tostring(autoSellError))
 end
 
+-- Auto Rebirth: verifica Cash/Rebirths e executa o remote quando atingir o custo.
+if AutoRebirthModule then
+    State.AutoRebirth = AutoRebirthModule.new()
+    State.Features.AutoRebirth = State.AutoRebirth
+else
+    warn("[DepHub] Steal An Exu autorebirth unavailable: " .. tostring(autoRebirthError))
+end
+
 State:Start()
 
 -- ---------------------------------------------------------------------------
@@ -230,6 +242,16 @@ do
             if sellSection then
                 sellSection:CreateButton("Sell All Exus", function()
                     State.AutoSell:StartSell()
+                end)
+            end
+        end
+
+        -- Auto Rebirth: executa rebirth automaticamente quando houver Cash suficiente.
+        if State.AutoRebirth then
+            local rebirthSection = Kit.Section(tab, "Auto Rebirth", "Left")
+            if rebirthSection then
+                rebirthSection:CreateToggle("Auto Rebirth", false, function(value)
+                    State.AutoRebirth:SetEnabled(value)
                 end)
             end
         end
