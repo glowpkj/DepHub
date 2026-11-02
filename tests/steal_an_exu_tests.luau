@@ -128,6 +128,7 @@ do
     check(ctx.State.__DEPHUB.StealAnExu ~= nil, "universe id exposes the Steal An Exu backend")
 end
 
+print("SAE_TEST: entry")
 -- The entry loads, registers the features, and mounts the controls.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -243,6 +244,7 @@ do
     check(ctx.State.__DEPHUB.StealAnExu == nil, "destroy clears the published state")
 end
 
+print("SAE_TEST: general selection behavior")
 -- Auto Steal Exu: the loop collects the Runtime exus and, per exu, opens the
 -- prompt (MaxActivationDistance=1000, HoldDuration=0, RequiresLineOfSight=false),
 -- teleports onto the Root + 3 studs, fires InputHoldBegin/End, and returns to the
@@ -303,6 +305,7 @@ do
     check(feature:SetEnabled(true) == false, "a destroyed steal refuses to turn on")
 end
 
+print("SAE_TEST: stale recovery")
 -- The stale-recovery step: when the loop's current target is gone, it re-collects
 -- the Runtime so an exu that SPAWNED after the list was built is picked up -- the
 -- "as vezes nao pega o prompt" fix. The refresh is the very code the loop runs, so
@@ -337,6 +340,7 @@ do
     backend:Destroy()
 end
 
+print("SAE_TEST: selected mapping and steal")
 -- Selected Terreiro mode maps each Nest to its nearest unique Runtime Exu.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -429,6 +433,7 @@ do
     backend:Destroy()
 end
 
+print("SAE_TEST: missing Runtime")
 -- Auto Steal Exu degrades cleanly when the world is missing: no Runtime, no crash,
 -- a reason.
 do
@@ -445,6 +450,7 @@ do
     backend:Destroy()
 end
 
+print("SAE_TEST: Auto Hop")
 -- Auto Hop waits for Runtime to exist and counts only actual Exus carrying
 -- Root.ProximityPrompt; an empty Runtime returns zero without starting a hop.
 do
@@ -502,6 +508,7 @@ do
     backend:Destroy()
 end
 
+print("SAE_TEST: Auto Place")
 -- Auto Place only sends tools mapped to selected source Terreiros.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -554,6 +561,7 @@ do
     backend:Destroy()
 end
 
+print("SAE_TEST: upgrades")
 -- Auto Upgrade: each toggle clicks the ClickDetector of MY pen (found by Owner,
 -- never Pen1), on its own board. Driven directly because the harness does not run
 -- spawned threads.
@@ -600,6 +608,7 @@ do
     check(base:SetEnabled(true) == false, "a destroyed upgrade refuses to turn on")
 end
 
+print("SAE_TEST: missing upgrade target")
 -- Auto Upgrade degrades cleanly with no pen: no detector, no crash, a reason.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -616,6 +625,7 @@ do
     backend:Destroy()
 end
 
+print("SAE_TEST: manual teleports")
 -- Manual teleport buttons resolve the player's pen by Owner and the sell Plaza by path.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -641,6 +651,7 @@ do
     backend:Destroy()
 end
 
+print("SAE_TEST: Auto Sell")
 -- Auto Sell: use the exact local GUI path and run as a toggle.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -716,6 +727,7 @@ do
     backend:Destroy()
 end
 
+print("SAE_TEST: missing Auto Sell GUI")
 -- Auto Sell degrades cleanly with no PlayerGui: no button, no crash, a reason.
 do
     local ctx = saeContext(103076400317371, 10771168447)
