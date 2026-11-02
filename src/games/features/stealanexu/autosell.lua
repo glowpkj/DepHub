@@ -201,10 +201,24 @@ function AutoSell:_loop(runId)
         task.wait(reason == "movimento ocupado por outra feature" and 0.05 or RETRY_INTERVAL)
     end
 
+    local hopPauseLogged = false
     while self.Enabled and not self.Destroyed and self.RunId == runId and self.AtPlaza do
-        if not self:IsAtPlaza() then
+        local hopping = false
+        if type(self.Ctx.IsAutoHopActive) == "function" then
+            local okHop, active = pcall(self.Ctx.IsAutoHopActive)
+            hopping = okHop and active == true
+        end
+
+        if hopping then
+            if not hopPauseLogged then
+                debugLog(self, "Auto Hop iniciou; pausando cliques de venda durante o teleporte.")
+                hopPauseLogged = true
+            end
+            task.wait(0.5)
+        elseif not self:IsAtPlaza() then
             task.wait(0.2)
         else
+            hopPauseLogged = false
             local button, reason = self:Button()
             if button then
             local ok, clickError = self:Click(button)
