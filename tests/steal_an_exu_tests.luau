@@ -19,6 +19,8 @@ local function saeContext(placeId, gameId)
     ctx.Responses[FEATURE_PREFIX .. "autosteal.lua"] = sources[FEATURE_PREFIX .. "autosteal.lua"]
     ctx.Responses[FEATURE_PREFIX .. "autoupgrade.lua"] = sources[FEATURE_PREFIX .. "autoupgrade.lua"]
     ctx.Responses[FEATURE_PREFIX .. "autosell.lua"] = sources[FEATURE_PREFIX .. "autosell.lua"]
+    ctx.Responses[FEATURE_PREFIX .. "autohop.lua"] = sources[FEATURE_PREFIX .. "autohop.lua"]
+    ctx.Responses["src/core/config-store.lua"] = sources["src/core/config-store.lua"]
     return ctx
 end
 
@@ -137,6 +139,8 @@ do
     check(type(backend.Features.AutoSteal) == "table", "the Auto Steal Exu feature is registered")
     check(type(backend.Features.AutoStealSelection) == "table", "the selected Terreiro steal feature is registered")
     check(type(backend.Features.AutoSell) == "table", "the Auto Sell feature is registered")
+    check(type(backend.Features.AutoHop) == "table", "the Auto Hop Server feature is registered")
+    check(type(backend.Store) == "table", "the shared config store is loaded")
     check(ctx.State.__DEPHUB.StealAnExu == backend, "the backend publishes itself")
 
     local labels = {}
@@ -153,6 +157,14 @@ do
         "the dropdown maps available Terreiros from the live Map.Terreiros folder")
     check(labels["Auto Sell Exus"] ~= nil and labels["Auto Sell Exus"].Kind == "toggle",
         "the panel has the Auto Sell Exus toggle")
+    check(labels["Auto Hop Server"] ~= nil and labels["Auto Hop Server"].Kind == "toggle",
+        "the panel has the Auto Hop Server toggle")
+    check(labels["Auto Execute"] ~= nil and labels["Auto Execute"].Kind == "toggle",
+        "the panel has the Auto Execute toggle")
+    check(labels["Save Config"] ~= nil and labels["Save Config"].Kind == "button",
+        "the panel has the Save Config button")
+    check(labels["Load Config"] ~= nil and labels["Load Config"].Kind == "button",
+        "the panel has the Load Config button")
 
     -- Auto Upgrade: one toggle per board (base, tread), each a live feature.
     check(type(backend.Features.UpgradeBase) == "table", "the Auto Upgrade Base feature is registered")
@@ -339,6 +351,34 @@ do
     local targets, reason = feature:_targets()
     check(targets == nil, "no exu targets without workspace.Runtime")
     check(type(reason) == "string", "a missing Runtime records a reason")
+
+    backend:Destroy()
+end
+
+-- Auto Hop waits for Runtime to exist and counts only actual Exus carrying
+-- Root.ProximityPrompt; an empty Runtime returns zero without starting a hop.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoHop
+
+    local count, reason = feature:RuntimeCount()
+    check(count == nil and type(reason) == "string", "Auto Hop waits when Runtime has not spawned")
+
+    local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ctx.Services.Workspace
+    count = feature:RuntimeCount()
+    check(count == 0, "Auto Hop sees an empty Runtime")
+
+    local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
+    local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
+    local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
+    count = feature:RuntimeCount()
+    check(count == 1, "Auto Hop counts an Exu with Root.ProximityPrompt")
+
+    prompt:Destroy()
+    count = feature:RuntimeCount()
+    check(count == 0, "Auto Hop sees that the Runtime Exu prompt has disappeared")
 
     backend:Destroy()
 end
