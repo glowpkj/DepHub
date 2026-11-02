@@ -20,6 +20,7 @@ local function saeContext(placeId, gameId)
     ctx.Responses[FEATURE_PREFIX .. "autoupgrade.lua"] = sources[FEATURE_PREFIX .. "autoupgrade.lua"]
     ctx.Responses[FEATURE_PREFIX .. "autosell.lua"] = sources[FEATURE_PREFIX .. "autosell.lua"]
     ctx.Responses[FEATURE_PREFIX .. "autohop.lua"] = sources[FEATURE_PREFIX .. "autohop.lua"]
+    ctx.Responses[FEATURE_PREFIX .. "autoplace.lua"] = sources[FEATURE_PREFIX .. "autoplace.lua"]
     ctx.Responses["src/core/config-store.lua"] = sources["src/core/config-store.lua"]
     return ctx
 end
@@ -35,11 +36,15 @@ local function buildWorld(ctx, options)
     local ws = ctx.Services.Workspace
 
     local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ws
+    local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
+    local terreiro = Instance.new("Folder"); terreiro.Name = "Terreiro1"; terreiro.Parent = terreiros
+    local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
 
     local pens = Instance.new("Folder"); pens.Name = "Pens"; pens.Parent = map
     -- Deliberately NOT Pen1: the feature must find the pen by Owner.
     local pen = Instance.new("Model"); pen.Name = "Pen7"; pen.Parent = pens
     pen:SetAttribute("Owner", ctx.Player.UserId)
+    pen:SetAttribute("Index", 4)
     local anchor = Instance.new("Part"); anchor.Name = "BadgeAnchor"; anchor.Parent = pen
     anchor.CFrame = CFrame.new(0, 50, 0)
 
@@ -61,6 +66,8 @@ local function buildWorld(ctx, options)
             local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
             local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
             root.CFrame = CFrame.new(index * 100, offset, 0)
+            local nest = Instance.new("Part"); nest.Name = "Nest" .. index; nest.Parent = nests
+            nest.CFrame = CFrame.new(index * 100, 0, 0)
             roots[#roots + 1] = root
             local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
             prompt.HoldDuration = 0.5
@@ -136,29 +143,38 @@ do
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     check(type(backend) == "table" and backend.Destroyed == false, "Steal An Exu entry returns a live backend")
     check(backend.Started == true, "the backend starts itself")
-    check(type(backend.Features.AutoSteal) == "table", "the Auto Steal Exu feature is registered")
-    check(type(backend.Features.AutoStealSelection) == "table", "the selected Terreiro steal feature is registered")
+    check(type(backend.Features.AutoSteal) == "nil", "the unfiltered Auto Steal feature is removed")
+    check(type(backend.Features.AutoStealSelection) == "table", "the multi-Terreiro steal feature is registered")
+    check(type(backend.Features.AutoPlace) == "table", "the Auto Place Exu feature is registered")
     check(type(backend.Features.AutoSell) == "table", "the Auto Sell feature is registered")
-    check(type(backend.Features.AutoHop) == "table", "the Auto Hop Server feature is registered")
+    check(type(backend.Features.AutoHop) == "table", "the selected-Terreiro Auto Hop feature is registered")
     check(type(backend.Store) == "table", "the shared config store is loaded")
     check(ctx.State.__DEPHUB.StealAnExu == backend, "the backend publishes itself")
 
     local labels = {}
     for _, control in ipairs(ui.Library._Controls) do labels[control.Label] = control end
-    check(labels["Auto Steal Exu"] ~= nil and labels["Auto Steal Exu"].Kind == "toggle",
-        "the panel has the Auto Steal Exu toggle")
-    check(labels["Steal Exu An Selection"] ~= nil and labels["Steal Exu An Selection"].Kind == "toggle",
-        "the panel has the selected Terreiro steal toggle")
-    local terreiroDropdown = labels["Terreiro"]
-    check(terreiroDropdown ~= nil and terreiroDropdown.Kind == "dropdown",
-        "the selected Terreiro feature has a dropdown")
+    check(labels["Auto Steal Exu"] == nil, "the unfiltered Auto Steal toggle is removed")
+    check(labels["Steal Exu Selection"] ~= nil and labels["Steal Exu Selection"].Kind == "toggle",
+        "the panel has the selected-Terreiro steal toggle")
+    local terreiroDropdown = labels["Steal Terreiros"]
+    check(terreiroDropdown ~= nil and terreiroDropdown.Kind == "dropdown" and terreiroDropdown.MultiSelect == true,
+        "the steal Terreiro dropdown is a multi-select")
     check(terreiroDropdown.Options and #terreiroDropdown.Options == 2
         and terreiroDropdown.Options[1] == "Terreiro1" and terreiroDropdown.Options[2] == "Terreiro4",
         "the dropdown maps available Terreiros from the live Map.Terreiros folder")
+    check(labels["Auto Place Exu"] ~= nil and labels["Auto Place Exu"].Kind == "toggle",
+        "the panel has the Auto Place Exu toggle")
+    local placeDropdown = labels["Place Terreiros"]
+    check(placeDropdown ~= nil and placeDropdown.Kind == "dropdown" and placeDropdown.MultiSelect == true,
+        "the Auto Place Terreiro dropdown is a multi-select")
     check(labels["Auto Sell Exus"] ~= nil and labels["Auto Sell Exus"].Kind == "toggle",
         "the panel has the Auto Sell Exus toggle")
-    check(labels["Auto Hop Server"] ~= nil and labels["Auto Hop Server"].Kind == "toggle",
-        "the panel has the Auto Hop Server toggle")
+    check(labels["Auto Hop When Empty"] ~= nil and labels["Auto Hop When Empty"].Kind == "toggle",
+        "the panel has the selected-Terreiro Auto Hop toggle")
+    check(labels["Teleport to Base"] ~= nil and labels["Teleport to Base"].Kind == "button",
+        "the panel has the manual base teleport button")
+    check(labels["Teleport to Sell Area"] ~= nil and labels["Teleport to Sell Area"].Kind == "button",
+        "the panel has the manual sell-area teleport button")
     check(labels["Auto Execute"] ~= nil and labels["Auto Execute"].Kind == "toggle",
         "the panel has the Auto Execute toggle")
     check(labels["Save Config"] ~= nil and labels["Save Config"].Kind == "button",
@@ -192,7 +208,7 @@ do
     local root = makeCharacter(ctx)   -- starts at (0,0,0)
 
     local backend = ctx:Run("src/games/steal-an-exu.lua")
-    local feature = backend.Features.AutoSteal
+    local feature = backend.Features.AutoStealSelection
 
     -- The collection sees both exus (each {prompt, ref=Root}) and both are alive.
     local targets = feature:_targets()
@@ -210,9 +226,8 @@ do
     check(prompt.MaxActivationDistance == 1000, "the steal sets MaxActivationDistance to 1000")
     check(prompt.RequiresLineOfSight == false, "the steal disables RequiresLineOfSight")
 
-    -- The step teleports onto the exu Root (y=3) + 3 studs, then returns to the
-    -- original position (0,0,0).
-    check(root.Position == Vector3.new(0, 0, 0), "the step returns to the original position")
+    -- With Sell off, a successful steal returns to the player's own pen.
+    check(root.Position == Vector3.new(0, 53, 0), "the step returns to the player's base when Auto Sell is off")
 
     -- A dead target (the server took the exu): the exu is destroyed, exactly as the
     -- game reaps it -- the prompt and its root go with it. The loop must see it as
@@ -241,7 +256,7 @@ do
     makeCharacter(ctx)
 
     local backend = ctx:Run("src/games/steal-an-exu.lua")
-    local feature = backend.Features.AutoSteal
+    local feature = backend.Features.AutoStealSelection
 
     -- The list built at the start sees only the two exus present then.
     local first = feature:_targets()
@@ -311,30 +326,30 @@ do
     local feature = backend.Features.AutoStealSelection
 
     check(feature.SelectedOnly == true, "the new feature uses selected-only target filtering")
-    check(feature.Terreiro == "Terreiro3", "the selection mode starts with the first discovered Terreiro")
-    check(feature:SetTerreiro("Terreiro3") == true, "the selected Terreiro can be changed")
+    check(feature.Terreiros.Terreiro3 == true, "the selection mode starts with the first discovered Terreiro")
+    check(feature:SetTerreiros({"Terreiro3", "Terreiro8"}) == true, "multiple Terreiros can be selected together")
     local selectedTargets = feature:_targets()
-    check(#selectedTargets == 2, "selected mode returns only the two Exus mapped to Terreiro3")
+    check(#selectedTargets == 3, "selecting both Terreiros returns all three mapped Exus")
     check(selectedTargets[1].model.Name == "ExuA" and selectedTargets[2].model.Name == "ExuB",
         "the Nest-to-Exu mapping chooses the nearest distinct Runtime models")
     check(selectedTargets[1].nestName == "Nest1" and selectedTargets[2].nestName == "Nest2",
         "each mapped Runtime Exu retains its source Nest")
 
-    check(feature:SetTerreiro("Terreiro8") == true, "the selected Terreiro can be switched without reloading")
+    check(feature:SetTerreiros({"Terreiro8"}) == true, "the selection can be narrowed without reloading")
     local otherTargets = feature:_targets()
     check(#otherTargets == 1 and otherTargets[1].model.Name == "ExuC",
-        "switching the dropdown updates the filtered targets")
+        "switching the multi-dropdown updates the filtered targets")
 
     feature.Enabled = true
-    feature:SetTerreiro("Terreiro3")
+    feature:SetTerreiros({"Terreiro3"})
     local origin = characterRoot.CFrame
     feature:_step(selectedTargets[1], characterRoot, origin)
     check(prompts[1].Hold.began == 1 and prompts[1].Hold.ended == 1,
         "selected mode reuses the same ProximityPrompt activation step")
     check(prompts[1].Hold.durationAtBegin == 0,
         "selected mode uses the same zero-duration prompt mechanism")
-    check(characterRoot.Position == origin.Position,
-        "selected mode returns to the exact position where the step started")
+    check(characterRoot.Position == Vector3.new(0, 53, 0),
+        "selected mode returns to the player's base when Auto Sell is off")
 
     backend:Destroy()
 end
@@ -346,7 +361,7 @@ do
     ctx:MountUI()
     makeCharacter(ctx)
     local backend = ctx:Run("src/games/steal-an-exu.lua")
-    local feature = backend.Features.AutoSteal
+    local feature = backend.Features.AutoStealSelection
 
     local targets, reason = feature:_targets()
     check(targets == nil, "no exu targets without workspace.Runtime")
@@ -366,19 +381,63 @@ do
     local count, reason = feature:RuntimeCount()
     check(count == nil and type(reason) == "string", "Auto Hop waits when Runtime has not spawned")
 
+    local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ctx.Services.Workspace
+    local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
+    local terreiro = Instance.new("Folder"); terreiro.Name = "Terreiro1"; terreiro.Parent = terreiros
+    local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
+    local nest = Instance.new("Part"); nest.Name = "Nest1"; nest.Parent = nests
+    nest.CFrame = CFrame.new(100, 0, 0)
+    backend.AutoStealSelection:SetTerreiros({"Terreiro1"})
+
     local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ctx.Services.Workspace
     count = feature:RuntimeCount()
-    check(count == 0, "Auto Hop sees an empty Runtime")
+    check(count == 0, "Auto Hop sees no Exus in the selected Terreiro")
 
     local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
     local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
+    root.CFrame = CFrame.new(100, 0, 0)
     local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
     count = feature:RuntimeCount()
-    check(count == 1, "Auto Hop counts an Exu with Root.ProximityPrompt")
+    check(count == 1, "Auto Hop counts only the selected Terreiro Exus")
 
     prompt:Destroy()
     count = feature:RuntimeCount()
     check(count == 0, "Auto Hop sees that the Runtime Exu prompt has disappeared")
+
+    backend:Destroy()
+end
+
+-- Auto Place only sends tools mapped to selected source Terreiros.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local world = buildWorld(ctx)
+    makeCharacter(ctx)
+
+    local backpack = Instance.new("Backpack"); backpack.Name = "Backpack"; backpack.Parent = ctx.Player
+    local selectedTool = Instance.new("Tool"); selectedTool.Name = "ExuSelected"; selectedTool.Parent = backpack
+    selectedTool:SetAttribute("ExuId", "exu-1")
+    local otherTool = Instance.new("Tool"); otherTool.Name = "ExuOther"; otherTool.Parent = backpack
+    otherTool:SetAttribute("ExuId", "exu-2")
+
+    ctx.State.__DEPHUB_STEALANEXU_EXU_SOURCES = {
+        ["exu-1"] = "Terreiro1",
+        ["exu-2"] = "Terreiro4",
+    }
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoPlace
+    local remote = Instance.new("RemoteEvent")
+    feature.ConfigModule = {PEN_SIZE = 64, Pens = {[4] = {X = 100, Z = 200}}}
+    feature.Remote = remote
+    feature:SetTerreiros({"Terreiro1"})
+
+    local placed = feature:PlaceOnce()
+    check(placed == 1, "Auto Place sends only one tool from the selected Terreiro")
+    check(remote.Fired and #remote.Fired == 1, "Auto Place fires PlaceExu once")
+    check(remote.Fired[1][1] == "exu-1", "Auto Place sends the selected ExuId")
+    check(remote.Fired[1][2] == Vector3.new(100 - 32 + 4, 0.3, 200 - 32 + 4),
+        "Auto Place uses the same configurable pen grid as the supplied script")
 
     backend:Destroy()
 end
@@ -441,6 +500,31 @@ do
     check(detector == nil, "no upgrade detector without a pen")
     check(type(reason) == "string", "a missing upgrade target records a reason")
     check(base:Click(nil) == false, "clicking without a detector is a no-op")
+
+    backend:Destroy()
+end
+
+-- Manual teleport buttons resolve the player's pen by Owner and the sell Plaza by path.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local world = buildWorld(ctx)
+    local root = makeCharacter(ctx)
+
+    local map = ctx.Services.Workspace:FindFirstChild("Map")
+    local plaza = Instance.new("Folder"); plaza.Name = "Plaza"; plaza.Parent = map
+    local plazaPart = Instance.new("Part"); plazaPart.Name = "Part"; plazaPart.Parent = plaza
+    plazaPart.Position = Vector3.new(900, 10, 900)
+    plazaPart.Size = Vector3.new(40, 2, 40)
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local movedBase = backend:TeleportToBase()
+    check(movedBase == true, "Teleport to Base resolves the Owner-matched pen")
+    check(root.Position == world.anchor.Position + Vector3.new(0, 3, 0), "Teleport to Base uses the player's BadgeAnchor")
+
+    local movedSell = backend:TeleportToSell()
+    check(movedSell == true, "Teleport to Sell resolves workspace.Map.Plaza.Part")
+    check(root.Position == plazaPart.Position + Vector3.new(0, 4, 0), "Teleport to Sell stands inside the Plaza area")
 
     backend:Destroy()
 end
