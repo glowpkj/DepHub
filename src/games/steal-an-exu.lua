@@ -72,7 +72,7 @@ if ConfigStoreModule then
 end
 
 local State = {
-    Version = "0.1.64",
+    Version = "0.1.65",
     Destroyed = false,
     Started = false,
     Features = {},
