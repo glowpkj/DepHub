@@ -292,12 +292,12 @@ do
     local sell = backend.Features.AutoSell
     check(sell:SetEnabled(true) == true, "Auto Sell can be enabled alongside selected stealing")
     feature:_step(targets[2], root, originalPos)
-    check(root.Position == plazaPart.Position + Vector3.new(0, 4, 0),
+    check(root.CFrame.Position == plazaPart.Position + Vector3.new(0, 4, 0),
         "when Steal and Sell are both on, the steal returns to the Plaza first")
     sell:SetEnabled(false)
 
     -- With Sell off, a successful steal returns to the player's own pen.
-    check(root.Position == Vector3.new(0, 53, 0), "the step returns to the player's base when Auto Sell is off")
+    check(root.CFrame.Position == Vector3.new(0, 53, 0), "the step returns to the player's base when Auto Sell is off")
 
     -- A dead target (the server took the exu): the exu is destroyed, exactly as the
     -- game reaps it -- the prompt and its root go with it. The loop must see it as
@@ -438,7 +438,7 @@ do
         "selected mode uses the same zero-duration prompt mechanism")
     check(ctx.State.__DEPHUB_STEALANEXU_EXU_SOURCES.ExuA == "Terreiro3",
         "Steal records the source Terreiro for the newly acquired ExuId")
-    check(characterRoot.Position == Vector3.new(0, 53, 0),
+    check(characterRoot.CFrame.Position == Vector3.new(0, 53, 0),
         "selected mode returns to the player's base when Auto Sell is off")
 
     backend:Destroy()
@@ -653,11 +653,11 @@ do
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local movedBase = backend:TeleportToBase()
     check(movedBase == true, "Teleport to Base resolves the Owner-matched pen")
-    check(root.Position == world.anchor.Position + Vector3.new(0, 3, 0), "Teleport to Base uses the player's BadgeAnchor")
+    check(root.CFrame.Position == world.anchor.Position + Vector3.new(0, 3, 0), "Teleport to Base uses the player's BadgeAnchor")
 
     local movedSell = backend:TeleportToSell()
     check(movedSell == true, "Teleport to Sell resolves workspace.Map.Plaza.Part")
-    check(root.Position == plazaPart.Position + Vector3.new(0, 4, 0), "Teleport to Sell stands inside the Plaza area")
+    check(root.CFrame.Position == plazaPart.Position + Vector3.new(0, 4, 0), "Teleport to Sell stands inside the Plaza area")
 
     backend:Destroy()
 end
@@ -718,7 +718,7 @@ do
     local sell = backend.Features.AutoSell
 
     check(sell:MoveToPlaza() == true, "Auto Sell teleports to workspace.Map.Plaza.Part")
-    check(characterRoot.Position == plazaPart.Position + Vector3.new(0, 4, 0), "Auto Sell stands above the Plaza part")
+    check(characterRoot.CFrame.Position == plazaPart.Position + Vector3.new(0, 4, 0), "Auto Sell stands above the Plaza part")
     check(sell.AtPlaza == true, "Auto Sell records that the player is at the Plaza")
 
     local lockOwner = {}
