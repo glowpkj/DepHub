@@ -316,7 +316,7 @@ end
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
-    makeCharacter(ctx)
+    local characterRoot = makeCharacter(ctx)
 
     local clicks = 0
     local guiButton = {
@@ -367,7 +367,7 @@ do
     local sell = backend.Features.AutoSell
 
     check(sell:MoveToPlaza() == true, "Auto Sell teleports to workspace.Map.Plaza.Part")
-    check(root.Position == plazaPart.Position + Vector3.new(0, 4, 0), "Auto Sell stands above the Plaza part")
+    check(characterRoot.Position == plazaPart.Position + Vector3.new(0, 4, 0), "Auto Sell stands above the Plaza part")
     check(sell.AtPlaza == true, "Auto Sell records that the player is at the Plaza")
 
     local lockOwner = {}
