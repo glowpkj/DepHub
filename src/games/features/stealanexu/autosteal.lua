@@ -17,7 +17,6 @@ local SCAN_WAIT = 0.25
 local EMPTY_WAIT = 0.6
 local CHARACTER_WAIT = 0.5
 local MOVEMENT_WAIT = 0.05
-local SOURCE_CONFIRM_WAIT = 0.18
 local TARGET_CACHE_TTL = 0.65
 
 local AutoSteal = {}
