@@ -361,6 +361,7 @@ do
     local otherNest = Instance.new("Part"); otherNest.Name = "Nest1"; otherNest.Parent = otherNests
     otherNest.CFrame = CFrame.new(900, 0, 0)
 
+    local backpack = Instance.new("Backpack"); backpack.Name = "Backpack"; backpack.Parent = ctx.Player
     local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ws
     local prompts = {}
     local function addExu(name, x)
@@ -377,6 +378,8 @@ do
         end
         prompt.InputHoldEnd = function(self)
             self.Hold.ended = self.Hold.ended + 1
+            local tool = Instance.new("Tool"); tool.Name = name; tool.Parent = backpack
+            tool:SetAttribute("ExuId", name)
         end
         prompts[#prompts + 1] = prompt
     end
@@ -412,6 +415,8 @@ do
         "selected mode reuses the same ProximityPrompt activation step")
     check(prompts[1].Hold.durationAtBegin == 0,
         "selected mode uses the same zero-duration prompt mechanism")
+    check(ctx.State.__DEPHUB_STEALANEXU_EXU_SOURCES.ExuA == "Terreiro3",
+        "Steal records the source Terreiro for the newly acquired ExuId")
     check(characterRoot.Position == Vector3.new(0, 53, 0),
         "selected mode returns to the player's base when Auto Sell is off")
 
