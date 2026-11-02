@@ -227,6 +227,9 @@ do
     backend.AutoHop:SetEnabled(false)
     backend.AutoSell:SetEnabled(false)
     local loaded = backend:LoadConfig()
+    print("SAE_LOAD DEBUG", "applied", loaded and table.concat(loaded.applied, ","), "failed", loaded and table.concat(loaded.failed, ","))
+    print("SAE_LOAD DEBUG", "config", backend.Config.selectedTerreiros and table.concat(backend.Config.selectedTerreiros, ","))
+    print("SAE_LOAD DEBUG", "feature", table.concat(backend.AutoStealSelection:SelectedTerreiros(), ","))
     check(loaded and #loaded.failed == 0, "Load Config reapplies all saved controls without failures")
     check(backend.AutoStealSelection.Terreiros.Terreiro1 == true
         and backend.AutoStealSelection.Terreiros.Terreiro4 == true,
