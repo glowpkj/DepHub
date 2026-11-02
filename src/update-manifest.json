@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-02T03:49:57.184781+00:00",
-  "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
-  "version": "0.1.38",
+  "generatedAt": "2026-11-02T03:59:25.785444+00:00",
+  "commit": "665a4e8512052263debf8df8828816262c5977f4",
+  "version": "0.1.39",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "dc29718a29619a8682fd62c73e1b5bf2684be424760cf50eaac0bb9ae28cf61f",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "95277fb5672ba558835b29ec807fb8c8724b0123633b1852e5947bad65416672",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "8e67413333c7309fc3ba9dcf52f4e8840a6af2ffa27225e1938ab48792a048c6",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "0a2a0ebdc8bcdf38d467641882406a0f6b8803e85951670651f70e206572fa79",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -56,8 +56,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "b6bb0d8dc5b3e751d2c7b633be0b280577ddd91bc71249ed45aa9ad8baf74132",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "9bd97ff9efa93d8975f924cfdcbfd5e268d6dcde4c2dc619a7034a9d2614636b",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -76,8 +76,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "06f4f839e4efbfcb656e821ed21fb1a9495b3e56025a309b380767b1f131a81f",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "e47ea2a9fa42a78da07ce29e1dc6a44f622547251c12701426e5779a997e2168",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -98,8 +98,8 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "d3b01f279775a51a3dd1edeea5b20c8938975a0aebe6472d0c9b2e915ec3a184",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "c4ce236c52ef3531f7aa5c3f302681c3c75889aa4cdaab610040943db80ef2e2",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -116,8 +116,8 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "f79e25c831103e6bf5b9b7685dc9731328417ca9e7396fff1185a0ae0d3a79bb",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "ef55ccb8974e3c09ec7104d674a69b5afb950cd504915cf5237a4f6edec1e564",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -134,8 +134,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "ac08f9987ab98eb3d9f9d949f854953ddc204cb39312135f6da3b79caebab886",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "0a0dbcd97f6930b594efcbd479b37c6f4bbef83ae16ae641b28c136b0a9da611",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -161,8 +161,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "dfb417b5dd98f677b4241801a6453137a3e3bb20bd8d5edc6f978fb2b3b0e919",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "fd4535401bd8f7f223588670ff206cc4eab3e2291bc464b81bd481bc4bf7c6e3",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -187,8 +187,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "56f6e44412c9ea8fa42f4446bcf43eecba7cd3fdf7624cd94b464fc16cd63dca",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "7d2531eae282a6a21b85cb2f571428ab563b5ea4677668f99dcbc511e5c5fe31",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -217,8 +217,8 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "2682b58e2200ba71f51d2d29f525766dd45b80aa41a775cd134fa2987c645b73",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "f7882cbfebc571bbd5954028a32c7d01d315a374d97e2241ad2f107bc0f3042e",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -235,8 +235,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "2680525ea35298f592fa3cdf58986ccf857d43f784cb9d0cea7d0933e57d15b3",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "8d5d814c40ccca61996d19501db1844cdea2f81112bba9c3fcf62173ade27eb8",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -258,8 +258,8 @@
     },
     "103076400317371": {
       "name": "Steal An Exu",
-      "version": "bdeb902c0275ba7760637078c7e94b26e36f1ebcfcfae7e9e28b51076c36668b",
-      "commit": "36e6f274cc015c2317368df1383b15c66a1dbdc5",
+      "version": "1acf5e53fa4d9a13893718e5d749d31e443de6d1d944aac53796b89a768ed85e",
+      "commit": "665a4e8512052263debf8df8828816262c5977f4",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -277,6 +277,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "665a4e8",
+      "Date": "2026-11-02T00:59:08-03:00",
+      "Changes": [
+        "0.1.39: desacelera o ciclo e instrumenta com debug"
+      ]
+    },
     {
       "Version": "36e6f27",
       "Date": "2026-11-02T00:49:42-03:00",
@@ -303,13 +310,6 @@
       "Date": "2026-11-02T00:05:41-03:00",
       "Changes": [
         "0.1.35: reconhece Steal An Exu (esqueleto, sem feature)"
-      ]
-    },
-    {
-      "Version": "8ff4f7d",
-      "Date": "2026-11-01T21:17:17-03:00",
-      "Changes": [
-        "0.1.34: console quieto no loader"
       ]
     }
   ]
