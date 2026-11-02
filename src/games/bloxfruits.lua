@@ -61,6 +61,7 @@ local FRUIT_NAMES = {
 -- INFRA_MODULES e nao aparece no painel.
 local FEATURE_MODULES = {
     {name = "bladhits", page = "Combat", section = "BLADE HITS", toggle = "Blade hits"},
+    {name = "fastattack", page = "Combat", section = "FAST ATTACK", toggle = "Fast attack"},
     {name = "silentaim", page = "Combat", section = "SILENT AIM", toggle = "Silent aim"},
     {name = "fruit", page = "Farm", section = "FRUIT", toggle = "Grab fruit"},
     {name = "islands", page = "Travel", section = "ISLAND TELEPORT", toggle = "Island teleport"},
@@ -159,6 +160,10 @@ local State = {
     Errors = {},
     Toggles = {},
     ToggleLabels = {},
+    -- Os handles dos controles de toggle (key -> handle), pra a exclusividade
+    -- (Blade hits x Fast attack) poder apagar o toggle do irmao na tela. O painel
+    -- registra no build; sem UI fica vazio e SetExclusive so mexe no estado.
+    ToggleHandles = {},
     LastError = nil,
     -- A persistencia mora no core (State.Store). Aqui so os aliases publicos que
     -- o painel ja usa: State.Config aponta pra mesma tabela de valores do store
@@ -445,8 +450,9 @@ function State:SetFeature(name, enabled)
                 -- painel ja marcou (o slider aplica mesmo sem reabrir o painel).
                 speed = self.PendingPlayerSpeed,
                 -- A blade hit nasce com o LOS que o painel ja marcou (o toggle
-                -- aplica mesmo sem reabrir o painel).
-                losCheck = self.PendingBladeLos,
+                -- aplica mesmo sem reabrir o painel). O Fast attack tem o proprio
+                -- Pending (ele e um toggle separado do Blade hits).
+                losCheck = (name == "fastattack") and self.PendingFastLos or self.PendingBladeLos,
             }
             local ok, created = pcall(factory.new, context)
             if not ok or type(created) ~= "table" then
@@ -482,6 +488,36 @@ end
 
 function State:SetToggle(key, enabled)
     return self:SetFeature(key, enabled == true)
+end
+
+-- Ligar uma feature DESLIGA a outra: o Blade hits e o Fast attack sao o mesmo
+-- golpe em velocidades diferentes -- ligar os dois empilharia dois loops batendo
+-- e o "so 1 ativo" que o usuario pediu. Chamado ANTES de ligar `key`; se `enabled`
+-- for falso nao faz nada. Devolve a lista de features que desligou (pra UI/teste).
+--
+-- Tambem sincroniza o CONTROLE do irmao (SetValue(false)), pra o toggle dele
+-- apagar na tela junto -- so mexer no estado deixaria o controle aceso mentindo.
+local EXCLUSIVE_WITH = {
+    bladhits = "fastattack",
+    fastattack = "bladhits",
+}
+
+function State:SetExclusive(key, enabled)
+    if enabled ~= true then return {} end
+    local other = EXCLUSIVE_WITH[key]
+    if not other then return {} end
+    if self:GetToggle(other) then
+        self:SetFeature(other, false)
+        self.Config[other] = false
+        local handle = self.ToggleHandles and self.ToggleHandles[other]
+        if handle and type(handle.SetValue) == "function" then
+            pcall(handle.SetValue, handle, false)
+        elseif handle then
+            pcall(function() handle.Value = false end)
+        end
+        return { other }
+    end
+    return {}
 end
 
 function State:GetToggle(key)
@@ -535,6 +571,7 @@ function State:Destroy()
     self.PendingSilentAimExceptions = nil
     self.PendingPlayerSpeed = nil
     self.PendingBladeLos = nil
+    self.PendingFastLos = nil
     if env.__DEPHUB_BLOXFRUITS == self then env.__DEPHUB_BLOXFRUITS = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruits == self then env.__DEPHUB.BloxFruits = nil end
     if env.__DEPHUB and env.__DEPHUB.BloxFruitsOwn == self then env.__DEPHUB.BloxFruitsOwn = nil end
@@ -572,9 +609,13 @@ local PANELS = {
                 if not value then State:SetFeature("bladhits", false) end
             end
             local bladeToggle = section:CreateToggle("Blade hits", State.Config.bladhits == true, function(value)
+                -- Exclusivo com o Fast attack: ligar um apaga o outro (mesmo golpe,
+                -- velocidades diferentes).
+                State:SetExclusive("bladhits", value)
                 applyBlade(value)
                 State.Config.bladhits = value == true
             end)
+            State.ToggleHandles.bladhits = bladeToggle
             State:RegisterConfig("bladhits", applyBlade, bladeToggle)
 
             -- LOS: nao hitar alvo atras de parede (raycast). Menos "cobertura
@@ -595,6 +636,49 @@ local PANELS = {
             State:RegisterConfig("bladhitsLos", applyLos, losToggle)
 
             section:CreateParagraph("Blade hits", "Auto-swing at every enemy in range using the game's attack remotes.")
+        end,
+    },
+    fastattack = {
+        page = "Combat",
+        section = "FAST ATTACK",
+        category = "Combat",
+        icon = "swords",
+        tabIcon = "swords",
+        build = function(section, instance)
+            -- Fast attack: o MESMO auto-hit da blade hit, com o intervalo maior
+            -- (0.30s x 0.05s) -- o golpe espacado. Bate em mobs e em players.
+            -- Salva e reativa como qualquer toggle (mesmo caminho do clique).
+            local function applyFast(value)
+                if value and not State:SetFeature("fastattack", true) then
+                    instance.Notify("Fast attack", "Remotes nao encontrados (Modules.Net).")
+                    return
+                end
+                if not value then State:SetFeature("fastattack", false) end
+            end
+            local fastToggle = section:CreateToggle("Fast attack", State.Config.fastattack == true, function(value)
+                -- Exclusivo com o Blade hits: ligar um apaga o outro.
+                State:SetExclusive("fastattack", value)
+                applyFast(value)
+                State.Config.fastattack = value == true
+            end)
+            State.ToggleHandles.fastattack = fastToggle
+            State:RegisterConfig("fastattack", applyFast, fastToggle)
+
+            -- LOS: mesmo freio da blade hit (nao hitar atras de parede).
+            local function applyFastLos(value)
+                if State.Instances.fastattack then
+                    State.Instances.fastattack:SetLos(value)
+                else
+                    State.PendingFastLos = value
+                end
+            end
+            local fastLosToggle = section:CreateToggle("Line of sight", State.Config.fastattackLos == true, function(value)
+                applyFastLos(value)
+                State.Config.fastattackLos = value == true
+            end)
+            State:RegisterConfig("fastattackLos", applyFastLos, fastLosToggle)
+
+            section:CreateParagraph("Fast attack", "The same auto-swing as Blade hits, with a longer gap between hits (0.30s). Only one of Blade hits / Fast attack runs at a time.")
         end,
     },
     silentaim = {

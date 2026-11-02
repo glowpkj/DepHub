@@ -1,3 +1,4 @@
+0.1.56 | Blox Fruits: new Fast attack feature (Combat). Same auto-swing as Blade hits but with a longer gap between hits (0.30s) and hits players too. Only one of Blade hits / Fast attack runs at a time.
 0.1.55 | Steal An Exu: Auto Steal Exu grabs more reliably. The target list is rebuilt when the current exu is gone, so Exus that spawn into the Runtime after the toggle is turned on are no longer missed. The steal mechanism itself is unchanged.
 0.1.54 | Steal An Exu: the Auto Steal Exu feature is back, with a toggle. On, it sweeps the Exus in workspace.Runtime and steals through each Root's ProximityPrompt: it widens the prompt, teleports onto the Root, fires the hold, and returns to where it started.
 0.1.53 | Steal An Exu: the Auto Steal Exu feature is removed. The panel no longer has the "Auto Steal Exu" toggle or the "Steal All" button, and its module is gone. What stays is Auto Upgrade (base and esteira) and the Sell All Exus button.

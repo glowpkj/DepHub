@@ -6,7 +6,7 @@
 -- pasta ativa, sem carregar e sem entrar no manifest -- portanto nao aparecem
 -- aqui. Nao existe flag global: o que carrega e so o que esta em FEATURE_MODULES.
 local FEATURE_PREFIX = "src/games/features/bloxfruits/"
-local FEATURES = {"bladhits", "silentaim", "fruit", "islands", "player", "esp"}
+local FEATURES = {"bladhits", "fastattack", "silentaim", "fruit", "islands", "player", "esp"}
 -- Infraestrutura: carrega sozinha (sem toggle) e fica em State.Infra.
 local INFRA = {"teleport"}
 
@@ -75,6 +75,33 @@ do
     check(instance.LastHitId == 4242, "SetHitId guarda o id pro proximo hit")
     instance:SetHitId(nil)
     check(instance.LastHitId == 4242, "SetHitId ignora nil e nao apaga o id")
+end
+
+-- Fast attack: o irmao da blade hit. MESMO mecanismo, so o INTERVALO muda
+-- (0.30s x 0.05s) -- o golpe espacado de PvP. Bate em mobs E em players por
+-- padrao (Players = true), e tem o proprio LOS.
+do
+    local Factory = sources[FEATURE_PREFIX .. "fastattack.lua"]
+    local ctx = bfContext(994732206, 994732206)
+    local feature = ctx.Env.loadstring(Factory)()
+    check(type(feature) == "table" and type(feature.new) == "function", "o fast attack carrega sozinho e publica new()")
+
+    local instance = feature.new()
+    check(type(instance) == "table", "fast attack instancia sem argumento")
+    check(instance:IsEnabled() == false, "fast attack comeca desligado")
+    -- A UNICA diferenca pra blade hit: o intervalo. 0.30s (mais LENTO de proposito).
+    check(instance.MinInterval == 0.3, "o intervalo padrao do fast attack e 0.30s")
+    check(instance.AttackRange == 300, "o alcance de mobs e o mesmo da blade hit (300)")
+    check(instance.PlayerRange == 60, "o alcance de player e o mesmo da blade hit (60)")
+    -- Bate em players por padrao -- o que o usuario precisa pra PvP.
+    check(instance.Players == true, "o fast attack bate em players por padrao (PvP)")
+    check(instance.EnemiesFolder == true and instance.CharactersFolder == true, "o fast attack tambem varre mobs")
+
+    -- Os setters validam (mesma assinatura da blade hit).
+    check(instance:SetInterval(0.15) and instance.MinInterval == 0.15, "SetInterval aplica um intervalo valido")
+    check(instance:SetInterval(-1) == false, "SetInterval rejeita negativo")
+    check(instance:SetRange(200) and instance.AttackRange == 200, "SetRange aplica um alcance valido")
+    check(instance:SetLos(true) == true and instance.LosCheck == true, "SetLos liga o LOS do fast attack")
 end
 
 -- Combat portado do OpenSource: a blade hit le o hitId capturado pelo gancho
@@ -235,6 +262,42 @@ do
     check(state:SetToggle("bladhits", true) == false, "backend destruido rejeita toggles")
 end
 
+-- Fast attack + exclusividade: ligar um desliga o outro. Sao o mesmo golpe em
+-- velocidades diferentes -- ligar os dois empilharia dois loops batendo. O
+-- SetExclusive roda ANTES do ligar (e o que o painel chama); com o irmao ligado,
+-- ele desliga o irmao e devolve a lista de quem caiu.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local state = ctx:Run("src/games/bloxfruits.lua")
+
+    -- O fast attack e carregado pelo backend, com o intervalo proprio (0.30s).
+    check(type(state.Features.fastattack) == "table", "o fast attack e carregado pelo backend")
+    check(state:SetToggle("fastattack", true) == true, "o fast attack liga pelo toggle")
+    check(state:GetToggle("fastattack") == true, "o fast attack fica ligado")
+    check(state.Instances.fastattack ~= nil and state.Instances.fastattack.MinInterval == 0.3,
+        "o fast attack instancia com o intervalo 0.30s")
+
+    -- Ligar o Blade hits com o Fast attack ligado DESLIGA o Fast attack.
+    local disabled = state:SetExclusive("bladhits", true)
+    check(#disabled == 1 and disabled[1] == "fastattack", "SetExclusive derruba o fast attack ao ligar a blade hit")
+    check(state:GetToggle("fastattack") == false, "o fast attack fica desligado")
+    check(state.Instances.fastattack:IsEnabled() == false, "a feature do fast attack para de verdade")
+    check(state.Config.fastattack == false, "o config do fast attack tambem e zerado")
+
+    -- O inverso: ligar o Fast attack com o Blade hits ligado derruba o Blade hits.
+    check(state:SetToggle("bladhits", true) == true, "a blade hit liga pelo toggle")
+    check(state:GetToggle("bladhits") == true, "a blade hit fica ligada")
+    local disabled2 = state:SetExclusive("fastattack", true)
+    check(#disabled2 == 1 and disabled2[1] == "bladhits", "SetExclusive derruba a blade hit ao ligar o fast attack")
+    check(state:GetToggle("bladhits") == false, "a blade hit fica desligada")
+
+    -- Desligar (enabled=false) nao dispara exclusividade nenhuma.
+    local none = state:SetExclusive("bladhits", false)
+    check(#none == 0, "SetExclusive com enabled=false nao desliga ninguem")
+
+    state:Destroy()
+end
+
 -- Sem os remotes, ligar nao explode: o modulo instancia, o Enable devolve false
 -- e o toggle fica desligado. O jogador ve a notificacao, nao um erro.
 do
@@ -290,7 +353,7 @@ do
     check(type(state) == "table" and state.Destroyed == false, "o backend sobe com o parked/ ao lado")
     check(next(state.Features) ~= nil, "so as features ativas carregam")
     for name in pairs(state.Features) do
-        check(name == "bladhits" or name == "silentaim" or name == "teleport" or name == "net-hook" or name == "fruit" or name == "islands" or name == "player" or name == "esp", "nenhuma feature parkeada e carregada")
+        check(name == "bladhits" or name == "fastattack" or name == "silentaim" or name == "teleport" or name == "net-hook" or name == "fruit" or name == "islands" or name == "player" or name == "esp", "nenhuma feature parkeada e carregada")
     end
     check(state.Instances["farm"] == nil, "uma feature parkeada nao instancia")
     check(state:SetToggle("farm", true) == false, "uma feature parkeada nao pode ser ligada")
@@ -2233,10 +2296,12 @@ do
     island.Handle:SetValue(true)
     check(state.Config.islandOn == true, "ligar Island teleport grava no Config (antes nao salvava)")
 
-    -- O toggle "Line of sight" existe e liga o LOS na blade hit de verdade.
+    -- O toggle "Line of sight" existe e liga o LOS na blade hit de verdade. Ha
+    -- DOIS "Line of sight" agora (blade hit e fast attack): este teste quer o da
+    -- BLADE HIT, que e montado primeiro -- por isso o primeiro match, nao o ultimo.
     local los
     for _, control in ipairs(ui.Library._Controls) do
-        if control.Kind == "toggle" and control.Label == "Line of sight" then los = control end
+        if control.Kind == "toggle" and control.Label == "Line of sight" then los = control break end
     end
     check(los ~= nil, "o painel monta o toggle Line of sight")
     los.Handle:SetValue(true)
