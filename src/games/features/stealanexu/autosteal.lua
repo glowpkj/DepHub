@@ -1,17 +1,21 @@
 -- Steal An Exu -- Auto Steal Exu (toggle).
 --
--- O mecanismo e' EXATAMENTE o script de referencia do usuario. Ligado, ele:
+-- O mecanismo e' o script de referencia do usuario. Ligado, ele:
 --
---   1) pega a lista UMA vez: cada filho do workspace.Runtime com
+--   1) monta a lista de alvos: cada filho do workspace.Runtime com
 --      Root.ProximityPrompt ({prompt, ref = Root});
 --   2) cicla pela lista (i = i % #targets + 1);
---   3) pula prompt que ja sumiu (not t.prompt.Parent);
+--   3) se o alvo atual sumiu, REMONTA a lista UMA vez (o Runtime muda o tempo
+--      todo: exu clonado/removido pelo servidor) e tenta de novo;
 --   4) abre o prompt (MaxActivationDistance=1000, HoldDuration=0,
 --      RequiresLineOfSight=false) e teleporta pra ref.Position + Vector3.new(0,3,0);
 --   5) task.wait(0.15), dispara (InputHoldBegin + InputHoldEnd, dentro de pcall);
 --   6) volta pra posicao original, task.wait(0.1), proximo.
 --
--- Nada alem disso: sem noclip, sem ancoragem, sem mapear a base. So o script.
+-- A UNICA diferenca pro script original e' o passo 3: ele nunca fica preso a uma
+-- lista velha. Com o mundo estavel isso nunca dispara (a lista segue a mesma);
+-- ele so reage quando o alvo sumiu -- que era o "as vezes nao pega o prompt".
+-- Nada mais mudou: sem noclip, sem ancoragem, sem mapear a base.
 --
 -- API: AutoSteal.new(ctx) -> obj com SetEnabled(on) / IsEnabled() / Destroy() e o
 --      campo Enabled.
@@ -88,8 +92,9 @@ end
 
 -- --- O loop (o script de referencia) --------------------------------------
 
--- Coleta a lista UMA vez (o script): {prompt, ref = Root} de cada filho do Runtime.
--- Devolve a lista, ou nil + motivo.
+-- Coleta a lista de alvos: {prompt, ref = Root} de cada filho do Runtime que tem
+-- Root.ProximityPrompt. Devolve a lista, ou nil + motivo. O loop remonta a lista
+-- quando o alvo atual sumiu (o Runtime muda o tempo todo).
 function AutoSteal:_targets()
     local runtime = game:GetService("Workspace"):FindFirstChild("Runtime")
     if not runtime then
@@ -104,6 +109,13 @@ function AutoSteal:_targets()
         end
     end
     return targets
+end
+
+-- Um alvo esta vivo? O prompt existe, ainda esta na arvore, e a ref tambem.
+function AutoSteal:_alive(target)
+    return target ~= nil
+        and target.prompt ~= nil and target.prompt.Parent ~= nil
+        and target.ref ~= nil and target.ref.Parent ~= nil
 end
 
 -- UM passo (a iteracao do script de referencia) no alvo `target`:
@@ -168,8 +180,15 @@ function AutoSteal:_loop()
     while self.Enabled do
         local t = targets[i]
 
-        -- Prompt que ja sumiu: pula pro proximo.
-        if not t.prompt or not t.prompt.Parent then
+        -- Alvo morto (o servidor levou o exu): remonta a lista UMA vez -- assim um
+        -- exu que apareceu no Runtime DEPOIS do toggle entra na proxima passada,
+        -- em vez de ficar de fora pra sempre. So remonta quando o alvo sumiu; com
+        -- o mundo estavel a lista segue a mesma (nada muda pro script original).
+        if not self:_alive(t) then
+            local refreshed = select(1, self:_targets())
+            if refreshed and #refreshed > 0 then
+                targets = refreshed
+            end
             i = i % #targets + 1
         else
             self:_step(t, root, originalPos)

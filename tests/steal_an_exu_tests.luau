@@ -152,7 +152,7 @@ do
     check(ctx.State.__DEPHUB.StealAnExu == nil, "destroy clears the published state")
 end
 
--- Auto Steal Exu: the loop collects the Runtime exus once and, per exu, opens the
+-- Auto Steal Exu: the loop collects the Runtime exus and, per exu, opens the
 -- prompt (MaxActivationDistance=1000, HoldDuration=0, RequiresLineOfSight=false),
 -- teleports onto the Root + 3 studs, fires InputHoldBegin/End, and returns to the
 -- original position. Driven one step at a time (_step) because the harness does not
@@ -166,9 +166,10 @@ do
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local feature = backend.Features.AutoSteal
 
-    -- The one-time collection sees both exus (each {prompt, ref=Root}).
+    -- The collection sees both exus (each {prompt, ref=Root}) and both are alive.
     local targets = feature:_targets()
-    check(type(targets) == "table" and #targets == 2, "the steal collects the Runtime prompts once (2)")
+    check(type(targets) == "table" and #targets == 2, "the steal collects the Runtime prompts (2)")
+    check(feature:_alive(targets[1]) == true, "a fresh target is alive")
 
     -- Run one step over the first exu and check the mechanism.
     local originalPos = root.CFrame
@@ -185,6 +186,13 @@ do
     -- original position (0,0,0).
     check(root.Position == Vector3.new(0, 0, 0), "the step returns to the original position")
 
+    -- A dead target (the server took the exu): the exu is destroyed, exactly as the
+    -- game reaps it -- the prompt and its root go with it. The loop must see it as
+    -- not-alive and re-collect instead of firing a stale prompt.
+    local gone = world.roots[1].Parent   -- the model owning Root 1
+    gone:Destroy()
+    check(feature:_alive(targets[1]) == false, "a target whose exu was destroyed is not alive")
+
     -- The toggle drives the feature and cleans up on destroy.
     check(feature:IsEnabled() == false, "the steal is off until the toggle turns it on")
     check(feature:SetEnabled(true) == true and feature:IsEnabled() == true, "the toggle turns the steal on")
@@ -192,6 +200,38 @@ do
 
     backend:Destroy()
     check(feature:SetEnabled(true) == false, "a destroyed steal refuses to turn on")
+end
+
+-- The stale-recovery step: when the loop's current target is gone, it re-collects
+-- the Runtime so an exu that SPAWNED after the list was built is picked up -- the
+-- "as vezes nao pega o prompt" fix. The refresh is the very code the loop runs, so
+-- driving _targets() after a spawn proves the new exu is in the rebuilt list.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local world = buildWorld(ctx, {exuCount = 2})
+    makeCharacter(ctx)
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoSteal
+
+    -- The list built at the start sees only the two exus present then.
+    local first = feature:_targets()
+    check(#first == 2, "the first collection sees the two exus present")
+
+    -- A THIRD exu spawns in the Runtime AFTER the list was built (exactly what the
+    -- server does: clones an exu in). The old one-shot list would never see it.
+    local runtime = ctx.Services.Workspace:FindFirstChild("Runtime")
+    local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
+    local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
+    root.CFrame = CFrame.new(999, 0, 0)
+    local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
+
+    -- A re-collect (what the loop does when a target is stale) now sees all three.
+    local refreshed = feature:_targets()
+    check(#refreshed == 3, "the re-collect picks up the exu that spawned after the list was built")
+
+    backend:Destroy()
 end
 
 -- Auto Steal Exu degrades cleanly when the world is missing: no Runtime, no crash,
