@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-02T06:25:33.169393+00:00",
-  "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
-  "version": "0.1.55",
+  "generatedAt": "2026-11-02T17:59:32.501586+00:00",
+  "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
+  "version": "0.1.56",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "7997aecda147114bd883cf893857efaf020b6b8dc421f581cd1bbd599d886a62",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "b36a5f7c55e69403d6df5f7590e21d1093ddb527ab08330bb11313f54ed7792d",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "40a1e6d7b2931d077f86f6b4ca4c2b8f9bcbb4172f8845a5ddcbea10173d9e4a",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "d4fcd46b79c252ffe400f246b7975c1ae06793b80d45ae57999810a6d2e722c0",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -42,6 +42,7 @@
         "src/core/redz-icons.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/bladhits.lua",
+        "src/games/features/bloxfruits/fastattack.lua",
         "src/games/features/bloxfruits/net-hook.lua",
         "src/games/features/bloxfruits/fruit.lua",
         "src/games/features/bloxfruits/islands.lua",
@@ -56,8 +57,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "1f1690fd7c3faa179394e59c58e6fcc238b65e1182f5e691c3de5a4c59043be3",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "01fea07109b2080ca30c80a1e0b8f85ddac920bc627f5094b95193527646e54e",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -76,8 +77,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "e652717c1433d54b578241880997ee7179b3a9ca6907737897ca045475ebc445",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "fb85510e896f330401703d9fe1e971089a8b76cc283c68f5d22fa7769e896b2d",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -98,8 +99,8 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "27a1808ff03c906182972d78a6774bbce06385de604ad77fa203fc11539e3536",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "bf54a447779a06c92bcb9a7e0a0376737bd018ce72245232226d08f43071c2bb",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -116,8 +117,8 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "4f294c3b78e4f0fb4c0aecdecc7eda166cf94b0e883fac11e195ecd2b1897385",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "2a071743d8b3a0dc84714c6b7ba5715a8188aa7657a4e64d2aae08a8fbddb239",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -134,8 +135,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "409f3ba2f13755010472b19655212c858ec7b08694c931748402068774d16da7",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "88d2b51dc12a38d827246e75d9ff462d4b00cba8104a5a4acb6d205dba43b9c3",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -161,8 +162,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "9ba442fe3b72c81ed629cd89d578a85573522ced5bc322e6b12e6f6abe7fa4c1",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "c03496146333999f72925b9832e6ad079ecca0c520a471cc1b8698b495b351d4",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -173,6 +174,7 @@
         "src/core/redz-icons.lua",
         "src/games/bloxfruits.lua",
         "src/games/features/bloxfruits/bladhits.lua",
+        "src/games/features/bloxfruits/fastattack.lua",
         "src/games/features/bloxfruits/net-hook.lua",
         "src/games/features/bloxfruits/fruit.lua",
         "src/games/features/bloxfruits/islands.lua",
@@ -187,8 +189,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "43a6dfae9d1fb022fbed9038006904f74196b169068e2d2403ba9507768c31b5",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "3780a05fa43ef23a67878aabf9347a98d6cb76dadd0777b6f2a1989448921af4",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -217,8 +219,8 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "e5e8d6e3669f5bd5724dd3bacedaeec8a2fb8239857ce0138217cdb43c25a153",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "0f24c2094d01bf291c18d95c31f6659e08276b150ab72d752054b9e078a17f48",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -235,8 +237,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "af7025152e172281ae1c43d92febb02eb1f9c0075caecddd4716b953894e8509",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "7a476baad2ac78fec84a247c1cf49d65f077ee78f94f0eae7073d572b7390e43",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -258,8 +260,8 @@
     },
     "103076400317371": {
       "name": "Steal An Exu",
-      "version": "639a0bec4fabcefc14334068af4943caaf6c8ea38924b3a6a7e8210b9be444cf",
-      "commit": "14f32fde659d877cc7363684ad7de3b17bd22fd9",
+      "version": "16f02db164d81a359dd32fcde42179df9028d4374efc0fb35e127e146dbc6559",
+      "commit": "0ac2677bc4705a0f3d47750685776957bddb9cd6",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -279,6 +281,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "0ac2677",
+      "Date": "2026-11-02T14:59:11-03:00",
+      "Changes": [
+        "0.1.56: Blox Fruits - feature Fast attack (a pedido)"
+      ]
+    },
     {
       "Version": "14f32fd",
       "Date": "2026-11-02T03:25:19-03:00",
@@ -305,13 +314,6 @@
       "Date": "2026-11-02T03:00:25-03:00",
       "Changes": [
         "0.1.52: roubo = script de referencia ATUALIZADO (Root+abre prompt)"
-      ]
-    },
-    {
-      "Version": "39b4fe7",
-      "Date": "2026-11-02T02:46:08-03:00",
-      "Changes": [
-        "0.1.51: roubo = script de referencia literal (lista unica + cicla)"
       ]
     }
   ]
