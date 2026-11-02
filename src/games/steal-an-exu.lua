@@ -209,13 +209,14 @@ function State:SelfExecLine()
     end
 
     local guard = ([[
-local __ok = pcall(function()
+local __allow = false
+pcall(function()
     if type(readfile) ~= "function" or type(isfile) ~= "function" then return end
     if isfile(%q) ~= true then return end
     local __text = tostring(readfile(%q))
-    if not __text:find('"autoexec":true', 1, true) then error("autoexec off") end
+    __allow = __text:find('"autoexec":true', 1, true) ~= nil
 end)
-if not __ok then return end
+if not __allow then return end
 ]]):format(tostring(self.Store.file), tostring(self.Store.file))
     return guard .. command
 end
@@ -225,7 +226,13 @@ function State:SetAutoExec(enabled)
     local queue = resolveQueueOnTeleport()
 
     if not enabled then
+        local saved = self:SaveConfig()
         if queue then pcall(queue, "") end
+        if not saved then
+            self.LastError = self.LastConfigError or "nao foi possivel salvar Auto Execute desligado"
+            return false
+        end
+        self.LastError = nil
         return true
     end
 
@@ -233,9 +240,24 @@ function State:SetAutoExec(enabled)
         self.LastError = "executor sem queue_on_teleport"
         return false
     end
+    if not self.Store or not self.Store:CanPersist() or not self.Store.file then
+        self.LastError = "executor sem API de arquivo; Auto Execute exige config persistente"
+        return false
+    end
+    if not self:SaveConfig() then
+        self.LastError = self.LastConfigError or "nao foi possivel salvar a config antes do Auto Execute"
+        return false
+    end
 
-    local ok, err = pcall(queue, self:SelfExecLine())
+    local line = self:SelfExecLine()
+    if type(line) ~= "string" or line == "" then
+        self.LastError = "nao foi possivel montar o comando de Auto Execute"
+        return false
+    end
+
+    local ok, err = pcall(queue, line)
     if not ok then self.LastError = "queue_on_teleport recusou: " .. tostring(err) end
+    if ok then self.LastError = nil end
     return ok
 end
 
@@ -752,17 +774,11 @@ do
         if configSection then
             local function applyAutoExec(value)
                 State.Config.autoexec = value == true
-                local saved = State:SaveConfig()
                 local ok = State:SetAutoExec(value)
                 if value and not ok then
                     local ui = env.__DEPHUB and env.__DEPHUB.UI
                     if ui and type(ui.Notify) == "function" then
                         ui:Notify("Auto Execute", State.LastError or "Executor sem queue_on_teleport.")
-                    end
-                elseif value and not saved then
-                    local ui = env.__DEPHUB and env.__DEPHUB.UI
-                    if ui and type(ui.Notify) == "function" then
-                        ui:Notify("Auto Execute", State.LastConfigError or "Config nao foi salva em disco.")
                     end
                 end
                 return ok
