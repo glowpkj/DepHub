@@ -184,7 +184,7 @@ function AutoSell:_loop(runId)
 
         self.LastError = reason
         debugLog(self, "aguardando Plaza:", tostring(reason))
-        task.wait(RETRY_INTERVAL)
+        task.wait(reason == "movimento ocupado por outra feature" and 0.05 or RETRY_INTERVAL)
     end
 
     while self.Enabled and not self.Destroyed and self.RunId == runId and self.AtPlaza do
