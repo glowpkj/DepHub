@@ -92,7 +92,7 @@ local function buildWorld(ctx, options)
     return {
         pen = pen, anchor = anchor,
         baseDetector = baseDetector, treadDetector = treadDetector,
-        fired = fired, roots = roots,
+        fired = fired, roots = roots, nests = nests,
     }
 end
 
@@ -190,6 +190,26 @@ do
     check(labels["Auto Upgrade Esteira"] ~= nil and labels["Auto Upgrade Esteira"].Kind == "toggle",
         "the panel has the Auto Upgrade Esteira toggle")
 
+    labels["Steal Terreiros"].Callback({Terreiro1 = true, Terreiro4 = true})
+    labels["Place Terreiros"].Callback({Terreiro4 = true})
+    labels["Steal Exu Selection"].Callback(true)
+    labels["Auto Place Exu"].Callback(true)
+    labels["Auto Hop When Empty"].Callback(true)
+    labels["Auto Sell Exus"].Callback(true)
+    labels["Save Config"].Callback()
+
+    local saved = ctx.Files["DepHub_StealAnExu_config.json"]
+    check(type(saved) == "string", "Save Config writes the shared config file")
+    check(saved:find('"selectedTerreiros":["Terreiro1","Terreiro4"]', 1, true) ~= nil,
+        "Save Config stores every selected Steal Terreiro")
+    check(saved:find('"placeTerreiros":["Terreiro4"]', 1, true) ~= nil,
+        "Save Config stores the independent Auto Place Terreiro list")
+    check(saved:find('"autoStealSelection":true', 1, true) ~= nil
+        and saved:find('"autoPlace":true', 1, true) ~= nil
+        and saved:find('"autoHopSelected":true', 1, true)
+        and saved:find('"autoSell":true', 1, true),
+        "Save Config stores all enabled automation toggles")
+
     backend:Destroy()
     backend:Destroy()
     check(backend.Destroyed == true, "destroy marks the backend destroyed")
@@ -225,6 +245,17 @@ do
     check(prompt.Hold.durationAtBegin == 0, "the steal zeroes HoldDuration before the hold")
     check(prompt.MaxActivationDistance == 1000, "the steal sets MaxActivationDistance to 1000")
     check(prompt.RequiresLineOfSight == false, "the steal disables RequiresLineOfSight")
+
+    local plaza = Instance.new("Folder"); plaza.Name = "Plaza"; plaza.Parent = ctx.Services.Workspace.Map
+    local plazaPart = Instance.new("Part"); plazaPart.Name = "Part"; plazaPart.Parent = plaza
+    plazaPart.CFrame = CFrame.new(900, 10, 900)
+    plazaPart.Size = Vector3.new(40, 2, 40)
+    local sell = backend.Features.AutoSell
+    check(sell:SetEnabled(true) == true, "Auto Sell can be enabled alongside selected stealing")
+    feature:_step(targets[2], root, originalPos)
+    check(root.Position == plazaPart.Position + Vector3.new(0, 4, 0),
+        "when Steal and Sell are both on, the steal returns to the Plaza first")
+    sell:SetEnabled(false)
 
     -- With Sell off, a successful steal returns to the player's own pen.
     check(root.Position == Vector3.new(0, 53, 0), "the step returns to the player's base when Auto Sell is off")
@@ -268,6 +299,8 @@ do
     local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
     local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
     root.CFrame = CFrame.new(999, 0, 0)
+    local newNest = Instance.new("Part"); newNest.Name = "Nest3"; newNest.Parent = world.nests
+    newNest.CFrame = CFrame.new(999, 0, 0)
     local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
 
     -- A re-collect (what the loop does when a target is stale) now sees all three.
@@ -380,6 +413,14 @@ do
 
     local count, reason = feature:RuntimeCount()
     check(count == nil and type(reason) == "string", "Auto Hop waits when Runtime has not spawned")
+
+    local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ctx.Services.Workspace
+    local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
+    local terreiro = Instance.new("Folder"); terreiro.Name = "Terreiro1"; terreiro.Parent = terreiros
+    local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
+    local nest = Instance.new("Part"); nest.Name = "Nest1"; nest.Parent = nests
+    nest.CFrame = CFrame.new(100, 0, 0)
+    backend.AutoStealSelection:SetTerreiros({"Terreiro1"})
 
     local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ctx.Services.Workspace
     local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
