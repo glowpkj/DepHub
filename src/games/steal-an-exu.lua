@@ -464,6 +464,14 @@ do
     end
 end
 
+function State:TeleportToBase()
+    return FeatureContext.TeleportToBase(self)
+end
+
+function State:TeleportToSell()
+    return FeatureContext.TeleportToSell(self)
+end
+
 -- A unica rotina de roubo e a selecao multipla de terreiros.
 if AutoStealModule then
     local availableTerreiros = AutoStealModule.terreiros()
