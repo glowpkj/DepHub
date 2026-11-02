@@ -363,6 +363,7 @@ do
     local pen = Instance.new("Model"); pen.Name = "PenSelectedTest"; pen.Parent = pens
     pen:SetAttribute("Owner", ctx.Player.UserId)
     local badgeAnchor = Instance.new("Part"); badgeAnchor.Name = "BadgeAnchor"; badgeAnchor.Parent = pen
+    badgeAnchor.Position = Vector3.new(0, 50, 0)
     badgeAnchor.CFrame = CFrame.new(0, 50, 0)
 
     local selected = Instance.new("Folder"); selected.Name = "Terreiro3"; selected.Parent = terreiros
