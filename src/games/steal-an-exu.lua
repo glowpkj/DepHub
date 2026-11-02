@@ -766,7 +766,7 @@ do
         if hopSection then
             hopSection:CreateParagraph(
                 "Auto Hop",
-                "A troca usa somente os terreiros marcados em Steal Terreiros. Exige que pelo menos um Exu selecionado tenha aparecido no servidor e que a selecao fique vazia por 15 segundos."
+                "Monitora somente os terreiros marcados. Quando Runtime e Nests estao mapeados e nao resta Exu selecionado por 15 segundos, troca de servidor. Se Auto Sell estiver ligado, espera vender; se Auto Place estiver ligado, espera enviar os pedidos pendentes."
             )
         end
 
@@ -833,7 +833,7 @@ do
             end)
             configSection:CreateParagraph(
                 "Config",
-                "Todas as selecoes multiplas, toggles e Auto Execute sao salvos automaticamente ao mudar, e tambem pelo botao Save Config."
+                "Selecoes multiplas e toggles sao salvos automaticamente e pelo botao Save Config. Persistencia exige writefile/readfile/isfile; Auto Execute tambem exige queue_on_teleport."
             )
         end
     end
