@@ -164,31 +164,48 @@ end
 function AutoSteal:_selectedTargets(runtime)
     local workspace = game:GetService("Workspace")
     local map = workspace:FindFirstChild("Map")
-    local terreiros = map and map:FindFirstChild("Terreiros")
-    local terreiro = terreiros and terreiros:FindFirstChild(self.Terreiro)
-    local nestsFolder = terreiro and terreiro:FindFirstChild("Nests")
+    local terreirosFolder = map and map:FindFirstChild("Terreiros")
+    local selectedTerreiro = terreirosFolder and terreirosFolder:FindFirstChild(self.Terreiro)
 
-    if not nestsFolder then
+    if not selectedTerreiro or not selectedTerreiro:FindFirstChild("Nests") then
         return {}, "Terreiro nao encontrado: " .. tostring(self.Terreiro)
     end
 
+    -- Primeiro mapeia os Nests de TODOS os terreiros. Assim, quando o terreiro
+    -- selecionado estiver vazio, um Exu de outro terreiro nunca sera atribuido
+    -- por engano ao Nest mais proximo que sobrou no filtro.
     local nests = {}
-    for _, nest in ipairs(nestsFolder:GetChildren()) do
-        local position = instancePosition(nest)
-        if position then
-            nests[#nests + 1] = {instance = nest, position = position}
+    for _, terreiro in ipairs(terreirosFolder:GetChildren()) do
+        local nestsFolder = terreiro:FindFirstChild("Nests")
+        if nestsFolder then
+            for _, nest in ipairs(nestsFolder:GetChildren()) do
+                local position = instancePosition(nest)
+                if position then
+                    nests[#nests + 1] = {
+                        instance = nest,
+                        position = position,
+                        terreiroName = terreiro.Name,
+                    }
+                end
+            end
         end
     end
-    table.sort(nests, function(a, b) return numberedNameSort(a.instance, b.instance) end)
+
+    table.sort(nests, function(a, b)
+        local aTerreiro = tonumber(a.terreiroName:match("(%d+)$")) or math.huge
+        local bTerreiro = tonumber(b.terreiroName:match("(%d+)$")) or math.huge
+        if aTerreiro ~= bTerreiro then return aTerreiro < bTerreiro end
+        if a.terreiroName ~= b.terreiroName then return a.terreiroName < b.terreiroName end
+        return numberedNameSort(a.instance, b.instance)
+    end)
 
     local runtimeTargets = collectRuntimeTargets(runtime)
     if #nests == 0 or #runtimeTargets == 0 then
         return {}, nil
     end
 
-    -- Associa cada Nest ao Exu mais proximo sem reutilizar o mesmo Exu duas vezes.
-    -- A ordenacao global por distancia evita que o primeiro Nest "roube" um Exu
-    -- que esta muito mais perto do Nest seguinte.
+    -- Associa cada Exu ao Nest mais proximo no mapa inteiro, sem reutilizar
+    -- Nests ou Exus. A selecao e aplicada somente depois desse mapeamento global.
     local pairsByDistance = {}
     for nestIndex, nest in ipairs(nests) do
         for targetIndex, target in ipairs(runtimeTargets) do
@@ -224,8 +241,9 @@ function AutoSteal:_selectedTargets(runtime)
     local targets = {}
     for nestIndex, nest in ipairs(nests) do
         local target = assigned[nestIndex]
-        if target then
+        if target and nest.terreiroName == self.Terreiro then
             target.nestName = nest.instance.Name
+            target.terreiroName = nest.terreiroName
             targets[#targets + 1] = target
         end
     end
