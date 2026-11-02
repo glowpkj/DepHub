@@ -55,7 +55,7 @@ local function loadFeature(relativePath, validate)
 end
 
 local State = {
-    Version = "0.1.61",
+    Version = "0.1.62",
     Destroyed = false,
     Started = false,
     Features = {},
@@ -188,10 +188,18 @@ do
     end
 end
 
--- Instancia o Auto Steal Exu (mecanismo pronto; so roda quando o toggle ligar).
+-- Auto Steal geral e Auto Steal por Terreiro compartilham o mesmo mecanismo
+-- de prompt/teleporte, mas cada toggle mantem seu proprio filtro e loop.
 if AutoStealModule then
     State.AutoSteal = AutoStealModule.new(FeatureContext)
     State.Features.AutoSteal = State.AutoSteal
+
+    local availableTerreiros = AutoStealModule.terreiros()
+    State.AutoStealSelection = AutoStealModule.new(FeatureContext, {
+        selectedOnly = true,
+        terreiro = availableTerreiros[1],
+    })
+    State.Features.AutoStealSelection = State.AutoStealSelection
 else
     warn("[DepHub] Steal An Exu autosteal unavailable: " .. tostring(autoStealError))
 end
@@ -248,6 +256,24 @@ do
             if stealSection then
                 stealSection:CreateToggle("Auto Steal Exu", false, function(value)
                     State.AutoSteal:SetEnabled(value)
+                end)
+            end
+        end
+
+        -- Rouba somente os Exus associados aos Nests do Terreiro selecionado.
+        if State.AutoStealSelection then
+            local selectionSection = Kit.Section(tab, "Steal Exu An Selection", "Left")
+            if selectionSection then
+                selectionSection:CreateDropdown(
+                    "Terreiro",
+                    AutoStealModule.terreiros(),
+                    State.AutoStealSelection.Terreiro,
+                    function(choice)
+                        State.AutoStealSelection:SetTerreiro(choice)
+                    end
+                )
+                selectionSection:CreateToggle("Steal Exu An Selection", false, function(value)
+                    State.AutoStealSelection:SetEnabled(value)
                 end)
             end
         end
