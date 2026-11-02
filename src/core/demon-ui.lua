@@ -166,77 +166,87 @@ local function makeSection(adapter, tabHandle, title)
         for _, option in ipairs(type(options) == "table" and options or {}) do
             list[#list + 1] = tostring(option)
         end
-        if #list == 0 then list = { "None" } end
+        if #list == 0 then list = {"None"} end
 
-        -- The selected set, kept here so an array can be rebuilt for the callback
-        -- and a saved selection restored, without reading the library's internals.
         local selected = {}
-        local order = list
+        local suppressCallback = false
+
         local function asArray()
             local out = {}
-            for _, name in ipairs(order) do
+            for _, name in ipairs(list) do
                 if selected[name] then out[#out + 1] = name end
             end
             return out
         end
 
-        local initialSet = {}
         local initialList = {}
         for _, name in ipairs(type(initial) == "table" and initial or {}) do
-            initialSet[tostring(name)] = true
-            initialList[#initialList + 1] = tostring(name)
-            selected[tostring(name)] = true
+            local key = tostring(name)
+            selected[key] = true
+            initialList[#initialList + 1] = key
         end
 
         local handle = tabHandle:AddDropdown({
             Name = tostring(label),
             Options = list,
-            -- RedzLib's multi-select default is an ARRAY of the pre-selected names
-            -- (`for i = 1, #Default`), not a set: handed a set `{F=true}` the
-            -- library loops zero times, selects nothing, and the field renders its
-            -- empty placeholder, "..." -- the dropdown that looked unselectable.
             Default = initialList,
             MultiSelect = true,
             Callback = function(value)
-                -- RedzLib passes the selected set; rebuild the ordered array from
-                -- it, keep it fresh, and hand the array to the caller.
                 selected = {}
                 if type(value) == "table" then
                     for name, isSelected in pairs(value) do
                         if isSelected then selected[tostring(name)] = true end
                     end
                 end
-                if callback then callback(asArray()) end
+                if callback and not suppressCallback then
+                    callback(asArray())
+                end
             end
         })
 
-        -- The adapter's own restore path. The library has no SetValue for a
-        -- multi-select dropdown, so restore is "clear then re-add each name".
-        -- `Add` only ADDS an option -- it does not mark it selected; the library
-        -- selects through its click path. So after re-adding, drive the selection
-        -- with `Select` (the library exposes it now). Without this the restore
-        -- moved nothing visible: the field kept the old selection (or went empty)
-        -- -- the "as listas nao mostram o que eu escolhi" the user reported.
-        -- `Set` also drives the caller's callback: the config store prefers the
-        -- handle's setter over the entry's `apply` whenever the handle can drive
-        -- (`handle.Value ~= value` is always true here, since a multi handle has
-        -- no `.Value`), so without this the restore would move the UI but never
-        -- tell the silent-aim feature its exception keys changed.
         if handle and type(handle) == "table" then
-            handle.Set = function(_, names)
-                pcall(function() handle:Clear() end)
-                selected = {}
+            handle.SetSilent = function(_, names)
+                local wanted = {}
                 for _, name in ipairs(type(names) == "table" and names or {}) do
                     local key = tostring(name)
-                    selected[key] = true
-                    pcall(function() handle:Add(key) end)
-                    if type(handle.Select) == "function" then
-                        pcall(function() handle:Select(key, true) end)
+                    for _, option in ipairs(list) do
+                        if option == key then wanted[key] = true; break end
                     end
                 end
-                if callback then callback(asArray()) end
+
+                suppressCallback = true
+                if type(handle.Clear) == "function" then
+                    pcall(function() handle:Clear() end)
+                end
+
+                if type(handle.Add) == "function" then
+                    for _, option in ipairs(list) do
+                        if wanted[option] then
+                            pcall(function() handle:Add(option) end)
+                        end
+                    end
+                end
+
+                if type(handle.Select) == "function" then
+                    for _, option in ipairs(list) do
+                        if wanted[option] then
+                            pcall(function() handle:Select(option, true) end)
+                        end
+                    end
+                end
+
+                selected = wanted
+                suppressCallback = false
+                return true
+            end
+
+            handle.Set = function(_, names)
+                local ok = handle:SetSilent(names)
+                if ok and callback then callback(asArray()) end
+                return ok
             end
         end
+
         return handle
     end
 
