@@ -43,6 +43,10 @@ end
 
 function AutoSteal.new(ctx, options)
     options = options or {}
+    local selected = {}
+    for _, name in ipairs(type(options.terreiros) == "table" and options.terreiros or {}) do
+        selected[tostring(name)] = true
+    end
     return setmetatable({
         Ctx = ctx or {},
         Enabled = false,
@@ -51,8 +55,8 @@ function AutoSteal.new(ctx, options)
         Destroyed = false,
         DebugLog = {},
         LastTargetCount = nil,
-        SelectedOnly = options.selectedOnly == true,
-        Terreiro = options.terreiro or "Terreiro1",
+        SelectedOnly = options.selectedOnly ~= false,
+        Terreiros = selected,
     }, AutoSteal)
 end
 
@@ -165,11 +169,13 @@ function AutoSteal:_selectedTargets(runtime)
     local workspace = game:GetService("Workspace")
     local map = workspace:FindFirstChild("Map")
     local terreirosFolder = map and map:FindFirstChild("Terreiros")
-    local selectedTerreiro = terreirosFolder and terreirosFolder:FindFirstChild(self.Terreiro)
-
-    if not selectedTerreiro or not selectedTerreiro:FindFirstChild("Nests") then
-        return {}, "Terreiro nao encontrado: " .. tostring(self.Terreiro)
+    if not terreirosFolder then
+        return {}, "workspace.Map.Terreiros nao encontrado"
     end
+
+    local selectedCount = 0
+    for _ in pairs(self.Terreiros) do selectedCount += 1 end
+    if selectedCount == 0 then return {}, "nenhum Terreiro selecionado" end
 
     -- Primeiro mapeia os Nests de TODOS os terreiros. Assim, quando o terreiro
     -- selecionado estiver vazio, um Exu de outro terreiro nunca sera atribuido
@@ -241,7 +247,7 @@ function AutoSteal:_selectedTargets(runtime)
     local targets = {}
     for nestIndex, nest in ipairs(nests) do
         local target = assigned[nestIndex]
-        if target and nest.terreiroName == self.Terreiro then
+        if target and self.Terreiros[nest.terreiroName] then
             target.nestName = nest.instance.Name
             target.terreiroName = nest.terreiroName
             targets[#targets + 1] = target
@@ -301,6 +307,19 @@ function AutoSteal:_step(target, root, originalPos)
     if not acquiredOk then return false end
 
     local returnCFrame = originalPos or root.CFrame
+    local resolveReturn = self.Ctx and self.Ctx.StealReturnCFrame
+    if type(resolveReturn) == "function" then
+        local ok, destination = pcall(resolveReturn)
+        if ok and destination then returnCFrame = destination end
+    end
+
+    local before = {}
+    local getExuIds = self.Ctx and self.Ctx.InventoryExuIds
+    if type(getExuIds) == "function" then
+        local ok, ids = pcall(getExuIds)
+        if ok and type(ids) == "table" then before = ids end
+    end
+
     local prompt = target.prompt
     local ref = target.ref
 
@@ -317,6 +336,19 @@ function AutoSteal:_step(target, root, originalPos)
         if not self.Destroyed and (self.Enabled or originalPos ~= nil) and self:_alive(target) then
             prompt:InputHoldBegin()
             prompt:InputHoldEnd()
+
+            if target.terreiroName then
+                task.wait(0.3)
+                if type(self.Ctx.TrackNewExuSources) == "function" then
+                    local okAfter, after = pcall(getExuIds or function() return {} end)
+                    if okAfter and type(after) == "table" then
+                        pcall(self.Ctx.TrackNewExuSources, before, after, target.terreiroName)
+                    end
+                end
+                if target.exuId ~= nil and type(self.Ctx.TrackExuSource) == "function" then
+                    pcall(self.Ctx.TrackExuSource, target.exuId, target.terreiroName)
+                end
+            end
         end
     end)
 
@@ -408,11 +440,34 @@ function AutoSteal:SetEnabled(on)
     return true
 end
 
-function AutoSteal:SetTerreiro(name)
-    if type(name) ~= "string" or name == "" then return false end
-    self.Terreiro = name
+function AutoSteal:SetTerreiros(names)
+    if type(names) ~= "table" then return false end
+    local available = {}
+    for _, name in ipairs(AutoSteal.terreiros()) do available[name] = true end
+    local selected = {}
+    for _, name in ipairs(names) do
+        name = tostring(name)
+        if available[name] then selected[name] = true end
+    end
+    self.Terreiros = selected
     self.LastTargetCount = nil
     return true
+end
+
+function AutoSteal:SetTerreiro(name)
+    return self:SetTerreiros({name})
+end
+
+function AutoSteal:SelectedTerreiros()
+    local result = {}
+    for _, name in ipairs(AutoSteal.terreiros()) do
+        if self.Terreiros[name] then result[#result + 1] = name end
+    end
+    return result
+end
+
+function AutoSteal:SelectionKey()
+    return table.concat(self:SelectedTerreiros(), "|")
 end
 
 function AutoSteal:Destroy()
