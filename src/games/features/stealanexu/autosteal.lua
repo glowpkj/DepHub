@@ -150,6 +150,24 @@ local function numberedNameSort(a, b)
     return aNumber < bNumber
 end
 
+local function explicitTerreiro(instance)
+    if not instance then return nil end
+    for _, attributeName in ipairs({
+        "Terreiro", "TerreiroName", "SourceTerreiro", "OriginTerreiro",
+        "TerreiroId", "TerreiroIndex", "OriginTerreiroId",
+    }) do
+        local ok, value = pcall(function() return instance:GetAttribute(attributeName) end)
+        if ok and value ~= nil then
+            local name = tostring(value)
+            local numeric = tonumber(name)
+            if numeric then return "Terreiro" .. tostring(math.floor(numeric)) end
+            if name:match("^%d+$") then return "Terreiro" .. name end
+            return name
+        end
+    end
+    return nil
+end
+
 function AutoSteal.terreiros()
     local workspace = game:GetService("Workspace")
     local map = workspace:FindFirstChild("Map")
@@ -202,9 +220,6 @@ function AutoSteal:_selectedTargets(runtime)
     if selectedCount == 0 then return {}, "nenhum Terreiro selecionado" end
     if selectedNestCount == 0 then return {}, "nenhum Nest disponivel nos terreiros selecionados" end
 
-    -- Primeiro mapeia os Nests de TODOS os terreiros. Assim, quando o terreiro
-    -- selecionado estiver vazio, um Exu de outro terreiro nunca sera atribuido
-    -- por engano ao Nest mais proximo que sobrou no filtro.
     local nests = {}
     for _, terreiro in ipairs(terreirosFolder:GetChildren()) do
         local nestsFolder = terreiro:FindFirstChild("Nests")
@@ -223,9 +238,9 @@ function AutoSteal:_selectedTargets(runtime)
     end
 
     table.sort(nests, function(a, b)
-        local aTerreiro = tonumber(a.terreiroName:match("(%d+)$")) or math.huge
-        local bTerreiro = tonumber(b.terreiroName:match("(%d+)$")) or math.huge
-        if aTerreiro ~= bTerreiro then return aTerreiro < bTerreiro end
+        local aNumber = tonumber(a.terreiroName:match("(%d+)$")) or math.huge
+        local bNumber = tonumber(b.terreiroName:match("(%d+)$")) or math.huge
+        if aNumber ~= bNumber then return aNumber < bNumber end
         if a.terreiroName ~= b.terreiroName then return a.terreiroName < b.terreiroName end
         return numberedNameSort(a.instance, b.instance)
     end)
@@ -235,46 +250,27 @@ function AutoSteal:_selectedTargets(runtime)
         return {}, nil
     end
 
-    -- Associa cada Exu ao Nest mais proximo no mapa inteiro, sem reutilizar
-    -- Nests ou Exus. A selecao e aplicada somente depois desse mapeamento global.
-    local pairsByDistance = {}
-    for nestIndex, nest in ipairs(nests) do
-        for targetIndex, target in ipairs(runtimeTargets) do
-            local delta = target.position - nest.position
-            pairsByDistance[#pairsByDistance + 1] = {
-                nestIndex = nestIndex,
-                targetIndex = targetIndex,
-                distance = delta.Magnitude,
-            }
-        end
-    end
-
-    table.sort(pairsByDistance, function(a, b)
-        if a.distance == b.distance then
-            if a.nestIndex == b.nestIndex then return a.targetIndex < b.targetIndex end
-            return a.nestIndex < b.nestIndex
-        end
-        return a.distance < b.distance
-    end)
-
-    local usedNests = {}
-    local usedTargets = {}
-    local assigned = {}
-
-    for _, pair in ipairs(pairsByDistance) do
-        if not usedNests[pair.nestIndex] and not usedTargets[pair.targetIndex] then
-            usedNests[pair.nestIndex] = true
-            usedTargets[pair.targetIndex] = true
-            assigned[pair.nestIndex] = runtimeTargets[pair.targetIndex]
-        end
-    end
-
     local targets = {}
-    for nestIndex, nest in ipairs(nests) do
-        local target = assigned[nestIndex]
-        if target and self.Terreiros[nest.terreiroName] then
-            target.nestName = nest.instance.Name
-            target.terreiroName = nest.terreiroName
+    for _, target in ipairs(runtimeTargets) do
+        local terreiroName = explicitTerreiro(target.model) or explicitTerreiro(target.ref)
+        local nearestNest = nil
+        local nearestDistance = math.huge
+
+        if not terreiroName then
+            for _, nest in ipairs(nests) do
+                local delta = target.position - nest.position
+                local distance = delta.Magnitude
+                if distance < nearestDistance then
+                    nearestDistance = distance
+                    nearestNest = nest
+                end
+            end
+            terreiroName = nearestNest and nearestNest.terreiroName or nil
+        end
+
+        if terreiroName and self.Terreiros[terreiroName] then
+            target.terreiroName = terreiroName
+            target.nestName = nearestNest and nearestNest.instance.Name or nil
             targets[#targets + 1] = target
         end
     end
