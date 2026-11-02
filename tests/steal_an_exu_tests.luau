@@ -446,14 +446,6 @@ do
     nest.CFrame = CFrame.new(100, 0, 0)
     backend.AutoStealSelection:SetTerreiros({"Terreiro1"})
 
-    local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ctx.Services.Workspace
-    local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
-    local terreiro = Instance.new("Folder"); terreiro.Name = "Terreiro1"; terreiro.Parent = terreiros
-    local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
-    local nest = Instance.new("Part"); nest.Name = "Nest1"; nest.Parent = nests
-    nest.CFrame = CFrame.new(100, 0, 0)
-    backend.AutoStealSelection:SetTerreiros({"Terreiro1"})
-
     local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ctx.Services.Workspace
     count = feature:RuntimeCount()
     check(count == 0, "Auto Hop sees no Exus in the selected Terreiro")
