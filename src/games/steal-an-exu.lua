@@ -236,12 +236,12 @@ do
             end
         end
 
-        -- Sell All: vende todos os Exus pela GUI "Vender Todos" do jogo.
+        -- Auto Sell: clica continuamente no botao exato Vender Todos.Button.Face.
         if State.AutoSell then
             local sellSection = Kit.Section(tab, "Sell All", "Left")
             if sellSection then
-                sellSection:CreateButton("Sell All Exus", function()
-                    State.AutoSell:StartSell()
+                sellSection:CreateToggle("Auto Sell Exus", false, function(value)
+                    State.AutoSell:SetEnabled(value)
                 end)
             end
         end
