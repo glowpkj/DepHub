@@ -58,7 +58,7 @@ function AutoSell:Button()
     local player = game:GetService("Players").LocalPlayer
     if not player then return nil, "sem LocalPlayer" end
 
-    local playerGui = player:FindFirstChildOfClass("PlayerGui") or player:FindFirstChild("PlayerGui")
+    local playerGui = player.PlayerGui or player:FindFirstChildOfClass("PlayerGui") or player:FindFirstChild("PlayerGui")
     if not playerGui then return nil, "sem PlayerGui" end
 
     local menus = playerGui:FindFirstChild("Menus")
