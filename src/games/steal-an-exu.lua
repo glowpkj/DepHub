@@ -54,11 +54,31 @@ local function loadFeature(relativePath, validate)
     return module
 end
 
+local ConfigStoreModule, configStoreError = loadFeature("src/core/config-store.lua", function(module)
+    return type(module.new) == "function"
+end)
+
+local configStore = nil
+if ConfigStoreModule then
+    local ok, store = pcall(ConfigStoreModule.new, {
+        file = "DepHub_StealAnExu_config.json",
+        gameId = tostring(game.GameId or game.PlaceId or ""),
+    })
+    if ok then
+        configStore = store
+    else
+        configStoreError = tostring(store)
+    end
+end
+
 local State = {
-    Version = "0.1.62",
+    Version = "0.1.63",
     Destroyed = false,
     Started = false,
     Features = {},
+    Store = configStore,
+    Config = configStore and configStore.Values or {},
+    LastConfigError = configStore and nil or tostring(configStoreError or "config-store indisponivel"),
     LastError = nil,
 }
 
@@ -89,6 +109,130 @@ function State:IsEnabled(name)
     if type(feature) ~= "table" then return false end
     if type(feature.IsEnabled) == "function" then return feature.IsEnabled(feature) == true end
     return feature.Enabled == true
+end
+
+function State:syncStore()
+    if self.Store then self.Store.Values = self.Config end
+    return self.Store
+end
+
+function State:SaveConfig()
+    if not self.Store then
+        self.LastConfigError = "config-store nao carregou"
+        return false
+    end
+    self:syncStore()
+    local ok = self.Store:Save()
+    self.LastConfigError = self.Store.LastError
+    return ok
+end
+
+function State:ReadConfig()
+    if not self.Store then return nil end
+    self:syncStore()
+    return self.Store:Read()
+end
+
+function State:ApplyConfig(config)
+    if not self.Store then return {applied = {}, failed = {}, count = 0} end
+    self:syncStore()
+    local result = self.Store:Apply(config)
+    self.LastApplyResult = result
+    return result
+end
+
+function State:LoadConfig()
+    local config = self:ReadConfig()
+    return self:ApplyConfig(config)
+end
+
+function State:PrimeConfig()
+    if not self.Store then return nil end
+    self:syncStore()
+    return self.Store:Prime()
+end
+
+function State:RegisterConfig(key, apply, handle)
+    if self.Store then return self.Store:Register(key, apply, handle) end
+    return apply
+end
+
+local function resolveQueueOnTeleport()
+    if type(queue_on_teleport) == "function" then return queue_on_teleport end
+    if type(env.queue_on_teleport) == "function" then return env.queue_on_teleport end
+    local genv = type(getgenv) == "function" and getgenv() or nil
+    if type(genv) == "table" and type(genv.queue_on_teleport) == "function" then
+        return genv.queue_on_teleport
+    end
+    if _G ~= env and type(_G.queue_on_teleport) == "function" then return _G.queue_on_teleport end
+    return nil
+end
+
+local SOURCE_HOSTS = {
+    ["raw.githubusercontent.com"] = true,
+    ["github.com"] = true,
+    ["cdn.jsdelivr.net"] = true,
+}
+
+local function safeRef(ref)
+    if type(ref) ~= "string" or ref == "" or #ref > 200 then return nil end
+    if ref:find("%.%.") or ref:find("^[/]") or ref:find("[/]$") then return nil end
+    if not ref:match("^[%w_%./-]+$") then return nil end
+    return ref
+end
+
+local function safeBase(base)
+    if type(base) ~= "string" or #base > 300 then return nil end
+    local scheme, host = base:match("^(https)://([^/]+)/")
+    if not scheme or not host or not SOURCE_HOSTS[host] then return nil end
+    if base:find('"') or base:find("\\") or base:find("[\\r\\n]") then return nil end
+    return base
+end
+
+function State:SelfExecLine()
+    local shared = env.__DEPHUB
+    local loaderState = env.__DEPHUB_LOADER_STATE
+    local ref = safeRef(shared and shared.SourceRef)
+        or safeRef(type(loaderState) == "table" and loaderState.SourceRef)
+        or "main"
+    local base = safeBase(shared and shared.SourceBaseURL)
+        or "https://raw.githubusercontent.com/glowpkj/DepHub/main/"
+    if not base:match("/$") then base = base .. "/" end
+    local command = ('loadstring(game:HttpGet("%sDepHub.lua"))("%s")'):format(base, ref)
+
+    if not self.Store or not self.Store:CanPersist() or not self.Store.file then
+        return command
+    end
+
+    local guard = ([[
+local __ok = pcall(function()
+    if type(readfile) ~= "function" or type(isfile) ~= "function" then return end
+    if isfile(%q) ~= true then return end
+    local __text = tostring(readfile(%q))
+    if not __text:find('"autoexec":true', 1, true) then error("autoexec off") end
+end)
+if not __ok then return end
+]]):format(tostring(self.Store.file), tostring(self.Store.file))
+    return guard .. command
+end
+
+function State:SetAutoExec(enabled)
+    enabled = enabled == true
+    local queue = resolveQueueOnTeleport()
+
+    if not enabled then
+        if queue then pcall(queue, "") end
+        return true
+    end
+
+    if not queue then
+        self.LastError = "executor sem queue_on_teleport"
+        return false
+    end
+
+    local ok, err = pcall(queue, self:SelfExecLine())
+    if not ok then self.LastError = "queue_on_teleport recusou: " .. tostring(err) end
+    return ok
 end
 
 function State:Start()
@@ -130,6 +274,10 @@ local AutoSellModule, autoSellError = loadFeature("src/games/features/stealanexu
 end)
 
 local AutoRebirthModule, autoRebirthError = loadFeature("src/games/features/stealanexu/autorebirth.lua", function(module)
+    return type(module.new) == "function"
+end)
+
+local AutoHopModule, autoHopError = loadFeature("src/games/features/stealanexu/autohop.lua", function(module)
     return type(module.new) == "function"
 end)
 
@@ -235,6 +383,15 @@ else
     warn("[DepHub] Steal An Exu autorebirth unavailable: " .. tostring(autoRebirthError))
 end
 
+-- Auto Hop Server: monitora o Runtime inteiro e troca de servidor quando ele
+-- permanece sem Exus. Nao controla o Auto Steal nem disputa o teleporte local.
+if AutoHopModule then
+    State.AutoHop = AutoHopModule.new({placeId = game.PlaceId})
+    State.Features.AutoHop = State.AutoHop
+else
+    warn("[DepHub] Steal An Exu autohop unavailable: " .. tostring(autoHopError))
+end
+
 State:Start()
 
 -- ---------------------------------------------------------------------------
@@ -246,6 +403,9 @@ State:Start()
 --   * "Auto Upgrade" -- um toggle por botao (o da base e o da esteira).
 -- ---------------------------------------------------------------------------
 do
+    local savedConfig = nil
+    pcall(function() savedConfig = State:PrimeConfig() end)
+
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
         local tab = Kit.Tab("Auto Steal", "Farming")
@@ -254,9 +414,12 @@ do
         if State.AutoSteal then
             local stealSection = Kit.Section(tab, "Auto Steal Exu", "Left")
             if stealSection then
-                stealSection:CreateToggle("Auto Steal Exu", false, function(value)
-                    State.AutoSteal:SetEnabled(value)
-                end)
+                local function applyAutoSteal(value)
+                    State.Config.autoSteal = value == true
+                    return State.AutoSteal:SetEnabled(value)
+                end
+                local handle = stealSection:CreateToggle("Auto Steal Exu", State.Config.autoSteal == true, applyAutoSteal)
+                State:RegisterConfig("autoSteal", applyAutoSteal, handle)
             end
         end
 
@@ -264,17 +427,29 @@ do
         if State.AutoStealSelection then
             local selectionSection = Kit.Section(tab, "Steal Exu An Selection", "Left")
             if selectionSection then
-                selectionSection:CreateDropdown(
+                local function applySelectedTerreiro(choice)
+                    State.Config.selectedTerreiro = choice
+                    return State.AutoStealSelection:SetTerreiro(choice)
+                end
+                local defaultTerreiro = State.Config.selectedTerreiro or State.AutoStealSelection.Terreiro
+                local terreiroHandle = selectionSection:CreateDropdown(
                     "Terreiro",
                     AutoStealModule.terreiros(),
-                    State.AutoStealSelection.Terreiro,
-                    function(choice)
-                        State.AutoStealSelection:SetTerreiro(choice)
-                    end
+                    defaultTerreiro,
+                    applySelectedTerreiro
                 )
-                selectionSection:CreateToggle("Steal Exu An Selection", false, function(value)
-                    State.AutoStealSelection:SetEnabled(value)
-                end)
+                State:RegisterConfig("selectedTerreiro", applySelectedTerreiro, terreiroHandle)
+
+                local function applySelectedSteal(value)
+                    State.Config.autoStealSelection = value == true
+                    return State.AutoStealSelection:SetEnabled(value)
+                end
+                local selectionHandle = selectionSection:CreateToggle(
+                    "Steal Exu An Selection",
+                    State.Config.autoStealSelection == true,
+                    applySelectedSteal
+                )
+                State:RegisterConfig("autoStealSelection", applySelectedSteal, selectionHandle)
             end
         end
 
@@ -282,9 +457,12 @@ do
         if State.AutoSell then
             local sellSection = Kit.Section(tab, "Sell All", "Left")
             if sellSection then
-                sellSection:CreateToggle("Auto Sell Exus", false, function(value)
-                    State.AutoSell:SetEnabled(value)
-                end)
+                local function applyAutoSell(value)
+                    State.Config.autoSell = value == true
+                    return State.AutoSell:SetEnabled(value)
+                end
+                local handle = sellSection:CreateToggle("Auto Sell Exus", State.Config.autoSell == true, applyAutoSell)
+                State:RegisterConfig("autoSell", applyAutoSell, handle)
             end
         end
 
@@ -292,9 +470,12 @@ do
         if State.AutoRebirth then
             local rebirthSection = Kit.Section(tab, "Auto Rebirth", "Left")
             if rebirthSection then
-                rebirthSection:CreateToggle("Auto Rebirth", false, function(value)
-                    State.AutoRebirth:SetEnabled(value)
-                end)
+                local function applyAutoRebirth(value)
+                    State.Config.autoRebirth = value == true
+                    return State.AutoRebirth:SetEnabled(value)
+                end
+                local handle = rebirthSection:CreateToggle("Auto Rebirth", State.Config.autoRebirth == true, applyAutoRebirth)
+                State:RegisterConfig("autoRebirth", applyAutoRebirth, handle)
             end
         end
 
@@ -303,17 +484,96 @@ do
             local upgradeSection = Kit.Section(tab, "Auto Upgrade", "Left")
             if upgradeSection then
                 if State.UpgradeBase then
-                    upgradeSection:CreateToggle("Auto Upgrade Base", false, function(value)
-                        State.UpgradeBase:SetEnabled(value)
-                    end)
+                    local function applyUpgradeBase(value)
+                        State.Config.upgradeBase = value == true
+                        return State.UpgradeBase:SetEnabled(value)
+                    end
+                    local handle = upgradeSection:CreateToggle("Auto Upgrade Base", State.Config.upgradeBase == true, applyUpgradeBase)
+                    State:RegisterConfig("upgradeBase", applyUpgradeBase, handle)
                 end
                 if State.UpgradeTread then
-                    upgradeSection:CreateToggle("Auto Upgrade Esteira", false, function(value)
-                        State.UpgradeTread:SetEnabled(value)
-                    end)
+                    local function applyUpgradeTread(value)
+                        State.Config.upgradeTread = value == true
+                        return State.UpgradeTread:SetEnabled(value)
+                    end
+                    local handle = upgradeSection:CreateToggle("Auto Upgrade Esteira", State.Config.upgradeTread == true, applyUpgradeTread)
+                    State:RegisterConfig("upgradeTread", applyUpgradeTread, handle)
                 end
             end
         end
+
+        -- Server Hop: troca somente quando Runtime fica vazio por 15 segundos.
+        if State.AutoHop then
+            local hopSection = Kit.Section(tab, "Server Hop", "Right")
+            if hopSection then
+                local function applyAutoHop(value)
+                    State.Config.autoHop = value == true
+                    local ok = State.AutoHop:SetEnabled(value)
+                    if value and not State.Config.autoexec and type(env.__DEPHUB.UI) == "table" then
+                        env.__DEPHUB.UI:Notify("Auto Hop Server", "Ative Auto Execute e salve a config para continuar farmando depois da troca de servidor.")
+                    end
+                    return ok
+                end
+                local handle = hopSection:CreateToggle("Auto Hop Server", State.Config.autoHop == true, applyAutoHop)
+                State:RegisterConfig("autoHop", applyAutoHop, handle)
+                hopSection:CreateParagraph("Auto Hop", "Quando workspace.Runtime ficar sem Exus por 15 segundos, procura um servidor publico diferente com vagas. Ative Auto Execute para o script voltar depois do teleporte.")
+            end
+        end
+
+        -- Config: salva todas as opcoes e permite autoexecutar o DepHub apos teleportes.
+        local configSection = Kit.Section(tab, "Config", "Right")
+        if configSection then
+            local function applyAutoExec(value)
+                State.Config.autoexec = value == true
+                local saved = State:SaveConfig()
+                local ok = State:SetAutoExec(value)
+                if value and not ok then
+                    local ui = env.__DEPHUB and env.__DEPHUB.UI
+                    if ui and type(ui.Notify) == "function" then
+                        ui:Notify("Auto Execute", State.LastError or "Executor sem queue_on_teleport.")
+                    end
+                elseif value and not saved then
+                    local ui = env.__DEPHUB and env.__DEPHUB.UI
+                    if ui and type(ui.Notify) == "function" then
+                        ui:Notify("Auto Execute", State.LastConfigError or "Config nao foi salva em disco.")
+                    end
+                end
+                return ok
+            end
+
+            local autoExecHandle = configSection:CreateToggle("Auto Execute", State.Config.autoexec == true, applyAutoExec)
+            State:RegisterConfig("autoexec", applyAutoExec, autoExecHandle)
+
+            configSection:CreateButton("Save Config", function()
+                local ok = State:SaveConfig()
+                local ui = env.__DEPHUB and env.__DEPHUB.UI
+                if ui and type(ui.Notify) == "function" then
+                    ui:Notify("Config", ok and "Config salva." or (State.LastConfigError or "Nao foi possivel salvar em disco."))
+                end
+            end)
+
+            configSection:CreateButton("Load Config", function()
+                local result = State:LoadConfig()
+                local ui = env.__DEPHUB and env.__DEPHUB.UI
+                if ui and type(ui.Notify) == "function" then
+                    local failed = result and #result.failed or 0
+                    ui:Notify("Config", ("Aplicadas: %d | Falhas: %d"):format(result and result.count or 0, failed))
+                end
+            end)
+            configSection:CreateParagraph("Config", "Save Config guarda toggles e Terreiro selecionado. A config e carregada automaticamente quando o DepHub inicia.")
+        end
+    end
+
+    if type(savedConfig) == "table" then
+        local result = State:ApplyConfig(savedConfig)
+        if result and #result.failed > 0 then
+            State.LastConfigError = ("falha ao aplicar %d opcoes salvas"):format(#result.failed)
+        end
+    end
+
+    -- Limpa qualquer queue antiga quando Auto Execute nao esta salvo como ligado.
+    if State.Config.autoexec ~= true then
+        pcall(function() State:SetAutoExec(false) end)
     end
 end
 
