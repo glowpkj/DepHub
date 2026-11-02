@@ -336,6 +336,12 @@ do
 
     local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ws
     local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
+    local pens = Instance.new("Folder"); pens.Name = "Pens"; pens.Parent = map
+    local pen = Instance.new("Model"); pen.Name = "PenSelectedTest"; pen.Parent = pens
+    pen:SetAttribute("Owner", ctx.Player.UserId)
+    local badgeAnchor = Instance.new("Part"); badgeAnchor.Name = "BadgeAnchor"; badgeAnchor.Parent = pen
+    badgeAnchor.CFrame = CFrame.new(0, 50, 0)
+
     local selected = Instance.new("Folder"); selected.Name = "Terreiro3"; selected.Parent = terreiros
     local selectedNests = Instance.new("Folder"); selectedNests.Name = "Nests"; selectedNests.Parent = selected
     local other = Instance.new("Folder"); other.Name = "Terreiro8"; other.Parent = terreiros
