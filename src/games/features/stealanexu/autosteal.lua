@@ -149,7 +149,7 @@ function AutoSteal:_step(target, root, originalPos)
         root.CFrame = CFrame.new(ref.Position + Vector3.new(0, 3, 0))
         task.wait(SETTLE_WAIT)
 
-        if self.Enabled and self:_alive(target) then
+        if not self.Destroyed and self:_alive(target) then
             prompt:InputHoldBegin()
             prompt:InputHoldEnd()
         end
