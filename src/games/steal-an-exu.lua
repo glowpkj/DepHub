@@ -772,10 +772,18 @@ do
 
         local configSection = Kit.Section(tab, "Config", "Right")
         if configSection then
+            local autoExecHandle = nil
+            local revertingAutoExec = false
             local function applyAutoExec(value)
                 State.Config.autoexec = value == true
                 local ok = State:SetAutoExec(value)
                 if value and not ok then
+                    State.Config.autoexec = false
+                    if autoExecHandle and not revertingAutoExec and type(autoExecHandle.SetValue) == "function" then
+                        revertingAutoExec = true
+                        pcall(function() autoExecHandle:SetValue(false) end)
+                        revertingAutoExec = false
+                    end
                     local ui = env.__DEPHUB and env.__DEPHUB.UI
                     if ui and type(ui.Notify) == "function" then
                         ui:Notify("Auto Execute", State.LastError or "Executor sem queue_on_teleport.")
@@ -784,7 +792,7 @@ do
                 return ok
             end
 
-            local autoExecHandle = configSection:CreateToggle("Auto Execute", State.Config.autoexec == true, applyAutoExec)
+            autoExecHandle = configSection:CreateToggle("Auto Execute", State.Config.autoexec == true, applyAutoExec)
             State:RegisterConfig("autoexec", applyAutoExec, autoExecHandle)
 
             configSection:CreateButton("Save Config", function()
