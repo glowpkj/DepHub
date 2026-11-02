@@ -481,6 +481,10 @@ do
         return State.AutoSell ~= nil and State.AutoSell:IsEnabled()
     end
 
+    function FeatureContext.IsAutoHopActive()
+        return State.AutoHop ~= nil and State.AutoHop.Hopping == true
+    end
+
     local sourceMap = env.__DEPHUB_STEALANEXU_EXU_SOURCES
     if type(sourceMap) ~= "table" then
         sourceMap = {}
