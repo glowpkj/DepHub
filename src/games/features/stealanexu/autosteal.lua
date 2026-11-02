@@ -94,7 +94,7 @@ function AutoSteal:_targets()
 
         if prompt and not seen[prompt] then
             seen[prompt] = true
-            targets[#targets + 1] = {prompt = prompt, ref = ref, model = child}
+            targets[#targets + 1] = {prompt = prompt, ref = ref, model = child, runtime = runtime}
         end
     end
 
@@ -105,7 +105,7 @@ function AutoSteal:_alive(target)
     return target ~= nil
         and target.prompt ~= nil and target.prompt.Parent ~= nil
         and target.ref ~= nil and target.ref.Parent ~= nil
-        and target.model ~= nil and target.model.Parent ~= nil
+        and target.model ~= nil and target.model.Parent == target.runtime
 end
 
 function AutoSteal:_acquireMovement()
