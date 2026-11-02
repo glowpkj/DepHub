@@ -11,15 +11,15 @@ do
     check(type(state) == "table", "Volleyball 4.2 starts")
     check(type(state.Act) == "function", "Volleyball exposes State:Act for the automations")
 
-    -- The removed features must not come back: no prediction/positioning state,
-    -- no toggles, and nothing spawned into the Workspace at load.
+    -- The removed prediction/positioning engine stays absent; the new visual
+    -- ESP is feature-owned and starts disabled.
     check(state.Toggles == nil, "the feature toggles are gone")
     check(state.Config == nil, "the feature config table is gone")
     check(state.CurrentBall == nil and state.History == nil, "the ball-prediction engine is gone")
     check(ctx.Services.Workspace:FindFirstChild("DepHubAutoSet") == nil, "no fixed set parts are spawned")
     check(ctx.Services.Workspace:FindFirstChild("BallPredictions") == nil, "no prediction marker folder is created")
 
-    -- The UI registers no Volleyball controls while the features are gone.
+    -- The backend tears down cleanly without spawning world objects at load.
     state:Destroy()
     check(state.Destroyed, "destroy marks the backend destroyed")
     check(ctx.State.__DEPHUB.Volleyball42 == nil, "destroy clears the published state")
@@ -546,7 +546,7 @@ do
     state:Destroy()
 end
 
--- The UI registers exactly one toggle and one slider for this one feature.
+-- The UI registers the Jump Anywhere and ESP Character Direction toggles, plus one impulse slider.
 do
     local ctx = sandbox(1316421563, 1316421563)
     local ui = ctx:MountUI()
@@ -557,6 +557,6 @@ do
         if control.Kind == "toggle" then toggles += 1 end
         if control.Kind == "slider" then sliders += 1 end
     end
-    check(toggles == 1, "the jump feature is one toggle")
+    check(toggles == 2, "Volleyball registers Jump Anywhere and ESP Character Direction")
     check(sliders == 1, "the jump feature has one impulse slider")
 end
