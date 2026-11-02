@@ -184,6 +184,11 @@ function AutoHop:Hop()
     log(self, "Runtime vazio; procurando servidor publico.")
 
     local candidates, reason = self:_serverCandidates()
+    if self.Destroyed or not self.Enabled then
+        self.Hopping = false
+        self.LastStatus = "idle"
+        return false
+    end
     if #candidates == 0 then
         self.Hopping = false
         self.LastError = reason or "nenhum servidor novo com vagas encontrado"
