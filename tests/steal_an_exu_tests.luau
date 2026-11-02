@@ -387,6 +387,7 @@ do
     addExu("ExuA", 102)
     addExu("ExuB", 204)
     addExu("ExuC", 905)
+    addExu("ExuD", 105)
 
     local characterRoot = makeCharacter(ctx)
     local backend = ctx:Run("src/games/steal-an-exu.lua")
@@ -396,9 +397,11 @@ do
     check(feature.Terreiros.Terreiro3 == true, "the selection mode starts with the first discovered Terreiro")
     check(feature:SetTerreiros({"Terreiro3", "Terreiro8"}) == true, "multiple Terreiros can be selected together")
     local selectedTargets = feature:_targets()
-    check(#selectedTargets == 3, "selecting both Terreiros returns all three mapped Exus")
+    check(#selectedTargets == 4, "selecting both Terreiros returns every mapped Runtime Exu")
     check(selectedTargets[1].model.Name == "ExuA" and selectedTargets[2].model.Name == "ExuB",
-        "the Nest-to-Exu mapping chooses the nearest distinct Runtime models")
+        "the Nest-to-Exu mapping associates each Runtime model with its nearest Nest")
+    check(selectedTargets[4].model.Name == "ExuD" and selectedTargets[4].nestName == "Nest1",
+        "multiple Exus near the same Nest are not discarded")
     check(selectedTargets[1].nestName == "Nest1" and selectedTargets[2].nestName == "Nest2",
         "each mapped Runtime Exu retains its source Nest")
 
