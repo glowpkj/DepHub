@@ -72,7 +72,7 @@ if ConfigStoreModule then
 end
 
 local State = {
-    Version = "0.1.63",
+    Version = "0.1.64",
     Destroyed = false,
     Started = false,
     Features = {},
@@ -288,6 +288,10 @@ local AutoHopModule, autoHopError = loadFeature("src/games/features/stealanexu/a
     return type(module.new) == "function"
 end)
 
+local AutoPlaceModule, autoPlaceError = loadFeature("src/games/features/stealanexu/autoplace.lua", function(module)
+    return type(module.new) == "function"
+end)
+
 -- Contexto COMPARTILHADO das features: os helpers de mundo que as duas usam
 -- (achar a MINHA base pelo Owner, e navegar um caminho dentro dela). Fica aqui,
 -- num lugar so, pra nao duplicar a logica de Owner em cada feature.
@@ -341,18 +345,132 @@ do
         end
         return instance
     end
+
+    local function partCFrame(part)
+        if not part then return nil end
+        local ok, frame = pcall(function()
+            return CFrame.new(part.Position + Vector3.new(0, part.Size.Y / 2 + 3, 0))
+        end)
+        return ok and frame or nil
+    end
+
+    function FeatureContext.BaseCFrame()
+        local pen = FeatureContext.MyPen()
+        if not pen then return nil, "base do jogador nao encontrada" end
+        local anchor = pen:FindFirstChild("BadgeAnchor", true)
+        if anchor and anchor:IsA("BasePart") then
+            return CFrame.new(anchor.Position + Vector3.new(0, 3, 0))
+        end
+        local ok, pivot = pcall(function() return pen:GetPivot() end)
+        if ok and pivot then return CFrame.new(pivot.Position + Vector3.new(0, 5, 0)) end
+        return nil, "ponto de retorno da base nao encontrado"
+    end
+
+    function FeatureContext.PlazaCFrame()
+        local map = Workspace:FindFirstChild("Map")
+        local plaza = map and map:FindFirstChild("Plaza")
+        local part = plaza and plaza:FindFirstChild("Part")
+        if not part or not part:IsA("BasePart") then
+            return nil, "workspace.Map.Plaza.Part nao encontrado"
+        end
+        return partCFrame(part)
+    end
+
+    function FeatureContext.StealReturnCFrame()
+        if State.AutoSell and State.AutoSell:IsEnabled() then
+            local sellFrame = FeatureContext.PlazaCFrame()
+            if sellFrame then return sellFrame end
+        end
+        return FeatureContext.BaseCFrame()
+    end
+
+    local function characterRoot()
+        local character = LocalPlayer and LocalPlayer.Character
+        return character and character:FindFirstChild("HumanoidRootPart") or nil
+    end
+
+    local function manualTeleport(owner, resolver)
+        if not FeatureContext.AcquireMovement(owner) then
+            return false, "outro recurso esta usando o teleporte"
+        end
+        local root = characterRoot()
+        local destination, reason = resolver()
+        local ok, err = pcall(function()
+            if not root then error("HumanoidRootPart nao encontrado") end
+            if not destination then error(reason or "destino indisponivel") end
+            root.CFrame = destination
+        end)
+        FeatureContext.ReleaseMovement(owner)
+        if not ok then return false, tostring(err) end
+        return true
+    end
+
+    function FeatureContext.TeleportToBase(owner)
+        return manualTeleport(owner or State, FeatureContext.BaseCFrame)
+    end
+
+    function FeatureContext.TeleportToSell(owner)
+        return manualTeleport(owner or State, FeatureContext.PlazaCFrame)
+    end
+
+    function FeatureContext.Terreiros()
+        return AutoStealModule and AutoStealModule.terreiros() or {}
+    end
+
+    local function inventoryExuIds()
+        local ids = {}
+        local seen = {}
+        local backpack = LocalPlayer and (LocalPlayer:FindFirstChildOfClass("Backpack") or LocalPlayer:FindFirstChild("Backpack"))
+        local character = LocalPlayer and LocalPlayer.Character
+        local function collect(container)
+            if not container then return end
+            for _, child in ipairs(container:GetChildren()) do
+                if child:IsA("Tool") then
+                    local id = child:GetAttribute("ExuId")
+                    if id ~= nil then
+                        local key = tostring(id)
+                        if not seen[key] then seen[key] = true; ids[#ids + 1] = key end
+                    end
+                end
+            end
+        end
+        collect(backpack)
+        collect(character)
+        return ids
+    end
+
+    function FeatureContext.InventoryExuIds()
+        return inventoryExuIds()
+    end
+
+    function FeatureContext.TrackExuSource(id, terreiroName)
+        if id == nil or type(terreiroName) ~= "string" then return end
+        local sourceMap = env.__DEPHUB_STEALANEXU_EXU_SOURCES
+        if type(sourceMap) ~= "table" then
+            sourceMap = {}
+            env.__DEPHUB_STEALANEXU_EXU_SOURCES = sourceMap
+        end
+        sourceMap[tostring(id)] = terreiroName
+    end
+
+    function FeatureContext.TrackNewExuSources(before, after, terreiroName)
+        local known = {}
+        for _, id in ipairs(type(before) == "table" and before or {}) do known[tostring(id)] = true end
+        for _, id in ipairs(type(after) == "table" and after or {}) do
+            if not known[tostring(id)] then FeatureContext.TrackExuSource(id, terreiroName) end
+        end
+    end
 end
 
--- Auto Steal geral e Auto Steal por Terreiro compartilham o mesmo mecanismo
--- de prompt/teleporte, mas cada toggle mantem seu proprio filtro e loop.
+-- A unica rotina de roubo e a selecao multipla de terreiros.
 if AutoStealModule then
-    State.AutoSteal = AutoStealModule.new(FeatureContext)
-    State.Features.AutoSteal = State.AutoSteal
-
     local availableTerreiros = AutoStealModule.terreiros()
+    local selectedTerreiros = State.Config.selectedTerreiros
+    if type(selectedTerreiros) ~= "table" then selectedTerreiros = {availableTerreiros[1]} end
+
     State.AutoStealSelection = AutoStealModule.new(FeatureContext, {
         selectedOnly = true,
-        terreiro = availableTerreiros[1],
+        terreiros = selectedTerreiros,
     })
     State.Features.AutoStealSelection = State.AutoStealSelection
 else
@@ -390,15 +508,31 @@ else
     warn("[DepHub] Steal An Exu autorebirth unavailable: " .. tostring(autoRebirthError))
 end
 
--- Auto Hop Server: monitora o Runtime inteiro e troca de servidor quando ele
--- permanece sem Exus. Nao controla o Auto Steal nem disputa o teleporte local.
+-- Auto Hop usa exatamente a mesma selecao de Exus do Auto Steal Selection.
 if AutoHopModule then
-    State.AutoHop = AutoHopModule.new({placeId = game.PlaceId})
+    State.AutoHop = AutoHopModule.new({
+        placeId = game.PlaceId,
+        targetProvider = function()
+            if not State.AutoStealSelection then return nil, "Auto Steal Selection indisponivel" end
+            return State.AutoStealSelection:_targets()
+        end,
+        scopeProvider = function()
+            return State.AutoStealSelection and State.AutoStealSelection:SelectionKey() or ""
+        end,
+    })
     State.Features.AutoHop = State.AutoHop
 else
     warn("[DepHub] Steal An Exu autohop unavailable: " .. tostring(autoHopError))
 end
 
+if AutoPlaceModule then
+    local placeTerreiros = State.Config.placeTerreiros
+    if type(placeTerreiros) ~= "table" then placeTerreiros = {} end
+    State.AutoPlace = AutoPlaceModule.new(FeatureContext, {terreiros = placeTerreiros})
+    State.Features.AutoPlace = State.AutoPlace
+else
+    warn("[DepHub] Steal An Exu autoplace unavailable: " .. tostring(autoPlaceError))
+end
 State:Start()
 
 -- ---------------------------------------------------------------------------
