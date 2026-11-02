@@ -397,10 +397,11 @@ end
 function AutoPlace:PendingCount()
     local count = 0
     local tools = self:_inventoryTools()
+    self:_reconcileSent(tools)
     for _, entry in ipairs(tools) do
         if not self.Placed[entry.key] then
             local source = self:_sourceTerreiro(entry.tool, entry.id)
-            if source and self.Terreiros[source] then count += 1 end
+            if source == nil or self.Terreiros[source] then count += 1 end
         end
     end
     return count
