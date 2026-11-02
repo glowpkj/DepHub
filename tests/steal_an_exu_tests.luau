@@ -2,9 +2,10 @@
 --
 -- What is checked here is the CONTRACT and the mechanism against API doubles, not
 -- the live game: the backend routes from its own ids, loads the feature from the
--- repo, mounts the toggle + terreiro dropdown, and the steal step finds the
--- player's pen by the Owner attribute (never a fixed Pen1), teleports to the
--- Nest, fires the right Runtime prompt and returns to the base -- all without
+-- repo, mounts the toggle + Steal All button, and the steal step finds the
+-- player's pen by the Owner attribute (never a fixed Pen1), teleports onto the
+-- Runtime Exu Root, steals the prompt by zeroing the HoldDuration and firing the
+-- hold (InputHoldBegin/End), restoring the HoldDuration after -- all without
 -- erroring when the world is missing.
 local FEATURE_PREFIX = "src/games/features/stealanexu/"
 
@@ -70,12 +71,19 @@ local function buildWorld(ctx, options)
         local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
         prompt.HoldDuration = 0.5
         prompt.MaxActivationDistance = 6.5
-        -- The prompt exposes the hold API the real game does. The steal now holds
-        -- the prompt (InputHoldBegin -> HoldDuration -> InputHoldEnd); the
-        -- double records each call so the test can assert the route.
-        prompt.Hold = {began = 0, ended = 0}
-        prompt.InputHoldBegin = function(self) self.Hold.began = self.Hold.began + 1 end
-        prompt.InputHoldEnd = function(self) self.Hold.ended = self.Hold.ended + 1 end
+        -- The prompt exposes the hold API the real game does. The steal mechanism
+        -- (confirmed in game) zeroes HoldDuration, then InputHoldBegin + End, then
+        -- restores it. The doubles record each call and the HoldDuration value
+        -- seen AT THE MOMENT of InputHoldBegin, so the test can prove the zeroing.
+        prompt.Hold = {began = 0, ended = 0, durationAtBegin = nil, restored = nil}
+        prompt.InputHoldBegin = function(self)
+            self.Hold.began = self.Hold.began + 1
+            self.Hold.durationAtBegin = self.HoldDuration
+        end
+        prompt.InputHoldEnd = function(self)
+            self.Hold.ended = self.Hold.ended + 1
+            self.Hold.restored = self.HoldDuration
+        end
         fired[#fired + 1] = prompt
     end
     return {
@@ -131,10 +139,7 @@ do
     for _, control in ipairs(ui.Library._Controls) do labels[control.Label] = control end
     check(labels["Auto Steal Exu"] ~= nil and labels["Auto Steal Exu"].Kind == "toggle",
         "the panel has the Auto Steal Exu toggle")
-    local dropdown = labels["Terreiro"]
-    check(dropdown ~= nil and dropdown.Kind == "dropdown", "the panel has the Terreiro dropdown")
-    check(dropdown.Options and #dropdown.Options == 9 and dropdown.Options[1] == "Terreiro1"
-        and dropdown.Options[9] == "Terreiro9", "the dropdown lists Terreiro1..Terreiro9")
+    check(labels["Terreiro"] == nil, "the panel no longer has a Terreiro dropdown (the sweep covers every exu)")
     check(labels["Steal All"] ~= nil and labels["Steal All"].Kind == "button",
         "the panel has the Steal All button")
 
@@ -152,9 +157,9 @@ do
     check(ctx.State.__DEPHUB.StealAnExu == nil, "destroy clears the published state")
 end
 
--- The steal step: find the pen by Owner (not Pen1), teleport ONTO the Exu Root
--- (not the Nest -- the bug where the Nest sat far from the exu), HOLD the Runtime
--- prompt (InputHoldBegin/End -- the fire does not steal), then return to the base.
+-- The steal step: find the pen by Owner (not Pen1), teleport ONTO the Exu Root,
+-- steal the prompt by zeroing the HoldDuration and firing InputHoldBegin/End
+-- (restoring the HoldDuration), then return to the base.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
@@ -183,14 +188,22 @@ do
     local ok, stole = feature:StealOnce()
     check(ok == true and stole >= 1, "StealOnce reaches and counts exu prompts")
 
-    -- The prompt is ACTED ON: the steal tries the hold API (InputHoldBegin) --
-    -- the routes in order (Begin puro -> hold -> fire). Every prompt reached had
-    -- at least one InputHoldBegin.
-    local actedAll = true
+    -- The prompt is ACTED ON by the working mechanism: HoldDuration is zeroed at
+    -- the moment InputHoldBegin fires, and the hold is closed (InputHoldEnd).
+    local actedAll, zeroedAll = true, true
     for _, prompt in ipairs(world.fired) do
-        if not (prompt.Hold.began >= 1) then actedAll = false end
+        if not (prompt.Hold.began >= 1 and prompt.Hold.ended >= 1) then actedAll = false end
+        if prompt.Hold.durationAtBegin ~= 0 then zeroedAll = false end
     end
-    check(actedAll, "every reached prompt is acted on (InputHoldBegin called)")
+    check(actedAll, "every reached prompt is held (InputHoldBegin then InputHoldEnd)")
+    check(zeroedAll, "the steal zeroes HoldDuration before firing the hold")
+
+    -- No residue: the HoldDuration is restored to its original 0.5 after the steal.
+    local restoredAll = true
+    for _, prompt in ipairs(world.fired) do
+        if prompt.HoldDuration ~= 0.5 then restoredAll = false end
+    end
+    check(restoredAll, "the steal restores the original HoldDuration (no residue)")
 
     -- The teleport onto an exu lands on its Root (offset 3 from the Nest); it
     -- must not use the bare Nest position.
@@ -357,42 +370,36 @@ do
     backend:Destroy()
 end
 
--- Steal All: one pass over every Terreiro (9 down to 1), firing each Runtime
--- prompt, and returning to the CFrame the pass started from. The pass is driven
--- directly (StealAll) because the harness does not run spawned threads.
+-- Steal All: one pass over EVERY exu in the Runtime, stealing each and returning
+-- to the CFrame the pass started from. The pass is driven directly (StealAll)
+-- because the harness does not run spawned threads.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
     local ws = ctx.Services.Workspace
 
     local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ws
-    local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
     local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ws
     local fired = {}
 
-    -- Two terreiros, each with two nests; every nest gets a Runtime exu whose Root
-    -- sits on it. Nest positions are unique so nearestRuntimeExu picks the right one.
-    local nestPositions = {}
-    for _, terreiroName in ipairs({"Terreiro1", "Terreiro9"}) do
-        local terreiro = Instance.new("Folder"); terreiro.Name = terreiroName; terreiro.Parent = terreiros
-        local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
-        for index = 1, 2 do
-            local x = (#nestPositions + 1) * 100
-            local nest = Instance.new("Part"); nest.Name = "Nest" .. index; nest.Parent = nests
-            nest.CFrame = CFrame.new(x, 0, 0)
-            nestPositions[#nestPositions + 1] = x
-
-            local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
-            local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
-            root.CFrame = CFrame.new(x, 0, 0)
-            local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
-            prompt.MaxActivationDistance = 6.5
-            prompt.HoldDuration = 0.5
-            prompt.Hold = {began = 0, ended = 0}
-            prompt.InputHoldBegin = function(self) self.Hold.began = self.Hold.began + 1 end
-            prompt.InputHoldEnd = function(self) self.Hold.ended = self.Hold.ended + 1 end
-            fired[#fired + 1] = prompt
+    -- Four exus in the Runtime, each with a Root.ProximityPrompt. The sweep is by
+    -- Runtime children, so the count of steals must equal the exu count (this is
+    -- the "pega varios" contract).
+    for index = 1, 4 do
+        local x = index * 100
+        local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
+        local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
+        root.CFrame = CFrame.new(x, 0, 0)
+        local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
+        prompt.MaxActivationDistance = 6.5
+        prompt.HoldDuration = 0.5
+        prompt.Hold = {began = 0, ended = 0, durationAtBegin = nil}
+        prompt.InputHoldBegin = function(self)
+            self.Hold.began = self.Hold.began + 1
+            self.Hold.durationAtBegin = self.HoldDuration
         end
+        prompt.InputHoldEnd = function(self) self.Hold.ended = self.Hold.ended + 1 end
+        fired[#fired + 1] = prompt
     end
 
     -- A base for the origin position, and a character that starts at a known spot.
@@ -411,14 +418,16 @@ do
     local feature = backend.Features.AutoSteal
 
     local ok, count = feature:StealAll()
-    check(ok == true and count == 4, "Steal All counts every exu it stole (4)")
-    -- Every exu is ACTED ON through the hold API at least once (the steal tries
-    -- the hold API before the plain fire).
-    local acted = true
+    check(ok == true and count == 4, "Steal All counts every exu in the Runtime (4)")
+    -- Every exu is ACTED ON by the working mechanism: HoldDuration zeroed at
+    -- InputHoldBegin and the hold closed.
+    local acted, zeroed = true, true
     for _, prompt in ipairs(fired) do
-        if not (prompt.Hold.began >= 1) then acted = false end
+        if not (prompt.Hold.began >= 1 and prompt.Hold.ended >= 1) then acted = false end
+        if prompt.Hold.durationAtBegin ~= 0 then zeroed = false end
     end
-    check(acted, "every exu in the pass is acted on (InputHoldBegin called)")
+    check(acted, "every exu in the pass is held (InputHoldBegin then InputHoldEnd)")
+    check(zeroed, "the pass zeroes HoldDuration before firing each hold")
     check(hrp.Position == Vector3.new(0, 50, 0), "the pass returns to the base it started from")
 
     backend:Destroy()

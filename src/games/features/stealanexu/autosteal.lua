@@ -3,20 +3,21 @@
 --
 -- O JOGO (o que este modulo assume):
 --
---   * workspace.Map.Terreiros.TerreiroN -- as fases, N = 1..9. Cada uma tem uma
---     pasta .Nests com Nest1..Nest8: o LUGAR onde um Exu esta (a POSICAO).
---   * workspace.Runtime -- os MODELOS dos Exu. O prompt vive em cada modelo:
---     Model.Root.ProximityPrompt. E de la que se PEGA o prompt; o Nest so da a
---     posicao.
+--   * workspace.Runtime -- os MODELOS dos Exu, um por Exu no servidor. O prompt
+--     vive em cada modelo: Model.Root.ProximityPrompt. E a VARREDURA e' aqui:
+--     percorre os filhos do Runtime e rouba um por um -- e' assim que se pega
+--     VARIOS Exus (os Nests podem apontar pro mesmo Exu por proximidade).
+--   * workspace.Map.Terreiros.TerreiroN -- as fases, N = 1..9, com .Nests
+--     Nest1..8. Sao so referencia visual do jogo; o roubo nao depende delas.
 --   * workspace.Map.Pens.PenX -- as bases, uma por jogador. Cada base tem o
 --     atributo "Owner" (o UserId do dono) e um BadgeAnchor (o ponto onde o
 --     jogador "guarda" o Exu). A NUMERACAO Pen1/Pen2 muda por servidor, entao a
 --     base certa so se acha pelo atributo Owner == LocalPlayer.UserId.
 --
 -- O CICLO de cada roubo (pedido do usuario):
---   1) teleporta pro Exu;
---   2) espera o prompt ficar ativo (no alcance);
---   3) dispara o prompt; se "ativou", teleporta pra base;
+--   1) teleporta pro Exu (Root do modelo do Runtime);
+--   2) espera o prompt assentar (no alcance);
+--   3) dispara o prompt (HoldDuration=0 + InputHoldBegin/End); teleporta pra base;
 --   4) espera VALIDATE_WAIT na base (o jogo confirmar o guardar);
 --   5) proximo Exu.
 --
@@ -51,13 +52,9 @@ AutoSteal.__index = AutoSteal
 --                      pro prompt assentar antes de segurar.
 --   POST_HOLD_WAIT  -- quanto ficar EM CIMA do Exu depois do InputHoldEnd, pro
 --                      servidor creditar o roubo antes de a gente sair de perto.
---   SETTLE_HOLD     -- quanto esperar um Triggered depois de cada tentativa de
---                      roubo (InputHoldBegin / hold / fire) antes de ir pra
---                      proxima rota.
 local VALIDATE_WAIT = 1.5
 local SETTLE_WAIT = 0.25
 local POST_HOLD_WAIT = 0.15
-local SETTLE_HOLD = 0.25
 
 -- Steal All (botao): mesma logica, so que mais apertada que o toggle (o usuario
 -- quer o botao "um pouco mais forte e rapido"). Ainda assim, folgada o bastante
@@ -65,16 +62,8 @@ local SETTLE_HOLD = 0.25
 local ALL_VALIDATE_WAIT = 0.8
 local ALL_SETTLE_WAIT = 0.2
 local ALL_POST_HOLD_WAIT = 0.15
-local ALL_SETTLE_HOLD = 0.2
 -- Um respiro entre um Exu e o proximo, pra nao metralhar o servidor.
 local ALL_STEP_GAP = 0.15
-local ALL_TERREIRO_FROM = 9
-local ALL_TERREIRO_TO = 1
-
--- O numero de terreiros e de nests por terreiro. O jogo usa Terreiro1..9 e
--- Nest1..8; mantemos como constantes para o dropdown e a varredura sairem daqui.
-AutoSteal.TERREIRO_COUNT = 9
-AutoSteal.NEST_COUNT = 8
 
 -- --- Debug ----------------------------------------------------------------
 -- Log de diagnostico por etapa. Vai pro console (print) e fica guardado em
@@ -105,18 +94,9 @@ local function debugLog(self, ...)
     end
 end
 
--- Os rotulos do dropdown de terreiro (Terreiro1..Terreiro9).
-function AutoSteal.terreiros()
-    local list = {}
-    for index = 1, AutoSteal.TERREIRO_COUNT do
-        list[#list + 1] = "Terreiro" .. index
-    end
-    return list
-end
-
 function AutoSteal.new(context, options)
-    options = options or {}
     local self = setmetatable({}, AutoSteal)
+    options = options or {}
     -- Contexto compartilhado do backend (helpers de mundo). Se vier um options
     -- no lugar (compatibilidade), aceita.
     if type(context) == "table" and context.MyPen then
@@ -127,7 +107,6 @@ function AutoSteal.new(context, options)
     end
     self.Enabled = false
     self.Thread = nil
-    self.Terreiro = options.terreiro or "Terreiro1"
     self.LastError = nil
     self.LastStatus = "idle"
     self.Destroyed = false
@@ -190,56 +169,28 @@ function AutoSteal:PenAnchor()
     return nil
 end
 
--- A pasta de Nests do terreiro pedido (workspace.Map.Terreiros.<terreiro>.Nests).
-function AutoSteal:TerreiroNests(name)
-    local map = mapFolder()
-    if not map then return nil end
-    local terreiros = map:FindFirstChild("Terreiros")
-    if not terreiros then return nil end
-    local terreiro = terreiros:FindFirstChild(self.Terreiro or name or "")
-    if not terreiro then return nil end
-    return terreiro:FindFirstChild("Nests")
-end
-
--- Onde roubar: a posicao do Nest. Nest e um Model ou uma Part; devolve a CFrame.
-local function nestPosition(nest)
-    if not nest then return nil end
-    if nest:IsA("BasePart") then return nest.CFrame end
-    if nest:IsA("Model") then
-        if nest.PrimaryPart then return nest.PrimaryPart.CFrame end
-        local ok, pivot = pcall(function() return nest:GetPivot() end)
-        if ok and pivot then return pivot end
-    end
-    return nil
-end
-
--- O Exu do Runtime mais perto de uma posicao. Os modelos no Runtime sao todos
--- iguais (mesmo nome), entao a associacao Nest -> Exu e por PROXIMIDADE: chega
--- perto, pega o do Runtime que esta ali. Devolve (model, prompt, rootPart), onde
--- rootPart e a BasePart que carrega o prompt -- e pra ONDE se teleporta.
-local function nearestRuntimeExu(position)
+-- TODOS os Exus do Runtime, cada um com seu Root/prompt. Os modelos sao iguais
+-- (mesmo nome), entao a unica varredura confiavel e' percorrer os filhos do
+-- Runtime -- e' isso que garante "pegar VARIOS", em vez de bater sempre no
+-- mesmo Exu por proximidade. Devolve uma lista de {model, prompt, rootPart}.
+local function runtimeExus()
+    local list = {}
     local runtime = Workspace:FindFirstChild("Runtime")
-    if not runtime then return nil, nil, nil end
-    local best, bestPrompt, bestRoot, bestDistance = nil, nil, nil, math.huge
+    if not runtime then return list end
     for _, model in ipairs(runtime:GetChildren()) do
         local root = model:FindFirstChild("Root")
         local prompt = root and root:FindFirstChild("ProximityPrompt")
         if prompt then
-            -- O ponto de referencia do Exu: o proprio Root se for BasePart, senao
-            -- o PrimaryPart do modelo.
-            local rootPart, origin
-            if root and root:IsA("BasePart") then rootPart, origin = root, root.Position
-            elseif model:IsA("Model") and model.PrimaryPart then rootPart, origin = model.PrimaryPart, model.PrimaryPart.Position
-            elseif model:IsA("BasePart") then rootPart, origin = model, model.Position end
-            if origin then
-                local distance = (origin - position).Magnitude
-                if distance < bestDistance then
-                    best, bestPrompt, bestRoot, bestDistance = model, prompt, rootPart, distance
-                end
+            local rootPart
+            if root and root:IsA("BasePart") then rootPart = root
+            elseif model:IsA("Model") and model.PrimaryPart then rootPart = model.PrimaryPart
+            elseif model:IsA("BasePart") then rootPart = model end
+            if rootPart then
+                list[#list + 1] = {model = model, prompt = prompt, rootPart = rootPart}
             end
         end
     end
-    return best, bestPrompt, bestRoot
+    return list
 end
 
 -- --- Personagem: root, noclip e ancoragem ---------------------------------
@@ -337,89 +288,58 @@ end
 
 -- Rouba o Exu.
 --
--- Historico (tudo medido no jogo, com espiao no prompt):
---   * fireproximityprompt dispara o Triggered local, mas o servidor IGNORA
---     (o Exu nao e' roubado).
---   * O [PromptSpy3] provou que o DEX NAO chama InputHoldBegin/End e nao usa
---     hold nenhum: ele dispara o Triggered DIRETO (igual fire) e MESMO ASSIM
---     rouba. Ou seja, o Triggered e' emitido por um caminho que o servidor
---     aceita -- nao pelo fireproximityprompt.
---   * O hold completo (Began -> 0.5s -> Ended) chegou a roubar no teste, mas o
---     spy mostrou que nao e' o mecanismo (o Triggered ja disparava sozinho).
+-- MECANISMO (confirmado em jogo, script de referencia do usuario):
 --
--- Entao aqui a gente tenta os caminhos NA ORDEM que mais roubam, e mede o
--- resultado pelo proprio Triggered (que o Dex tambem usa como sinal):
---   1) InputHoldBegin "puro" -- o que casa com o comportamento instantaneo do
---      Dex e nao depende de esperar HoldDuration. Se o prompt responder com um
---      Triggered, consideramos roubado.
---   2) InputHoldBegin + End (hold completo) -- caso o (1) nao responda.
---   3) fireproximityprompt -- ultimo recurso (executor/jogo sem InputHold*).
+--     prompt.HoldDuration = 0        -- <- a peca-chave
+--     prompt:InputHoldBegin()
+--     prompt:InputHoldEnd()
 --
--- `settle`: quanto esperar um Triggered depois de cada tentativa.
+-- Com o HoldDuration zerado o hold completa NA HORA, e o servidor aceita o
+-- roubo. Sem zerar, o InputHoldEnd chega antes de o hold real (0.5s) terminar
+-- e o servidor descarta -- foi por isso que o fire e o hold completo nao
+-- roubavam de forma consistente. O [PromptSpy3] mostrou que o Dex nao usa hold:
+-- ele faz exatamente isto (zera o tempo e fecha o hold na hora).
+--
+-- Restauramos o HoldDuration original logo depois, pra nao deixar residuo no
+-- prompt do jogo (regra 3: cleanup real).
+--
+-- Se a versao do jogo/executor nao tiver InputHoldBegin/End, cai no
+-- fireproximityprompt (o antigo), pra nunca travar.
+--
 -- `postHold`: respiro em cima do Exu antes de voltar pra base (pro servidor
---             creditar). Devolve true se alguma tentativa foi enviada.
-local function stealPrompt(prompt, settle, postHold)
+--             creditar). Devolve true se a acao foi enviada.
+local function stealPrompt(prompt, postHold)
     if not prompt then return false end
-    settle = tonumber(settle) or 0.2
     postHold = tonumber(postHold) or 0
-
-    -- Observa o Triggered (o Dex tambem usa esse sinal).
-    local triggered = false
-    local connection
-    pcall(function()
-        connection = prompt.Triggered:Connect(function() triggered = true end)
-    end)
-
-    local function waitTriggered()
-        local deadline = os.clock() + settle
-        while not triggered and os.clock() < deadline do task.wait(0.02) end
-        return triggered
-    end
 
     local hasBegin = type(prompt.InputHoldBegin) == "function"
     local hasEnd = type(prompt.InputHoldEnd) == "function"
-    local sent = false
 
-    -- 1) InputHoldBegin puro (rota mais proxima do Dex).
     if hasBegin then
-        local ok = pcall(function() prompt:InputHoldBegin() end)
-        if ok then
-            sent = true
-            if waitTriggered() then
-                if hasEnd then pcall(function() prompt:InputHoldEnd() end) end
-                task.wait(postHold)
-                if connection then pcall(function() connection:Disconnect() end) end
-                return true
-            end
-        end
-    end
+        -- Guarda o valor real pra restaurar depois (sem residuo).
+        local original = prompt.HoldDuration
+        pcall(function() prompt.HoldDuration = 0 end)
 
-    -- 2) Hold completo (Began -> HoldDuration -> Ended).
-    if hasBegin and hasEnd then
-        pcall(function() prompt:InputHoldBegin() end)
-        local hold = tonumber(prompt.HoldDuration) or 0.5
-        if hold < 0.05 then hold = 0.05 end
-        task.wait(hold)
-        pcall(function() prompt:InputHoldEnd() end)
-        sent = true
-        if waitTriggered() then
+        local began = pcall(function() prompt:InputHoldBegin() end)
+        if hasEnd then pcall(function() prompt:InputHoldEnd() end) end
+
+        -- Restaura o HoldDuration do jogo assim que o roubo foi despachado.
+        pcall(function() prompt.HoldDuration = original end)
+
+        if began then
             task.wait(postHold)
-            if connection then pcall(function() connection:Disconnect() end) end
             return true
         end
     end
 
-    -- 3) Fire instantaneo (ultimo recurso).
+    -- Fallback (executor/jogo sem InputHold*): o fire instantaneo.
     local fire = fireproximityprompt
     if type(fire) == "function" then
         local ok = pcall(fire, prompt)
-        sent = sent or ok
-        waitTriggered()
+        task.wait(postHold)
+        return ok
     end
-
-    task.wait(postHold)
-    if connection then pcall(function() connection:Disconnect() end) end
-    return sent
+    return false
 end
 
 -- O prompt esta no alcance? (Enabled e a distancia dentro do MaxActivationDistance)
@@ -436,15 +356,14 @@ end
 
 -- --- O passo de roubo -----------------------------------------------------
 
--- Um roubo. A CORRECAO do bug "nao pega": o Nest NAO fica sempre em cima do Exu
--- (o log mostrou dist de 14 a 24 studs em alguns Nests, com range 6.5). Entao a
--- ordem certa e:
---   1) acha o Exu do Runtime perto do Nest -> pega a POSICAO REAL do Root dele;
---   2) teleporta pra CIMA do Root (dentro dos 6.5), nao pro Nest;
---   3) SEGURA o prompt (InputHoldBegin/End) -- o fire instantaneo nao rouba;
---   4) volta pra base pra validar.
+-- Um roubo, preso a UM Exu do Runtime.
+--   1) vai pra CIMA do Root do Exu (dentro do MaxActivationDistance);
+--   2) zera o HoldDuration e fecha o hold (InputHoldBegin/End) -- o mecanismo
+--      confirmado em jogo; o fire instantaneo nao rouba;
+--   3) volta pra base pra validar.
+-- `target`: {model, prompt, rootPart} (vindo de runtimeExus()).
 -- options.validateWait / settleWait / postHold / label: como antes.
-function AutoSteal:_stealAt(nestTarget, rootPosition, options)
+function AutoSteal:_stealAt(target, options)
     options = options or {}
     local label = options.label or "?"
     local anchor = self:PenAnchor()
@@ -454,19 +373,17 @@ function AutoSteal:_stealAt(nestTarget, rootPosition, options)
         return false
     end
 
-    local position = rootPosition or nestTarget.Position
-
-    -- 1) Acha o Exu do Runtime perto do Nest e a posicao REAL do Root dele.
-    local model, prompt, rootPart = nearestRuntimeExu(position)
+    local prompt = target and target.prompt
+    local rootPart = target and target.rootPart
     if not prompt or not rootPart then
-        debugLog(self, label, "1) sem Exu no Runtime perto do Nest")
+        debugLog(self, label, "1) Exu invalido (sem Root/prompt)")
         self:TeleportTo(anchor)
         task.wait(options.validateWait or VALIDATE_WAIT)
         return false
     end
 
-    -- 2) Teleporta pra CIMA do Root do Exu (nao pro Nest) -- e o que faz o prompt
-    --    valer de verdade no servidor.
+    -- 2) Teleporta pra CIMA do Root do Exu -- e o que faz o prompt valer de
+    --    verdade no servidor.
     self:TeleportTo(rootPart.CFrame)
     debugLog(self, label, "2) teleportou pro Root do Exu (",
         rootPart:GetFullName(), ")")
@@ -487,10 +404,10 @@ function AutoSteal:_stealAt(nestTarget, rootPosition, options)
             string.format("%.1f", distance), "range=", tostring(range), ")")
     end
 
-    -- 4) Rouba. stealPrompt tenta InputHoldBegin puro, depois o hold completo,
-    --    depois o fire -- o Triggered de cada rota diz qual o servidor aceitou.
-    --    E fica em cima do Exu (postHold) pro servidor creditar antes de sair.
-    local stolen = stealPrompt(prompt, options.settle or SETTLE_HOLD, options.postHold or POST_HOLD_WAIT)
+    -- 4) Rouba zerando o HoldDuration e fechando o hold na hora (mecanismo
+    --    confirmado em jogo), e fica em cima do Exu (postHold) pro servidor
+    --    creditar antes de teleportar.
+    local stolen = stealPrompt(prompt, options.postHold or POST_HOLD_WAIT)
     debugLog(self, label, "4) roubo ->", tostring(stolen),
         "HoldDuration=", tostring(prompt.HoldDuration))
 
@@ -503,54 +420,49 @@ function AutoSteal:_stealAt(nestTarget, rootPosition, options)
     return stolen
 end
 
--- Um ciclo do Auto Steal Exu: varre os Nests do Terreiro escolhido, roubando um
--- por um (cada um com sua ida-e-volta pra base).
+-- Um ciclo do Auto Steal Exu: varre TODOS os Exus do Runtime, roubando um por um
+-- (cada um com sua ida-e-volta pra base). A varredura e' pelos filhos do Runtime
+-- -- nao pelos Nests -- porque e' isso que pega VARIOS Exus: os Nests podem
+-- apontar pro mesmo Exu por proximidade, e ai so um era roubado.
 function AutoSteal:StealOnce()
     if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
-    local nests = self:TerreiroNests()
-    if not nests then
-        self.LastError = "terreiro nao encontrado: " .. tostring(self.Terreiro)
-        debugLog(self, "ABORTA: Terreiro nao encontrado (", tostring(self.Terreiro), ")")
+    local exus = runtimeExus()
+    if #exus == 0 then
+        self.LastError = "nenhum Exu no Runtime"
+        debugLog(self, "ABORTA: workspace.Runtime sem Exus")
+        self.LastStatus = "no targets"
         return false, 0
     end
 
-    debugLog(self, "=== ciclo Auto Steal Exu (", tostring(self.Terreiro), ") ===")
+    debugLog(self, "=== ciclo Auto Steal Exu (", tostring(#exus), "Exus) ===")
     local stole = 0
-    for index = 1, AutoSteal.NEST_COUNT do
-        local nest = nests:FindFirstChild("Nest" .. index)
-        local target = nest and nestPosition(nest)
-        if target then
-            local ok = self:_stealAt(target, target.Position, {
-                label = "Nest" .. index,
-                validateWait = VALIDATE_WAIT,
-                settleWait = SETTLE_WAIT,
-                settle = SETTLE_HOLD,
-                postHold = POST_HOLD_WAIT,
-            })
-            if ok then stole = stole + 1 end
-        else
-            debugLog(self, "Nest" .. index, "ausente")
-        end
+    for index = 1, #exus do
+        local ok = self:_stealAt(exus[index], {
+            label = "Exu" .. index,
+            validateWait = VALIDATE_WAIT,
+            settleWait = SETTLE_WAIT,
+            postHold = POST_HOLD_WAIT,
+        })
+        if ok then stole = stole + 1 end
     end
 
-    debugLog(self, "=== fim do ciclo: roubou", stole, "de", tostring(AutoSteal.NEST_COUNT), "===")
+    debugLog(self, "=== fim do ciclo: roubou", stole, "de", tostring(#exus), "===")
     self.LastStatus = stole > 0 and "stealing" or "no targets"
     return stole > 0, stole
 end
 
 -- --- Steal All (botao) ----------------------------------------------------
 
--- Uma passada por TODOS os Exus: Terreiro9 -> Terreiro1 (ordem pedida pelo
--- usuario), Nest1..8 em cada. Mesmo ciclo do toggle, so que mais rapido e com o
--- disparo de longe antes de piscar. No fim volta pro CFrame de origem.
+-- Uma passada por TODOS os Exus do Runtime, do ultimo pro primeiro. Mesmo ciclo
+-- do toggle, so que mais rapido. No fim volta pro CFrame de origem.
 function AutoSteal:StealAll()
     if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
 
-    local map = mapFolder()
-    local terreiros = map and map:FindFirstChild("Terreiros")
-    if not terreiros then
-        self.LastError = "Terreiros nao encontrados"
-        debugLog(self, "ABORTA: workspace.Map.Terreiros ausente")
+    local exus = runtimeExus()
+    if #exus == 0 then
+        self.LastError = "nenhum Exu no Runtime"
+        debugLog(self, "ABORTA: workspace.Runtime sem Exus")
+        self.LastStatus = "no targets"
         return false, 0
     end
 
@@ -559,30 +471,18 @@ function AutoSteal:StealAll()
     self.LastError = nil
     local stole, skipped = 0, 0
 
-    debugLog(self, "=== Steal All: Terreiro" .. ALL_TERREIRO_FROM .. " -> Terreiro" .. ALL_TERREIRO_TO, "===")
+    debugLog(self, "=== Steal All:", #exus, "Exus ===")
 
-    for terreiroIndex = ALL_TERREIRO_FROM, ALL_TERREIRO_TO, -1 do
-        local terreiro = terreiros:FindFirstChild("Terreiro" .. terreiroIndex)
-        local nests = terreiro and terreiro:FindFirstChild("Nests")
-        if not nests then
-            debugLog(self, "Terreiro" .. terreiroIndex, "sem .Nests (pulado)")
-        else
-            for nestIndex = 1, AutoSteal.NEST_COUNT do
-                local nest = nests:FindFirstChild("Nest" .. nestIndex)
-                local target = nest and nestPosition(nest)
-                if target then
-                    local ok = self:_stealAt(target, target.Position, {
-                        label = "T" .. terreiroIndex .. ".Nest" .. nestIndex,
-                        validateWait = ALL_VALIDATE_WAIT,
-                        settleWait = ALL_SETTLE_WAIT,
-                        settle = ALL_SETTLE_HOLD,
-                        postHold = ALL_POST_HOLD_WAIT,
-                    })
-                    if ok then stole = stole + 1 else skipped = skipped + 1 end
-                    task.wait(ALL_STEP_GAP)
-                end
-            end
-        end
+    -- Do ultimo pro primeiro (a ordem pedida pelo usuario para a varredura).
+    for index = #exus, 1, -1 do
+        local ok = self:_stealAt(exus[index], {
+            label = "Exu" .. index,
+            validateWait = ALL_VALIDATE_WAIT,
+            settleWait = ALL_SETTLE_WAIT,
+            postHold = ALL_POST_HOLD_WAIT,
+        })
+        if ok then stole = stole + 1 else skipped = skipped + 1 end
+        task.wait(ALL_STEP_GAP)
     end
 
     -- Volta pra base no fim (tambem e onde o ultimo passo ja parou).
@@ -624,7 +524,7 @@ end
 -- --- Ciclo de vida --------------------------------------------------------
 
 function AutoSteal:_loop()
-    debugLog(self, "loop Auto Steal Exu iniciado (", tostring(self.Terreiro), ")")
+    debugLog(self, "loop Auto Steal Exu iniciado")
     self:_enterStealState()
     while self.Enabled do
         local done, result = pcall(function() return self:StealOnce() end)
@@ -657,11 +557,6 @@ end
 
 function AutoSteal:IsEnabled()
     return self.Enabled == true
-end
-
-function AutoSteal:SetTerreiro(name)
-    self.Terreiro = tostring(name or "Terreiro1")
-    return true
 end
 
 function AutoSteal:Destroy()
