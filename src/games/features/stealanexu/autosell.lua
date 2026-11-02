@@ -1,12 +1,13 @@
 -- Steal An Exu -- Auto Sell All (vende TODOS os Exus de uma vez).
 --
--- O jogo expoe um botao "Vender Todos" na propria GUI:
+-- O jogo expoe um container "Vender Todos" na propria GUI:
 --
---     game.Players.LocalPlayer.PlayerGui.Menus["Vender Todos"].Button
+--     game.Players.LocalPlayer.PlayerGui.Menus["Vender Todos"]
 --
--- Clicar nele vende os Exus do jogador. O botao e' um GuiButton de verdade, entao
--- o jeito de acionar e' o mesmo de um clique: disparar a ativacao do GuiButton
--- (gui:Activate()) ou, se o executor tiver, o click virtual no objeto.
+-- Esse container e' um Frame; o CLICAVEL (GuiButton) fica dentro dele. Entao a
+-- gente acha o container e desce ate' o primeiro GuiButton pra acionar. O botao
+-- e' acionado como um clique: o clique virtual do executor (firesignal no
+-- MouseButton1Click, que e' o mesmo efeito do mouse) ou o :Activate() oficial.
 --
 -- E' uma ACAO de passada unica (botao no painel), nao um loop: chama uma vez e
 -- pronto. Se o jogo so vender um Exu por clique, a gente repete ate o botao
@@ -82,17 +83,19 @@ end
 
 -- --- O alvo (o botao da GUI) ----------------------------------------------
 
--- O GuiButton "Vender Todos" do jogador, ou nil + motivo. Varre o caso comum
--- (Menus.<nome>.Button) e tambem aceita o botao direto em Menus, caso o jogo
--- mude a estrutura.
+-- O objeto "Vender Todos" do jogador. O nome que o usuario mostrou e':
+--
+--     PlayerGui.Menus["Vender Todos"]        -- isto e' um Frame (o container)
+--
+-- O clicavel (GuiButton de verdade, com MouseButton1Click/Activate) esta DENTRO
+-- dele. Entao: acha o container e, se ele nao for ele mesmo um botao, desce ate'
+-- o primeiro GuiButton que tiver. Devolve o objeto a acionar.
 function AutoSell:Button()
     local player = game:GetService("Players").LocalPlayer
     if not player then return nil, "sem LocalPlayer" end
 
-    -- Caminho real (o que o usuario mostrou): player.PlayerGui.
     local gui = player.PlayerGui
     if not gui then
-        -- Fallback: procura o PlayerGui entre os filhos do jogador.
         local found = player:FindFirstChildOfClass("PlayerGui") or player:FindFirstChild("PlayerGui")
         gui = found
     end
@@ -100,31 +103,45 @@ function AutoSell:Button()
 
     local folder = gui:FindFirstChild(SELL_FOLDER)
     local node = folder and folder:FindFirstChild(SELL_BUTTON_NAME)
-    -- Caminho esperado: Menus["Vender Todos"].Button (um GuiButton).
-    local button = node and node:FindFirstChild("Button")
-    if button then return button end
-    -- Fallbacks: o proprio node ja sendo o botao, ou o botao solto.
-    if node and (node:IsA("GuiButton") or type(node.Activate) == "function") then return node end
-    local loose = gui:FindFirstChild("Vender Todos", true)
-    if loose then
-        local inner = loose:FindFirstChild("Button")
-        if inner then return inner end
-        if loose:IsA("GuiButton") then return loose end
+    if not node then
+        node = gui:FindFirstChild(SELL_BUTTON_NAME, true)
     end
-    return nil, "botao 'Vender Todos' nao encontrado no PlayerGui"
+    if not node then return nil, "botao 'Vender Todos' nao encontrado no PlayerGui" end
+
+    -- O proprio node ja e' um botao? Usa ele.
+    if node:IsA("GuiButton") then return node end
+
+    -- Senao desce: o clicavel e' um GuiButton dentro do Frame.
+    local inner = node:FindFirstChildWhichIsA("GuiButton", true)
+    if inner then return inner end
+    -- Caso o "botao" seja um Frame com .Button (como no caminho do usuario).
+    local named = node:FindFirstChild("Button")
+    if named and named:IsA("GuiButton") then return named end
+    if named then return named end
+
+    -- Nao achou um GuiButton: devolve o node (tenta Activate/Click generico).
+    return node
 end
 
--- Um clique no botao da GUI. Prefere o click virtual do executor (age como um
--- clique real no GuiButton); senao usa o :Activate() do GuiButton, que e' o
--- caminho oficial pra acionar sem mouse.
+-- Um clique no objeto da GUI. O caminho certo e' o clique virtual do executor no
+-- GuiButton (mesmo efeito do mouse); senao o :Activate() oficial do GuiButton.
+--
+-- IMPORTANTE: so toca em MouseButton1Click quando o objeto REALMENTE tem esse
+-- sinal (GuiButton). Indexar ".MouseButton1Click" num Frame da erro, e o erro
+-- escapava do pcall porque a indexacao acontecia ANTES da chamada.
 function AutoSell:Click(button)
     if not button then return false end
 
-    -- 1) clique virtual no objeto, se o executor expuser (mesmo efeito do mouse).
-    local virtual = type(firesignal) == "function" and button.MouseButton1Click
-    if virtual then
-        local ok = pcall(firesignal, button.MouseButton1Click)
-        if ok then return true end
+    -- 1) clique virtual no GuiButton, SE ele tiver o sinal MouseButton1Click.
+    if type(firesignal) == "function" then
+        local hasSignal = pcall(function() return button.MouseButton1Click end)
+        if hasSignal then
+            local signal = button.MouseButton1Click
+            if signal ~= nil then
+                local ok = pcall(firesignal, signal)
+                if ok then return true end
+            end
+        end
     end
 
     -- 2) caminho oficial do GuiButton.
@@ -192,12 +209,15 @@ function AutoSell:StartSell()
     end
     debugLog(self, "venda iniciada (botao)")
     self.Thread = task.spawn(function()
+        -- O self.Thread SEMPRE e' limpo no fim, mesmo se Sell() explodir: sem
+        -- isso o botao ficaria "travado" (toda chamada seguinte cairia no
+        -- "ja tem uma passada rodando"). O pcall externo cuida do erro.
         local ok, err = pcall(function() return self:Sell() end)
+        self.Thread = nil
         if not ok then
             self.LastError = tostring(err)
             debugLog(self, "VENDA ERRO:", tostring(err))
         end
-        self.Thread = nil
         debugLog(self, "venda terminada")
     end)
     return true

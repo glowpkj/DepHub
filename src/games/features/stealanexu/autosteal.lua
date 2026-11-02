@@ -14,12 +14,11 @@
 --     jogador "guarda" o Exu). A NUMERACAO Pen1/Pen2 muda por servidor, entao a
 --     base certa so se acha pelo atributo Owner == LocalPlayer.UserId.
 --
--- O CICLO de cada roubo (pedido do usuario):
---   1) teleporta pro Exu (Root do modelo do Runtime);
---   2) espera o prompt assentar (no alcance);
---   3) dispara o prompt (HoldDuration=0 + InputHoldBegin/End); teleporta pra base;
---   4) espera VALIDATE_WAIT na base (o jogo confirmar o guardar);
---   5) proximo Exu.
+-- O CICLO de cada roubo (script de referencia do usuario, que funciona):
+--   1) teleporta pro modelo do Exu (GetPivot().Position + Vector3.new(0,3,0));
+--   2) task.wait(0.1);
+--   3) dispara o prompt (HoldDuration=0 + InputHoldBegin/End) e volta pra base;
+--   4) proximo Exu.
 --
 -- Enquanto roda, o personagem fica ANCORADO no ar e SEM colisao (noclip): sem
 -- gravidade, sem colisao, sem fisica brigando com o teleporte. Ao parar, tudo e
@@ -41,30 +40,15 @@ local LocalPlayer = Players.LocalPlayer
 local AutoSteal = {}
 AutoSteal.__index = AutoSteal
 
--- TEMPOS (calibraveis). O usuario reclamou que "nao pega os exu, acho que ta mto
--- rapido", entao tudo aqui esta folgado de proposito -- da pra ir apertando
--- conforme o jogo responder.
---
--- Auto Steal Exu (toggle):
---   VALIDATE_WAIT   -- quanto esperar na base depois de roubar (o jogo confirmar
---                      o guardar) antes de ir pro proximo Exu.
---   SETTLE_WAIT     -- quanto esperar parado em cima do Exu depois do teleporte,
---                      pro prompt assentar antes de segurar (era o task.wait(0.1)
---                      do script de referencia; subiu pra 0.3).
---   POST_HOLD_WAIT  -- quanto ficar EM CIMA do Exu depois do InputHoldEnd, pro
---                      servidor creditar o roubo antes de a gente sair de perto.
-local VALIDATE_WAIT = 1.5
-local SETTLE_WAIT = 0.3
-local POST_HOLD_WAIT = 0.15
-
--- Steal All (botao): mesma logica, so que mais apertada que o toggle (o usuario
--- quer o botao "um pouco mais forte e rapido"). Ainda assim, folgada o bastante
--- pra o servidor processar.
-local ALL_VALIDATE_WAIT = 0.8
-local ALL_SETTLE_WAIT = 0.3
-local ALL_POST_HOLD_WAIT = 0.15
--- Um respiro entre um Exu e o proximo, pra nao metralhar o servidor.
-local ALL_STEP_GAP = 0.15
+-- TEMPOS (calibraveis), iguais ao script de referencia que funciona:
+--   SETTLE_WAIT   -- task.wait(0.1) DEPOIS do teleporte, antes de disparar.
+--   POST_WAIT     -- task.wait(0.1) DEPOIS de disparar, antes de voltar pra base.
+-- Um valor so pra cada, sem mais folga do que o script usa.
+local SETTLE_WAIT = 0.1
+local POST_WAIT = 0.1
+-- Quanto esperar na base depois de voltar (o script nao espera; mantemos um
+-- tico so pra dar tempo do teleporte assentar antes do proximo Exu).
+local VALIDATE_WAIT = 0.1
 
 -- --- Debug ----------------------------------------------------------------
 -- Log de diagnostico por etapa. Vai pro console (print) e fica guardado em
@@ -170,10 +154,10 @@ function AutoSteal:PenAnchor()
     return nil
 end
 
--- TODOS os Exus do Runtime, cada um com seu Root/prompt. Os modelos sao iguais
--- (mesmo nome), entao a unica varredura confiavel e' percorrer os filhos do
--- Runtime -- e' isso que garante "pegar VARIOS", em vez de bater sempre no
--- mesmo Exu por proximidade. Devolve uma lista de {model, prompt, rootPart}.
+-- TODOS os Exus do Runtime, cada um com seu prompt. Os modelos sao iguais (mesmo
+-- nome), entao a unica varredura confiavel e' percorrer os filhos do Runtime --
+-- e' isso que garante "pegar VARIOS", em vez de bater sempre no mesmo Exu por
+-- proximidade. Devolve uma lista de {model, prompt}.
 local function runtimeExus()
     local list = {}
     local runtime = Workspace:FindFirstChild("Runtime")
@@ -182,13 +166,7 @@ local function runtimeExus()
         local root = model:FindFirstChild("Root")
         local prompt = root and root:FindFirstChild("ProximityPrompt")
         if prompt then
-            local rootPart
-            if root and root:IsA("BasePart") then rootPart = root
-            elseif model:IsA("Model") and model.PrimaryPart then rootPart = model.PrimaryPart
-            elseif model:IsA("BasePart") then rootPart = model end
-            if rootPart then
-                list[#list + 1] = {model = model, prompt = prompt, rootPart = rootPart}
-            end
+            list[#list + 1] = {model = model, prompt = prompt}
         end
     end
     return list
@@ -320,8 +298,8 @@ end
 
 -- --- O passo de roubo -----------------------------------------------------
 
--- Um roubo: teleporta pra CIMA do Root do Exu, zera o hold e dispara, e volta pra
--- base. E' o script de referencia, dentro do ciclo.
+-- Um roubo: teleporta pra CIMA do modelo do Exu (GetPivot + 3 studs), zera o hold,
+-- dispara e volta pra base. E' o script de referencia, dentro do ciclo.
 function AutoSteal:_stealAt(target, options)
     options = options or {}
     local label = options.label or "?"
@@ -332,35 +310,35 @@ function AutoSteal:_stealAt(target, options)
         return false
     end
 
-    local rootPart = target and target.rootPart
+    local model = target and target.model
     local prompt = target and target.prompt
-    if not rootPart or not prompt then
-        debugLog(self, label, "sem Root/prompt")
+    if not model or not prompt then
+        debugLog(self, label, "sem model/prompt")
         return false
     end
 
     -- O modelo ainda esta no Runtime? Se o servidor ja levou (roubado) ou moveu,
-    -- o alvo da lista virou um Root orfao -- teleportar pra ele nao rouba nada.
-    -- Pula, sem gastar tempo.
+    -- o alvo virou orfao -- teleportar pra ele nao rouba nada. Pula.
     local runtime = Workspace:FindFirstChild("Runtime")
-    if runtime and target.model and target.model.Parent ~= runtime then
-        debugLog(self, label, "pulado:", target.model.Name, "(ja saiu do Runtime)")
+    if runtime and model.Parent ~= runtime then
+        debugLog(self, label, "pulado:", model.Name, "(ja saiu do Runtime)")
         return false
     end
 
-    -- 1) Teleporta pra CIMA do Root do Exu.
-    self:TeleportTo(rootPart.CFrame)
-    debugLog(self, label, "teleportou pro Root (", rootPart:GetFullName(), ")")
+    -- 1) Teleporta pra CIMA do modelo (model:GetPivot().Position + 3 studs) --
+    --    igual ao script de referencia.
+    local pos = model:GetPivot().Position
+    self:TeleportTo(CFrame.new(pos + Vector3.new(0, 3, 0)))
+    debugLog(self, label, "teleportou pro Exu (", model.Name, ")")
 
-    -- 2) Espera o prompt assentar (o task.wait(0.1) do script de referencia).
+    -- 2) Espera o prompt assentar.
     task.wait(options.settleWait or SETTLE_WAIT)
 
-    -- 3) Dispara o prompt (HoldDuration=0 + InputHoldBegin/End).
+    -- 3) Dispara o prompt (HoldDuration=0 + InputHoldBegin/End + InputHoldEnd).
     local ok = stealPrompt(prompt)
     debugLog(self, label, "disparou o prompt ->", tostring(ok))
 
-    -- 4) Respira em cima do Exu pro servidor creditar, e volta pra base.
-    task.wait(options.postHold or POST_HOLD_WAIT)
+    -- 4) Volta pra base.
     self:TeleportTo(anchor)
     task.wait(options.validateWait or VALIDATE_WAIT)
 
@@ -387,7 +365,7 @@ function AutoSteal:StealOnce()
         self:_stealAt(target, {
             label = "Exu" .. index,
             settleWait = SETTLE_WAIT,
-            postHold = POST_HOLD_WAIT,
+            postHold = POST_WAIT,
             validateWait = VALIDATE_WAIT,
         })
         stole = stole + 1
@@ -430,13 +408,12 @@ function AutoSteal:StealAll()
         if not target then break end
         done[target.model] = true
         self:_stealAt(target, {
-            label = "Exu" .. (#exus - index + 1),
-            settleWait = ALL_SETTLE_WAIT,
-            postHold = ALL_POST_HOLD_WAIT,
-            validateWait = ALL_VALIDATE_WAIT,
+            label = "Exu" .. index,
+            settleWait = SETTLE_WAIT,
+            postHold = POST_WAIT,
+            validateWait = VALIDATE_WAIT,
         })
         stole = stole + 1
-        task.wait(ALL_STEP_GAP)
     end
 
     if origin then self:TeleportTo(origin) end

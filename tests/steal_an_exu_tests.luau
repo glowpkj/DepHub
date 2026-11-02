@@ -161,14 +161,16 @@ do
     check(ctx.State.__DEPHUB.StealAnExu == nil, "destroy clears the published state")
 end
 
--- The steal step: find the pen by Owner (not Pen1), teleport ONTO the Exu Root,
--- steal the prompt by zeroing the HoldDuration and firing InputHoldBegin/End
--- (restoring the HoldDuration), then return to the base.
+-- The steal step: find the pen by Owner (not Pen1), teleport onto the Exu model
+-- (that is the reference script: model:GetPivot().Position + 3 studs up), steal the
+-- prompt by zeroing the HoldDuration and firing InputHoldBegin/End (restoring the
+-- HoldDuration), then return to the base.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
-    -- The exu Root sits 3 studs off its Nest, so a teleport to the Nest would end
-    -- up at the Nest, distinct from the Root. The feature must land on the Root.
+    -- The exu model sits 3 studs off its Nest (its pivot is the Root, at y=3), so
+    -- the reference teleport (pivot + 3) lands at y=6 -- derived from the EXU, not
+    -- from the Nest (which is at y=0).
     local world = buildWorld(ctx, {rootOffset = 3})
     local root = makeCharacter(ctx)
 
@@ -209,13 +211,13 @@ do
     end
     check(restoredAll, "the steal restores the original HoldDuration (no residue)")
 
-    -- The teleport onto an exu lands on its Root (offset 3 from the Nest); it
-    -- must not use the bare Nest position.
-    local landedOnRoot = false
+    -- The teleport lands on the exu's pivot (the Root, y=3) plus 3 studs up, so
+    -- y=6 -- it follows the exu, not the Nest (y=0). The reference mechanism.
+    local landedOnExu = false
     for _, position in ipairs(teleports) do
-        if position.Y == 3 then landedOnRoot = true end
+        if position.Y == 6 then landedOnExu = true end
     end
-    check(landedOnRoot, "the steal teleports onto the Exu Root, not the Nest")
+    check(landedOnExu, "the steal teleports onto the exu (pivot + 3 studs), not the Nest")
 
     -- After the step the character is back at the base anchor (it started at 0,0,0
     -- and the anchor is at 0,50,0).
@@ -409,47 +411,77 @@ do
     backend:Destroy()
 end
 
--- Auto Sell: find the "Vender Todos" button in the PlayerGui and click it once
--- (the button sells every exu at once). If the button is gone, the pass stops and
--- reports no sell. Driven directly (Sell) because the harness does not run
--- spawned threads.
+-- Auto Sell: find the "Vender Todos" clickable in the PlayerGui and click it.
+--
+-- The REAL structure (from the game log) is:
+--
+--     PlayerGui.Menus["Vender Todos"]        -- a FRAME (the container)
+--     ...                                             .<GuiButton inside>
+--
+-- The old code assumed PlayerGui.Menus["Vender Todos"].Button WAS a GuiButton and
+-- blew up ("MouseButton1Click is not a valid member of Frame"). So this test builds
+-- the container as a FRAME and puts the real GuiButton INSIDE it -- the feature must
+-- descend to the GuiButton and activate it, never index the Frame.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
     makeCharacter(ctx)
 
-    -- Build the sell GUI by hand (the harness forbids Instance.new("ScreenGui")):
-    -- PlayerGui.Menus["Vender Todos"].Button, a button that records its clicks.
+    -- A clickable GuiButton double (records activations; exposes MouseButton1Click
+    -- like a real GuiButton so the firesignal path is exercised).
     local clicks = 0
-    local button = {
+    local guiButton = {
         Kind = "button",
-        IsA = function(_, c) return c == "GuiButton" or c == "GuiObject" end,
-        GetFullName = function() return "PlayerGui.Menus.Vender Todos.Button" end,
+        ClassName = "TextButton",
+        IsA = function(_, c) return c == "GuiButton" or c == "TextButton" or c == "GuiObject" end,
+        GetFullName = function() return "PlayerGui.Menus.Vender Todos.Label" end,
+        -- A non-nil signal value: the feature must only touch this AFTER checking
+        -- the object actually has it (a Frame would error on the index).
+        MouseButton1Click = {Name = "MouseButton1Click"},
         Activate = function() clicks = clicks + 1 end,
     }
-    local node = Instance.new("Folder"); node.Name = "Vender Todos"
+    guiButton.FindFirstChild = function() end
+    guiButton.FindFirstChildWhichIsA = function() end
+    -- firesignal is the executor virtual-click: record it so we can prove the
+    -- feature fired the right signal on the GuiButton.
+    local firedSignals = {}
+    ctx.Env.firesignal = function(signal) firedSignals[#firedSignals + 1] = signal end
+
+    -- The container: a FRAME named "Vender Todos" (NOT a GuiButton). Indexing
+    -- MouseButton1Click on it must never happen -- mirror Roblox, where the index
+    -- errors ("MouseButton1Click is not a valid member of Frame").
+    local frame = setmetatable({
+        Kind = "frame",
+        ClassName = "Frame",
+        IsA = function(_, c) return c == "Frame" or c == "GuiObject" end,
+        GetFullName = function() return "PlayerGui.Menus.Vender Todos" end,
+    }, {
+        __index = function(_, key)
+            error(key .. " is not a valid member of Frame", 2)
+        end,
+    })
+    frame.FindFirstChild = function(_, name) if name == "Label" then return guiButton end end
+    frame.FindFirstChildWhichIsA = function(_, class) if class == "GuiButton" then return guiButton end end
+
     local menus = Instance.new("Folder"); menus.Name = "Menus"
-    -- The feature walks gui.Menus["Vender Todos"].Button via FindFirstChild.
-    menus.FindFirstChild = function(_, name)
-        if name == "Vender Todos" then return node end
-    end
-    node.FindFirstChild = function(_, name)
-        if name == "Button" then return button end
-    end
-    local playerGui = {Menus = menus}
-    playerGui.FindFirstChild = function(_, name)
-        if name == "Menus" then return menus end
-    end
+    menus.FindFirstChild = function(_, name) if name == "Vender Todos" then return frame end end
+
+    local playerGui = {}
+    playerGui.FindFirstChild = function(_, name) if name == "Menus" then return menus end end
     ctx.Player.PlayerGui = playerGui
 
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local sell = backend.Features.AutoSell
 
-    check(sell:Button() == button, "the sell feature finds the Vender Todos button in the PlayerGui")
+    -- The feature must descend INTO the Frame and return the GuiButton -- and must
+    -- never index MouseButton1Click on the Frame (that is the crash we fixed).
+    check(sell:Button() == guiButton, "the sell feature descends into the Vender Todos Frame to the GuiButton")
 
     local ok, count = sell:Sell()
-    check(ok == true and count >= 1, "Sell clicks Vender Todos and reports the sell")
-    check(clicks >= 1, "the Vender Todos button was activated")
+    check(ok == true and count >= 1, "Sell clicks the clickable and reports the sell")
+    -- The click lands by firing the GuiButton's MouseButton1Click (the virtual
+    -- click). Activate is only the fallback when no firesignal exists.
+    check(firedSignals[1] == guiButton.MouseButton1Click, "the sell fires the GuiButton's MouseButton1Click")
 
     backend:Destroy()
 end
