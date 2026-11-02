@@ -39,13 +39,14 @@ function Feature.new()
         Destroyed = false,
         Players = {},
         Connections = {},
-        Folder = nil
+        Folder = nil,
+        NextColor = 0
     }, Feature)
 end
 
-function Feature:_colorFor(player)
-    local index = (math.abs(tonumber(player.UserId) or 0) % #COLORS) + 1
-    return COLORS[index]
+function Feature:_colorFor()
+    self.NextColor = (self.NextColor % #COLORS) + 1
+    return COLORS[self.NextColor]
 end
 
 function Feature:_removeVisual(data)
@@ -213,7 +214,7 @@ function Feature:_monitor(player)
     if player == Players.LocalPlayer or self.Players[player] then return end
 
     local data = {
-        Color = self:_colorFor(player),
+        Color = self:_colorFor(),
         Connections = {},
         Generation = 0,
         Visual = nil,
