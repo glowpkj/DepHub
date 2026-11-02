@@ -228,6 +228,13 @@ do
         and backend.AutoHop:IsEnabled() and backend.AutoSell:IsEnabled(),
         "Load Config restores every saved automation toggle")
 
+    labels["Auto Execute"].Callback(true)
+    check(type(ctx.QueuedTeleportScript) == "string"
+        and ctx.QueuedTeleportScript:find('"autoexec":true', 1, true) ~= nil,
+        "Auto Execute queues a guarded re-execution after saving config")
+    labels["Auto Execute"].Callback(false)
+    check(ctx.QueuedTeleportScript == "", "turning Auto Execute off clears the teleport queue")
+
     backend:Destroy()
     backend:Destroy()
     check(backend.Destroyed == true, "destroy marks the backend destroyed")
