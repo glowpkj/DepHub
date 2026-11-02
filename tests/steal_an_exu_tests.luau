@@ -357,8 +357,24 @@ do
     end
     ctx.Player.PlayerGui = playerGui
 
+    local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ctx.Services.Workspace
+    local plaza = Instance.new("Folder"); plaza.Name = "Plaza"; plaza.Parent = map
+    local plazaPart = Instance.new("Part"); plazaPart.Name = "Part"; plazaPart.Parent = plaza
+    plazaPart.Position = Vector3.new(900, 10, 900)
+    plazaPart.Size = Vector3.new(40, 2, 40)
+
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local sell = backend.Features.AutoSell
+
+    check(sell:MoveToPlaza() == true, "Auto Sell teleports to workspace.Map.Plaza.Part")
+    check(root.Position == plazaPart.Position + Vector3.new(0, 4, 0), "Auto Sell stands above the Plaza part")
+    check(sell.AtPlaza == true, "Auto Sell records that the player is at the Plaza")
+
+    local lockOwner = {}
+    check(sell.Ctx.AcquireMovement(lockOwner) == true, "shared movement lock can be acquired")
+    local blockedMove = sell:MoveToPlaza()
+    check(blockedMove == false, "Auto Sell does not teleport during another feature movement")
+    check(sell.Ctx.ReleaseMovement(lockOwner) == true, "shared movement lock is released")
 
     check(sell:Button() == guiButton, "Auto Sell resolves the exact Button.Face GuiButton")
     check(sell:Click(guiButton) == true, "Auto Sell activates the exact Face button")
