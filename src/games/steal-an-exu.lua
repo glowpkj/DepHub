@@ -125,6 +125,10 @@ local AutoUpgradeModule, autoUpgradeError = loadFeature("src/games/features/stea
     return type(module.new) == "function"
 end)
 
+local AutoSellModule, autoSellError = loadFeature("src/games/features/stealanexu/autosell.lua", function(module)
+    return type(module.new) == "function"
+end)
+
 -- Contexto COMPARTILHADO das features: os helpers de mundo que as duas usam
 -- (achar a MINHA base pelo Owner, e navegar um caminho dentro dela). Fica aqui,
 -- num lugar so, pra nao duplicar a logica de Owner em cada feature.
@@ -187,6 +191,14 @@ else
     warn("[DepHub] Steal An Exu autoupgrade unavailable: " .. tostring(autoUpgradeError))
 end
 
+-- Auto Sell All: uma instancia da GUI de venda (o botao "Vender Todos").
+if AutoSellModule then
+    State.AutoSell = AutoSellModule.new(FeatureContext)
+    State.Features.AutoSell = State.AutoSell
+else
+    warn("[DepHub] Steal An Exu autosell unavailable: " .. tostring(autoSellError))
+end
+
 State:Start()
 
 -- ---------------------------------------------------------------------------
@@ -195,6 +207,8 @@ State:Start()
 --     Guardar na base e o proprio teleporte de volta -- sem knob separado.
 --   * "Steal All" -- um botao de passada unica: todos os Exus do Runtime, com
 --     wait entre cada um.
+--   * "Sell All" -- um botao de passada unica: vende os Exus pela GUI do jogo
+--     (PlayerGui.Menus["Vender Todos"].Button).
 -- ---------------------------------------------------------------------------
 do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
@@ -213,6 +227,16 @@ do
             if allSection then
                 allSection:CreateButton("Steal All", function()
                     feature:StartStealAll()
+                end)
+            end
+        end
+
+        -- Sell All: vende todos os Exus pela GUI "Vender Todos" do jogo.
+        if State.AutoSell then
+            local sellSection = Kit.Section(tab, "Sell All", "Left")
+            if sellSection then
+                sellSection:CreateButton("Sell All Exus", function()
+                    State.AutoSell:StartSell()
                 end)
             end
         end

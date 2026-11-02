@@ -19,6 +19,7 @@ local function saeContext(placeId, gameId)
     ctx.Player.UserId = MY_USER_ID
     ctx.Responses[FEATURE_PREFIX .. "autosteal.lua"] = sources[FEATURE_PREFIX .. "autosteal.lua"]
     ctx.Responses[FEATURE_PREFIX .. "autoupgrade.lua"] = sources[FEATURE_PREFIX .. "autoupgrade.lua"]
+    ctx.Responses[FEATURE_PREFIX .. "autosell.lua"] = sources[FEATURE_PREFIX .. "autosell.lua"]
     return ctx
 end
 
@@ -133,6 +134,7 @@ do
     check(type(backend) == "table" and backend.Destroyed == false, "Steal An Exu entry returns a live backend")
     check(backend.Started == true, "the backend starts itself")
     check(type(backend.Features.AutoSteal) == "table", "the Auto Steal feature is registered")
+    check(type(backend.Features.AutoSell) == "table", "the Auto Sell feature is registered")
     check(ctx.State.__DEPHUB.StealAnExu == backend, "the backend publishes itself")
 
     local labels = {}
@@ -142,6 +144,8 @@ do
     check(labels["Terreiro"] == nil, "the panel no longer has a Terreiro dropdown (the sweep covers every exu)")
     check(labels["Steal All"] ~= nil and labels["Steal All"].Kind == "button",
         "the panel has the Steal All button")
+    check(labels["Sell All Exus"] ~= nil and labels["Sell All Exus"].Kind == "button",
+        "the panel has the Sell All Exus button")
 
     -- Auto Upgrade: one toggle per board (base, tread), each a live feature.
     check(type(backend.Features.UpgradeBase) == "table", "the Auto Upgrade Base feature is registered")
@@ -366,6 +370,67 @@ do
     check(detector == nil, "no upgrade detector without a pen")
     check(type(reason) == "string", "a missing upgrade target records a reason")
     check(base:Click(nil) == false, "clicking without a detector is a no-op")
+
+    backend:Destroy()
+end
+
+-- Auto Sell: find the "Vender Todos" button in the PlayerGui and click it once
+-- (the button sells every exu at once). If the button is gone, the pass stops and
+-- reports no sell. Driven directly (Sell) because the harness does not run
+-- spawned threads.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    makeCharacter(ctx)
+
+    -- Build the sell GUI by hand (the harness forbids Instance.new("ScreenGui")):
+    -- PlayerGui.Menus["Vender Todos"].Button, a button that records its clicks.
+    local clicks = 0
+    local button = {
+        Kind = "button",
+        IsA = function(_, c) return c == "GuiButton" or c == "GuiObject" end,
+        GetFullName = function() return "PlayerGui.Menus.Vender Todos.Button" end,
+        Activate = function() clicks = clicks + 1 end,
+    }
+    local node = Instance.new("Folder"); node.Name = "Vender Todos"
+    local menus = Instance.new("Folder"); menus.Name = "Menus"
+    -- The feature walks gui.Menus["Vender Todos"].Button via FindFirstChild.
+    menus.FindFirstChild = function(_, name)
+        if name == "Vender Todos" then return node end
+    end
+    node.FindFirstChild = function(_, name)
+        if name == "Button" then return button end
+    end
+    local playerGui = {Menus = menus}
+    playerGui.FindFirstChild = function(_, name)
+        if name == "Menus" then return menus end
+    end
+    ctx.Player.PlayerGui = playerGui
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local sell = backend.Features.AutoSell
+
+    check(sell:Button() == button, "the sell feature finds the Vender Todos button in the PlayerGui")
+
+    local ok, count = sell:Sell()
+    check(ok == true and count >= 1, "Sell clicks Vender Todos and reports the sell")
+    check(clicks >= 1, "the Vender Todos button was activated")
+
+    backend:Destroy()
+end
+
+-- Auto Sell degrades cleanly with no PlayerGui: no button, no crash, a reason.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    makeCharacter(ctx)
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local sell = backend.Features.AutoSell
+
+    local button, reason = sell:Button()
+    check(button == nil, "no sell button without a PlayerGui")
+    check(type(reason) == "string", "a missing sell button records a reason")
+    check(sell:Sell() == false, "selling with no button is a no-op")
 
     backend:Destroy()
 end
