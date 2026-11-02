@@ -91,6 +91,20 @@ local function instancePosition(instance)
     return ok and position or nil
 end
 
+local function readExuId(instance)
+    if not instance then return nil end
+    local ok, value = pcall(function() return instance:GetAttribute("ExuId") end)
+    if ok and value ~= nil then return value end
+    local okChildren, descendants = pcall(function() return instance:GetDescendants() end)
+    if okChildren then
+        for _, descendant in ipairs(descendants) do
+            local okId, childId = pcall(function() return descendant:GetAttribute("ExuId") end)
+            if okId and childId ~= nil then return childId end
+        end
+    end
+    return nil
+end
+
 local function collectRuntimeTargets(runtime)
     local targets = {}
     local seen = {}
@@ -121,6 +135,7 @@ local function collectRuntimeTargets(runtime)
                 model = model,
                 runtime = runtime,
                 position = position,
+                exuId = readExuId(model),
             }
         end
     end
