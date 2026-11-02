@@ -78,7 +78,8 @@ validateFeatureDirectory('84822469255086', 'src/games/features/noobpiece');
 validateFeatureDirectory('3808081382', 'src/games/features/tsb');
 validateFeatureDirectory('66654135', 'src/games/features/mm2');
 validateFeatureDirectory('4658598196', 'src/games/features/aotr');
-validateFeatureDirectory('1316421563', 'src/games/features/volleyball');
+validateFeatureDirectory('1316421563', 'src/games/features/volleyball')
+validateFeatureDirectory('103076400317371', 'src/games/features/stealanexu');
 
 if (!loader.includes('["142823291"]') || !loader.includes('["66654135"]') || !loader.includes('src/games/mm2.lua')) {
   fail('MM2 loader routing is incomplete');
