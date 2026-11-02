@@ -69,7 +69,6 @@ function AutoHop.new(options)
         Thread = nil,
         RunId = 0,
         EmptySince = nil,
-        SawExu = false,
         NextAttempt = 0,
         PendingServerId = nil,
         HopStartedAt = nil,
@@ -121,6 +120,7 @@ function AutoHop:RuntimeCount()
         local ok, targets, reason = pcall(self.TargetProvider)
         if not ok then return nil, tostring(targets) end
         if type(targets) ~= "table" then return nil, reason or "mapeamento de terreiros indisponivel" end
+        if #targets == 0 and reason ~= nil then return nil, reason end
         return #targets
     end
 
@@ -284,7 +284,6 @@ function AutoHop:_loop(runId)
         if scopeKey ~= self.LastScopeKey then
             self.LastScopeKey = scopeKey
             self.EmptySince = nil
-            self.SawExu = false
             self.NextAttempt = 0
             self.LastStatus = "selection changed"
             log(self, "selecao alterada; monitor reiniciado.")
@@ -321,13 +320,8 @@ function AutoHop:_loop(runId)
             if self.EmptySince ~= nil then
                 log(self, count, "Exus detectados; monitor de vazio reiniciado.")
             end
-            self.SawExu = true
             self.EmptySince = nil
             self.LastStatus = "farming"
-            self.LastError = nil
-        elseif not self.SawExu then
-            self.EmptySince = nil
-            self.LastStatus = "waiting for first Exu"
             self.LastError = nil
         else
             if self.EmptySince == nil then
@@ -359,7 +353,6 @@ function AutoHop:SetEnabled(enabled)
 
     if enabled then
         self.EmptySince = nil
-        self.SawExu = false
         self.NextAttempt = 0
         self.LastError = nil
         self.LastStatus = "monitoring"
