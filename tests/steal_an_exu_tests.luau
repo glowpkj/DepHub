@@ -68,6 +68,14 @@ local function buildWorld(ctx, options)
         root.CFrame = CFrame.new(index * 100, offset, 0)   -- near Nest{index}
         roots[#roots + 1] = root
         local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
+        prompt.HoldDuration = 0.5
+        prompt.MaxActivationDistance = 6.5
+        -- The prompt exposes the hold API the real game does. The steal now holds
+        -- the prompt (InputHoldBegin -> HoldDuration -> InputHoldEnd); the
+        -- double records each call so the test can assert the route.
+        prompt.Hold = {began = 0, ended = 0}
+        prompt.InputHoldBegin = function(self) self.Hold.began = self.Hold.began + 1 end
+        prompt.InputHoldEnd = function(self) self.Hold.ended = self.Hold.ended + 1 end
         fired[#fired + 1] = prompt
     end
     return {
@@ -145,8 +153,8 @@ do
 end
 
 -- The steal step: find the pen by Owner (not Pen1), teleport ONTO the Exu Root
--- (not the Nest -- the bug where the Nest sat far from the exu), fire the Runtime
--- prompt, then return to the base BadgeAnchor.
+-- (not the Nest -- the bug where the Nest sat far from the exu), HOLD the Runtime
+-- prompt (InputHoldBegin/End -- the fire does not steal), then return to the base.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
@@ -163,13 +171,6 @@ do
     local anchor = feature:PenAnchor()
     check(anchor ~= nil and anchor.Position == Vector3.new(0, 50, 0), "the base anchor is the BadgeAnchor")
 
-    -- The executor global the feature calls to use a prompt. It lives on the
-    -- sandbox env (the same table a real executor publishes it to).
-    local firedCount = 0
-    ctx.Env.fireproximityprompt = function(prompt)
-        for _, candidate in ipairs(world.fired) do if candidate == prompt then firedCount = firedCount + 1 end end
-    end
-
     -- Record where each teleport lands, so the test can prove the target is the
     -- exu Root (y = 3 beside Nest1) and never the Nest (y = 0).
     local teleports = {}
@@ -181,7 +182,14 @@ do
 
     local ok, stole = feature:StealOnce()
     check(ok == true and stole >= 1, "StealOnce reaches and counts exu prompts")
-    check(firedCount >= 1, "the Runtime ProximityPrompt is fired")
+
+    -- The prompt is HELD (the route that actually steals): every prompt that was
+    -- reached had InputHoldBegin and InputHoldEnd called, in that order.
+    local heldAll = true
+    for _, prompt in ipairs(world.fired) do
+        if not (prompt.Hold.began >= 1 and prompt.Hold.ended >= 1) then heldAll = false end
+    end
+    check(heldAll, "every reached prompt is held (InputHoldBegin then InputHoldEnd)")
 
     -- The teleport onto an exu lands on its Root (offset 3 from the Nest); it
     -- must not use the bare Nest position.
@@ -194,7 +202,6 @@ do
     -- After the step the character is back at the base anchor (it started at 0,0,0
     -- and the anchor is at 0,50,0).
     check(root.Position == Vector3.new(0, 50, 0), "the step returns to the base anchor")
-    ctx.Env.fireproximityprompt = nil
     feature.TeleportTo = originalTeleport
 
     -- With the toggle on, the loop runs; with it off it stops.
@@ -218,7 +225,6 @@ do
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local feature = backend.Features.AutoSteal
 
-    ctx.Env.fireproximityprompt = function() end
     -- Entering the steal state freezes the body and turns collision off.
     feature:_enterStealState()
     check(root.Anchored == true, "the body is anchored while stealing (floats in place)")
@@ -239,8 +245,36 @@ do
     backend:Destroy()
     check(root.Anchored == false, "destroy unfreezes the body")
     check(root.CanCollide == true, "destroy restores collision")
+end
+
+-- Fallback: a build whose prompt has no InputHold* (older/other executor) still
+-- steals through the fireproximityprompt global instead of throwing.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local world = buildWorld(ctx)
+    local root = makeCharacter(ctx)
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoSteal
+
+    -- Strip the hold API so the feature must fall back.
+    for _, prompt in ipairs(world.fired) do
+        prompt.InputHoldBegin = nil
+        prompt.InputHoldEnd = nil
+    end
+    local firedCount = 0
+    ctx.Env.fireproximityprompt = function(prompt)
+        for _, candidate in ipairs(world.fired) do if candidate == prompt then firedCount = firedCount + 1 end end
+    end
+
+    local ok, stole = feature:StealOnce()
+    check(ok == true and stole >= 1, "without InputHold* the step still steals (fallback)")
+    check(firedCount >= 1, "the fallback uses fireproximityprompt")
+    check(root.Position == Vector3.new(0, 50, 0), "the fallback step still returns to the base")
 
     ctx.Env.fireproximityprompt = nil
+    backend:Destroy()
 end
 
 -- Degrades cleanly when the world is missing: no pen, no crash, and a reason.
@@ -352,6 +386,10 @@ do
             root.CFrame = CFrame.new(x, 0, 0)
             local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
             prompt.MaxActivationDistance = 6.5
+            prompt.HoldDuration = 0.5
+            prompt.Hold = {began = 0, ended = 0}
+            prompt.InputHoldBegin = function(self) self.Hold.began = self.Hold.began + 1 end
+            prompt.InputHoldEnd = function(self) self.Hold.ended = self.Hold.ended + 1 end
             fired[#fired + 1] = prompt
         end
     end
@@ -371,22 +409,16 @@ do
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local feature = backend.Features.AutoSteal
 
-    local firedCount = 0
-    ctx.Env.fireproximityprompt = function(prompt)
-        for _, candidate in ipairs(fired) do if candidate == prompt then firedCount = firedCount + 1 end end
-    end
-
     local ok, count = feature:StealAll()
-    check(ok == true and count == 4, "Steal All counts every exu it fired (4)")
-    -- Each exu is fired twice: once from range, once after the blink-teleport.
-    check(firedCount == 8, "each exu prompt is fired, wide then on arrival")
-    -- The pass hands every prompt back its original range; the widened value must
-    -- not be left behind after the pass.
-    local restored = true
-    for _, prompt in ipairs(fired) do if prompt.MaxActivationDistance ~= 6.5 then restored = false end end
-    check(restored, "each prompt's MaxActivationDistance is restored after firing")
+    check(ok == true and count == 4, "Steal All counts every exu it stole (4)")
+    -- Every exu is HOLD (InputHoldBegin/End) -- the route that steals. Each is
+    -- held exactly once (no more wide-fire before arrival).
+    local held = true
+    for _, prompt in ipairs(fired) do
+        if not (prompt.Hold.began == 1 and prompt.Hold.ended == 1) then held = false end
+    end
+    check(held, "every exu in the pass is held once (InputHoldBegin/End)")
     check(hrp.Position == Vector3.new(0, 50, 0), "the pass returns to the base it started from")
-    ctx.Env.fireproximityprompt = nil
 
     backend:Destroy()
 end

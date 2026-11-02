@@ -329,6 +329,41 @@ end
 
 -- --- Disparo do prompt ----------------------------------------------------
 
+-- O ROUBO DE VERDADE (descoberto em teste no jogo):
+-- fireproximityprompt NAO funciona aqui -- ele dispara o Triggered na hora, e o
+-- servidor do jogo ignora (o Exu nao e' roubado). O que rouba e' SEGURAR o
+-- prompt pelo HoldDuration: InputHoldBegin -> espera -> InputHoldEnd. Foi assim
+-- que o teste [HoldTest2] modo 0 roubou de fato o Exu.
+--
+-- Entao esta funcao faz o hold. Se a versao do jogo/executor nao tiver
+-- InputHoldBegin/End, cai no fireproximityprompt (o antigo), pra nunca travar.
+-- Devolve true se mandou o hold (ou o fire de fallback).
+local function stealPrompt(prompt)
+    if not prompt then return false end
+
+    local holdBegin = prompt.InputHoldBegin
+    local holdEnd = prompt.InputHoldEnd
+    if type(holdBegin) == "function" and type(holdEnd) == "function" then
+        local began = pcall(function() prompt:InputHoldBegin() end)
+        if began then
+            -- Segura o tempo que o prompt pede (o jogo usa 0.5s).
+            local hold = tonumber(prompt.HoldDuration) or 0.5
+            if hold < 0.05 then hold = 0.05 end
+            task.wait(hold)
+            pcall(function() prompt:InputHoldEnd() end)
+            return true
+        end
+    end
+
+    -- Fallback (executor/jogo sem InputHold*): o fire instantaneo.
+    local fire = fireproximityprompt
+    if type(fire) == "function" then
+        local ok = pcall(fire, prompt)
+        return ok
+    end
+    return false
+end
+
 -- O prompt esta no alcance? (Enabled e a distancia dentro do MaxActivationDistance)
 local function promptInRange(prompt, rootPosition)
     if not prompt then return false end
@@ -367,18 +402,6 @@ local function armPromptTrigger(prompt)
     return wait, cleanup
 end
 
--- Tenta disparar o prompt de longe: sobe a MaxActivationDistance na hora do
--- disparo e devolve o valor original em seguida (sem residuo).
-local function firePromptWide(prompt)
-    local fire = fireproximityprompt
-    if type(fire) ~= "function" or not prompt then return false end
-    local original = prompt.MaxActivationDistance
-    pcall(function() prompt.MaxActivationDistance = 1e9 end)
-    local ok = pcall(fire, prompt)
-    pcall(function() prompt.MaxActivationDistance = original end)
-    return ok
-end
-
 -- --- O passo de roubo -----------------------------------------------------
 
 -- Um roubo. A CORRECAO do bug "nao pega": o Nest NAO fica sempre em cima do Exu
@@ -386,10 +409,9 @@ end
 -- ordem certa e:
 --   1) acha o Exu do Runtime perto do Nest -> pega a POSICAO REAL do Root dele;
 --   2) teleporta pra CIMA do Root (dentro dos 6.5), nao pro Nest;
---   3) espera o prompt entrar no alcance, dispara, espera o "ativou";
+--   3) SEGURA o prompt (InputHoldBegin/End) -- o fire instantaneo nao rouba;
 --   4) volta pra base pra validar.
 -- options.validateWait / settleWait / promptTimeout / label: como antes.
--- options.wide: tenta tambem o disparo de longe (o toggle ja nao precisa).
 function AutoSteal:_stealAt(nestTarget, rootPosition, options)
     options = options or {}
     local label = options.label or "?"
@@ -433,23 +455,14 @@ function AutoSteal:_stealAt(nestTarget, rootPosition, options)
             string.format("%.1f", distance), "range=", tostring(range), ")")
     end
 
-    -- Escuta o Triggered ANTES de disparar (o trigger pode ser sincrono).
+    -- Escuta o Triggered ANTES de disparar (o trigger vem durante o hold).
     local waitTriggered, cleanup = armPromptTrigger(prompt)
 
-    -- 4a) Mais forte (Steal All): tenta de longe tambem.
-    if options.wide then
-        local wideOk = firePromptWide(prompt)
-        debugLog(self, label, "4a) disparo de longe ->", tostring(wideOk))
-    end
-
-    -- 4b) Dispara normal, com o personagem em cima do Exu.
-    local fire = fireproximityprompt
-    if type(fire) == "function" then
-        local firedOk = pcall(fire, prompt)
-        debugLog(self, label, "4b) fireproximityprompt ->", tostring(firedOk))
-    else
-        debugLog(self, label, "4b) fireproximityprompt INDISPONIVEL (executor sem essa funcao?)")
-    end
+    -- 4) Rouba SEGURANDO o prompt (InputHoldBegin -> HoldDuration ->
+    --    InputHoldEnd). E' isso que o servidor aceita; o fire instantaneo nao.
+    local stolen = stealPrompt(prompt)
+    debugLog(self, label, "4) hold(InputHoldBegin/End) ->", tostring(stolen),
+        "HoldDuration=", tostring(prompt.HoldDuration))
 
     local didFire = waitTriggered(options.promptTimeout or PROMPT_TIMEOUT)
     cleanup()
@@ -536,7 +549,6 @@ function AutoSteal:StealAll()
                         validateWait = ALL_VALIDATE_WAIT,
                         settleWait = ALL_SETTLE_WAIT,
                         promptTimeout = ALL_PROMPT_TIMEOUT,
-                        wide = true,
                     })
                     if ok then stole = stole + 1 else skipped = skipped + 1 end
                     task.wait(ALL_STEP_GAP)
