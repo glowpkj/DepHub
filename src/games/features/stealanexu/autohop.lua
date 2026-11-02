@@ -62,7 +62,7 @@ end
 
 function AutoHop.new(options)
     options = options or {}
-    return setmetatable({
+    local self = setmetatable({
         Enabled = false,
         Destroyed = false,
         Hopping = false,
@@ -70,12 +70,35 @@ function AutoHop.new(options)
         RunId = 0,
         EmptySince = nil,
         NextAttempt = 0,
+        PendingServerId = nil,
         LastError = nil,
         LastStatus = "idle",
         DebugLog = {},
         PlaceId = tonumber(options.placeId) or game.PlaceId,
         EmptyGrace = tonumber(options.emptyGrace) or EMPTY_GRACE,
+        TeleportConnection = nil,
     }, AutoHop)
+
+    local ok, connection = pcall(function()
+        return TeleportService.TeleportInitFailed:Connect(function(player, result, message)
+            if player ~= LocalPlayer or self.Destroyed then return end
+
+            local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
+            if type(visited) == "table" and self.PendingServerId then
+                visited[self.PendingServerId] = nil
+            end
+
+            self.PendingServerId = nil
+            self.Hopping = false
+            self.LastError = tostring(message or result or "teleporte recusado")
+            self.LastStatus = "teleport failed"
+            self.NextAttempt = os.clock() + RETRY_INTERVAL
+            log(self, "TeleportInitFailed:", self.LastError)
+        end)
+    end)
+    if ok then self.TeleportConnection = connection end
+
+    return self
 end
 
 function AutoHop:IsEnabled()
@@ -206,6 +229,7 @@ function AutoHop:Hop()
 
     local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
     if type(visited) == "table" then visited[selected.id] = true end
+    self.PendingServerId = selected.id
 
     local ok, err = pcall(function()
         TeleportService:TeleportToPlaceInstance(self.PlaceId, selected.id, LocalPlayer)
@@ -213,6 +237,7 @@ function AutoHop:Hop()
 
     if not ok then
         if type(visited) == "table" then visited[selected.id] = nil end
+        self.PendingServerId = nil
         self.Hopping = false
         self.LastError = tostring(err)
         self.LastStatus = "teleport failed"
@@ -301,6 +326,10 @@ function AutoHop:Destroy()
     self.Enabled = false
     self.Hopping = false
     self.RunId = self.RunId + 1
+    if self.TeleportConnection then
+        pcall(function() self.TeleportConnection:Disconnect() end)
+        self.TeleportConnection = nil
+    end
     self.DebugLog = {}
 end
 
