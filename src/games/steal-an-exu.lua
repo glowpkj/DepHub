@@ -1,9 +1,8 @@
 -- Steal An Exu - backend.
 --
--- Features: Auto Steal Exu (o loop de roubo pelo prompt), Auto Upgrade (os botoes
--- da base e da esteira) e Auto Sell All (a GUI "Vender Todos"). O backend sobe,
--- carrega os modulos do repositorio, registra em State.Features e monta a UI
--- (categoria Farming). A logica mora nas features.
+-- Features: Steal Exu Selection (multi-Terreiro), Auto Place, Auto Sell,
+-- Auto Hop, Auto Upgrade, Auto Rebirth and persistent config. The backend loads
+-- repository modules, registers State.Features and builds the Farming UI.
 
 local game, task, type, tostring, pcall = game, task, type, tostring, pcall
 local Players = game:GetService("Players")
@@ -699,7 +698,7 @@ do
                 State:RegisterConfig("autoPlace", applyAutoPlace, placeToggle)
                 placeSection:CreateParagraph(
                     "Auto Place",
-                    "Coloca Tools com ExuId cuja origem foi mapeada para os terreiros selecionados. Exus sem origem identificada sao ignorados para evitar colocar no grupo errado."
+                    "Coloca Tools com ExuId cuja origem foi mapeada para os terreiros selecionados. Exus sem origem identificada sao ignorados; enquanto Auto Sell estiver ligado, Auto Place pausa para nao competir com a venda."
                 )
             end
         end
@@ -717,7 +716,7 @@ do
                 State:RegisterConfig("autoSell", applyAutoSell, handle)
                 sellSection:CreateParagraph(
                     "Sell priority",
-                    "Com Steal e Sell ligados, cada Exu roubado retorna diretamente para a Plaza. O Sell so clica quando voce esta dentro da area."
+                    "Com Steal e Sell ligados, cada Exu roubado retorna diretamente para a Plaza. O Sell so clica dentro da area e tem prioridade sobre Auto Place."
                 )
             end
         end
