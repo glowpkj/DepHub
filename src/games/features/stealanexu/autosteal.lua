@@ -253,6 +253,9 @@ function AutoSteal:_selectedTargets(runtime)
     local targets = {}
     for _, target in ipairs(runtimeTargets) do
         local terreiroName = explicitTerreiro(target.model) or explicitTerreiro(target.ref)
+        if terreiroName and not terreirosFolder:FindFirstChild(terreiroName) then
+            terreiroName = nil
+        end
         local nearestNest = nil
         local nearestDistance = math.huge
 
