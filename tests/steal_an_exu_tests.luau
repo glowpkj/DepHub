@@ -298,7 +298,9 @@ do
         "when Steal and Sell are both on, the steal returns to the Plaza first")
     sell:SetEnabled(false)
 
-    -- With Sell off, a successful steal returns to the player's own pen.
+    -- Run another steal with Sell now off; the return destination should switch
+    -- back to the player's own pen on this next step.
+    feature:_step(targets[1], root, originalPos)
     check(root.CFrame.Position == Vector3.new(0, 53, 0), "the step returns to the player's base when Auto Sell is off")
 
     -- A dead target (the server took the exu): the exu is destroyed, exactly as the
