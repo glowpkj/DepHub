@@ -560,7 +560,9 @@ do
     check(remote.Fired[1][1] == "exu-1", "Auto Place sends the selected ExuId")
     check(remote.Fired[1][2] == Vector3.new(100 - 29 + 4, 0.3, 200 - 29 + 4),
         "Auto Place uses the same configurable pen grid as the supplied script")
-    check(feature:PendingCount() == 0, "Auto Place clears its pending count after sending placement")
+    check(feature:PendingCount() == 1, "Auto Place keeps a request pending until the server removes the Tool")
+    selectedTool:Destroy()
+    check(feature:PendingCount() == 0, "Auto Place clears its pending count after server confirmation")
 
     local queuedTool = Instance.new("Tool"); queuedTool.Name = "ExuQueued"; queuedTool.Parent = backpack
     queuedTool:SetAttribute("ExuId", "exu-3")
