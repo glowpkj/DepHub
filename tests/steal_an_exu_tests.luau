@@ -477,7 +477,7 @@ do
     check(placed == 1, "Auto Place sends only one tool from the selected Terreiro")
     check(remote.Fired and #remote.Fired == 1, "Auto Place fires PlaceExu once")
     check(remote.Fired[1][1] == "exu-1", "Auto Place sends the selected ExuId")
-    check(remote.Fired[1][2] == Vector3.new(100 - 32 + 4, 0.3, 200 - 32 + 4),
+    check(remote.Fired[1][2] == Vector3.new(100 - 29 + 4, 0.3, 200 - 29 + 4),
         "Auto Place uses the same configurable pen grid as the supplied script")
 
     backend:Destroy()
