@@ -515,13 +515,28 @@ do
         return true
     end
 
+    local sourceSaveQueued = false
     function FeatureContext.PersistExuSources()
-        State.Config.exuSources = sourceMap
-        local saved = State:PersistIfAutoExec()
-        if not saved then
-            print("[StealAnExu] AVISO: origens dos Exus ficaram apenas em memoria:", State.LastConfigError or "falha ao salvar")
-        end
-        return saved
+        if sourceSaveQueued then return true end
+        sourceSaveQueued = true
+
+        task.spawn(function()
+            task.wait(0.2)
+            State.Config.exuSources = sourceMap
+            local saved = State:PersistIfAutoExec()
+            sourceSaveQueued = false
+            if not saved then
+                print("[StealAnExu] AVISO: origens dos Exus ficaram apenas em memoria:", State.LastConfigError or "falha ao salvar")
+            else
+                print("[StealAnExu] Origem dos Exus salva em lote:", (function()
+                    local count = 0
+                    for _ in pairs(sourceMap) do count += 1 end
+                    return count
+                end)(), "IDs.")
+            end
+        end)
+
+        return true
     end
 
     function FeatureContext.TrackNewExuSources(before, after, terreiroName)
