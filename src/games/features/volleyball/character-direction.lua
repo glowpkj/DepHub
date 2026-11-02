@@ -118,7 +118,12 @@ end
 function Feature:_getEndpoint(data)
     local root = data.Root
     local origin = root.Position
-    local direction = root.CFrame.LookVector * MAX_DISTANCE
+    local frame = root.CFrame
+    local look = frame and frame.LookVector
+    if not look then
+        return origin + Vector3.new(0, 0, -MAX_DISTANCE)
+    end
+    local direction = look * MAX_DISTANCE
 
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Exclude
