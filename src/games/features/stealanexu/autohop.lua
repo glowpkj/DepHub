@@ -81,6 +81,7 @@ function AutoHop.new(options)
         TeleportConnection = nil,
         TargetProvider = options.targetProvider,
         ScopeProvider = options.scopeProvider,
+        PendingProvider = options.pendingProvider,
         LastScopeKey = nil,
     }, AutoHop)
 
@@ -290,6 +291,12 @@ function AutoHop:_loop(runId)
         end
 
         local count, reason = self:RuntimeCount()
+        local pending = 0
+        if count ~= nil and type(self.PendingProvider) == "function" then
+            local okPending, value = pcall(self.PendingProvider)
+            if okPending then pending = tonumber(value) or 0 end
+        end
+
         if count == nil then
             self.EmptySince = nil
             self.LastStatus = "waiting for Runtime"
@@ -306,6 +313,10 @@ function AutoHop:_loop(runId)
             self.LastStatus = "teleport timeout"
             self.LastError = "o teleporte nao iniciou; tentando outro servidor"
             log(self, self.LastError)
+        elseif pending > 0 then
+            self.EmptySince = nil
+            self.LastStatus = "waiting for Auto Sell"
+            self.LastError = nil
         elseif count > 0 then
             if self.EmptySince ~= nil then
                 log(self, count, "Exus detectados; monitor de vazio reiniciado.")
