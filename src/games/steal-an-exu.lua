@@ -531,6 +531,12 @@ if AutoHopModule then
         scopeProvider = function()
             return State.AutoStealSelection and State.AutoStealSelection:SelectionKey() or ""
         end,
+        pendingProvider = function()
+            if State.AutoSell and State.AutoSell:IsEnabled() then
+                return #FeatureContext.InventoryExuIds()
+            end
+            return 0
+        end,
     })
     State.Features.AutoHop = State.AutoHop
 else
