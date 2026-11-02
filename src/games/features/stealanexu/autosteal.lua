@@ -112,9 +112,10 @@ function AutoSteal:_acquireMovement()
     local acquire = self.Ctx and self.Ctx.AcquireMovement
     if type(acquire) ~= "function" then return true, false end
 
-    while self.Enabled and not self.Destroyed do
+    while not self.Destroyed do
         local ok, acquired = pcall(acquire, self)
         if ok and acquired == true then return true, true end
+        if not self.Enabled then return false, false end
         task.wait(MOVEMENT_WAIT)
     end
 
