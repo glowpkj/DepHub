@@ -16,6 +16,7 @@ local MY_USER_ID = 7091741787
 local function saeContext(placeId, gameId)
     local ctx = sandbox(placeId, gameId)
     ctx.Player.UserId = MY_USER_ID
+    ctx.Responses[FEATURE_PREFIX .. "autosteal.lua"] = sources[FEATURE_PREFIX .. "autosteal.lua"]
     ctx.Responses[FEATURE_PREFIX .. "autoupgrade.lua"] = sources[FEATURE_PREFIX .. "autoupgrade.lua"]
     ctx.Responses[FEATURE_PREFIX .. "autosell.lua"] = sources[FEATURE_PREFIX .. "autosell.lua"]
     return ctx
@@ -23,7 +24,10 @@ end
 
 -- Builds the minimal world the backend's features read: Map.Pens with one pen
 -- owned by the local player (Owner attribute) and a BadgeAnchor, plus the two
--- upgrade boards the Auto Upgrade toggles click.
+-- upgrade boards the Auto Upgrade toggles click. When `options.exuCount` is set,
+-- also builds workspace.Runtime with that many exu models, each carrying a
+-- Root.ProximityPrompt (what the Auto Steal Exu loop sweeps). `options.rootOffset`
+-- lifts each Root off y=0 so a test can tell the Root from the Nest line.
 local function buildWorld(ctx, options)
     options = options or {}
     local ws = ctx.Services.Workspace
@@ -46,9 +50,40 @@ local function buildWorld(ctx, options)
     local treadBoard = Instance.new("Part"); treadBoard.Name = "Board"; treadBoard.Parent = treadSign
     local treadDetector = Instance.new("ClickDetector"); treadDetector.Name = "ClickDetector"; treadDetector.Parent = treadBoard
 
+    -- Optional Runtime with exu models (the Auto Steal Exu sweep).
+    local fired, roots = {}, {}
+    if options.exuCount then
+        local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ws
+        local offset = options.rootOffset or 0
+        for index = 1, options.exuCount do
+            local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
+            local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
+            root.CFrame = CFrame.new(index * 100, offset, 0)
+            roots[#roots + 1] = root
+            local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
+            prompt.HoldDuration = 0.5
+            prompt.MaxActivationDistance = 6.5
+            -- The prompt exposes the hold API the real game does. The steal widens
+            -- the prompt (MaxActivationDistance=1000, HoldDuration=0,
+            -- RequiresLineOfSight=false), then InputHoldBegin + End. The doubles
+            -- record each call and the HoldDuration value seen AT THE MOMENT of
+            -- InputHoldBegin, so the test can prove the zeroing.
+            prompt.Hold = {began = 0, ended = 0, durationAtBegin = nil}
+            prompt.InputHoldBegin = function(self)
+                self.Hold.began = self.Hold.began + 1
+                self.Hold.durationAtBegin = self.HoldDuration
+            end
+            prompt.InputHoldEnd = function(self)
+                self.Hold.ended = self.Hold.ended + 1
+            end
+            fired[#fired + 1] = prompt
+        end
+    end
+
     return {
         pen = pen, anchor = anchor,
         baseDetector = baseDetector, treadDetector = treadDetector,
+        fired = fired, roots = roots,
     }
 end
 
@@ -92,13 +127,14 @@ do
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     check(type(backend) == "table" and backend.Destroyed == false, "Steal An Exu entry returns a live backend")
     check(backend.Started == true, "the backend starts itself")
+    check(type(backend.Features.AutoSteal) == "table", "the Auto Steal Exu feature is registered")
     check(type(backend.Features.AutoSell) == "table", "the Auto Sell feature is registered")
     check(ctx.State.__DEPHUB.StealAnExu == backend, "the backend publishes itself")
 
     local labels = {}
     for _, control in ipairs(ui.Library._Controls) do labels[control.Label] = control end
-    check(labels["Auto Steal Exu"] == nil, "the panel no longer has the Auto Steal Exu toggle")
-    check(labels["Steal All"] == nil, "the panel no longer has the Steal All button")
+    check(labels["Auto Steal Exu"] ~= nil and labels["Auto Steal Exu"].Kind == "toggle",
+        "the panel has the Auto Steal Exu toggle")
     check(labels["Sell All Exus"] ~= nil and labels["Sell All Exus"].Kind == "button",
         "the panel has the Sell All Exus button")
 
@@ -114,6 +150,64 @@ do
     backend:Destroy()
     check(backend.Destroyed == true, "destroy marks the backend destroyed")
     check(ctx.State.__DEPHUB.StealAnExu == nil, "destroy clears the published state")
+end
+
+-- Auto Steal Exu: the loop collects the Runtime exus once and, per exu, opens the
+-- prompt (MaxActivationDistance=1000, HoldDuration=0, RequiresLineOfSight=false),
+-- teleports onto the Root + 3 studs, fires InputHoldBegin/End, and returns to the
+-- original position. Driven one step at a time (_step) because the harness does not
+-- run the infinite loop.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local world = buildWorld(ctx, {exuCount = 2, rootOffset = 3})
+    local root = makeCharacter(ctx)   -- starts at (0,0,0)
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoSteal
+
+    -- The one-time collection sees both exus (each {prompt, ref=Root}).
+    local targets = feature:_targets()
+    check(type(targets) == "table" and #targets == 2, "the steal collects the Runtime prompts once (2)")
+
+    -- Run one step over the first exu and check the mechanism.
+    local originalPos = root.CFrame
+    feature:_step(targets[1], root, originalPos)
+
+    local prompt = world.fired[1]
+    check(prompt.Hold.began == 1 and prompt.Hold.ended == 1,
+        "the steal opens and closes the hold (InputHoldBegin then InputHoldEnd)")
+    check(prompt.Hold.durationAtBegin == 0, "the steal zeroes HoldDuration before the hold")
+    check(prompt.MaxActivationDistance == 1000, "the steal sets MaxActivationDistance to 1000")
+    check(prompt.RequiresLineOfSight == false, "the steal disables RequiresLineOfSight")
+
+    -- The step teleports onto the exu Root (y=3) + 3 studs, then returns to the
+    -- original position (0,0,0).
+    check(root.Position == Vector3.new(0, 0, 0), "the step returns to the original position")
+
+    -- The toggle drives the feature and cleans up on destroy.
+    check(feature:IsEnabled() == false, "the steal is off until the toggle turns it on")
+    check(feature:SetEnabled(true) == true and feature:IsEnabled() == true, "the toggle turns the steal on")
+    check(feature:SetEnabled(false) == true and feature:IsEnabled() == false, "the toggle turns the steal off")
+
+    backend:Destroy()
+    check(feature:SetEnabled(true) == false, "a destroyed steal refuses to turn on")
+end
+
+-- Auto Steal Exu degrades cleanly when the world is missing: no Runtime, no crash,
+-- a reason.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    makeCharacter(ctx)
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoSteal
+
+    local targets, reason = feature:_targets()
+    check(targets == nil, "no exu targets without workspace.Runtime")
+    check(type(reason) == "string", "a missing Runtime records a reason")
+
+    backend:Destroy()
 end
 
 -- Auto Upgrade: each toggle clicks the ClickDetector of MY pen (found by Owner,

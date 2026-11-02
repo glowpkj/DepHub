@@ -1,8 +1,9 @@
 -- Steal An Exu - backend.
 --
--- Duas features: Auto Upgrade (os botoes da base e da esteira) e Auto Sell All (a
--- GUI "Vender Todos"). O backend sobe, carrega os modulos do repositorio, registra
--- em State.Features e monta a UI (categoria Farming). A logica mora nas features.
+-- Features: Auto Steal Exu (o loop de roubo pelo prompt), Auto Upgrade (os botoes
+-- da base e da esteira) e Auto Sell All (a GUI "Vender Todos"). O backend sobe,
+-- carrega os modulos do repositorio, registra em State.Features e monta a UI
+-- (categoria Farming). A logica mora nas features.
 
 local game, task, type, tostring, pcall = game, task, type, tostring, pcall
 local Players = game:GetService("Players")
@@ -116,6 +117,10 @@ function State:Destroy()
     end
 end
 
+local AutoStealModule, autoStealError = loadFeature("src/games/features/stealanexu/autosteal.lua", function(module)
+    return type(module.new) == "function"
+end)
+
 local AutoUpgradeModule, autoUpgradeError = loadFeature("src/games/features/stealanexu/autoupgrade.lua", function(module)
     return type(module.new) == "function"
 end)
@@ -163,6 +168,14 @@ do
     end
 end
 
+-- Instancia o Auto Steal Exu (mecanismo pronto; so roda quando o toggle ligar).
+if AutoStealModule then
+    State.AutoSteal = AutoStealModule.new(FeatureContext)
+    State.Features.AutoSteal = State.AutoSteal
+else
+    warn("[DepHub] Steal An Exu autosteal unavailable: " .. tostring(autoStealError))
+end
+
 -- Instancia o Auto Upgrade. Duas instancias do MESMO mecanismo (o botao da base e
 -- o da esteira sao o mesmo click), mudando so o caminho dentro do pen.
 if AutoUpgradeModule then
@@ -190,6 +203,8 @@ State:Start()
 
 -- ---------------------------------------------------------------------------
 -- Apresentacao: categoria Farming.
+--   * "Auto Steal Exu" -- o loop (toggle). O script de referencia: varre os Exus
+--     do Runtime e rouba pelo prompt.
 --   * "Sell All" -- um botao de passada unica: vende os Exus pela GUI do jogo
 --     (PlayerGui.Menus["Vender Todos"]).
 --   * "Auto Upgrade" -- um toggle por botao (o da base e o da esteira).
@@ -198,6 +213,16 @@ do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
         local tab = Kit.Tab("Auto Steal", "Farming")
+
+        -- Auto Steal Exu: o loop do roubo (o script de referencia).
+        if State.AutoSteal then
+            local stealSection = Kit.Section(tab, "Auto Steal Exu", "Left")
+            if stealSection then
+                stealSection:CreateToggle("Auto Steal Exu", false, function(value)
+                    State.AutoSteal:SetEnabled(value)
+                end)
+            end
+        end
 
         -- Sell All: vende todos os Exus pela GUI "Vender Todos" do jogo.
         if State.AutoSell then

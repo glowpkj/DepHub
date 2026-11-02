@@ -241,6 +241,7 @@
       "src/core/updater.lua",
       "src/core/diagnostics.lua",
       "src/games/steal-an-exu.lua",
+      "src/games/features/stealanexu/autosteal.lua",
       "src/games/features/stealanexu/autoupgrade.lua",
       "src/games/features/stealanexu/autosell.lua",
       "src/games/updates/103076400317371.txt"
