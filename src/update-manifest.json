@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-02T22:53:50.978158+00:00",
-  "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+  "generatedAt": "2026-11-02T22:55:42.013872+00:00",
+  "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
   "version": "0.1.67",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
       "version": "36516f9d7b1d3c5cefc37717bc1331f5711390d643cbf9397b7ea77f4e689778",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -31,7 +31,7 @@
     "994732206": {
       "name": "Blox Fruits Sea 2",
       "version": "8b9bf2bd9b5a0f461d608d2e2dd0beb72cea813751a28b96eca3f855896912b1",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -58,7 +58,7 @@
     "1316421563": {
       "name": "Volleyball 4.2",
       "version": "33494006a8bc98d4abbd05b2cce666c4bd8c0b821c1ef55c261f14db2f36f999",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -79,7 +79,7 @@
     "3808081382": {
       "name": "The Strongest Battlegrounds",
       "version": "06c602be49109ef1b02426eee3e430a19c0f990d324016b82c272c494230d1d7",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -101,7 +101,7 @@
     "114234929420007": {
       "name": "Blood Strike",
       "version": "a83ad8e95d7d265f3a4bc67fc64f0b8dfa77acdf9a7192126159f1f4c1b58a7d",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -119,7 +119,7 @@
     "107778070777162": {
       "name": "Steal An Egg",
       "version": "b614b86e94fb13515c0633dc3580b92bf65870ff3ad17c46e86b57e1e6dd72f2",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -137,7 +137,7 @@
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
       "version": "5e670398ab8c4463a2e6b593ff86f68e81cef5b1bd7222078aac21676fe8009f",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -164,7 +164,7 @@
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
       "version": "bfba64685649af4cfb939bfe191fd219b1c1dd32470276ec45f06847ef0d7722",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -191,7 +191,7 @@
     "84822469255086": {
       "name": "Noob Piece",
       "version": "e1ab1afa91a376c54a2f2574303a9cca95ec6b2e32a9ce7a2053f8a5bae0b160",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -221,7 +221,7 @@
     "93978595733734": {
       "name": "Violence District",
       "version": "7dbd0e7f625e7c726ce58831c1f3d4c6efb928d98f660258cf0dfada35a8a44b",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -239,7 +239,7 @@
     "4658598196": {
       "name": "Attack on Titan Revolution",
       "version": "409c8348fbb8575c352c362051c35f475d7eaeb56b77d28adea8c7cc210ee0a6",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -261,8 +261,8 @@
     },
     "103076400317371": {
       "name": "Steal An Exu",
-      "version": "4f2eb1ad215fd6f3d9e9134ea84f567e9002f57293853d0886572b955a30b736",
-      "commit": "a7096a5c9aec10b383100cc5dabbb9dec9c5f9be",
+      "version": "4e1b230ce061f4ffb5cd1f90f57e7c51e2614697d8d1b9a7b5ad4ac13897b7ee",
+      "commit": "63fa322c082ce78420c81ef9cee45dfcca28e7dc",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -286,6 +286,20 @@
   },
   "recentUpdates": [
     {
+      "Version": "63fa322",
+      "Date": "2026-11-02T19:55:32-03:00",
+      "Changes": [
+        "Debounce Exu source config writes in the background"
+      ]
+    },
+    {
+      "Version": "e7727ab",
+      "Date": "2026-11-02T19:55:22-03:00",
+      "Changes": [
+        "Move Exu source discovery to a background queue so Steal never waits for inventory replication"
+      ]
+    },
+    {
       "Version": "a7096a5",
       "Date": "2026-11-02T19:53:38-03:00",
       "Changes": [
@@ -304,20 +318,6 @@
       "Date": "2026-11-02T19:53:10-03:00",
       "Changes": [
         "Add Auto Hop teleport-state diagnostics and random-server fallback"
-      ]
-    },
-    {
-      "Version": "baf7b31",
-      "Date": "2026-11-02T19:52:44-03:00",
-      "Changes": [
-        "Batch Exu source persistence instead of disk write per stolen Exu"
-      ]
-    },
-    {
-      "Version": "da59c4d",
-      "Date": "2026-11-02T19:52:35-03:00",
-      "Changes": [
-        "Speed up Steal source tracking and cache selected Terreiro target mapping"
       ]
     }
   ]
