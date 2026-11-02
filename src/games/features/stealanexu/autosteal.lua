@@ -49,18 +49,19 @@ AutoSteal.__index = AutoSteal
 --   VALIDATE_WAIT   -- quanto esperar na base depois de roubar (o jogo confirmar
 --                      o guardar) antes de ir pro proximo Exu.
 --   SETTLE_WAIT     -- quanto esperar parado em cima do Exu depois do teleporte,
---                      pro prompt assentar antes de segurar.
+--                      pro prompt assentar antes de segurar (era o task.wait(0.1)
+--                      do script de referencia; subiu pra 0.3).
 --   POST_HOLD_WAIT  -- quanto ficar EM CIMA do Exu depois do InputHoldEnd, pro
 --                      servidor creditar o roubo antes de a gente sair de perto.
 local VALIDATE_WAIT = 1.5
-local SETTLE_WAIT = 0.25
+local SETTLE_WAIT = 0.3
 local POST_HOLD_WAIT = 0.15
 
 -- Steal All (botao): mesma logica, so que mais apertada que o toggle (o usuario
 -- quer o botao "um pouco mais forte e rapido"). Ainda assim, folgada o bastante
 -- pra o servidor processar.
 local ALL_VALIDATE_WAIT = 0.8
-local ALL_SETTLE_WAIT = 0.2
+local ALL_SETTLE_WAIT = 0.3
 local ALL_POST_HOLD_WAIT = 0.15
 -- Um respiro entre um Exu e o proximo, pra nao metralhar o servidor.
 local ALL_STEP_GAP = 0.15
