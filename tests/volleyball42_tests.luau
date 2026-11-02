@@ -25,6 +25,48 @@ do
     check(ctx.State.__DEPHUB.Volleyball42 == nil, "destroy clears the published state")
 end
 
+
+-- ESP Character Direction: the Visual toggle starts the per-player jump
+-- direction indicators and disabling/unloading removes every visual.
+do
+    local ctx = sandbox(1316421563, 1316421563)
+    ctx:MountUI()
+
+    local target, character = ctx:AddPlayer("DirectionTarget")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    local root = character:FindFirstChild("HumanoidRootPart")
+    humanoid.FloorMaterial = "Ground"
+    humanoid.GetState = function()
+        return Enum.HumanoidStateType.Freefall
+    end
+    root.AssemblyLinearVelocity = Vector3.new(0, 12, 0)
+
+    local state = ctx:Run("src/games/volleyball42.lua")
+    check(state.CharacterDirection ~= nil, "character direction feature loads")
+    check(state.CharacterDirectionEnabled == false, "character direction starts disabled")
+    check(state:SetCharacterDirectionEnabled(true) == true, "character direction enables")
+    ctx:FlushSpawned()
+
+    humanoid.FloorMaterial = Enum.Material.Air
+    ctx.Services.RunService.Heartbeat:Fire(0.05)
+
+    local folder = ctx.Services.Workspace:FindFirstChild("DepHubCharacterDirection")
+    check(folder ~= nil, "enabling creates the ESP folder")
+    check(folder:FindFirstChild("DepHubDirectionTarget") ~= nil, "jump detection creates a target part")
+    check(state.CharacterDirection.Active == true, "the feature is active")
+
+    check(state:SetCharacterDirectionEnabled(false) == true, "character direction disables")
+    check(ctx.Services.Workspace:FindFirstChild("DepHubCharacterDirection") == nil,
+        "disabling destroys all ESP visuals")
+    check(state.CharacterDirection.Active == false, "the feature is inactive")
+
+    state:SetCharacterDirectionEnabled(true)
+    ctx:FlushSpawned()
+    state:Destroy()
+    check(ctx.Services.Workspace:FindFirstChild("DepHubCharacterDirection") == nil,
+        "destroy removes the ESP folder")
+end
+
 -- Volleyball 4.2 actions: the remotes/animations the game uses to spawn the ball,
 -- set, spike, block, bump, dive and serve, exposed to the automations through
 -- State:Act. The harness has no PlayerAction remote or Animations tree by
