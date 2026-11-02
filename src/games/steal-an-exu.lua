@@ -79,6 +79,7 @@ local State = {
     Store = configStore,
     Config = configStore and configStore.Values or {},
     LastConfigError = not configStore and tostring(configStoreError or "config-store indisponivel") or nil,
+    ConfigWarningShown = false,
     LastError = nil,
 }
 
@@ -128,7 +129,17 @@ function State:SaveConfig()
 end
 
 function State:PersistIfAutoExec()
-    return self:SaveConfig()
+    local saved = self:SaveConfig()
+    if saved then
+        self.ConfigWarningShown = false
+    elseif not self.ConfigWarningShown then
+        self.ConfigWarningShown = true
+        local ui = env.__DEPHUB and env.__DEPHUB.UI
+        if ui and type(ui.Notify) == "function" then
+            ui:Notify("Config", self.LastConfigError or "O executor nao conseguiu salvar a config.")
+        end
+    end
+    return saved
 end
 
 function State:ReadConfig()
@@ -791,9 +802,11 @@ do
                         pcall(function() autoExecHandle:SetValue(false) end)
                         revertingAutoExec = false
                     end
+                end
+                if not ok then
                     local ui = env.__DEPHUB and env.__DEPHUB.UI
                     if ui and type(ui.Notify) == "function" then
-                        ui:Notify("Auto Execute", State.LastError or "Executor sem queue_on_teleport.")
+                        ui:Notify("Auto Execute", State.LastError or State.LastConfigError or "Nao foi possivel atualizar Auto Execute.")
                     end
                 end
                 return ok
