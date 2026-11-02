@@ -62,6 +62,7 @@ function AutoSteal.new(ctx, options)
         TargetCache = nil,
         TargetCacheAt = 0,
         TargetCacheKey = nil,
+        TargetCacheRuntimeCount = nil,
         SourceTrackQueue = {},
         SourceTrackWorker = false,
     }, AutoSteal)
@@ -299,8 +300,13 @@ function AutoSteal:_targets()
     if self.SelectedOnly then
         local now = os.clock()
         local selectionKey = self:SelectionKey()
+        local runtimeCount = #runtime:GetChildren()
         local cached = self.TargetCache
-        if cached and self.TargetCacheKey == selectionKey and now - self.TargetCacheAt < TARGET_CACHE_TTL then
+        if cached
+            and self.TargetCacheKey == selectionKey
+            and self.TargetCacheRuntimeCount == runtimeCount
+            and now - self.TargetCacheAt < TARGET_CACHE_TTL
+        then
             local stillAlive = true
             for _, target in ipairs(cached) do
                 if not self:_alive(target) then
@@ -317,6 +323,7 @@ function AutoSteal:_targets()
             self.TargetCache = targets
             self.TargetCacheAt = now
             self.TargetCacheKey = selectionKey
+            self.TargetCacheRuntimeCount = runtimeCount
         else
             self.TargetCache = nil
         end
@@ -571,6 +578,7 @@ function AutoSteal:SetTerreiros(names)
     self.LastTargetCount = nil
     self.TargetCache = nil
     self.TargetCacheKey = nil
+    self.TargetCacheRuntimeCount = nil
     return true
 end
 
