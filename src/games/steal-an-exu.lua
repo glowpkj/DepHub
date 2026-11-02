@@ -507,14 +507,17 @@ do
         if sourceMap[key] == terreiroName then return false end
 
         sourceMap[key] = terreiroName
-        State.Config.exuSources = State.Config.exuSources or {}
-        State.Config.exuSources[key] = terreiroName
-        print("[StealAnExu] Exu source:", key, "=>", terreiroName, "| salvando na config.")
+        State.Config.exuSources = sourceMap
+        return true
+    end
+
+    function FeatureContext.PersistExuSources()
+        State.Config.exuSources = sourceMap
         local saved = State:PersistIfAutoExec()
         if not saved then
-            print("[StealAnExu] AVISO: origem do Exu ficou apenas em memoria:", State.LastConfigError or "falha ao salvar")
+            print("[StealAnExu] AVISO: origens dos Exus ficaram apenas em memoria:", State.LastConfigError or "falha ao salvar")
         end
-        return true
+        return saved
     end
 
     function FeatureContext.TrackNewExuSources(before, after, terreiroName)
