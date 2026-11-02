@@ -8,6 +8,7 @@ local pcall = pcall
 local tostring = tostring
 local table = table
 local math = math
+local os = os
 
 local SETTLE_WAIT = 0.15
 local POST_WAIT = 0.1
@@ -362,15 +363,35 @@ function AutoSteal:_step(target, root, originalPos)
             prompt:InputHoldEnd()
 
             if target.terreiroName then
-                task.wait(0.3)
-                if type(self.Ctx.TrackNewExuSources) == "function" then
-                    local okAfter, after = pcall(getExuIds or function() return {} end)
-                    if okAfter and type(after) == "table" then
-                        pcall(self.Ctx.TrackNewExuSources, before, after, target.terreiroName)
-                    end
-                end
+                local tracked = 0
                 if target.exuId ~= nil and type(self.Ctx.TrackExuSource) == "function" then
-                    pcall(self.Ctx.TrackExuSource, target.exuId, target.terreiroName)
+                    local okTrack, result = pcall(self.Ctx.TrackExuSource, target.exuId, target.terreiroName)
+                    if okTrack and result then tracked += 1 end
+                    debugLog(self, "ExuId do Runtime:", tostring(target.exuId),
+                        "=>", target.terreiroName, "| registro direto:", okTrack and result == true or false)
+                end
+
+                local deadline = os.clock() + 2.5
+                repeat
+                    task.wait(0.25)
+                    if type(self.Ctx.TrackNewExuSources) == "function" then
+                        local okAfter, after = pcall(getExuIds or function() return {} end)
+                        if okAfter and type(after) == "table" then
+                            local okTrack, added = pcall(self.Ctx.TrackNewExuSources, before, after, target.terreiroName)
+                            if okTrack then tracked += tonumber(added) or 0 end
+                        end
+                    end
+                    if tracked > 0 then break end
+                until os.clock() >= deadline
+
+                if tracked > 0 then
+                    debugLog(self, tracked, "ExuId(s) vinculados ao", target.terreiroName)
+                else
+                    local okIds, currentIds = pcall(getExuIds or function() return {} end)
+                    debugLog(self, "prompt acionado em", target.terreiroName,
+                        "mas nenhum novo Tool/ExuId apareceu no Backpack/Character.",
+                        "ExuId do Runtime =", tostring(target.exuId),
+                        "| inventario legivel =", okIds and type(currentIds) == "table")
                 end
             end
         end
