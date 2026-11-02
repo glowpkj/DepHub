@@ -189,8 +189,18 @@ function AutoSteal:_selectedTargets(runtime)
     end
 
     local selectedCount = 0
-    for _ in pairs(self.Terreiros) do selectedCount += 1 end
+    local selectedNestCount = 0
+    for terreiroName in pairs(self.Terreiros) do
+        selectedCount += 1
+        local selectedFolder = terreirosFolder:FindFirstChild(terreiroName)
+        local selectedNests = selectedFolder and selectedFolder:FindFirstChild("Nests")
+        if not selectedNests then
+            return {}, "Nests do " .. tostring(terreiroName) .. " ainda nao carregaram"
+        end
+        selectedNestCount += #selectedNests:GetChildren()
+    end
     if selectedCount == 0 then return {}, "nenhum Terreiro selecionado" end
+    if selectedNestCount == 0 then return {}, "nenhum Nest disponivel nos terreiros selecionados" end
 
     -- Primeiro mapeia os Nests de TODOS os terreiros. Assim, quando o terreiro
     -- selecionado estiver vazio, um Exu de outro terreiro nunca sera atribuido
@@ -221,7 +231,7 @@ function AutoSteal:_selectedTargets(runtime)
     end)
 
     local runtimeTargets = collectRuntimeTargets(runtime)
-    if #nests == 0 or #runtimeTargets == 0 then
+    if #runtimeTargets == 0 then
         return {}, nil
     end
 
