@@ -468,7 +468,9 @@ end
 if AutoStealModule then
     local availableTerreiros = AutoStealModule.terreiros()
     local selectedTerreiros = State.Config.selectedTerreiros
-    if type(selectedTerreiros) ~= "table" then selectedTerreiros = {availableTerreiros[1]} end
+    if type(selectedTerreiros) ~= "table" or #selectedTerreiros == 0 then
+        selectedTerreiros = {availableTerreiros[1]}
+    end
 
     State.AutoStealSelection = AutoStealModule.new(FeatureContext, {
         selectedOnly = true,
