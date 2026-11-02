@@ -1176,6 +1176,77 @@ do
     fruit2:Destroy()
 end
 
+-- Auto random fruit, parte NOVA: antes de girar, VOA ate o NPC da gacha. O NPC e
+-- achado em runtime (sem caminho chumbado) e o roll so sai depois de chegar perto
+-- -- "pra ter uma seguranca" (o usuario nao quer girar de longe). Aqui a busca e
+-- o voo sao exercitados com NPCs de verdade montados no Workspace.
+do
+    local ctx = bfContext(994732206, 994732206)
+    local Fruit = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "fruit.lua"])()
+
+    -- Personagem com root, pra a medida de chegada (distancia) funcionar.
+    local character = Instance.new("Model"); character.Name, character.Parent = "Character", ctx.Player
+    ctx.Player.Character = character
+    local root = Instance.new("Part"); root.Name, root.Position, root.Parent = "HumanoidRootPart", Vector3.new(0, 0, 0), character
+    local humanoid = Instance.new("Humanoid"); humanoid.Parent = character
+
+    -- O NPC da gacha no caminho de REFERENCIA: workspace.NPCs["Blox Fruit Gacha"].
+    local npcs = Instance.new("Folder"); npcs.Name, npcs.Parent = "NPCs", ctx.Services.Workspace
+    -- O NPC e um Model com a parte fisica dentro (GoToInstance aceita Model).
+    local gacha = Instance.new("Model"); gacha.Name, gacha.Parent = "Blox Fruit Gacha", npcs
+    local gachaPart = Instance.new("Part"); gachaPart.Name, gachaPart.Position, gachaPart.Parent = "Head", Vector3.new(0, 0, 60), gacha
+
+    local motor = ctx.Env.loadstring(sources[FEATURE_PREFIX .. "teleport.lua"])().new()
+    motor:Enable()
+    local fruit = Fruit.new({ randomCooldown = 1 })
+    fruit:SetTeleport(motor)
+    fruit:Enable()
+
+    -- 1. Acha pelo caminho de referencia (NPCs["Blox Fruit Gacha"]).
+    check(fruit:_gachaNpc() == gacha, "acha o NPC da gacha pelo caminho de referencia")
+
+    -- 2. Chegada: com o root JA na posicao do NPC, a medida de distancia aprova na
+    -- primeira checagem (sem depender do tween do harness). E o voo foi DISPARADO.
+    fruit.RandomEnabled = true
+    root.Position = gachaPart.Position
+    check(fruit:_gotoGachaNpc() == true, "chega ao NPC da gacha (distancia dentro do raio)")
+    check(fruit.GachaNpc == gacha, "guarda o NPC achado")
+    root.Position = Vector3.new(0, 0, 0)
+    motor:Cancel()
+    check(fruit:_gotoGachaNpc() == true or motor:IsFlying(), "sa pega distancia dispara o voo ate o NPC")
+
+    -- 3. Com o NPC RENOMEADO no meio da pasta (sem o nome exato), o fallback por
+    -- "gacha" no nome ainda acha.
+    gacha.Name = "Blox Fruit Gacha 2"
+    check(fruit:_gachaNpc() == gacha, "acha o NPC pelo trecho 'gacha' quando o nome exato nao bate")
+
+    -- 4. Sem a pasta NPCs, a varredura do workspace inteiro acha.
+    gacha.Parent = ctx.Services.Workspace
+    npcs:Destroy()
+    check(fruit:_gachaNpc() == gacha, "acha o NPC mesmo sem a pasta NPCs (varre o workspace)")
+
+    -- 5. Sem NPC nenhum, a busca devolve nil e o voo recusa com motivo -- mas o
+    -- roll ainda sai (nao girar seria pior que girar de longe).
+    gacha:Destroy()
+    fruit.LastError = nil
+    check(fruit:_gachaNpc() == nil, "sem NPC a busca devolve nil")
+    check(fruit:_gotoGachaNpc() == false and fruit.LastError == "NPC da gacha nao encontrado",
+        "sem NPC o voo recusa com motivo")
+    local gachaRF = ctx.Services.ReplicatedStorage.Modules.Net:FindFirstChild("RF/GachaNetworkRF")
+    ctx:SetMethod(gachaRF, "InvokeServer", function() return 0 end)
+    check(select(1, fruit:RollGacha()) == true, "sem NPC o roll ainda sai (roll degrada, nao trava)")
+
+    -- 6. Desligar o random cancela o voo em andamento (motor compartilhado).
+    check(fruit:SetRandom(true) == true, "liga o random")
+    motor:GoTo(Vector3.new(0, 0, 5000))
+    check(motor:IsFlying() == true, "ha um voo em andamento")
+    fruit:SetRandom(false)
+    check(motor:IsFlying() == false, "desligar o random cancela o voo ate o NPC")
+
+    motor:Destroy()
+    fruit:Destroy()
+end
+
 -- (o gate que ele pediu). O destino e uma POSICAO fixa (Vector3) da lista do
 -- OpenSource; o voo vai direto pro ponto, sem lookup de instancia no mapa.
 do

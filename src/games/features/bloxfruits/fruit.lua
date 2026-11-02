@@ -129,6 +129,11 @@ function Feature.new(options)
     self.RandomCooldown = options.randomCooldown or 90
     self.LastError = nil
     self.LastGachaCooldown = nil
+    -- O NPC da gacha achado em runtime (guardado pro debug; reachado a cada
+    -- ciclo, porque um mar novo / respawn troca o Instance). GachaArrived registra
+    -- se a ultima rolagem teve chegada confirmada perto do balcao.
+    self.GachaNpc = nil
+    self.GachaArrived = false
     return self
 end
 
@@ -452,6 +457,12 @@ end
 -- BoxName="ZiolesGacha"} -- o mesmo caminho que o jogo usa. A resposta traz o
 -- cooldown real (um numero); enquanto for > 3 usamos ele em vez do default, pra
 -- respeitar o tempo que o servidor manda.
+--
+-- ANTES de rolar, a feature VOA ate o NPC da gacha ("Blox Fruit Gacha"): girar
+-- de longe e a parte "suspeita" -- o servidor ve a chamada partindo de um
+-- personagem que nunca chegou perto do balcao. O usuario pediu justamente pra
+-- chegar perto primeiro ("so pra ter uma seguranca"). O NPC e' achado em RUNTIME,
+-- sem caminho chumbado, pra funcionar nos tres mares (ver _gachaNpc).
 
 -- Resolve o RemoteFunction da gacha. Modules.Net e o caminho atual; cai pro Net
 -- solto em ReplicatedStorage em builds antigas (mesmo padrao da blade hit).
@@ -460,6 +471,107 @@ function Feature:_gachaRF()
     local net = (modules and modules:FindFirstChild("Net")) or ReplicatedStorage:FindFirstChild("Net")
     if not net then return nil end
     return net:FindFirstChild("RF/GachaNetworkRF")
+end
+
+-- O nome do NPC da gacha. Referencia do usuario: workspace.NPCs["Blox Fruit
+-- Gacha"]. So isto e' "caminho"; a busca abaixo JA TENTA esse primeiro, mas nao
+-- depende dele -- o mar/ilha pode nomear diferente, entao o resto e' por escaneio.
+local GACHA_NPC_NAME = "Blox Fruit Gacha"
+-- O trecho que identifica o balcao em qualquer mar (o nome varia: "Blox Fruit
+-- Gacha", "Blox Fruit Gacha 2", "Fruit Gacha", ...). Comparado no minusculo.
+local GACHA_MARK = "gacha"
+
+-- A parte fisica do NPC (pra o teleporte ter pra onde ir): o proprio NPC se ja
+-- for BasePart, senao um "HumanoidRootPart"/"Head" filho, senao a primeira
+-- BasePart descendente. Um Model sem parte nenhuma nao serve de destino.
+local function npcPart(npc)
+    if not npc then return nil end
+    if npc:IsA("BasePart") then return npc end
+    return npc:FindFirstChild("HumanoidRootPart") or npc:FindFirstChild("Head") or npc:FindFirstChildWhichIsA("BasePart")
+end
+
+-- O nome casa o balcao da gacha? Comparado no minusculo; o nome EXATO vale
+-- sempre e o MARK (substring) cobre as variantes por mar.
+local function isGachaName(name)
+    local lower = tostring(name):lower()
+    return lower == GACHA_NPC_NAME:lower() or lower:find(GACHA_MARK, 1, true) ~= nil
+end
+
+-- Acha o NPC da gacha em RUNTIME, em qualquer mar, sem caminho chumbado.
+--
+-- A ordem pensa no custo x na certeza:
+--   1. o caminho de referencia do usuario (workspace.NPCs["Blox Fruit Gacha"]) --
+--      um FindFirstChild direto, barato, e o caso normal;
+--   2. varredura de workspace.NPCs (a pasta dos NPCs): procura o nome EXATO e,
+--      se nao achar, qualquer descendente com "gacha" no nome;
+--   3. varredura de workspace inteiro (recursiva): cobre o mar que renomeia a
+--      pasta dos NPCs ou poe o balcao noutro lugar -- mesmo sem a pasta NPCs.
+-- Devolve o Instance do NPC (que sirva de destino pro teleporte) ou nil, e o
+-- motivo em LastError.
+function Feature:_gachaNpc()
+    -- 1. Referencia direta.
+    local npcs = workspace:FindFirstChild("NPCs")
+    if npcs then
+        local exact = npcs:FindFirstChild(GACHA_NPC_NAME)
+        if exact and npcPart(exact) then return exact end
+        -- 2a. Nome exato em qualquer profundidade de NPCs.
+        local byExact = npcs:FindFirstChild(GACHA_NPC_NAME, true)
+        if byExact and npcPart(byExact) then return byExact end
+        -- 2b. Qualquer descendente de NPCs com "gacha" no nome.
+        for _, descendant in ipairs(npcs:GetDescendants()) do
+            if isGachaName(descendant.Name) and npcPart(descendant) then return descendant end
+        end
+    end
+    -- 3. Varredura do workspace inteiro (a pasta pode ter outro nome no mar).
+    for _, descendant in ipairs(workspace:GetDescendants()) do
+        if isGachaName(descendant.Name) and npcPart(descendant) and not descendant:IsA("Tool") then
+            return descendant
+        end
+    end
+    return nil
+end
+
+-- Voa ate o NPC da gacha e ESPERA chegar perto antes de rolar. Devolve true se
+-- chegou (ou ja estava perto). Sem motor/NPC devolve false e deixa o motivo em
+-- LastError -- quem chama decide (hoje: rola assim mesmo, com o motivo gravado).
+--
+-- A espera e' por DISTANCIA (nao por tempo fixo): o Go do motor leva o tempo que
+-- a distancia pedir, entao poll ate o root chegar no raio de chegada. O timeout
+-- evita travar se o voo for cortado (Cancel, respawn no meio).
+local GACHA_ARRIVE_RADIUS = 12  -- studs: "perto do balcao" ja conta como chegou
+local GACHA_ARRIVE_TIMEOUT = 12 -- s: teto da espera
+
+function Feature:_gotoGachaNpc()
+    local motor = self.Teleport
+    if not motor or type(motor.GoToInstance) ~= "function" then
+        self.LastError = "teleport motor ausente"
+        return false
+    end
+    local npc = self:_gachaNpc()
+    if not npc then
+        self.LastError = "NPC da gacha nao encontrado"
+        return false
+    end
+    self.GachaNpc = npc
+    -- Voa ate o NPC (a parte fisica dele). GoToInstance aceita BasePart ou Model.
+    local part = npcPart(npc)
+    pcall(function() motor:GoToInstance(npc) end)
+    -- Espera chegar: poll da distancia do meu root ate o destino, com timeout.
+    local target = part and part.Position or nil
+    local waited = 0
+    while self.RandomEnabled and waited < GACHA_ARRIVE_TIMEOUT do
+        local root = self:_hrp()
+        if root and target then
+            if (root.Position - target).Magnitude <= GACHA_ARRIVE_RADIUS then return true end
+        end
+        task.wait(0.2)
+        waited = waited + 0.2
+    end
+    -- Sem parte-alvo (NPC sem geometria) nao ha o que medir: deixa o voo rolar
+    -- e segue -- nao da pra confirmar chegada, mas nao travar o loop e' melhor.
+    if not target then return true end
+    self.LastError = "nao cheguei ao NPC da gacha (timeout)"
+    return false
 end
 
 -- Uma rolagem. Devolve true se o remote existiu e a chamada saiu. Quando a
@@ -481,9 +593,26 @@ end
 
 function Feature:SetRandom(on)
     self.RandomEnabled = on == true
-    if not self.RandomEnabled then self:_cancel("random"); self:_refresh(); return true end
+    if not self.RandomEnabled then
+        -- Desligar o random para o LOOP e tambem o voo ate o NPC da gacha. O
+        -- motor e COMPARTILHADO (grab de fruta, ilha): parar o voo aqui evita o
+        -- "desliguei e ele continua teleportando" -- mesmo cuidado do grab.
+        if self.Teleport and type(self.Teleport.Cancel) == "function" then
+            pcall(self.Teleport.Cancel, self.Teleport)
+        end
+        self:_cancel("random")
+        self:_refresh()
+        return true
+    end
     self:_spawn("random", function()
         while self.RandomEnabled do
+            -- SEGURANCA: chega perto do NPC da gacha ANTES de girar. Gira so
+            -- depois; se nao achar o NPC/nao chegar, ainda rola (o motivo fica em
+            -- LastError) -- nao girar seria pior que girar de longe, que ja e' o
+            -- comportamento antigo. O voo respeita o RandomEnabled no wait.
+            local arrived = false
+            pcall(function() arrived = self:_gotoGachaNpc() end)
+            if not self.RandomEnabled then break end
             local ok, cooldown = pcall(function() return self:RollGacha() end)
             local wait = self.RandomCooldown
             if ok and type(cooldown) == "number" then wait = cooldown end
@@ -493,6 +622,8 @@ function Feature:SetRandom(on)
                 task.wait(1)
                 wait = wait - 1
             end
+            -- `arrived` fica disponivel pra debug; o roll ja saiu de qualquer jeito.
+            self.GachaArrived = arrived == true
         end
     end)
     self:_refresh()
@@ -604,6 +735,7 @@ function Feature:Destroy()
     self:Disable()
     self.Teleport = nil
     self.EspMap = {}
+    self.GachaNpc = nil
 end
 
 return Feature
