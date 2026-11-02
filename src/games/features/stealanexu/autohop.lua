@@ -79,6 +79,9 @@ function AutoHop.new(options)
         PlaceId = tonumber(options.placeId) or game.PlaceId,
         EmptyGrace = tonumber(options.emptyGrace) or EMPTY_GRACE,
         TeleportConnection = nil,
+        TargetProvider = options.targetProvider,
+        ScopeProvider = options.scopeProvider,
+        LastScopeKey = nil,
     }, AutoHop)
 
     local ok, connection = pcall(function()
@@ -113,6 +116,13 @@ function AutoHop:Logs()
 end
 
 function AutoHop:RuntimeCount()
+    if type(self.TargetProvider) == "function" then
+        local ok, targets, reason = pcall(self.TargetProvider)
+        if not ok then return nil, tostring(targets) end
+        if type(targets) ~= "table" then return nil, reason or "mapeamento de terreiros indisponivel" end
+        return #targets
+    end
+
     local workspace = game:GetService("Workspace")
     local runtime = workspace:FindFirstChild("Runtime")
     if not runtime then return nil, "workspace.Runtime ainda nao apareceu" end
@@ -123,6 +133,13 @@ function AutoHop:RuntimeCount()
     end
 
     return count
+end
+
+function AutoHop:_scopeKey()
+    if type(self.ScopeProvider) ~= "function" then return "all" end
+    local ok, key = pcall(self.ScopeProvider)
+    if not ok then return "scope-error" end
+    return tostring(key or "")
 end
 
 function AutoHop:_httpGet(url)
@@ -259,8 +276,19 @@ function AutoHop:Hop()
 end
 
 function AutoHop:_loop(runId)
-    log(self, "monitor iniciado; aguardando Runtime ficar vazio por", self.EmptyGrace, "segundos.")
+    self.LastScopeKey = self:_scopeKey()
+    log(self, "monitor iniciado; aguardando selecao ficar vazia por", self.EmptyGrace, "segundos.")
     while self.Enabled and not self.Destroyed and self.RunId == runId do
+        local scopeKey = self:_scopeKey()
+        if scopeKey ~= self.LastScopeKey then
+            self.LastScopeKey = scopeKey
+            self.EmptySince = nil
+            self.SawExu = false
+            self.NextAttempt = 0
+            self.LastStatus = "selection changed"
+            log(self, "selecao alterada; monitor reiniciado.")
+        end
+
         local count, reason = self:RuntimeCount()
         if count == nil then
             self.EmptySince = nil
