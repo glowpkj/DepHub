@@ -164,6 +164,8 @@ do
         "the dropdown maps available Terreiros from the live Map.Terreiros folder")
     check(labels["Auto Place Exu"] ~= nil and labels["Auto Place Exu"].Kind == "toggle",
         "the panel has the Auto Place Exu toggle")
+    check(labels["Diagnose Auto Place"] ~= nil and labels["Diagnose Auto Place"].Kind == "button",
+        "the panel has the Auto Place diagnostic button")
     local placeDropdown = labels["Place Terreiros"]
     check(placeDropdown ~= nil and placeDropdown.Kind == "dropdown" and placeDropdown.MultiSelect == true,
         "the Auto Place Terreiro dropdown is a multi-select")
@@ -503,6 +505,10 @@ do
     feature.ConfigModule = {PEN_SIZE = 64, Pens = {[4] = {X = 100, Z = 200}}}
     feature.Remote = remote
     feature:SetTerreiros({"Terreiro1"})
+
+    local diagnosis = feature:Diagnose()
+    check(diagnosis.setup == true, "Auto Place diagnosis validates the base config and PlaceExu remote")
+    check(#diagnosis.mapped == 1, "Auto Place diagnosis identifies the selected Exu source mapping")
 
     check(feature:PendingCount() == 1, "Auto Place reports selected tools that still need placement")
     local placed = feature:PlaceOnce()
