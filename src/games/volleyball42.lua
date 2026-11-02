@@ -67,6 +67,15 @@ if not JumpAnywhere then
     warn("[DepHub] Volleyball jump feature unavailable: " .. tostring(jumpError))
 end
 
+local CharacterDirection, directionError = loadFeature("src/games/features/volleyball/character-direction.lua", function(module)
+    return type(module.new) == "function"
+        and type(module.Enable) == "function"
+        and type(module.Disable) == "function"
+end)
+if not CharacterDirection then
+    warn("[DepHub] Volleyball character direction ESP unavailable: " .. tostring(directionError))
+end
+
 local State = {
     Version = "0.3.0",
     Destroyed = false,
@@ -81,6 +90,8 @@ local State = {
     Jump = nil,
     JumpEnabled = false,
     JumpImpulse = 25,
+    CharacterDirection = nil,
+    CharacterDirectionEnabled = false,
 }
 
 -- O modulo de acoes conta os disparos via actor.Log; aponta para o log do State.
@@ -141,6 +152,30 @@ function State:SetJumpEnabled(enabled)
     return true
 end
 
+function State:SetCharacterDirectionEnabled(enabled)
+    if self.Destroyed then return false end
+
+    local wanted = enabled == true
+    if wanted then
+        if not self.CharacterDirection then return false, "unavailable:feature" end
+        if not self.CharacterDirectionEnabled then
+            local ok, err = self.CharacterDirection:Enable()
+            if not ok then
+                self.LastError = tostring(err or "enable failed")
+                return false, self.LastError
+            end
+        end
+        self.CharacterDirectionEnabled = true
+    else
+        if self.CharacterDirection then
+            self.CharacterDirection:Disable()
+        end
+        self.CharacterDirectionEnabled = false
+    end
+
+    return true
+end
+
 -- Impulso em % (0-150). Grava sempre; o efeito so vale com o toggle ligado.
 function State:SetJumpImpulse(percent)
     if self.Destroyed then return false end
@@ -161,6 +196,12 @@ function State:Destroy()
     end
     self.JumpEnabled = false
 
+    if self.CharacterDirection then
+        pcall(self.CharacterDirection.Destroy, self.CharacterDirection)
+        self.CharacterDirection = nil
+    end
+    self.CharacterDirectionEnabled = false
+
     -- Cancela um serve em andamento (ele tem um task.wait interno) para nao
     -- disparar "Serving" depois do unload.
     if self.Actions and type(self.Actions.Cancel) == "function" then
@@ -175,9 +216,12 @@ function State:Destroy()
     end
 end
 
--- Instancia o recurso de pulo (mecanismo pronto; so liga quando o toggle ligar).
+-- Instancia os recursos; cada um so inicia quando seu toggle ligar.
 if JumpAnywhere then
     State.Jump = JumpAnywhere.new()
+end
+if CharacterDirection then
+    State.CharacterDirection = CharacterDirection.new()
 end
 
 State:Start()
@@ -210,6 +254,23 @@ do
                 State:SetJumpImpulse(value)
             end)
         end
+    end
+end
+
+do
+    local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
+    if Kit then
+    local visualTab = Kit.Tab("ESP", "Visual")
+    local visualSection = Kit.Section(visualTab, "Character Direction", "Left")
+    if visualSection then
+        visualSection:CreateToggle("ESP Character Direction", State.CharacterDirectionEnabled, function(value)
+            local ok, err = State:SetCharacterDirectionEnabled(value)
+            if not ok then
+                State.LastError = tostring(err)
+                warn("[DepHub] ESP Character Direction unavailable: " .. tostring(err))
+            end
+        end)
+    end
     end
 end
 
