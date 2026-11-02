@@ -140,8 +140,8 @@ do
         for _, candidate in ipairs(world.fired) do if candidate == prompt then firedCount = firedCount + 1 end end
     end
 
-    local ok = feature:StealOnce()
-    check(ok == true, "StealOnce reaches an exu prompt")
+    local ok, stole = feature:StealOnce()
+    check(ok == true and stole >= 1, "StealOnce reaches and counts exu prompts")
     check(firedCount >= 1, "the Runtime ProximityPrompt is fired")
 
     -- After the step the character is back at the base anchor (it started at 0,0,0
@@ -154,6 +154,45 @@ do
     check(feature:SetEnabled(false) == true and feature:IsEnabled() == false, "the feature turns off")
 
     backend:Destroy()
+end
+
+-- While the run is on, the character floats (anchored) and clips through the
+-- world (noclip); when it stops, both are restored.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local world = buildWorld(ctx)
+    local root = makeCharacter(ctx)
+    local torso = Instance.new("Part"); torso.Name = "Torso"; torso.Parent = root.Parent
+    torso.CanCollide = true
+    root.Anchored = false
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoSteal
+
+    ctx.Env.fireproximityprompt = function() end
+    -- Entering the steal state freezes the body and turns collision off.
+    feature:_enterStealState()
+    check(root.Anchored == true, "the body is anchored while stealing (floats in place)")
+    check(root.CanCollide == false, "the body has no collision while stealing (noclip)")
+    check(torso.CanCollide == false, "noclip covers every part, not just the root")
+
+    local ok, stolen = feature:StealAll()
+    check(ok == true and stolen == 2, "Steal All counts the exus it steals (2)")
+
+    -- Leaving the state restores the original collision and anchoring.
+    feature:_leaveStealState()
+    check(root.Anchored == false, "anchoring is restored after the run")
+    check(root.CanCollide == true, "collision is restored after the run")
+    check(torso.CanCollide == true, "collision is restored on every part")
+
+    -- Destroy must also leave nothing frozen behind.
+    feature:_enterStealState()
+    backend:Destroy()
+    check(root.Anchored == false, "destroy unfreezes the body")
+    check(root.CanCollide == true, "destroy restores collision")
+
+    ctx.Env.fireproximityprompt = nil
 end
 
 -- Degrades cleanly when the world is missing: no pen, no crash, and a reason.
