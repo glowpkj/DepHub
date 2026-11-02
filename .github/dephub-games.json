@@ -61,6 +61,7 @@
       "src/games/volleyball42.lua",
       "src/games/features/volleyball/actions.lua",
       "src/games/features/volleyball/jump-anywhere.lua",
+      "src/games/features/volleyball/character-direction.lua",
       "src/games/updates/1316421563.txt"
     ]
   },
@@ -211,7 +212,8 @@
     ]
   },
   "4658598196": {
-    "name": "Attack on Titan Revolution",    "files": [
+    "name": "Attack on Titan Revolution",
+    "files": [
       "DepHub.lua",
       "src/version.txt",
       "src/core/demon-ui.lua",
