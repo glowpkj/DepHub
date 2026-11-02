@@ -8,7 +8,7 @@
 --   esteira-> workspace.Map.Pens.<MeuPen>.TreadSign.Board.ClickDetector
 --
 -- "A base muda": NUNCA usa Pen1/Pen2 fixo -- o pen e' sempre o MEU, achado pelo
--- atributo Owner (mesma logica do autosteal, vinda do contexto do backend).
+-- atributo Owner (logica vinda do contexto do backend).
 --
 -- Os dois quadros sao o MESMO mecanismo mudando so o caminho dentro do pen, entao
 -- este modulo e' uma fabrica: o backend instancia duas vezes (base e esteira),

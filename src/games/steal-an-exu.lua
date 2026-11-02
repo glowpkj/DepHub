@@ -1,9 +1,8 @@
 -- Steal An Exu - backend.
 --
--- Esqueleto com uma feature: o Auto Steal Exu (src/games/features/stealanexu/
--- autosteal.lua). O backend sobe, carrega o modulo do repositorio, registra em
--- State.Features e monta a UI (categoria Farming, uma secao com o toggle e o
--- dropdown de Terreiro). A logica toda (teleporte, prompt, base) mora na feature.
+-- Duas features: Auto Upgrade (os botoes da base e da esteira) e Auto Sell All (a
+-- GUI "Vender Todos"). O backend sobe, carrega os modulos do repositorio, registra
+-- em State.Features e monta a UI (categoria Farming). A logica mora nas features.
 
 local game, task, type, tostring, pcall = game, task, type, tostring, pcall
 local Players = game:GetService("Players")
@@ -53,10 +52,6 @@ local function loadFeature(relativePath, validate)
     if not okRun or type(module) ~= "table" or not validate(module) then return nil, "run: " .. tostring(module) end
     return module
 end
-
-local AutoStealModule, autoStealError = loadFeature("src/games/features/stealanexu/autosteal.lua", function(module)
-    return type(module.new) == "function"
-end)
 
 local State = {
     Version = "0.1.1",
@@ -168,16 +163,8 @@ do
     end
 end
 
--- Instancia o Auto Steal Exu (mecanismo pronto; so roda quando o toggle ligar).
-if AutoStealModule then
-    State.AutoSteal = AutoStealModule.new(FeatureContext)
-    State.Features.AutoSteal = State.AutoSteal
-else
-    warn("[DepHub] Steal An Exu autosteal unavailable: " .. tostring(autoStealError))
-end
-
--- Auto Upgrade: duas instancias do MESMO mecanismo (o botao da base e o da
--- esteira sao o mesmo click), mudando so o caminho dentro do pen.
+-- Instancia o Auto Upgrade. Duas instancias do MESMO mecanismo (o botao da base e
+-- o da esteira sao o mesmo click), mudando so o caminho dentro do pen.
 if AutoUpgradeModule then
     State.UpgradeBase = AutoUpgradeModule.new(FeatureContext, {
         label = "base", path = "PenSign.Board.ClickDetector",
@@ -203,33 +190,14 @@ State:Start()
 
 -- ---------------------------------------------------------------------------
 -- Apresentacao: categoria Farming.
---   * "Auto Steal Exu" -- o loop (toggle). Varre TODOS os Exus do Runtime.
---     Guardar na base e o proprio teleporte de volta -- sem knob separado.
---   * "Steal All" -- um botao de passada unica: todos os Exus do Runtime, com
---     wait entre cada um.
 --   * "Sell All" -- um botao de passada unica: vende os Exus pela GUI do jogo
---     (PlayerGui.Menus["Vender Todos"].Button).
+--     (PlayerGui.Menus["Vender Todos"]).
+--   * "Auto Upgrade" -- um toggle por botao (o da base e o da esteira).
 -- ---------------------------------------------------------------------------
 do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
         local tab = Kit.Tab("Auto Steal", "Farming")
-
-        local feature = State.AutoSteal
-        if feature then
-            local section = Kit.Section(tab, "Auto Steal Exu", "Left")
-            if section then
-                section:CreateToggle("Auto Steal Exu", false, function(value)
-                    feature:SetEnabled(value)
-                end)
-            end
-            local allSection = Kit.Section(tab, "Steal All", "Left")
-            if allSection then
-                allSection:CreateButton("Steal All", function()
-                    feature:StartStealAll()
-                end)
-            end
-        end
 
         -- Sell All: vende todos os Exus pela GUI "Vender Todos" do jogo.
         if State.AutoSell then
