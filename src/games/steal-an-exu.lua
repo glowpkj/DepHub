@@ -467,6 +467,10 @@ do
         return inventoryExuIds()
     end
 
+    function FeatureContext.IsAutoSellEnabled()
+        return State.AutoSell ~= nil and State.AutoSell:IsEnabled()
+    end
+
     function FeatureContext.TrackExuSource(id, terreiroName)
         if id == nil or type(terreiroName) ~= "string" then return end
         local sourceMap = env.__DEPHUB_STEALANEXU_EXU_SOURCES
@@ -556,6 +560,9 @@ if AutoHopModule then
         pendingProvider = function()
             if State.AutoSell and State.AutoSell:IsEnabled() then
                 return #FeatureContext.InventoryExuIds()
+            end
+            if State.AutoPlace and State.AutoPlace:IsEnabled() then
+                return State.AutoPlace:PendingCount()
             end
             return 0
         end,
