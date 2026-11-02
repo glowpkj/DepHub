@@ -489,12 +489,25 @@ do
     feature.Remote = remote
     feature:SetTerreiros({"Terreiro1"})
 
+    check(feature:PendingCount() == 1, "Auto Place reports selected tools that still need placement")
     local placed = feature:PlaceOnce()
     check(placed == 1, "Auto Place sends only one tool from the selected Terreiro")
     check(remote.Fired and #remote.Fired == 1, "Auto Place fires PlaceExu once")
     check(remote.Fired[1][1] == "exu-1", "Auto Place sends the selected ExuId")
     check(remote.Fired[1][2] == Vector3.new(100 - 29 + 4, 0.3, 200 - 29 + 4),
         "Auto Place uses the same configurable pen grid as the supplied script")
+    check(feature:PendingCount() == 0, "Auto Place clears its pending count after sending placement")
+
+    local queuedTool = Instance.new("Tool"); queuedTool.Name = "ExuQueued"; queuedTool.Parent = backpack
+    queuedTool:SetAttribute("ExuId", "exu-3")
+    ctx.State.__DEPHUB_STEALANEXU_EXU_SOURCES["exu-3"] = "Terreiro1"
+    check(feature:PendingCount() == 1, "Auto Place detects another selected tool")
+    backend.AutoSell:SetEnabled(true)
+    local paused = feature:PlaceOnce()
+    check(paused == 0 and feature.LastStatus == "paused for Auto Sell",
+        "Auto Sell takes priority and pauses Auto Place")
+    check(#remote.Fired == 1, "Auto Place does not race Auto Sell with a placement request")
+    backend.AutoSell:SetEnabled(false)
 
     backend:Destroy()
 end
