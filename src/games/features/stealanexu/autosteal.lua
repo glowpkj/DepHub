@@ -32,6 +32,14 @@ AutoSteal.__index = AutoSteal
 local BASE_WAIT = 0.5
 local PROMPT_WAIT = 0.15
 
+-- Steal All (botao unico): o wait entre um Exu e outro, e a ordem dos terreiros
+-- (do 9 pro 1 -- o usuario pediu "comeca do 9 ate o 1"). Aumentamos a
+-- MaxActivationDistance do prompt na hora de disparar pra tentar pegar de longe,
+-- e devolvemos o valor original depois (nada de residuo).
+local ALL_WAIT = 0.25
+local ALL_TERREIRO_FROM = 9
+local ALL_TERREIRO_TO = 1
+
 -- O numero de terreiros e de nests por terreiro. O jogo usa Terreiro1..9 e
 -- Nest1..8; mantemos como constantes para o dropdown e a varredura sairem daqui.
 AutoSteal.TERREIRO_COUNT = 9
@@ -54,6 +62,10 @@ function AutoSteal.new(options)
     self.Terreiro = options.terreiro or "Terreiro1"
     self.LastError = nil
     self.LastStatus = "idle"
+    self.Destroyed = false
+    -- Steal All: uma passada unica (botao). AllThread guarda a thread viva pra
+    -- nao deixar duas passadas rodarem juntas.
+    self.AllThread = nil
     -- Teleporte instantaneo: o jogo nao tem anti-cheat de posicao, entao o
     -- destino e escrito direto no HumanoidRootPart.CFrame (sem tween, sem voo).
     self.Instant = true
@@ -216,6 +228,91 @@ function AutoSteal:StealOnce()
     return fired
 end
 
+-- Dispara um ProximityPrompt o mais "de longe" possivel: sobe a
+-- MaxActivationDistance na hora (o jogo valida 6.5 studs por padrao) e devolve o
+-- valor original em seguida -- sem residuo. Nao garante que o servidor aceite
+-- (isso so o jogo diz), por isso quem chama tambem pisca-o-teleporte ate o Exu.
+local function firePromptWide(prompt)
+    local fire = fireproximityprompt
+    if type(fire) ~= "function" then return false end
+    local original = prompt.MaxActivationDistance
+    pcall(function() prompt.MaxActivationDistance = 1e9 end)
+    local ok = pcall(fire, prompt)
+    pcall(function() prompt.MaxActivationDistance = original end)
+    return ok
+end
+
+-- --- Steal All (botao) ----------------------------------------------------
+
+-- Uma passada por TODOS os Exus: Terreiro9 -> Terreiro1 (o usuario pediu essa
+-- ordem), e em cada Terreiro os Nest1..Nest8. Para cada Exu: tenta disparar de
+-- longe e, pra garantir contra a validacao de distancia do servidor, pisca o
+-- teleporte ate o Nest, dispara, e segue. No fim volta pro CFrame de origem (a
+-- sua base, de onde voce clicou).
+function AutoSteal:StealAll()
+    local root = self:_root()
+    if not root then self.LastError = "sem personagem"; return false end
+
+    -- CFrame de origem: e pra onde voltamos no fim (a base, no caso).
+    local okOrigin, origin = pcall(function() return root.CFrame end)
+    if not okOrigin or not origin then origin = nil end
+
+    local map = mapFolder()
+    local terreiros = map and map:FindFirstChild("Terreiros")
+    if not terreiros then self.LastError = "Terreiros nao encontrados"; return false end
+
+    self.LastStatus = "stealing all"
+    self.AllError = nil
+    local fired, skipped = 0, 0
+
+    for terreiroIndex = ALL_TERREIRO_FROM, ALL_TERREIRO_TO, -1 do
+        local terreiro = terreiros:FindFirstChild("Terreiro" .. terreiroIndex)
+        local nests = terreiro and terreiro:FindFirstChild("Nests")
+        if nests then
+            for nestIndex = 1, AutoSteal.NEST_COUNT do
+                local nest = nests:FindFirstChild("Nest" .. nestIndex)
+                local target = nest and nestPosition(nest)
+                if target then
+                    -- O Exu do Runtime nesse Nest -> o prompt dele.
+                    local _, prompt = nearestRuntimeExu(target.Position)
+                    if prompt then
+                        -- 1) tenta de longe; 2) pisca ate o Nest e dispara de novo
+                        --    (cobre o jogo que revalida a distancia no servidor).
+                        firePromptWide(prompt)
+                        self:TeleportTo(target)
+                        task.wait()
+                        firePromptWide(prompt)
+                        fired = fired + 1
+                    else
+                        skipped = skipped + 1
+                    end
+                    task.wait(ALL_WAIT)
+                end
+            end
+        end
+    end
+
+    -- Volta pra origem (a base). Sem isso o personagem fica no ultimo Nest.
+    if origin then self:TeleportTo(origin) end
+
+    self.LastStatus = "idle"
+    self.LastError = nil
+    self.LastCounts = {fired = fired, skipped = skipped}
+    return fired > 0, fired
+end
+
+-- O botao chama isto: sobe a passada numa thread propria pra nao travar o
+-- clique. Uma passada por vez -- se ja tem uma rodando, ignora o clique.
+function AutoSteal:StartStealAll()
+    if self.Destroyed or self.AllThread then return false end
+    self.AllThread = task.spawn(function()
+        local ok, err = pcall(function() return self:StealAll() end)
+        if not ok then self.LastError = tostring(err) end
+        self.AllThread = nil
+    end)
+    return true
+end
+
 -- --- Ciclo de vida --------------------------------------------------------
 
 function AutoSteal:_loop()
@@ -254,7 +351,9 @@ function AutoSteal:SetTerreiro(name)
 end
 
 function AutoSteal:Destroy()
+    self.Destroyed = true
     self:SetEnabled(false)
+    if self.AllThread then pcall(task.cancel, self.AllThread); self.AllThread = nil end
 end
 
 return AutoSteal

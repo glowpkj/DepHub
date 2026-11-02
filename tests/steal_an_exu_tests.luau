@@ -108,6 +108,8 @@ do
     check(dropdown ~= nil and dropdown.Kind == "dropdown", "the panel has the Terreiro dropdown")
     check(dropdown.Options and #dropdown.Options == 9 and dropdown.Options[1] == "Terreiro1"
         and dropdown.Options[9] == "Terreiro9", "the dropdown lists Terreiro1..Terreiro9")
+    check(labels["Steal All"] ~= nil and labels["Steal All"].Kind == "button",
+        "the panel has the Steal All button")
 
     backend:Destroy()
     backend:Destroy()
@@ -167,6 +169,75 @@ do
     local ok = feature:StealOnce()
     check(ok == false, "StealOnce does not throw without a base")
     check(type(feature.LastError) == "string", "a failed step records a reason")
+
+    backend:Destroy()
+end
+
+-- Steal All: one pass over every Terreiro (9 down to 1), firing each Runtime
+-- prompt, and returning to the CFrame the pass started from. The pass is driven
+-- directly (StealAll) because the harness does not run spawned threads.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local ws = ctx.Services.Workspace
+
+    local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ws
+    local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
+    local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ws
+    local fired = {}
+
+    -- Two terreiros, each with two nests; every nest gets a Runtime exu whose Root
+    -- sits on it. Nest positions are unique so nearestRuntimeExu picks the right one.
+    local nestPositions = {}
+    for _, terreiroName in ipairs({"Terreiro1", "Terreiro9"}) do
+        local terreiro = Instance.new("Folder"); terreiro.Name = terreiroName; terreiro.Parent = terreiros
+        local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
+        for index = 1, 2 do
+            local x = (#nestPositions + 1) * 100
+            local nest = Instance.new("Part"); nest.Name = "Nest" .. index; nest.Parent = nests
+            nest.CFrame = CFrame.new(x, 0, 0)
+            nestPositions[#nestPositions + 1] = x
+
+            local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
+            local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
+            root.CFrame = CFrame.new(x, 0, 0)
+            local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
+            prompt.MaxActivationDistance = 6.5
+            fired[#fired + 1] = prompt
+        end
+    end
+
+    -- A base for the origin position, and a character that starts at a known spot.
+    local pens = Instance.new("Folder"); pens.Name = "Pens"; pens.Parent = map
+    local pen = Instance.new("Model"); pen.Name = "Pen3"; pen.Parent = pens
+    pen:SetAttribute("Owner", MY_USER_ID)
+    local anchor = Instance.new("Part"); anchor.Name = "BadgeAnchor"; anchor.Parent = pen
+    anchor.CFrame = CFrame.new(0, 50, 0)
+
+    local character = Instance.new("Model"); character.Name = "Character"; character.Parent = ws
+    ctx.Player.Character = character
+    local hrp = Instance.new("Part"); hrp.Name = "HumanoidRootPart"; hrp.Parent = character
+    hrp.CFrame = CFrame.new(0, 50, 0)   -- standing at the base
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoSteal
+
+    local firedCount = 0
+    ctx.Env.fireproximityprompt = function(prompt)
+        for _, candidate in ipairs(fired) do if candidate == prompt then firedCount = firedCount + 1 end end
+    end
+
+    local ok, count = feature:StealAll()
+    check(ok == true and count == 4, "Steal All counts every exu it fired (4)")
+    -- Each exu is fired twice: once from range, once after the blink-teleport.
+    check(firedCount == 8, "each exu prompt is fired, wide then on arrival")
+    -- The pass hands every prompt back its original range; the widened value must
+    -- not be left behind after the pass.
+    local restored = true
+    for _, prompt in ipairs(fired) do if prompt.MaxActivationDistance ~= 6.5 then restored = false end end
+    check(restored, "each prompt's MaxActivationDistance is restored after firing")
+    check(hrp.Position == Vector3.new(0, 50, 0), "the pass returns to the base it started from")
+    ctx.Env.fireproximityprompt = nil
 
     backend:Destroy()
 end

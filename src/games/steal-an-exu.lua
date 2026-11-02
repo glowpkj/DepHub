@@ -132,9 +132,11 @@ end
 State:Start()
 
 -- ---------------------------------------------------------------------------
--- Apresentacao: categoria Farming, uma secao "Auto Steal Exu" com o toggle e o
--- dropdown do terreiro. Guardar um Terreiro aqui, na sua base, e o proprio
--- teleporte de volta -- por isso nao ha knob separado para "guardar".
+-- Apresentacao: categoria Farming.
+--   * "Auto Steal Exu" -- o loop de um Terreiro (toggle + dropdown do Terreiro).
+--     Guardar na base e o proprio teleporte de volta -- sem knob separado.
+--   * "Steal All" -- um botao de passada unica, Terreiro9 -> Terreiro1, todos os
+--     Exus, com wait entre cada um.
 -- ---------------------------------------------------------------------------
 do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
@@ -148,6 +150,12 @@ do
             end)
             section:CreateDropdown("Terreiro", AutoStealModule.terreiros(), feature.Terreiro, function(choice)
                 feature:SetTerreiro(choice)
+            end)
+        end
+        local allSection = Kit.Section(tab, "Steal All", "Left")
+        if allSection then
+            allSection:CreateButton("Steal All", function()
+                feature:StartStealAll()
             end)
         end
     end
