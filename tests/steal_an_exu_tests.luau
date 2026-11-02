@@ -210,6 +210,24 @@ do
         and saved:find('"autoSell":true', 1, true),
         "Save Config stores all enabled automation toggles")
 
+    backend.AutoStealSelection:SetTerreiros({"Terreiro4"})
+    backend.AutoPlace:SetTerreiros({"Terreiro1"})
+    backend.AutoStealSelection:SetEnabled(false)
+    backend.AutoPlace:SetEnabled(false)
+    backend.AutoHop:SetEnabled(false)
+    backend.AutoSell:SetEnabled(false)
+    local loaded = backend:LoadConfig()
+    check(loaded and #loaded.failed == 0, "Load Config reapplies all saved controls without failures")
+    check(backend.AutoStealSelection.Terreiros.Terreiro1 == true
+        and backend.AutoStealSelection.Terreiros.Terreiro4 == true,
+        "Load Config restores the full multi-Terreiro Steal selection")
+    check(backend.AutoPlace.Terreiros.Terreiro4 == true
+        and backend.AutoPlace.Terreiros.Terreiro1 == nil,
+        "Load Config restores the independent Auto Place selection")
+    check(backend.AutoStealSelection:IsEnabled() and backend.AutoPlace:IsEnabled()
+        and backend.AutoHop:IsEnabled() and backend.AutoSell:IsEnabled(),
+        "Load Config restores every saved automation toggle")
+
     backend:Destroy()
     backend:Destroy()
     check(backend.Destroyed == true, "destroy marks the backend destroyed")
