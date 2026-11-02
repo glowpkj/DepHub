@@ -356,28 +356,43 @@ function Store:Apply(config)
     config = config or self.Saved
     local result = { applied = {}, failed = {}, count = 0 }
     if type(config) ~= "table" then return result end
+
     for _, entry in ipairs(self.Entries) do
         local value = config[entry.key]
         if value ~= nil then
             local handle = entry.handle
+            local silentSetter = handle and handle.SetSilent
             local handleCanDrive = handle ~= nil
-                and (type(handle.SetValue) == "function" or type(handle.Set) == "function")
-            local willChange = handleCanDrive and (handle.Value ~= value)
+                and (type(handle.SetValue) == "function"
+                    or type(handle.Set) == "function"
+                    or type(silentSetter) == "function")
+            local isMultiSelect = type(value) == "table"
+                and type(silentSetter) == "function"
 
             local ok, applied
-            if willChange then
-                -- O SetValue move o controle E dispara o callback (o efeito).
-                local setter = type(handle.SetValue) == "function" and handle.SetValue or handle.Set
-                ok, applied = pcall(setter, handle, value)
-            else
-                -- Sem handle, ou controle ja no valor: aplica o efeito direto.
+            if isMultiSelect then
+                -- Multi-select values are arrays. Apply the actual backend state
+                -- exactly once, then synchronize the UI without firing its callback
+                -- once per selected item.
                 ok, applied = pcall(entry.apply, value)
-                -- Move o controle (se houver) sem re-disparar: quando o valor ja
-                -- bate, o SetValue da RedzLib nao faz nada, mas garante que a UI
-                -- fique coerente em handles de outro tipo.
-                if ok and handleCanDrive then
+                if ok and applied ~= false then
+                    local syncOk, syncResult = pcall(silentSetter, handle, value)
+                    if not syncOk or syncResult == false then
+                        ok = false
+                        applied = false
+                    end
+                end
+            else
+                local willChange = handleCanDrive and (handle.Value ~= value)
+                if willChange then
                     local setter = type(handle.SetValue) == "function" and handle.SetValue or handle.Set
-                    pcall(setter, handle, value)
+                    ok, applied = pcall(setter, handle, value)
+                else
+                    ok, applied = pcall(entry.apply, value)
+                    if ok and handleCanDrive then
+                        local setter = type(handle.SetValue) == "function" and handle.SetValue or handle.Set
+                        pcall(setter, handle, value)
+                    end
                 end
             end
 
@@ -391,6 +406,7 @@ function Store:Apply(config)
             end
         end
     end
+
     return result
 end
 
