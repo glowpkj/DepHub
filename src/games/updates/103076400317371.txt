@@ -1,3 +1,4 @@
+0.1.60 | Steal An Exu: Auto Sell is now a toggle. It repeatedly activates the exact LocalPlayer.PlayerGui.Menus["Vender Todos"].Button.Face target from the local GUI, without searching another nested button; toggle off stops it.
 0.1.59 | Steal An Exu: added Auto Rebirth toggle. While enabled, checks Cash and Rebirths every 0.5s, calculates the current rebirth cost through Shared.Config, and invokes Rewards:InvokeServer("rebirth") when affordable. Toggle off or reload stops the loop.
 0.1.57 | Blox Fruits: Auto random fruit now flies to the fruit-gacha NPC first and only rolls after arriving near it. The NPC is found at runtime on any sea, with no hardcoded path.
 0.1.56 | Blox Fruits: new Fast attack feature (Combat). Same auto-swing as Blade hits but with a longer gap between hits (0.30s) and hits players too. Only one of Blade hits / Fast attack runs at a time.
