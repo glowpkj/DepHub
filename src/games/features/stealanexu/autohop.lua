@@ -78,31 +78,71 @@ function AutoHop.new(options)
         PlaceId = tonumber(options.placeId) or game.PlaceId,
         EmptyGrace = tonumber(options.emptyGrace) or EMPTY_GRACE,
         TeleportConnection = nil,
+        PlayerTeleportConnection = nil,
+        TeleportStarted = false,
+        FallbackAttempted = false,
+        TeleportStartedAt = nil,
         TargetProvider = options.targetProvider,
         ScopeProvider = options.scopeProvider,
         PendingProvider = options.pendingProvider,
         LastScopeKey = nil,
     }, AutoHop)
 
+    local function failedTeleport(source, reason, placeId)
+        if self.Destroyed or not self.Hopping then return end
+        local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
+        if type(visited) == "table" and self.PendingServerId then
+            visited[self.PendingServerId] = nil
+        end
+        self.PendingServerId = nil
+        self.HopStartedAt = nil
+        self.TeleportStartedAt = nil
+        self.TeleportStarted = false
+        self.FallbackAttempted = false
+        self.Hopping = false
+        self.LastError = tostring(reason or "teleporte recusado")
+        self.LastStatus = "teleport failed"
+        self.NextAttempt = os.clock() + RETRY_INTERVAL
+        log(self, source, "falha:", self.LastError, "| placeId =", tostring(placeId))
+    end
+
     local ok, connection = pcall(function()
-        return TeleportService.TeleportInitFailed:Connect(function(player, result, message)
-            if player ~= LocalPlayer or self.Destroyed then return end
-
-            local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
-            if type(visited) == "table" and self.PendingServerId then
-                visited[self.PendingServerId] = nil
-            end
-
-            self.PendingServerId = nil
-            self.HopStartedAt = nil
-            self.Hopping = false
-            self.LastError = tostring(message or result or "teleporte recusado")
-            self.LastStatus = "teleport failed"
-            self.NextAttempt = os.clock() + RETRY_INTERVAL
-            log(self, "TeleportInitFailed:", self.LastError)
+        return TeleportService.TeleportInitFailed:Connect(function(player, result, message, placeId)
+            if player ~= LocalPlayer then return end
+            failedTeleport("TeleportInitFailed", tostring(result) .. ": " .. tostring(message), placeId)
         end)
     end)
-    if ok then self.TeleportConnection = connection end
+    if ok then
+        self.TeleportConnection = connection
+    else
+        log(self, "nao foi possivel conectar TeleportInitFailed:", tostring(connection))
+    end
+
+    local playerOk, playerConnection = pcall(function()
+        return LocalPlayer.OnTeleport:Connect(function(state, placeId, spawnName)
+            if self.Destroyed or not self.Hopping then return end
+            local stateName = tostring(state)
+            log(self, "Player.OnTeleport:", stateName,
+                "| placeId =", tostring(placeId),
+                "| spawn =", tostring(spawnName))
+
+            if stateName:find("Started", 1, true)
+                or stateName:find("WaitingForServer", 1, true)
+                or stateName:find("InProgress", 1, true)
+            then
+                self.TeleportStarted = true
+                self.TeleportStartedAt = os.clock()
+                self.LastStatus = stateName
+            elseif stateName:find("Failed", 1, true) then
+                failedTeleport("Player.OnTeleport", stateName, placeId)
+            end
+        end)
+    end)
+    if playerOk then
+        self.PlayerTeleportConnection = playerConnection
+    else
+        log(self, "nao foi possivel conectar Player.OnTeleport:", tostring(playerConnection))
+    end
 
     return self
 end
@@ -225,18 +265,25 @@ function AutoHop:Hop()
     if self.Destroyed or self.Hopping then return false end
     self.Hopping = true
     self.HopStartedAt = os.clock()
+    self.TeleportStarted = false
+    self.TeleportStartedAt = nil
+    self.FallbackAttempted = false
     self.LastStatus = "searching server"
-    log(self, "Runtime vazio; procurando servidor publico.")
+    log(self, "Runtime vazio; buscando servidores publicos.",
+        "| PlaceId =", self.PlaceId, "| JobId atual =", tostring(game.JobId))
 
     local candidates, reason = self:_serverCandidates()
     if self.Destroyed or not self.Enabled then
         self.Hopping = false
+        self.HopStartedAt = nil
         self.LastStatus = "idle"
         return false
     end
     if #candidates == 0 then
         self.Hopping = false
         self.HopStartedAt = nil
+        self.TeleportStarted = false
+        self.FallbackAttempted = false
         self.LastError = reason or "nenhum servidor novo com vagas encontrado"
         self.LastStatus = "waiting for server"
         self.NextAttempt = os.clock() + RETRY_INTERVAL
@@ -254,6 +301,10 @@ function AutoHop:Hop()
     if type(visited) == "table" then visited[selected.id] = true end
     self.PendingServerId = selected.id
 
+    log(self, "alvo selecionado:", selected.id,
+        "| players =", selected.playing .. "/" .. selected.maxPlayers,
+        "| metodo = TeleportToPlaceInstance")
+
     local ok, err = pcall(function()
         TeleportService:TeleportToPlaceInstance(self.PlaceId, selected.id, LocalPlayer)
     end)
@@ -262,6 +313,9 @@ function AutoHop:Hop()
         if type(visited) == "table" then visited[selected.id] = nil end
         self.PendingServerId = nil
         self.HopStartedAt = nil
+        self.TeleportStarted = false
+        self.TeleportStartedAt = nil
+        self.FallbackAttempted = false
         self.Hopping = false
         self.LastError = tostring(err)
         self.LastStatus = "teleport failed"
@@ -271,8 +325,9 @@ function AutoHop:Hop()
     end
 
     self.LastError = nil
-    self.LastStatus = "teleporting"
-    log(self, "indo para servidor", selected.id, "players", selected.playing .. "/" .. selected.maxPlayers)
+    self.LastStatus = "request accepted; awaiting teleport state"
+    log(self, "pedido de teleporte aceito localmente para", selected.id,
+        "| aguardando Player.OnTeleport/TeleportInitFailed.")
     return true
 end
 
@@ -300,17 +355,53 @@ function AutoHop:_loop(runId)
             self.EmptySince = nil
             self.LastStatus = "waiting for Runtime"
             self.LastError = reason
-        elseif self.Hopping and self.HopStartedAt and os.clock() - self.HopStartedAt >= 30 then
-            local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
-            if type(visited) == "table" and self.PendingServerId then
-                visited[self.PendingServerId] = nil
+        elseif self.Hopping and not self.TeleportStarted and self.HopStartedAt
+            and os.clock() - self.HopStartedAt >= 10 and not self.FallbackAttempted then
+            self.FallbackAttempted = true
+            self.LastStatus = "target teleport gave no state; trying random server"
+            log(self, "nenhum evento Player.OnTeleport apos 10s; tentando fallback Teleport(placeId).")
+            local okFallback, fallbackError = pcall(function()
+                TeleportService:Teleport(self.PlaceId, LocalPlayer)
+            end)
+            if okFallback then
+                self.HopStartedAt = os.clock()
+                log(self, "fallback Teleport solicitado; aguardando estado.")
+            else
+                local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
+                if type(visited) == "table" and self.PendingServerId then
+                    visited[self.PendingServerId] = nil
+                end
+                self.PendingServerId = nil
+                self.HopStartedAt = nil
+                self.Hopping = false
+                self.NextAttempt = os.clock() + RETRY_INTERVAL
+                self.LastStatus = "teleport failed"
+                self.LastError = "fallback Teleport falhou: " .. tostring(fallbackError)
+                log(self, self.LastError)
             end
+        elseif self.Hopping and self.FallbackAttempted and not self.TeleportStarted
+            and self.HopStartedAt and os.clock() - self.HopStartedAt >= 15 then
+            local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
+            if type(visited) == "table" and self.PendingServerId then visited[self.PendingServerId] = nil end
             self.PendingServerId = nil
             self.HopStartedAt = nil
             self.Hopping = false
             self.NextAttempt = os.clock() + RETRY_INTERVAL
             self.LastStatus = "teleport timeout"
-            self.LastError = "o teleporte nao iniciou; tentando outro servidor"
+            self.LastError = "nenhum metodo iniciou o teleporte; nova tentativa em 10s"
+            log(self, self.LastError)
+        elseif self.Hopping and self.TeleportStarted and self.TeleportStartedAt
+            and os.clock() - self.TeleportStartedAt >= 30 then
+            local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
+            if type(visited) == "table" and self.PendingServerId then visited[self.PendingServerId] = nil end
+            self.PendingServerId = nil
+            self.HopStartedAt = nil
+            self.TeleportStartedAt = nil
+            self.TeleportStarted = false
+            self.Hopping = false
+            self.NextAttempt = os.clock() + RETRY_INTERVAL
+            self.LastStatus = "teleport timeout"
+            self.LastError = "teleporte iniciou mas nao concluiu em 30s; tentando novamente"
             log(self, self.LastError)
         elseif pending > 0 then
             self.EmptySince = nil
@@ -385,6 +476,10 @@ function AutoHop:Destroy()
     if self.TeleportConnection then
         pcall(function() self.TeleportConnection:Disconnect() end)
         self.TeleportConnection = nil
+    end
+    if self.PlayerTeleportConnection then
+        pcall(function() self.PlayerTeleportConnection:Disconnect() end)
+        self.PlayerTeleportConnection = nil
     end
     self.DebugLog = {}
 end
