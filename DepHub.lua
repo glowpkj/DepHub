@@ -24,7 +24,7 @@ local HOST_TEMPLATES = {
     "https://cdn.jsdelivr.net/gh/glowpkj/DepHub@" .. sourceRef .. "/",
 }
 local BASE_URL = HOST_TEMPLATES[1]
-local VERSION = "0.1.34"
+local VERSION = "0.1.35"
 local CACHE_KEY = "__DEPHUB_SOURCE_CACHE"
 local EXECUTED_KEY = "__DEPHUB_LOADER_EXECUTED"
 local STATE_KEY = "__DEPHUB_LOADER_STATE"
@@ -75,7 +75,8 @@ local function detectExecutor()
 end
 
 local BACKEND_KEYS = {
-    "AOTR", "TSB", "MM2", "NoobPiece", "BloxFruits", "Universal", "Runtime", "Volleyball42"
+    "AOTR", "TSB", "MM2", "NoobPiece", "BloxFruits", "Universal", "Runtime", "Volleyball42",
+    "BloodStrike", "StealAnEgg", "ViolenceDistrict", "StealAnExu"
 }
 
 local HANDLE_KEYS = {
@@ -135,6 +136,7 @@ local function sessionHealthy()
     if type(state) ~= "table" then return false end
     local backend = state.AOTR or state.TSB or state.MM2 or state.NoobPiece
         or state.BloxFruits or state.Universal or state.Runtime or state.Volleyball42
+        or state.BloodStrike or state.StealAnEgg or state.ViolenceDistrict or state.StealAnExu
     return type(backend) == "table" and not backend.Destroyed
 end
 
@@ -485,7 +487,9 @@ local targets = {
     ["114234929420007"] = {Core = "src/games/bloodstrike.lua", BloodStrike = true},
     ["107778070777162"] = {Core = "src/games/steal-a-egg.lua", StealAnEgg = true},
     ["93978595733734"] = {Core = "src/games/violence-district.lua", ViolenceDistrict = true},
-    ["6739698191"] = {Core = "src/games/violence-district.lua", ViolenceDistrict = true}
+    ["6739698191"] = {Core = "src/games/violence-district.lua", ViolenceDistrict = true},
+    ["103076400317371"] = {Core = "src/games/steal-an-exu.lua", StealAnExu = true},
+    ["10771168447"] = {Core = "src/games/steal-an-exu.lua", StealAnExu = true}
 }
 
 local gameName = tostring(game.Name or ""):lower()
@@ -657,6 +661,7 @@ local isVolleyball42 = target.Volleyball42 == true
 local isBloodStrike = target.BloodStrike == true
 local isStealAnEgg = target.StealAnEgg == true
 local isViolenceDistrict = target.ViolenceDistrict == true
+local isStealAnExu = target.StealAnExu == true
 
 if isRT3 then
     if coreResult ~= true then
@@ -672,7 +677,7 @@ else
 end
 
 env.__DEPHUB.Universal = target.Universal and coreResult or nil
-env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isMM2 and not isAOTR and not isNoobPiece and not isVolleyball42 and not isBloodStrike and not isStealAnEgg and not isViolenceDistrict and coreResult or nil
+env.__DEPHUB.BloxFruits = not target.Universal and not isRT3 and not isTSB and not isMM2 and not isAOTR and not isNoobPiece and not isVolleyball42 and not isBloodStrike and not isStealAnEgg and not isViolenceDistrict and not isStealAnExu and coreResult or nil
 env.__DEPHUB.TSB = isTSB and coreResult or nil
 env.__DEPHUB.MM2 = isMM2 and coreResult or nil
 env.__DEPHUB.AOTR = isAOTR and coreResult or nil
@@ -681,6 +686,7 @@ env.__DEPHUB.Volleyball42 = isVolleyball42 and coreResult or nil
 env.__DEPHUB.BloodStrike = isBloodStrike and coreResult or nil
 env.__DEPHUB.StealAnEgg = isStealAnEgg and coreResult or nil
 env.__DEPHUB.ViolenceDistrict = isViolenceDistrict and coreResult or nil
+env.__DEPHUB.StealAnExu = isStealAnExu and coreResult or nil
 
 local backend
 if target.Universal then backend = coreResult
@@ -693,6 +699,7 @@ elseif isVolleyball42 then backend = coreResult
 elseif isBloodStrike then backend = coreResult
 elseif isStealAnEgg then backend = coreResult
 elseif isViolenceDistrict then backend = coreResult
+elseif isStealAnExu then backend = coreResult
 else backend = coreResult end
 
 -- Informational only: the shell no longer changes per game, so this label

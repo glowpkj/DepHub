@@ -209,8 +209,7 @@
     ]
   },
   "4658598196": {
-    "name": "Attack on Titan Revolution",
-    "files": [
+    "name": "Attack on Titan Revolution",    "files": [
       "DepHub.lua",
       "src/version.txt",
       "src/core/demon-ui.lua",
@@ -227,6 +226,22 @@
       "src/games/features/aotr/movement.lua",
       "src/games/features/aotr/combat.lua",
       "src/games/updates/4658598196.txt"
+    ]
+  },
+  "103076400317371": {
+    "name": "Steal An Exu",
+    "files": [
+      "DepHub.lua",
+      "src/version.txt",
+      "src/core/demon-ui.lua",
+      "src/core/ui-kit.lua",
+      "src/core/config-store.lua",
+      "src/dephubv2lib.lua",
+      "src/core/redz-icons.lua",
+      "src/core/updater.lua",
+      "src/core/diagnostics.lua",
+      "src/games/steal-an-exu.lua",
+      "src/games/updates/103076400317371.txt"
     ]
   }
 }
