@@ -84,6 +84,10 @@ local function buildWorld(ctx, options)
         prompt.InputHoldEnd = function(self)
             self.Hold.ended = self.Hold.ended + 1
             self.Hold.restored = self.HoldDuration
+            -- A REAL steal makes the exu LEAVE the Runtime (that is the ground
+            -- truth the feature now checks). The double mirrors it: on a
+            -- successful hold the model is unparented, so _stealAt counts a steal.
+            exu.Parent = nil
         end
         fired[#fired + 1] = prompt
     end
@@ -283,7 +287,14 @@ do
     end
     local firedCount = 0
     ctx.Env.fireproximityprompt = function(prompt)
-        for _, candidate in ipairs(world.fired) do if candidate == prompt then firedCount = firedCount + 1 end end
+        for _, candidate in ipairs(world.fired) do
+            if candidate == prompt then
+                firedCount = firedCount + 1
+                -- A real fire that is accepted makes the exu leave the Runtime.
+                local owner = prompt.Parent and prompt.Parent.Parent
+                if owner then owner.Parent = nil end
+            end
+        end
     end
 
     local ok, stole = feature:StealOnce()
@@ -463,7 +474,11 @@ do
             self.Hold.began = self.Hold.began + 1
             self.Hold.durationAtBegin = self.HoldDuration
         end
-        prompt.InputHoldEnd = function(self) self.Hold.ended = self.Hold.ended + 1 end
+        prompt.InputHoldEnd = function(self)
+            self.Hold.ended = self.Hold.ended + 1
+            -- A real steal makes the exu leave the Runtime; the double mirrors it.
+            exu.Parent = nil
+        end
         fired[#fired + 1] = prompt
     end
 

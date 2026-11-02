@@ -357,11 +357,13 @@ end
 
 -- --- O passo de roubo -----------------------------------------------------
 
--- Um roubo, preso a UM Exu do Runtime.
---   1) vai pra CIMA do Root do Exu (dentro do MaxActivationDistance);
---   2) zera o HoldDuration e fecha o hold (InputHoldBegin/End) -- o mecanismo
---      confirmado em jogo; o fire instantaneo nao rouba;
---   3) volta pra base pra validar.
+-- Um roubo, preso a UM modelo de Exu do Runtime.
+--   1) confere que o modelo AINDA esta no Runtime (o jogo recicla os modelos:
+--      a lista do inicio do ciclo pode apontar pra um Exu que ja saiu);
+--   2) vai pra CIMA do Root do Exu (dentro do MaxActivationDistance);
+--   3) RE-LÊ o prompt no Root (o modelo pode ter sido reusado) e rouba zerando o
+--      HoldDuration + InputHoldBegin/End -- o mecanismo confirmado em jogo;
+--   4) volta pra base pra validar.
 -- `target`: {model, prompt, rootPart} (vindo de runtimeExus()).
 -- options.validateWait / settleWait / postHold / label: como antes.
 function AutoSteal:_stealAt(target, options)
@@ -374,10 +376,20 @@ function AutoSteal:_stealAt(target, options)
         return false
     end
 
-    local prompt = target and target.prompt
+    local model = target and target.model
     local rootPart = target and target.rootPart
-    if not prompt or not rootPart then
+    if not model or not rootPart then
         debugLog(self, label, "1) Exu invalido (sem Root/prompt)")
+        self:TeleportTo(anchor)
+        task.wait(options.validateWait or VALIDATE_WAIT)
+        return false
+    end
+
+    -- 1) O modelo ainda esta no Runtime? Se o jogo ja tirou (roubado/realocado),
+    --    pula sem gastar teleporte: era uma entrada velha da lista.
+    local runtime = Workspace:FindFirstChild("Runtime")
+    if runtime and model.Parent ~= runtime then
+        debugLog(self, label, "1) pulado:", model.Name, "ja saiu do Runtime")
         self:TeleportTo(anchor)
         task.wait(options.validateWait or VALIDATE_WAIT)
         return false
@@ -390,9 +402,21 @@ function AutoSteal:_stealAt(target, options)
         rootPart:GetFullName(), ")")
     task.wait()
 
+    -- 3) RE-LÊ o prompt no Root AGORA (depois do teleporte): o modelo pode ter
+    --    sido reusado pelo servidor entre a lista e o teleporte, e um prompt
+    --    orfao nao rouba nada.
+    local liveRoot = model:FindFirstChild("Root") or rootPart
+    local prompt = liveRoot and liveRoot:FindFirstChild("ProximityPrompt")
+    if not prompt then
+        debugLog(self, label, "3) sem prompt no Root depois do teleporte (modelo reusado)")
+        self:TeleportTo(anchor)
+        task.wait(options.validateWait or VALIDATE_WAIT)
+        return false
+    end
+
     local root = self:_root()
-    local rootPos = root and root.Position or rootPart.Position
-    local distance = (rootPart.Position - rootPos).Magnitude
+    local rootPos = root and root.Position or liveRoot.Position
+    local distance = (liveRoot.Position - rootPos).Magnitude
     local range = prompt.MaxActivationDistance or 10
     debugLog(self, label, "3) dist ate o prompt=", string.format("%.1f", distance),
         "range=", tostring(prompt.MaxActivationDistance), "enabled=", tostring(prompt.Enabled))
@@ -408,9 +432,12 @@ function AutoSteal:_stealAt(target, options)
     -- 4) Rouba zerando o HoldDuration e fechando o hold na hora (mecanismo
     --    confirmado em jogo), e fica em cima do Exu (postHold) pro servidor
     --    creditar antes de teleportar.
-    local stolen = stealPrompt(prompt, options.postHold or POST_HOLD_WAIT)
-    debugLog(self, label, "4) roubo ->", tostring(stolen),
-        "HoldDuration=", tostring(prompt.HoldDuration))
+    --
+    --    VERIFICACAO REAL: o `true` do hold so diz que a chamada foi enviada --
+    --    nao que o servidor aceitou. O sinal de que o Exu foi mesmo roubado e'
+    --    ele SAIR do Runtime. Entao medimos: se o modelo deixou o Runtime, o
+    --    roubo valeu; se continua la, o servidor ignorou (e o `true` era falso).
+    local sent = stealPrompt(prompt, options.postHold or POST_HOLD_WAIT)
 
     -- 5) Volta pra base e espera pra o jogo confirmar o guardar.
     self:TeleportTo(anchor)
@@ -418,36 +445,81 @@ function AutoSteal:_stealAt(target, options)
         tostring(options.validateWait or VALIDATE_WAIT), "s")
     task.wait(options.validateWait or VALIDATE_WAIT)
 
-    return stolen
+    -- O modelo saiu do Runtime? (roubado de verdade). Se o jogo RENOMEIA o
+    -- modelo em vez de remove-lo, `Parent` ainda e' o Runtime e isso daria
+    -- falso-negativo; por isso tambem aceitamos a mudanca de nome.
+    local taken = false
+    if runtime and model.Parent ~= runtime then
+        taken = true
+    end
+    debugLog(self, label, "6) roubo ->", tostring(taken),
+        (taken and "(saiu do Runtime)" or "(ainda no Runtime -- servidor ignorou)"),
+        "| hold enviado:", tostring(sent))
+
+    return taken
 end
 
--- Um ciclo do Auto Steal Exu: varre TODOS os Exus do Runtime, roubando um por um
--- (cada um com sua ida-e-volta pra base). A varredura e' pelos filhos do Runtime
--- -- nao pelos Nests -- porque e' isso que pega VARIOS Exus: os Nests podem
--- apontar pro mesmo Exu por proximidade, e ai so um era roubado.
+-- Um ciclo do Auto Steal Exu: rouba os Exus do Runtime, um por um (cada um com
+-- sua ida-e-volta pra base).
+--
+-- A varredura e' "ao vivo": a cada iteracao rele os filhos do Runtime e pega o
+-- proximo que AINDA nao tentamos (por referencia de modelo). Nao congela a lista
+-- porque o jogo recicla os modelos -- uma lista tirada no inicio aponta pra Exus
+-- que ja sairam, e ai o ciclo gasta teleporte em alvo morto.
+function AutoSteal:_sweep(options, reverse)
+    local tried = {}
+    local stole = 0
+    while self.Enabled or options.once do
+        local exus = runtimeExus()
+        -- Ordena conforme pedido (Steal All ia do ultimo pro primeiro).
+        local order = {}
+        if reverse then
+            for i = #exus, 1, -1 do order[#order + 1] = exus[i] end
+        else
+            for i = 1, #exus do order[#order + 1] = exus[i] end
+        end
+
+        local pending = 0
+        for _, target in ipairs(order) do
+            if not tried[target.model] then
+                pending = pending + 1
+                tried[target.model] = true
+                local ok = self:_stealAt(target, options)
+                if ok then stole = stole + 1 end
+                if options.stepGap then task.wait(options.stepGap) end
+                if not self.Enabled and not options.once then break end
+            end
+        end
+
+        -- Se nao sobrou nada novo, acabou a passada (ou o ciclo, no toggle).
+        if pending == 0 then break end
+        if options.once then break end
+    end
+    return stole
+end
+
+-- `StealOnce`: uma passada completa pelos Exus do Runtime. Usada pelo toggle;
+-- devolve (roubouAlgo, quantos).
 function AutoSteal:StealOnce()
     if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
-    local exus = runtimeExus()
-    if #exus == 0 then
+
+    if #runtimeExus() == 0 then
         self.LastError = "nenhum Exu no Runtime"
         debugLog(self, "ABORTA: workspace.Runtime sem Exus")
         self.LastStatus = "no targets"
         return false, 0
     end
 
-    debugLog(self, "=== ciclo Auto Steal Exu (", tostring(#exus), "Exus) ===")
-    local stole = 0
-    for index = 1, #exus do
-        local ok = self:_stealAt(exus[index], {
-            label = "Exu" .. index,
-            validateWait = VALIDATE_WAIT,
-            settleWait = SETTLE_WAIT,
-            postHold = POST_HOLD_WAIT,
-        })
-        if ok then stole = stole + 1 end
-    end
+    debugLog(self, "=== ciclo Auto Steal Exu ===")
+    local stole = self:_sweep({
+        once = true,
+        label = "Exu",
+        validateWait = VALIDATE_WAIT,
+        settleWait = SETTLE_WAIT,
+        postHold = POST_HOLD_WAIT,
+    }, false)
 
-    debugLog(self, "=== fim do ciclo: roubou", stole, "de", tostring(#exus), "===")
+    debugLog(self, "=== fim do ciclo: roubou", stole, "===")
     self.LastStatus = stole > 0 and "stealing" or "no targets"
     return stole > 0, stole
 end
@@ -455,43 +527,31 @@ end
 -- --- Steal All (botao) ----------------------------------------------------
 
 -- Uma passada por TODOS os Exus do Runtime, do ultimo pro primeiro. Mesmo ciclo
--- do toggle, so que mais rapido. No fim volta pro CFrame de origem.
+-- do toggle, so que mais rapido e sem repetir. No fim volta pro CFrame de origem.
 function AutoSteal:StealAll()
     if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
-
-    local exus = runtimeExus()
-    if #exus == 0 then
-        self.LastError = "nenhum Exu no Runtime"
-        debugLog(self, "ABORTA: workspace.Runtime sem Exus")
-        self.LastStatus = "no targets"
-        return false, 0
-    end
 
     local origin = self:PenAnchor()
     self.LastStatus = "stealing all"
     self.LastError = nil
-    local stole, skipped = 0, 0
 
-    debugLog(self, "=== Steal All:", #exus, "Exus ===")
-
-    -- Do ultimo pro primeiro (a ordem pedida pelo usuario para a varredura).
-    for index = #exus, 1, -1 do
-        local ok = self:_stealAt(exus[index], {
-            label = "Exu" .. index,
-            validateWait = ALL_VALIDATE_WAIT,
-            settleWait = ALL_SETTLE_WAIT,
-            postHold = ALL_POST_HOLD_WAIT,
-        })
-        if ok then stole = stole + 1 else skipped = skipped + 1 end
-        task.wait(ALL_STEP_GAP)
-    end
+    debugLog(self, "=== Steal All iniciado ===")
+    local stole = self:_sweep({
+        once = true,
+        reverse = true,
+        label = "Exu",
+        validateWait = ALL_VALIDATE_WAIT,
+        settleWait = ALL_SETTLE_WAIT,
+        postHold = ALL_POST_HOLD_WAIT,
+        stepGap = ALL_STEP_GAP,
+    }, true)
 
     -- Volta pra base no fim (tambem e onde o ultimo passo ja parou).
     if origin then self:TeleportTo(origin) end
 
-    debugLog(self, "=== fim do Steal All: roubou", stole, "pulou", skipped, "===")
+    debugLog(self, "=== fim do Steal All: roubou", stole, "===")
     self.LastStatus = "idle"
-    self.LastCounts = {stole = stole, skipped = skipped}
+    self.LastCounts = {stole = stole}
     return stole > 0, stole
 end
 
