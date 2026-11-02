@@ -40,15 +40,11 @@ local LocalPlayer = Players.LocalPlayer
 local AutoSteal = {}
 AutoSteal.__index = AutoSteal
 
--- TEMPOS (calibraveis), iguais ao script de referencia que funciona:
---   SETTLE_WAIT   -- task.wait(0.1) DEPOIS do teleporte, antes de disparar.
---   POST_WAIT     -- task.wait(0.1) DEPOIS de disparar, antes de voltar pra base.
--- Um valor so pra cada, sem mais folga do que o script usa.
+-- TEMPOS (iguais ao script de referencia que funciona):
+--   SETTLE_WAIT -- task.wait(0.1) DEPOIS do teleporte, antes de disparar.
+--   POST_WAIT   -- task.wait(0.1) DEPOIS de disparar, antes de voltar pra base.
 local SETTLE_WAIT = 0.1
 local POST_WAIT = 0.1
--- Quanto esperar na base depois de voltar (o script nao espera; mantemos um
--- tico so pra dar tempo do teleporte assentar antes do proximo Exu).
-local VALIDATE_WAIT = 0.1
 
 -- --- Debug ----------------------------------------------------------------
 -- Log de diagnostico por etapa. Vai pro console (print) e fica guardado em
@@ -152,24 +148,6 @@ function AutoSteal:PenAnchor()
     if anchor:IsA("BasePart") then return anchor.CFrame end
     if anchor:IsA("Model") and anchor.PrimaryPart then return anchor.PrimaryPart.CFrame end
     return nil
-end
-
--- TODOS os Exus do Runtime, cada um com seu prompt. Os modelos sao iguais (mesmo
--- nome), entao a unica varredura confiavel e' percorrer os filhos do Runtime --
--- e' isso que garante "pegar VARIOS", em vez de bater sempre no mesmo Exu por
--- proximidade. Devolve uma lista de {model, prompt}.
-local function runtimeExus()
-    local list = {}
-    local runtime = Workspace:FindFirstChild("Runtime")
-    if not runtime then return list end
-    for _, model in ipairs(runtime:GetChildren()) do
-        local root = model:FindFirstChild("Root")
-        local prompt = root and root:FindFirstChild("ProximityPrompt")
-        if prompt then
-            list[#list + 1] = {model = model, prompt = prompt}
-        end
-    end
-    return list
 end
 
 -- --- Personagem: root, noclip e ancoragem ---------------------------------
@@ -298,95 +276,129 @@ end
 
 -- --- O passo de roubo -----------------------------------------------------
 
--- Um roubo: teleporta pra CIMA do modelo do Exu (GetPivot + 3 studs), zera o hold,
--- dispara e volta pra base. E' o script de referencia, dentro do ciclo.
-function AutoSteal:_stealAt(target, options)
-    options = options or {}
-    local label = options.label or "?"
+-- Um roubo, EXATAMENTE o script de referencia do usuario:
+--
+--     local pos = t.model:GetPivot().Position
+--     hrp.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
+--     task.wait(0.1)
+--     t.prompt.HoldDuration = 0
+--     t.prompt:InputHoldBegin()
+--     t.prompt:InputHoldEnd()
+--     hrp.CFrame = originalPos
+--     task.wait(0.1)
+--
+-- Sem skip, sem releitura, sem verificacao. Teleporta pro modelo, dispara, volta.
+function AutoSteal:_stealAt(target)
+    local model = target and target.model
+    local prompt = target and target.prompt
+    if not model or not prompt then return false end
+
     local anchor = self:PenAnchor()
     if not anchor then
         self.LastError = "base nao encontrada (Owner)"
-        debugLog(self, label, "ABORTA: base nao encontrada (Owner)")
+        debugLog(self, "ABORTA: base nao encontrada (Owner)")
         return false
     end
 
-    local model = target and target.model
-    local prompt = target and target.prompt
-    if not model or not prompt then
-        debugLog(self, label, "sem model/prompt")
-        return false
-    end
-
-    -- O modelo ainda esta no Runtime? Se o servidor ja levou (roubado) ou moveu,
-    -- o alvo virou orfao -- teleportar pra ele nao rouba nada. Pula.
-    local runtime = Workspace:FindFirstChild("Runtime")
-    if runtime and model.Parent ~= runtime then
-        debugLog(self, label, "pulado:", model.Name, "(ja saiu do Runtime)")
-        return false
-    end
-
-    -- 1) Teleporta pra CIMA do modelo (model:GetPivot().Position + 3 studs) --
-    --    igual ao script de referencia.
+    -- Teleporta (o script de referencia).
     local pos = model:GetPivot().Position
     self:TeleportTo(CFrame.new(pos + Vector3.new(0, 3, 0)))
-    debugLog(self, label, "teleportou pro Exu (", model.Name, ")")
+    debugLog(self, "teleportou pro Exu (", model.Name, ")")
 
-    -- 2) Espera o prompt assentar.
-    task.wait(options.settleWait or SETTLE_WAIT)
+    -- task.wait(0.1)
+    task.wait(SETTLE_WAIT)
 
-    -- 3) Dispara o prompt (HoldDuration=0 + InputHoldBegin/End + InputHoldEnd).
-    local ok = stealPrompt(prompt)
-    debugLog(self, label, "disparou o prompt ->", tostring(ok))
+    -- Ativa (o script de referencia).
+    stealPrompt(prompt)
+    debugLog(self, "disparou o prompt")
 
-    -- 4) Volta pra base.
+    -- Volta (o script de referencia).
     self:TeleportTo(anchor)
-    task.wait(options.validateWait or VALIDATE_WAIT)
+    task.wait(POST_WAIT)
 
     return true
 end
 
--- Um ciclo: passa pelos Exus do Runtime, roubando um por um (cada um com sua
--- ida-e-volta pra base). A cada passo RELÊ a lista: o servidor recicla/move os
--- modelos, entao so os que AINDA estao no Runtime valem -- e os que chegaram
--- depois tambem entram.
-function AutoSteal:StealOnce()
-    if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
+-- --- Auto Steal Exu (toggle) / Steal All (botao) --------------------------
 
-    local done = {}
-    local stole = 0
-    for index = 1, 200 do
-        local exus = runtimeExus()
-        local target = nil
-        for _, candidate in ipairs(exus) do
-            if not done[candidate.model] then target = candidate; break end
-        end
-        if not target then break end
-        done[target.model] = true
-        self:_stealAt(target, {
-            label = "Exu" .. index,
-            settleWait = SETTLE_WAIT,
-            postHold = POST_WAIT,
-            validateWait = VALIDATE_WAIT,
-        })
-        stole = stole + 1
+-- O script de referencia, dentro do ciclo. Coleta a lista UMA vez, cicla por ela
+-- (i = i % #targets + 1) e rouba um por um -- exatamente como o script que
+-- funciona.
+--
+-- `once = true`: uma passada (passa por cada alvo uma vez e para).
+-- `once = false`: ciclo infinito (como o script); `stop()` decide quando parar.
+function AutoSteal:_runCycle(options)
+    options = options or {}
+    local once = options.once == true
+    local stop = options.stop
+
+    local runtime = Workspace:FindFirstChild("Runtime")
+    if not runtime then
+        self.LastError = "workspace.Runtime nao encontrado"
+        debugLog(self, "ABORTA: workspace.Runtime nao encontrado")
+        return 0
     end
 
-    if stole == 0 then
-        self.LastError = "nenhum Exu no Runtime"
-        debugLog(self, "ABORTA: workspace.Runtime sem Exus novos")
+    -- Coleta todos os modelos com Root.ProximityPrompt (UMA vez, como o script).
+    local targets = {}
+    for _, child in ipairs(runtime:GetChildren()) do
+        local root = child:FindFirstChild("Root")
+        local prompt = root and root:FindFirstChild("ProximityPrompt")
+        if prompt then
+            targets[#targets + 1] = {model = child, prompt = prompt}
+        end
+    end
+
+    if #targets == 0 then
+        self.LastError = "Nenhum ProximityPrompt encontrado em Runtime"
         self.LastStatus = "no targets"
-        return false, 0
+        debugLog(self, "Nenhum ProximityPrompt encontrado em Runtime")
+        return 0
+    end
+
+    self.LastStatus = "stealing"
+    debugLog(self, "=== ciclo Auto Steal Exu (", tostring(#targets), " Exus) ===")
+
+    local stole = 0
+    local i = 1
+    while true do
+        -- `reverse`: do ultimo pro primeiro (volta pra tras). Senao, do 1o pro
+        -- ultimo -- como o script de referencia.
+        local index
+        if options.reverse then
+            index = #targets - ((i - 1) % #targets)
+        else
+            index = ((i - 1) % #targets) + 1
+        end
+        local t = targets[index]
+
+        -- Teleporta / Ativa / Volta (o script de referencia).
+        self:_stealAt(t)
+        stole = stole + 1
+        if once and stole >= #targets then break end
+        if stop and stop() then break end
+
+        -- Proximo (cicla de volta ao 1o quando acaba).
+        i = i + 1
+        if stop and stop() then break end
     end
 
     debugLog(self, "=== fim do ciclo: passou por", stole, "Exus ===")
-    self.LastStatus = "stealing"
+    return stole
+end
+
+-- Uma passada completa pelos Exus do Runtime (usada pelo toggle e pelo teste).
+function AutoSteal:StealOnce()
+    if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
+    local stole = self:_runCycle({once = true})
+    if stole == 0 then return false, 0 end
     return true, stole
 end
 
 -- --- Steal All (botao) ----------------------------------------------------
 
--- A passada do botao: os mesmos Exus do Runtime, do ultimo pro primeiro, mais
--- rapida. Relê a lista a cada passo (o servidor recicla os modelos). No fim volta
+-- A passada do botao: uma volta por TODOS os Exus do Runtime, do ultimo pro
+-- primeiro (como o script, so que parando depois de uma passada). No fim volta
 -- pro CFrame de origem.
 function AutoSteal:StealAll()
     if not self:_root() then self.LastError = "sem personagem"; return false, 0 end
@@ -394,27 +406,9 @@ function AutoSteal:StealAll()
     local origin = self:PenAnchor()
     self.LastStatus = "stealing all"
     self.LastError = nil
-    local stole = 0
 
-    local done = {}
     debugLog(self, "=== Steal All ===")
-    for index = 1, 200 do
-        local exus = runtimeExus()
-        -- Do ultimo pro primeiro: pega o ultimo ainda nao tentado.
-        local target = nil
-        for i = #exus, 1, -1 do
-            if not done[exus[i].model] then target = exus[i]; break end
-        end
-        if not target then break end
-        done[target.model] = true
-        self:_stealAt(target, {
-            label = "Exu" .. index,
-            settleWait = SETTLE_WAIT,
-            postHold = POST_WAIT,
-            validateWait = VALIDATE_WAIT,
-        })
-        stole = stole + 1
-    end
+    local stole = self:_runCycle({once = true, reverse = true})
 
     if origin then self:TeleportTo(origin) end
 

@@ -314,9 +314,9 @@ do
     backend:Destroy()
 end
 
--- An exu that already LEFT the Runtime (the server took/moved it) is skipped, not
--- teleported to: the log showed the sweep burning steps on orphan "Root" parts of
--- exus that were already gone. Driven directly (StealOnce).
+-- The list of exus is collected ONCE, at the start of the pass -- exactly like the
+-- reference script. So an exu already gone when the pass starts (the server took
+-- it) is simply not in the list: the pass reaches only the ones still in Runtime.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
@@ -326,22 +326,15 @@ do
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local feature = backend.Features.AutoSteal
 
-    -- Take the FIRST exu out of the Runtime (as a successful steal would).
+    -- Take the FIRST exu out of the Runtime BEFORE the pass (as a successful steal
+    -- leaves it). The one-time collection then never sees it.
     local gone = world.roots[1].Parent            -- the model that owns Root 1
     gone.Parent = nil
 
-    local teleports = {}
-    local originalTeleport = feature.TeleportTo
-    feature.TeleportTo = function(self, cframe)
-        teleports[#teleports + 1] = cframe
-        return originalTeleport(self, cframe)
-    end
-
     local ok, stole = feature:StealOnce()
-    feature.TeleportTo = originalTeleport
 
-    -- Only the exu still in the Runtime is reached; the orphan one is skipped.
-    check(ok == true and stole == 1, "the sweep skips an exu that left the Runtime (1 reached)")
+    -- Only the exu still in the Runtime is in the collected list.
+    check(ok == true and stole == 1, "the pass collects the exus once and reaches only the live one (1)")
     check(world.fired[1].Hold.began == 0, "the gone exu's prompt is never fired")
     check(world.fired[2].Hold.began == 1, "the exu still in the Runtime is fired")
     check(root.Position == Vector3.new(0, 50, 0), "the step returns to the base anchor")
