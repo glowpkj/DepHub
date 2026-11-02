@@ -264,18 +264,18 @@ do
     local otherNests = Instance.new("Folder"); otherNests.Name = "Nests"; otherNests.Parent = other
 
     local nest1 = Instance.new("Part"); nest1.Name = "Nest1"; nest1.Parent = selectedNests
-    nest1.Position = Vector3.new(100, 0, 0)
+    nest1.CFrame = CFrame.new(100, 0, 0)
     local nest2 = Instance.new("Part"); nest2.Name = "Nest2"; nest2.Parent = selectedNests
-    nest2.Position = Vector3.new(200, 0, 0)
+    nest2.CFrame = CFrame.new(200, 0, 0)
     local otherNest = Instance.new("Part"); otherNest.Name = "Nest1"; otherNest.Parent = otherNests
-    otherNest.Position = Vector3.new(900, 0, 0)
+    otherNest.CFrame = CFrame.new(900, 0, 0)
 
     local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ws
     local prompts = {}
     local function addExu(name, x)
         local model = Instance.new("Model"); model.Name = name; model.Parent = runtime
         local rootPart = Instance.new("Part"); rootPart.Name = "Root"; rootPart.Parent = model
-        rootPart.Position = Vector3.new(x, 0, 0)
+        rootPart.CFrame = CFrame.new(x, 0, 0)
         local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = rootPart
         prompt.HoldDuration = 0.5
         prompt.MaxActivationDistance = 6.5
@@ -299,7 +299,7 @@ do
     local feature = backend.Features.AutoStealSelection
 
     check(feature.SelectedOnly == true, "the new feature uses selected-only target filtering")
-    check(feature.Terreiro == "Terreiro1", "the selection mode starts with the first mapped Terreiro")
+    check(feature.Terreiro == "Terreiro3", "the selection mode starts with the first discovered Terreiro")
     check(feature:SetTerreiro("Terreiro3") == true, "the selected Terreiro can be changed")
     local selectedTargets = feature:_targets()
     check(#selectedTargets == 2, "selected mode returns only the two Exus mapped to Terreiro3")
