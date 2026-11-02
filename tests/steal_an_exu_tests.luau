@@ -368,6 +368,7 @@ do
     local prompts = {}
     local function addExu(name, x)
         local model = Instance.new("Model"); model.Name = name; model.Parent = runtime
+        model:SetAttribute("ExuId", name)
         local rootPart = Instance.new("Part"); rootPart.Name = "Root"; rootPart.Parent = model
         rootPart.CFrame = CFrame.new(x, 0, 0)
         local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = rootPart
