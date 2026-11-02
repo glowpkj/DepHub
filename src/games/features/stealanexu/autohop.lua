@@ -69,6 +69,7 @@ function AutoHop.new(options)
         Thread = nil,
         RunId = 0,
         EmptySince = nil,
+        SawExu = false,
         NextAttempt = 0,
         PendingServerId = nil,
         LastError = nil,
@@ -264,8 +265,13 @@ function AutoHop:_loop(runId)
             if self.EmptySince ~= nil then
                 log(self, count, "Exus detectados; monitor de vazio reiniciado.")
             end
+            self.SawExu = true
             self.EmptySince = nil
             self.LastStatus = "farming"
+            self.LastError = nil
+        elseif not self.SawExu then
+            self.EmptySince = nil
+            self.LastStatus = "waiting for first Exu"
             self.LastError = nil
         else
             if self.EmptySince == nil then
@@ -297,6 +303,7 @@ function AutoHop:SetEnabled(enabled)
 
     if enabled then
         self.EmptySince = nil
+        self.SawExu = false
         self.NextAttempt = 0
         self.LastError = nil
         self.LastStatus = "monitoring"
