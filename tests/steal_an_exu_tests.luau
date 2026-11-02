@@ -124,10 +124,18 @@ do
     local ctx = saeContext(103076400317371, 10771168447)
     local ui = ctx:MountUI()
 
+    local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ctx.Services.Workspace
+    local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
+    for _, name in ipairs({"Terreiro1", "Terreiro4"}) do
+        local terreiro = Instance.new("Folder"); terreiro.Name = name; terreiro.Parent = terreiros
+        local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
+    end
+
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     check(type(backend) == "table" and backend.Destroyed == false, "Steal An Exu entry returns a live backend")
     check(backend.Started == true, "the backend starts itself")
     check(type(backend.Features.AutoSteal) == "table", "the Auto Steal Exu feature is registered")
+    check(type(backend.Features.AutoStealSelection) == "table", "the selected Terreiro steal feature is registered")
     check(type(backend.Features.AutoSell) == "table", "the Auto Sell feature is registered")
     check(ctx.State.__DEPHUB.StealAnExu == backend, "the backend publishes itself")
 
@@ -135,6 +143,14 @@ do
     for _, control in ipairs(ui.Library._Controls) do labels[control.Label] = control end
     check(labels["Auto Steal Exu"] ~= nil and labels["Auto Steal Exu"].Kind == "toggle",
         "the panel has the Auto Steal Exu toggle")
+    check(labels["Steal Exu An Selection"] ~= nil and labels["Steal Exu An Selection"].Kind == "toggle",
+        "the panel has the selected Terreiro steal toggle")
+    local terreiroDropdown = labels["Terreiro"]
+    check(terreiroDropdown ~= nil and terreiroDropdown.Kind == "dropdown",
+        "the selected Terreiro feature has a dropdown")
+    check(terreiroDropdown.Options and #terreiroDropdown.Options == 2
+        and terreiroDropdown.Options[1] == "Terreiro1" and terreiroDropdown.Options[2] == "Terreiro4",
+        "the dropdown maps available Terreiros from the live Map.Terreiros folder")
     check(labels["Auto Sell Exus"] ~= nil and labels["Auto Sell Exus"].Kind == "toggle",
         "the panel has the Auto Sell Exus toggle")
 
@@ -230,6 +246,83 @@ do
     -- A re-collect (what the loop does when a target is stale) now sees all three.
     local refreshed = feature:_targets()
     check(#refreshed == 3, "the re-collect picks up the exu that spawned after the list was built")
+
+    backend:Destroy()
+end
+
+-- Selected Terreiro mode maps each Nest to its nearest unique Runtime Exu.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local ws = ctx.Services.Workspace
+
+    local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ws
+    local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
+    local selected = Instance.new("Folder"); selected.Name = "Terreiro3"; selected.Parent = terreiros
+    local selectedNests = Instance.new("Folder"); selectedNests.Name = "Nests"; selectedNests.Parent = selected
+    local other = Instance.new("Folder"); other.Name = "Terreiro8"; other.Parent = terreiros
+    local otherNests = Instance.new("Folder"); otherNests.Name = "Nests"; otherNests.Parent = other
+
+    local nest1 = Instance.new("Part"); nest1.Name = "Nest1"; nest1.Parent = selectedNests
+    nest1.Position = Vector3.new(100, 0, 0)
+    local nest2 = Instance.new("Part"); nest2.Name = "Nest2"; nest2.Parent = selectedNests
+    nest2.Position = Vector3.new(200, 0, 0)
+    local otherNest = Instance.new("Part"); otherNest.Name = "Nest1"; otherNest.Parent = otherNests
+    otherNest.Position = Vector3.new(900, 0, 0)
+
+    local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ws
+    local prompts = {}
+    local function addExu(name, x)
+        local model = Instance.new("Model"); model.Name = name; model.Parent = runtime
+        local rootPart = Instance.new("Part"); rootPart.Name = "Root"; rootPart.Parent = model
+        rootPart.Position = Vector3.new(x, 0, 0)
+        local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = rootPart
+        prompt.HoldDuration = 0.5
+        prompt.MaxActivationDistance = 6.5
+        prompt.Hold = {began = 0, ended = 0, durationAtBegin = nil}
+        prompt.InputHoldBegin = function(self)
+            self.Hold.began = self.Hold.began + 1
+            self.Hold.durationAtBegin = self.HoldDuration
+        end
+        prompt.InputHoldEnd = function(self)
+            self.Hold.ended = self.Hold.ended + 1
+        end
+        prompts[#prompts + 1] = prompt
+    end
+
+    addExu("ExuA", 102)
+    addExu("ExuB", 204)
+    addExu("ExuC", 905)
+
+    local characterRoot = makeCharacter(ctx)
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local feature = backend.Features.AutoStealSelection
+
+    check(feature.SelectedOnly == true, "the new feature uses selected-only target filtering")
+    check(feature.Terreiro == "Terreiro1", "the selection mode starts with the first mapped Terreiro")
+    check(feature:SetTerreiro("Terreiro3") == true, "the selected Terreiro can be changed")
+    local selectedTargets = feature:_targets()
+    check(#selectedTargets == 2, "selected mode returns only the two Exus mapped to Terreiro3")
+    check(selectedTargets[1].model.Name == "ExuA" and selectedTargets[2].model.Name == "ExuB",
+        "the Nest-to-Exu mapping chooses the nearest distinct Runtime models")
+    check(selectedTargets[1].nestName == "Nest1" and selectedTargets[2].nestName == "Nest2",
+        "each mapped Runtime Exu retains its source Nest")
+
+    check(feature:SetTerreiro("Terreiro8") == true, "the selected Terreiro can be switched without reloading")
+    local otherTargets = feature:_targets()
+    check(#otherTargets == 1 and otherTargets[1].model.Name == "ExuC",
+        "switching the dropdown updates the filtered targets")
+
+    feature.Enabled = true
+    feature:SetTerreiro("Terreiro3")
+    local origin = characterRoot.CFrame
+    feature:_step(selectedTargets[1], characterRoot, origin)
+    check(prompts[1].Hold.began == 1 and prompts[1].Hold.ended == 1,
+        "selected mode reuses the same ProximityPrompt activation step")
+    check(prompts[1].Hold.durationAtBegin == 0,
+        "selected mode uses the same zero-duration prompt mechanism")
+    check(characterRoot.Position == origin.Position,
+        "selected mode returns to the exact position where the step started")
 
     backend:Destroy()
 end
