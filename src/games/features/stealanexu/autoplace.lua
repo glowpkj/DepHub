@@ -202,6 +202,13 @@ function AutoPlace:_sourceTerreiro(tool, id)
     local value = attribute(tool, {"Terreiro", "TerreiroName", "SourceTerreiro", "OriginTerreiro"})
     if value ~= nil then return tostring(value) end
 
+    local index = attribute(tool, {"TerreiroId", "TerreiroIndex", "OriginTerreiroId"})
+    if index ~= nil then
+        local numeric = tonumber(index)
+        if numeric then return "Terreiro" .. tostring(math.floor(numeric)) end
+        return tostring(index)
+    end
+
     return nil
 end
 
