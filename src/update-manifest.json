@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-02T05:10:50.228917+00:00",
-  "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
-  "version": "0.1.47",
+  "generatedAt": "2026-11-02T05:15:39.640378+00:00",
+  "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
+  "version": "0.1.48",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "1c9925dd38b50609a730cd0609696db05faf453e8e282472b260dd054b7e6f98",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "3e04765c00a90b7a035f79497d7e505ab76ae8d0f451cbda59187409b72912e9",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "2f203f994d255248a9bb87aaea6427ca1386bf3528981ce3aa0fabf00502d0b7",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "dc3696b9a2612144cbfcbacee8482dba1bdaa0cff957e540db2eba93f3cdeb73",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -56,8 +56,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "4a3d8dfdbef08da599994cc9c906b9ceaaa5d96f1a3cd89cf78fdff95fb26ae6",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "42f75afababfc86ad1d8dfc0d2b8a062d713b9788d9fe82669251d086d0e7ab6",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -76,8 +76,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "887feb0bed02ff168f2b04eb98a4c984b0bbe5a7627213868b80873a1bf37187",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "8d6ee555b11b30c3c5ba501031dd279ddf551f65e4c99b0c65d1f94863dfe84c",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -98,8 +98,8 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "773a57afba1a9bf4e63422a4875a66cda753850ce2a747df5dd5bab3de192782",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "105f7790e5dc78f5bfa5f8b7d3f9f93c1057c80cd6f87c59d52644bb01ef80c2",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -116,8 +116,8 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "66e29f5d9f9646382c7d3b81e1facffacf2dba2dccaac7bd6f884df291c02246",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "6980ce9df79605c4fd0876c657516288abea5a30a350b8113aa046c0777d40f8",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -134,8 +134,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "bad0644f8f7d09ba58d1f5a07bc121ed280df930f864c90c9636ef61c4cb0c1a",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "bf76fcfab10f8a100756c0e27515779a68fd60bba4d4f547aab1a4055a10cd3a",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -161,8 +161,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "50455273f55210b84cde900e32293d4b6b62ac63189b322243a373c04188c906",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "315b8797350ed35597d77220759448faf9d6a3ac76517a9cc303b39389740d15",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -187,8 +187,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "dd778415c4bb48ef7689e9c006605c88fbf133fece74ad938c2828dac6136163",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "eed4fff4a7d9c81d5b193fcac2a8b0686358f61d90a384391b76e21610ce43f7",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -217,8 +217,8 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "a1a916a2aabafee61d596b0d3c9cd185bb31ebf5ebdf2d51776c6d053c08be3b",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "df0d4f13d45b374ec3d3a03d358bad0dfb47eccbcf2994f540e4185f3fcbf265",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -235,8 +235,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "00abf538ed6fdbcf0239daf4de9d978377c6c24375b9e8182328bf8c0c590789",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "95a462d646991d4f78e1662fcfe82e74087e8bd9642a831b5d85294a05e504e0",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -258,8 +258,8 @@
     },
     "103076400317371": {
       "name": "Steal An Exu",
-      "version": "440f6e681e4cbd5a71766d9c77670527028ff60d509e48ee559f9b53f8fe38e9",
-      "commit": "911f4dfdd95a7c555f46342184a47043ae9ce4d1",
+      "version": "c19c60e57b9310a97f731eabcf769b96d1eda8b694b6e46b00aff4427e44d0dd",
+      "commit": "740714ea57bb2958f8acfe35e42e90472d75bfa9",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -279,6 +279,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "740714e",
+      "Date": "2026-11-02T02:15:25-03:00",
+      "Changes": [
+        "0.1.48: roubo volta ao simples que funciona (remove a verifica\u00e7\u00e3o)"
+      ]
+    },
     {
       "Version": "911f4df",
       "Date": "2026-11-02T02:10:36-03:00",
@@ -305,13 +312,6 @@
       "Date": "2026-11-02T01:54:43-03:00",
       "Changes": [
         "0.1.44: roubo funciona (HoldDuration=0) e pega VARIOS Exus"
-      ]
-    },
-    {
-      "Version": "2be8748",
-      "Date": "2026-11-02T01:43:29-03:00",
-      "Changes": [
-        "0.1.43: steal tenta a acao certa do prompt (dado do espiao)"
       ]
     }
   ]
