@@ -51,9 +51,13 @@ AutoSteal.__index = AutoSteal
 --                      pro prompt assentar antes de segurar.
 --   POST_HOLD_WAIT  -- quanto ficar EM CIMA do Exu depois do InputHoldEnd, pro
 --                      servidor creditar o roubo antes de a gente sair de perto.
+--   SETTLE_HOLD     -- quanto esperar um Triggered depois de cada tentativa de
+--                      roubo (InputHoldBegin / hold / fire) antes de ir pra
+--                      proxima rota.
 local VALIDATE_WAIT = 1.5
 local SETTLE_WAIT = 0.25
 local POST_HOLD_WAIT = 0.15
+local SETTLE_HOLD = 0.25
 
 -- Steal All (botao): mesma logica, so que mais apertada que o toggle (o usuario
 -- quer o botao "um pouco mais forte e rapido"). Ainda assim, folgada o bastante
@@ -61,6 +65,7 @@ local POST_HOLD_WAIT = 0.15
 local ALL_VALIDATE_WAIT = 0.8
 local ALL_SETTLE_WAIT = 0.2
 local ALL_POST_HOLD_WAIT = 0.15
+local ALL_SETTLE_HOLD = 0.2
 -- Um respiro entre um Exu e o proximo, pra nao metralhar o servidor.
 local ALL_STEP_GAP = 0.15
 local ALL_TERREIRO_FROM = 9
@@ -330,51 +335,91 @@ end
 
 -- --- Disparo do prompt ----------------------------------------------------
 
--- O ROUBO DE VERDADE (descoberto em teste no jogo):
--- fireproximityprompt NAO funciona aqui -- ele dispara o Triggered na hora, e o
--- servidor do jogo ignora (o Exu nao e' roubado). O que rouba e' SEGURAR o
--- prompt pelo HoldDuration: InputHoldBegin -> espera -> InputHoldEnd. Foi assim
--- que o teste [HoldTest2] modo 0 roubou de fato o Exu.
+-- Rouba o Exu.
 --
--- IMPORTANTE: o Triggered NAO diz nada. Ele dispara sempre (e' local), mesmo
--- quando o servidor ignora. Por isso o resultado do roubo e' "o hold foi
--- enviado e completado", nao "o Triggered apareceu".
+-- Historico (tudo medido no jogo, com espiao no prompt):
+--   * fireproximityprompt dispara o Triggered local, mas o servidor IGNORA
+--     (o Exu nao e' roubado).
+--   * O [PromptSpy3] provou que o DEX NAO chama InputHoldBegin/End e nao usa
+--     hold nenhum: ele dispara o Triggered DIRETO (igual fire) e MESMO ASSIM
+--     rouba. Ou seja, o Triggered e' emitido por um caminho que o servidor
+--     aceita -- nao pelo fireproximityprompt.
+--   * O hold completo (Began -> 0.5s -> Ended) chegou a roubar no teste, mas o
+--     spy mostrou que nao e' o mecanismo (o Triggered ja disparava sozinho).
 --
--- `postHold`: quanto esperar DEPOIS do InputHoldEnd, ainda em cima do Exu, pra o
--- servidor processar antes de a gente sair de perto (teleportar). Sem isso o
--- servidor pode cortar o roubo no meio.
+-- Entao aqui a gente tenta os caminhos NA ORDEM que mais roubam, e mede o
+-- resultado pelo proprio Triggered (que o Dex tambem usa como sinal):
+--   1) InputHoldBegin "puro" -- o que casa com o comportamento instantaneo do
+--      Dex e nao depende de esperar HoldDuration. Se o prompt responder com um
+--      Triggered, consideramos roubado.
+--   2) InputHoldBegin + End (hold completo) -- caso o (1) nao responda.
+--   3) fireproximityprompt -- ultimo recurso (executor/jogo sem InputHold*).
 --
--- Se a versao do jogo/executor nao tiver InputHoldBegin/End, cai no
--- fireproximityprompt (o antigo), pra nunca travar. Devolve true se mandou a
--- acao (hold completo ou fire de fallback).
-local function stealPrompt(prompt, postHold)
+-- `settle`: quanto esperar um Triggered depois de cada tentativa.
+-- `postHold`: respiro em cima do Exu antes de voltar pra base (pro servidor
+--             creditar). Devolve true se alguma tentativa foi enviada.
+local function stealPrompt(prompt, settle, postHold)
     if not prompt then return false end
+    settle = tonumber(settle) or 0.2
+    postHold = tonumber(postHold) or 0
 
-    local holdBegin = prompt.InputHoldBegin
-    local holdEnd = prompt.InputHoldEnd
-    if type(holdBegin) == "function" and type(holdEnd) == "function" then
-        local began = pcall(function() prompt:InputHoldBegin() end)
-        if began then
-            -- Segura o tempo que o prompt pede (o jogo usa 0.5s) e ACOMPANHA ate
-            -- o fim antes de seguir.
-            local hold = tonumber(prompt.HoldDuration) or 0.5
-            if hold < 0.05 then hold = 0.05 end
-            task.wait(hold)
-            pcall(function() prompt:InputHoldEnd() end)
-            -- Respira em cima do Exu pro servidor creditar o roubo.
-            task.wait(postHold or 0)
+    -- Observa o Triggered (o Dex tambem usa esse sinal).
+    local triggered = false
+    local connection
+    pcall(function()
+        connection = prompt.Triggered:Connect(function() triggered = true end)
+    end)
+
+    local function waitTriggered()
+        local deadline = os.clock() + settle
+        while not triggered and os.clock() < deadline do task.wait(0.02) end
+        return triggered
+    end
+
+    local hasBegin = type(prompt.InputHoldBegin) == "function"
+    local hasEnd = type(prompt.InputHoldEnd) == "function"
+    local sent = false
+
+    -- 1) InputHoldBegin puro (rota mais proxima do Dex).
+    if hasBegin then
+        local ok = pcall(function() prompt:InputHoldBegin() end)
+        if ok then
+            sent = true
+            if waitTriggered() then
+                if hasEnd then pcall(function() prompt:InputHoldEnd() end) end
+                task.wait(postHold)
+                if connection then pcall(function() connection:Disconnect() end) end
+                return true
+            end
+        end
+    end
+
+    -- 2) Hold completo (Began -> HoldDuration -> Ended).
+    if hasBegin and hasEnd then
+        pcall(function() prompt:InputHoldBegin() end)
+        local hold = tonumber(prompt.HoldDuration) or 0.5
+        if hold < 0.05 then hold = 0.05 end
+        task.wait(hold)
+        pcall(function() prompt:InputHoldEnd() end)
+        sent = true
+        if waitTriggered() then
+            task.wait(postHold)
+            if connection then pcall(function() connection:Disconnect() end) end
             return true
         end
     end
 
-    -- Fallback (executor/jogo sem InputHold*): o fire instantaneo.
+    -- 3) Fire instantaneo (ultimo recurso).
     local fire = fireproximityprompt
     if type(fire) == "function" then
         local ok = pcall(fire, prompt)
-        task.wait(postHold or 0)
-        return ok
+        sent = sent or ok
+        waitTriggered()
     end
-    return false
+
+    task.wait(postHold)
+    if connection then pcall(function() connection:Disconnect() end) end
+    return sent
 end
 
 -- O prompt esta no alcance? (Enabled e a distancia dentro do MaxActivationDistance)
@@ -442,11 +487,11 @@ function AutoSteal:_stealAt(nestTarget, rootPosition, options)
             string.format("%.1f", distance), "range=", tostring(range), ")")
     end
 
-    -- 4) Rouba SEGURANDO o prompt (InputHoldBegin -> HoldDuration ->
-    --    InputHoldEnd), e espera em cima do Exu (postHold) pro servidor creditar
-    --    ANTES de teleportar. O Triggered nao e' criterio: ele dispara sempre.
-    local stolen = stealPrompt(prompt, options.postHold or POST_HOLD_WAIT)
-    debugLog(self, label, "4) hold(InputHoldBegin/End) ->", tostring(stolen),
+    -- 4) Rouba. stealPrompt tenta InputHoldBegin puro, depois o hold completo,
+    --    depois o fire -- o Triggered de cada rota diz qual o servidor aceitou.
+    --    E fica em cima do Exu (postHold) pro servidor creditar antes de sair.
+    local stolen = stealPrompt(prompt, options.settle or SETTLE_HOLD, options.postHold or POST_HOLD_WAIT)
+    debugLog(self, label, "4) roubo ->", tostring(stolen),
         "HoldDuration=", tostring(prompt.HoldDuration))
 
     -- 5) Volta pra base e espera pra o jogo confirmar o guardar.
@@ -479,6 +524,7 @@ function AutoSteal:StealOnce()
                 label = "Nest" .. index,
                 validateWait = VALIDATE_WAIT,
                 settleWait = SETTLE_WAIT,
+                settle = SETTLE_HOLD,
                 postHold = POST_HOLD_WAIT,
             })
             if ok then stole = stole + 1 end
@@ -529,6 +575,7 @@ function AutoSteal:StealAll()
                         label = "T" .. terreiroIndex .. ".Nest" .. nestIndex,
                         validateWait = ALL_VALIDATE_WAIT,
                         settleWait = ALL_SETTLE_WAIT,
+                        settle = ALL_SETTLE_HOLD,
                         postHold = ALL_POST_HOLD_WAIT,
                     })
                     if ok then stole = stole + 1 else skipped = skipped + 1 end

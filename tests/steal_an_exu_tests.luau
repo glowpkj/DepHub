@@ -183,13 +183,14 @@ do
     local ok, stole = feature:StealOnce()
     check(ok == true and stole >= 1, "StealOnce reaches and counts exu prompts")
 
-    -- The prompt is HELD (the route that actually steals): every prompt that was
-    -- reached had InputHoldBegin and InputHoldEnd called, in that order.
-    local heldAll = true
+    -- The prompt is ACTED ON: the steal tries the hold API (InputHoldBegin) --
+    -- the routes in order (Begin puro -> hold -> fire). Every prompt reached had
+    -- at least one InputHoldBegin.
+    local actedAll = true
     for _, prompt in ipairs(world.fired) do
-        if not (prompt.Hold.began >= 1 and prompt.Hold.ended >= 1) then heldAll = false end
+        if not (prompt.Hold.began >= 1) then actedAll = false end
     end
-    check(heldAll, "every reached prompt is held (InputHoldBegin then InputHoldEnd)")
+    check(actedAll, "every reached prompt is acted on (InputHoldBegin called)")
 
     -- The teleport onto an exu lands on its Root (offset 3 from the Nest); it
     -- must not use the bare Nest position.
@@ -411,13 +412,13 @@ do
 
     local ok, count = feature:StealAll()
     check(ok == true and count == 4, "Steal All counts every exu it stole (4)")
-    -- Every exu is HOLD (InputHoldBegin/End) -- the route that steals. Each is
-    -- held exactly once (no more wide-fire before arrival).
-    local held = true
+    -- Every exu is ACTED ON through the hold API at least once (the steal tries
+    -- the hold API before the plain fire).
+    local acted = true
     for _, prompt in ipairs(fired) do
-        if not (prompt.Hold.began == 1 and prompt.Hold.ended == 1) then held = false end
+        if not (prompt.Hold.began >= 1) then acted = false end
     end
-    check(held, "every exu in the pass is held once (InputHoldBegin/End)")
+    check(acted, "every exu in the pass is acted on (InputHoldBegin called)")
     check(hrp.Position == Vector3.new(0, 50, 0), "the pass returns to the base it started from")
 
     backend:Destroy()
