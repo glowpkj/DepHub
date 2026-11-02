@@ -128,10 +128,7 @@ function State:SaveConfig()
 end
 
 function State:PersistIfAutoExec()
-    if self.Config.autoexec == true then
-        return self:SaveConfig()
-    end
-    return true
+    return self:SaveConfig()
 end
 
 function State:ReadConfig()
@@ -330,6 +327,11 @@ do
         for _, pen in ipairs(pens:GetChildren()) do
             local owner = pen:GetAttribute("Owner")
             if owner ~= nil and tostring(owner) == wanted then return pen end
+        end
+        local penName = LocalPlayer and LocalPlayer:GetAttribute("PenName")
+        if penName then
+            local namedPen = pens:FindFirstChild(tostring(penName))
+            if namedPen then return namedPen end
         end
         return nil
     end
@@ -535,13 +537,9 @@ else
 end
 State:Start()
 
+
 -- ---------------------------------------------------------------------------
--- Apresentacao: categoria Farming.
---   * "Auto Steal Exu" -- o loop (toggle). O script de referencia: varre os Exus
---     do Runtime e rouba pelo prompt.
---   * "Sell All" -- um botao de passada unica: vende os Exus pela GUI do jogo
---     (PlayerGui.Menus["Vender Todos"]).
---   * "Auto Upgrade" -- um toggle por botao (o da base e o da esteira).
+-- Farming: roubo multi-Terreiro, Auto Place, Auto Sell, Auto Hop e config.
 -- ---------------------------------------------------------------------------
 do
     local savedConfig = nil
@@ -550,40 +548,31 @@ do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
     if Kit then
         local tab = Kit.Tab("Auto Steal", "Farming")
-
-        -- Auto Steal Exu: o loop do roubo (o script de referencia).
-        if State.AutoSteal then
-            local stealSection = Kit.Section(tab, "Auto Steal Exu", "Left")
-            if stealSection then
-                local function applyAutoSteal(value)
-                    State.Config.autoSteal = value == true
-                    local ok = State.AutoSteal:SetEnabled(value)
-                    State:PersistIfAutoExec()
-                    return ok
-                end
-                local handle = stealSection:CreateToggle("Auto Steal Exu", State.Config.autoSteal == true, applyAutoSteal)
-                State:RegisterConfig("autoSteal", applyAutoSteal, handle)
-            end
+        local availableTerreiros = AutoStealModule and AutoStealModule.terreiros() or {}
+        local defaultStealTerreiros = State.Config.selectedTerreiros
+        if type(defaultStealTerreiros) ~= "table" or #defaultStealTerreiros == 0 then
+            defaultStealTerreiros = {availableTerreiros[1]}
+        end
+        if State.AutoStealSelection then
+            State.AutoStealSelection:SetTerreiros(defaultStealTerreiros)
         end
 
-        -- Rouba somente os Exus associados aos Nests do Terreiro selecionado.
         if State.AutoStealSelection then
-            local selectionSection = Kit.Section(tab, "Steal Exu An Selection", "Left")
-            if selectionSection then
-                local function applySelectedTerreiro(choice)
-                    State.Config.selectedTerreiro = choice
-                    local ok = State.AutoStealSelection:SetTerreiro(choice)
+            local stealSection = Kit.Section(tab, "Steal Exu Selection", "Left")
+            if stealSection then
+                local function applyStealTerreiros(names)
+                    State.Config.selectedTerreiros = table.clone(names)
+                    local ok = State.AutoStealSelection:SetTerreiros(names)
                     State:PersistIfAutoExec()
                     return ok
                 end
-                local defaultTerreiro = State.Config.selectedTerreiro or State.AutoStealSelection.Terreiro
-                local terreiroHandle = selectionSection:CreateDropdown(
-                    "Terreiro",
-                    AutoStealModule.terreiros(),
-                    defaultTerreiro,
-                    applySelectedTerreiro
+                local handle = stealSection:CreateMultiDropdown(
+                    "Steal Terreiros",
+                    availableTerreiros,
+                    defaultStealTerreiros,
+                    applyStealTerreiros
                 )
-                State:RegisterConfig("selectedTerreiro", applySelectedTerreiro, terreiroHandle)
+                State:RegisterConfig("selectedTerreiros", applyStealTerreiros, handle)
 
                 local function applySelectedSteal(value)
                     State.Config.autoStealSelection = value == true
@@ -591,16 +580,74 @@ do
                     State:PersistIfAutoExec()
                     return ok
                 end
-                local selectionHandle = selectionSection:CreateToggle(
-                    "Steal Exu An Selection",
+                local stealHandle = stealSection:CreateToggle(
+                    "Steal Exu Selection",
                     State.Config.autoStealSelection == true,
                     applySelectedSteal
                 )
-                State:RegisterConfig("autoStealSelection", applySelectedSteal, selectionHandle)
+                State:RegisterConfig("autoStealSelection", applySelectedSteal, stealHandle)
+
+                local function applyHop(value)
+                    State.Config.autoHopSelected = value == true
+                    local ok = State.AutoHop and State.AutoHop:SetEnabled(value) or false
+                    State:PersistIfAutoExec()
+                    return ok
+                end
+                local hopHandle = stealSection:CreateToggle(
+                    "Auto Hop When Empty",
+                    State.Config.autoHopSelected == true,
+                    applyHop
+                )
+                State:RegisterConfig("autoHopSelected", applyHop, hopHandle)
+                stealSection:CreateParagraph(
+                    "Selected farming",
+                    "Rouba somente os terreiros marcados. O Auto Hop espera os Exus desses mesmos terreiros acabarem antes de trocar de servidor."
+                )
             end
         end
 
-        -- Auto Sell: vai para Map.Plaza.Part uma vez e clica no botao Vender Todos.
+        if State.AutoPlace then
+            local placeSection = Kit.Section(tab, "Auto Place Exu", "Left")
+            if placeSection then
+                local defaultPlaceTerreiros = State.Config.placeTerreiros
+                if type(defaultPlaceTerreiros) ~= "table" or #defaultPlaceTerreiros == 0 then
+                    defaultPlaceTerreiros = table.clone(defaultStealTerreiros)
+                end
+                State.AutoPlace:SetTerreiros(defaultPlaceTerreiros)
+
+                local function applyPlaceTerreiros(names)
+                    State.Config.placeTerreiros = table.clone(names)
+                    local ok = State.AutoPlace:SetTerreiros(names)
+                    State:PersistIfAutoExec()
+                    return ok
+                end
+                local placeDropdown = placeSection:CreateMultiDropdown(
+                    "Place Terreiros",
+                    availableTerreiros,
+                    defaultPlaceTerreiros,
+                    applyPlaceTerreiros
+                )
+                State:RegisterConfig("placeTerreiros", applyPlaceTerreiros, placeDropdown)
+
+                local function applyAutoPlace(value)
+                    State.Config.autoPlace = value == true
+                    local ok = State.AutoPlace:SetEnabled(value)
+                    State:PersistIfAutoExec()
+                    return ok
+                end
+                local placeToggle = placeSection:CreateToggle(
+                    "Auto Place Exu",
+                    State.Config.autoPlace == true,
+                    applyAutoPlace
+                )
+                State:RegisterConfig("autoPlace", applyAutoPlace, placeToggle)
+                placeSection:CreateParagraph(
+                    "Auto Place",
+                    "Coloca Tools com ExuId cuja origem foi mapeada para os terreiros selecionados. Exus sem origem identificada sao ignorados para evitar colocar no grupo errado."
+                )
+            end
+        end
+
         if State.AutoSell then
             local sellSection = Kit.Section(tab, "Sell All", "Left")
             if sellSection then
@@ -612,10 +659,13 @@ do
                 end
                 local handle = sellSection:CreateToggle("Auto Sell Exus", State.Config.autoSell == true, applyAutoSell)
                 State:RegisterConfig("autoSell", applyAutoSell, handle)
+                sellSection:CreateParagraph(
+                    "Sell priority",
+                    "Com Steal e Sell ligados, cada Exu roubado retorna diretamente para a Plaza. O Sell so clica quando voce esta dentro da area."
+                )
             end
         end
 
-        -- Auto Rebirth: executa rebirth automaticamente quando houver Cash suficiente.
         if State.AutoRebirth then
             local rebirthSection = Kit.Section(tab, "Auto Rebirth", "Left")
             if rebirthSection then
@@ -630,7 +680,6 @@ do
             end
         end
 
-        -- Auto Upgrade: um toggle por botao (o da base e o da esteira).
         if State.UpgradeBase or State.UpgradeTread then
             local upgradeSection = Kit.Section(tab, "Auto Upgrade", "Left")
             if upgradeSection then
@@ -657,26 +706,32 @@ do
             end
         end
 
-        -- Server Hop: troca somente quando Runtime fica vazio por 15 segundos.
-        if State.AutoHop then
-            local hopSection = Kit.Section(tab, "Server Hop", "Right")
-            if hopSection then
-                local function applyAutoHop(value)
-                    State.Config.autoHop = value == true
-                    local ok = State.AutoHop:SetEnabled(value)
-                    State:PersistIfAutoExec()
-                    if value and not State.Config.autoexec and type(env.__DEPHUB.UI) == "table" then
-                        env.__DEPHUB.UI:Notify("Auto Hop Server", "Ative Auto Execute e salve a config para continuar farmando depois da troca de servidor.")
-                    end
-                    return ok
-                end
-                local handle = hopSection:CreateToggle("Auto Hop Server", State.Config.autoHop == true, applyAutoHop)
-                State:RegisterConfig("autoHop", applyAutoHop, handle)
-                hopSection:CreateParagraph("Auto Hop", "Quando workspace.Runtime ficar sem Exus por 15 segundos, procura um servidor publico diferente com vagas. Ative Auto Execute para o script voltar depois do teleporte.")
-            end
+        local hopSection = Kit.Section(tab, "Server Hop", "Right")
+        if hopSection then
+            hopSection:CreateParagraph(
+                "Auto Hop",
+                "A troca usa somente os terreiros marcados em Steal Terreiros. Exige que pelo menos um Exu selecionado tenha aparecido no servidor e que a selecao fique vazia por 15 segundos."
+            )
         end
 
-        -- Config: salva todas as opcoes e permite autoexecutar o DepHub apos teleportes.
+        local teleportSection = Kit.Section(tab, "Manual Teleport", "Right")
+        if teleportSection then
+            teleportSection:CreateButton("Teleport to Base", function()
+                local ok, reason = FeatureContext.TeleportToBase(State)
+                local ui = env.__DEPHUB and env.__DEPHUB.UI
+                if ui and type(ui.Notify) == "function" then
+                    ui:Notify("Teleport to Base", ok and "Teleportado para sua base." or tostring(reason))
+                end
+            end)
+            teleportSection:CreateButton("Teleport to Sell Area", function()
+                local ok, reason = FeatureContext.TeleportToSell(State)
+                local ui = env.__DEPHUB and env.__DEPHUB.UI
+                if ui and type(ui.Notify) == "function" then
+                    ui:Notify("Teleport to Sell Area", ok and "Teleportado para a Plaza." or tostring(reason))
+                end
+            end)
+        end
+
         local configSection = Kit.Section(tab, "Config", "Right")
         if configSection then
             local function applyAutoExec(value)
@@ -704,7 +759,7 @@ do
                 local ok = State:SaveConfig()
                 local ui = env.__DEPHUB and env.__DEPHUB.UI
                 if ui and type(ui.Notify) == "function" then
-                    ui:Notify("Config", ok and "Config salva." or (State.LastConfigError or "Nao foi possivel salvar em disco."))
+                    ui:Notify("Config", ok and "Todas as configuracoes foram salvas." or (State.LastConfigError or "Nao foi possivel salvar em disco."))
                 end
             end)
 
@@ -716,7 +771,10 @@ do
                     ui:Notify("Config", ("Aplicadas: %d | Falhas: %d"):format(result and result.count or 0, failed))
                 end
             end)
-            configSection:CreateParagraph("Config", "Save Config guarda toggles e Terreiro selecionado. A config e carregada automaticamente quando o DepHub inicia.")
+            configSection:CreateParagraph(
+                "Config",
+                "Todas as selecoes multiplas, toggles e Auto Execute sao salvos automaticamente ao mudar, e tambem pelo botao Save Config."
+            )
         end
     end
 
@@ -727,7 +785,6 @@ do
         end
     end
 
-    -- Limpa qualquer queue antiga quando Auto Execute nao esta salvo como ligado.
     if State.Config.autoexec ~= true then
         pcall(function() State:SetAutoExec(false) end)
     end
