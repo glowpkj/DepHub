@@ -55,7 +55,7 @@ local function loadFeature(relativePath, validate)
 end
 
 local State = {
-    Version = "0.1.1",
+    Version = "0.1.61",
     Destroyed = false,
     Started = false,
     Features = {},
@@ -138,6 +138,22 @@ end)
 -- num lugar so, pra nao duplicar a logica de Owner em cada feature.
 local FeatureContext = {}
 do
+    -- Um unico bloqueio de movimento para impedir que Auto Steal e Auto Sell
+    -- teleportem o personagem ao mesmo tempo.
+    local movementOwner = nil
+
+    function FeatureContext.AcquireMovement(owner)
+        if movementOwner ~= nil and movementOwner ~= owner then return false end
+        movementOwner = owner
+        return true
+    end
+
+    function FeatureContext.ReleaseMovement(owner)
+        if movementOwner ~= owner then return false end
+        movementOwner = nil
+        return true
+    end
+
     local Players = game:GetService("Players")
     local Workspace = game:GetService("Workspace")
     local LocalPlayer = Players.LocalPlayer
@@ -236,7 +252,7 @@ do
             end
         end
 
-        -- Auto Sell: clica continuamente no botao exato Vender Todos.Button.Face.
+        -- Auto Sell: vai para Map.Plaza.Part uma vez e clica no botao Vender Todos.
         if State.AutoSell then
             local sellSection = Kit.Section(tab, "Sell All", "Left")
             if sellSection then
