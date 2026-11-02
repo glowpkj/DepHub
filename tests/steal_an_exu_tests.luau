@@ -133,6 +133,7 @@ print("SAE_TEST: entry")
 do
     local ctx = saeContext(103076400317371, 10771168447)
     local ui = ctx:MountUI()
+    print("SAE_TEST: entry UI mounted")
 
     local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ctx.Services.Workspace
     local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
@@ -140,8 +141,10 @@ do
         local terreiro = Instance.new("Folder"); terreiro.Name = name; terreiro.Parent = terreiros
         local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
     end
+    print("SAE_TEST: entry map ready")
 
     local backend = ctx:Run("src/games/steal-an-exu.lua")
+    print("SAE_TEST: entry backend returned")
     check(type(backend) == "table" and backend.Destroyed == false, "Steal An Exu entry returns a live backend")
     check(backend.Started == true, "the backend starts itself")
     check(type(backend.Features.AutoSteal) == "nil", "the unfiltered Auto Steal feature is removed")
@@ -152,6 +155,7 @@ do
     check(type(backend.Store) == "table", "the shared config store is loaded")
     check(ctx.State.__DEPHUB.StealAnExu == backend, "the backend publishes itself")
 
+    print("SAE_TEST: entry features passed")
     local labels = {}
     for _, control in ipairs(ui.Library._Controls) do labels[control.Label] = control end
     check(labels["Auto Steal Exu"] == nil, "the unfiltered Auto Steal toggle is removed")
@@ -184,6 +188,7 @@ do
         "the panel has the Save Config button")
     check(labels["Load Config"] ~= nil and labels["Load Config"].Kind == "button",
         "the panel has the Load Config button")
+    print("SAE_TEST: entry UI assertions passed")
 
     -- Auto Upgrade: one toggle per board (base, tread), each a live feature.
     check(type(backend.Features.UpgradeBase) == "table", "the Auto Upgrade Base feature is registered")
