@@ -249,6 +249,7 @@
       "src/games/features/stealanexu/autoupgrade.lua",
       "src/games/features/stealanexu/autosell.lua",
       "src/games/features/stealanexu/autorebirth.lua",
+      "src/games/features/stealanexu/autohop.lua",
       "src/games/updates/103076400317371.txt"
     ]
   }
