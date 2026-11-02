@@ -17,12 +17,17 @@ local function saeContext(placeId, gameId)
     local ctx = sandbox(placeId, gameId)
     ctx.Player.UserId = MY_USER_ID
     ctx.Responses[FEATURE_PREFIX .. "autosteal.lua"] = sources[FEATURE_PREFIX .. "autosteal.lua"]
+    ctx.Responses[FEATURE_PREFIX .. "autoupgrade.lua"] = sources[FEATURE_PREFIX .. "autoupgrade.lua"]
     return ctx
 end
 
 -- Builds the minimal world the feature reads: Map.Terreiros.TerreiroN.Nests with
 -- Nest1..NestM, Map.Pens with one pen owned by the local player (Owner attribute)
 -- and a BadgeAnchor, and Runtime with exu models carrying Root.ProximityPrompt.
+--
+-- RootOffset: the exu Root sits this far from its Nest (studs). The default is 0
+-- (Root on the Nest); tests that care about the "teleport to the Root, not the
+-- Nest" fix pass a nonzero offset so the two positions differ.
 local function buildWorld(ctx, options)
     options = options or {}
     local ws = ctx.Services.Workspace
@@ -45,16 +50,30 @@ local function buildWorld(ctx, options)
     local anchor = Instance.new("Part"); anchor.Name = "BadgeAnchor"; anchor.Parent = pen
     anchor.CFrame = CFrame.new(0, 50, 0)
 
+    -- The two upgrade boards the Auto Upgrade toggles click.
+    local baseSign = Instance.new("Model"); baseSign.Name = "PenSign"; baseSign.Parent = pen
+    local baseBoard = Instance.new("Part"); baseBoard.Name = "Board"; baseBoard.Parent = baseSign
+    local baseDetector = Instance.new("ClickDetector"); baseDetector.Name = "ClickDetector"; baseDetector.Parent = baseBoard
+
+    local treadSign = Instance.new("Model"); treadSign.Name = "TreadSign"; treadSign.Parent = pen
+    local treadBoard = Instance.new("Part"); treadBoard.Name = "Board"; treadBoard.Parent = treadSign
+    local treadDetector = Instance.new("ClickDetector"); treadDetector.Name = "ClickDetector"; treadDetector.Parent = treadBoard
+
     local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ws
-    local fired = {}
+    local fired, roots = {}, {}
+    local offset = options.rootOffset or 0
     for index = 1, (options.exuCount or 2) do
         local exu = Instance.new("Model"); exu.Name = "Exu"; exu.Parent = runtime
         local root = Instance.new("Part"); root.Name = "Root"; root.Parent = exu
-        root.CFrame = CFrame.new(index * 100, 0, 0)   -- sits on Nest{index}
+        root.CFrame = CFrame.new(index * 100, offset, 0)   -- near Nest{index}
+        roots[#roots + 1] = root
         local prompt = Instance.new("ProximityPrompt"); prompt.Name = "ProximityPrompt"; prompt.Parent = root
         fired[#fired + 1] = prompt
     end
-    return {fired = fired, pen = pen, anchor = anchor}
+    return {
+        fired = fired, roots = roots, pen = pen, anchor = anchor,
+        baseDetector = baseDetector, treadDetector = treadDetector,
+    }
 end
 
 -- A teleport is a direct CFrame write on the HumanoidRootPart; the harness records
@@ -111,18 +130,29 @@ do
     check(labels["Steal All"] ~= nil and labels["Steal All"].Kind == "button",
         "the panel has the Steal All button")
 
+    -- Auto Upgrade: one toggle per board (base, tread), each a live feature.
+    check(type(backend.Features.UpgradeBase) == "table", "the Auto Upgrade Base feature is registered")
+    check(type(backend.Features.UpgradeTread) == "table", "the Auto Upgrade Esteira feature is registered")
+    check(labels["Auto Upgrade Base"] ~= nil and labels["Auto Upgrade Base"].Kind == "toggle",
+        "the panel has the Auto Upgrade Base toggle")
+    check(labels["Auto Upgrade Esteira"] ~= nil and labels["Auto Upgrade Esteira"].Kind == "toggle",
+        "the panel has the Auto Upgrade Esteira toggle")
+
     backend:Destroy()
     backend:Destroy()
     check(backend.Destroyed == true, "destroy marks the backend destroyed")
     check(ctx.State.__DEPHUB.StealAnExu == nil, "destroy clears the published state")
 end
 
--- The steal step: find the pen by Owner (not Pen1), teleport to the Nest, fire
--- the Runtime prompt, then return to the base BadgeAnchor.
+-- The steal step: find the pen by Owner (not Pen1), teleport ONTO the Exu Root
+-- (not the Nest -- the bug where the Nest sat far from the exu), fire the Runtime
+-- prompt, then return to the base BadgeAnchor.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
-    local world = buildWorld(ctx)
+    -- The exu Root sits 3 studs off its Nest, so a teleport to the Nest would end
+    -- up at the Nest, distinct from the Root. The feature must land on the Root.
+    local world = buildWorld(ctx, {rootOffset = 3})
     local root = makeCharacter(ctx)
 
     local backend = ctx:Run("src/games/steal-an-exu.lua")
@@ -140,14 +170,32 @@ do
         for _, candidate in ipairs(world.fired) do if candidate == prompt then firedCount = firedCount + 1 end end
     end
 
+    -- Record where each teleport lands, so the test can prove the target is the
+    -- exu Root (y = 3 beside Nest1) and never the Nest (y = 0).
+    local teleports = {}
+    local originalTeleport = feature.TeleportTo
+    feature.TeleportTo = function(self, cframe)
+        teleports[#teleports + 1] = cframe.Position
+        return originalTeleport(self, cframe)
+    end
+
     local ok, stole = feature:StealOnce()
     check(ok == true and stole >= 1, "StealOnce reaches and counts exu prompts")
     check(firedCount >= 1, "the Runtime ProximityPrompt is fired")
+
+    -- The teleport onto an exu lands on its Root (offset 3 from the Nest); it
+    -- must not use the bare Nest position.
+    local landedOnRoot = false
+    for _, position in ipairs(teleports) do
+        if position.Y == 3 then landedOnRoot = true end
+    end
+    check(landedOnRoot, "the steal teleports onto the Exu Root, not the Nest")
 
     -- After the step the character is back at the base anchor (it started at 0,0,0
     -- and the anchor is at 0,50,0).
     check(root.Position == Vector3.new(0, 50, 0), "the step returns to the base anchor")
     ctx.Env.fireproximityprompt = nil
+    feature.TeleportTo = originalTeleport
 
     -- With the toggle on, the loop runs; with it off it stops.
     check(feature:SetEnabled(true) == true and feature:IsEnabled() == true, "the feature turns on")
@@ -208,6 +256,68 @@ do
     local ok = feature:StealOnce()
     check(ok == false, "StealOnce does not throw without a base")
     check(type(feature.LastError) == "string", "a failed step records a reason")
+
+    backend:Destroy()
+end
+
+-- Auto Upgrade: each toggle clicks the ClickDetector of MY pen (found by Owner,
+-- never Pen1), on its own board. Driven directly because the harness does not run
+-- spawned threads.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    local world = buildWorld(ctx)
+    makeCharacter(ctx)
+
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local base = backend.Features.UpgradeBase
+    local tread = backend.Features.UpgradeTread
+
+    check(base ~= nil and tread ~= nil, "both upgrade features are registered")
+
+    -- Each upgrade resolves the ClickDetector on MY pen.
+    check(base:Detector() == world.baseDetector, "Auto Upgrade Base targets PenSign.Board.ClickDetector of my pen")
+    check(tread:Detector() == world.treadDetector, "Auto Upgrade Esteira targets TreadSign.Board.ClickDetector of my pen")
+
+    -- A click counts how many times each detector is fired. fireclickdetector is
+    -- the executor global; it lives on the sandbox env.
+    local clicks = {}
+    ctx.Env.fireclickdetector = function(detector) clicks[detector] = (clicks[detector] or 0) + 1 end
+
+    check(base:Click(world.baseDetector) == true, "a base upgrade click reports success")
+    check(tread:Click(world.treadDetector) == true, "a tread upgrade click reports success")
+    check(clicks[world.baseDetector] == 1, "the base ClickDetector is fired")
+    check(clicks[world.treadDetector] == 1, "the tread ClickDetector is fired")
+
+    -- One loop body click per feature, driven directly.
+    base:Click(base:Detector())
+    tread:Click(tread:Detector())
+    check(clicks[world.baseDetector] == 2, "a second base click lands on the same detector")
+    check(clicks[world.treadDetector] == 2, "a second tread click lands on the same detector")
+
+    -- Toggle contract + clean destroy.
+    check(base:SetEnabled(true) == true and base:IsEnabled() == true, "the base upgrade turns on")
+    check(base:SetEnabled(false) == true and base:IsEnabled() == false, "the base upgrade turns off")
+    check(tread:SetEnabled(true) == true and tread:IsEnabled() == true, "the tread upgrade turns on")
+    check(tread:SetEnabled(false) == true and tread:IsEnabled() == false, "the tread upgrade turns off")
+
+    ctx.Env.fireclickdetector = nil
+    backend:Destroy()
+    check(base:SetEnabled(true) == false, "a destroyed upgrade refuses to turn on")
+end
+
+-- Auto Upgrade degrades cleanly with no pen: no detector, no crash, a reason.
+do
+    local ctx = saeContext(103076400317371, 10771168447)
+    ctx:MountUI()
+    makeCharacter(ctx)
+    local backend = ctx:Run("src/games/steal-an-exu.lua")
+    local base = backend.Features.UpgradeBase
+
+    local detector, reason = base:Detector()
+    check(detector == nil, "no upgrade detector without a pen")
+    check(type(reason) == "string", "a missing upgrade target records a reason")
+    check(base:Click(nil) == false, "clicking without a detector is a no-op")
 
     backend:Destroy()
 end

@@ -108,9 +108,17 @@ function AutoSteal.terreiros()
     return list
 end
 
-function AutoSteal.new(options)
+function AutoSteal.new(context, options)
     options = options or {}
     local self = setmetatable({}, AutoSteal)
+    -- Contexto compartilhado do backend (helpers de mundo). Se vier um options
+    -- no lugar (compatibilidade), aceita.
+    if type(context) == "table" and context.MyPen then
+        self.Ctx = context
+    else
+        self.Ctx = options
+        options = type(context) == "table" and context or options
+    end
     self.Enabled = false
     self.Thread = nil
     self.Terreiro = options.terreiro or "Terreiro1"
@@ -144,6 +152,11 @@ end
 -- Pen1/Pen2 fixo -- a numeracao muda por servidor -- e funciona para quem
 -- receber o script (UserId de cada um), nao so para mim.
 function AutoSteal:MyPen()
+    -- Se o backend passou o helper compartilhado, usa ele (uma logica so de
+    -- Owner no repo). Senao, cai no fallback local.
+    if self.Ctx and type(self.Ctx.MyPen) == "function" then
+        return self.Ctx.MyPen()
+    end
     local map = mapFolder()
     if not map then return nil end
     local pens = map:FindFirstChild("Pens")
@@ -196,28 +209,31 @@ end
 
 -- O Exu do Runtime mais perto de uma posicao. Os modelos no Runtime sao todos
 -- iguais (mesmo nome), entao a associacao Nest -> Exu e por PROXIMIDADE: chega
--- perto, pega o do Runtime que esta ali. Devolve (model, prompt, position).
+-- perto, pega o do Runtime que esta ali. Devolve (model, prompt, rootPart), onde
+-- rootPart e a BasePart que carrega o prompt -- e pra ONDE se teleporta.
 local function nearestRuntimeExu(position)
     local runtime = Workspace:FindFirstChild("Runtime")
     if not runtime then return nil, nil, nil end
-    local best, bestPrompt, bestPosition, bestDistance = nil, nil, nil, math.huge
+    local best, bestPrompt, bestRoot, bestDistance = nil, nil, nil, math.huge
     for _, model in ipairs(runtime:GetChildren()) do
         local root = model:FindFirstChild("Root")
         local prompt = root and root:FindFirstChild("ProximityPrompt")
         if prompt then
-            local origin
-            if root:IsA("BasePart") then origin = root.Position
-            elseif model:IsA("Model") and model.PrimaryPart then origin = model.PrimaryPart.Position
-            elseif model:IsA("BasePart") then origin = model.Position end
+            -- O ponto de referencia do Exu: o proprio Root se for BasePart, senao
+            -- o PrimaryPart do modelo.
+            local rootPart, origin
+            if root and root:IsA("BasePart") then rootPart, origin = root, root.Position
+            elseif model:IsA("Model") and model.PrimaryPart then rootPart, origin = model.PrimaryPart, model.PrimaryPart.Position
+            elseif model:IsA("BasePart") then rootPart, origin = model, model.Position end
             if origin then
                 local distance = (origin - position).Magnitude
                 if distance < bestDistance then
-                    best, bestPrompt, bestPosition, bestDistance = model, prompt, origin, distance
+                    best, bestPrompt, bestRoot, bestDistance = model, prompt, rootPart, distance
                 end
             end
         end
     end
-    return best, bestPrompt, bestPosition
+    return best, bestPrompt, bestRoot
 end
 
 -- --- Personagem: root, noclip e ancoragem ---------------------------------
@@ -365,14 +381,16 @@ end
 
 -- --- O passo de roubo -----------------------------------------------------
 
--- Um roubo: teleporta pro Exu, espera o prompt ficar no alcance, dispara,
--- espera o "ativou", e volta pra base pra validar. Devolve true se disparou.
--- options.validateWait: quanto esperar na base depois de disparar.
--- options.settleWait:   quanto esperar em cima do Exu depois do teleporte.
--- options.promptTimeout:quanto esperar o Triggered ("ativou").
--- options.wide:         tenta tambem o disparo de longe antes de piscar.
--- options.label:        prefixo do log (ex.: "T9.Nest3").
-function AutoSteal:_stealAt(target, rootPosition, options)
+-- Um roubo. A CORRECAO do bug "nao pega": o Nest NAO fica sempre em cima do Exu
+-- (o log mostrou dist de 14 a 24 studs em alguns Nests, com range 6.5). Entao a
+-- ordem certa e:
+--   1) acha o Exu do Runtime perto do Nest -> pega a POSICAO REAL do Root dele;
+--   2) teleporta pra CIMA do Root (dentro dos 6.5), nao pro Nest;
+--   3) espera o prompt entrar no alcance, dispara, espera o "ativou";
+--   4) volta pra base pra validar.
+-- options.validateWait / settleWait / promptTimeout / label: como antes.
+-- options.wide: tenta tambem o disparo de longe (o toggle ja nao precisa).
+function AutoSteal:_stealAt(nestTarget, rootPosition, options)
     options = options or {}
     local label = options.label or "?"
     local anchor = self:PenAnchor()
@@ -382,64 +400,64 @@ function AutoSteal:_stealAt(target, rootPosition, options)
         return false
     end
 
-    local position = rootPosition or target.Position
+    local position = rootPosition or nestTarget.Position
 
-    -- 1) Teleporta pro Exu.
-    self:TeleportTo(target)
-    debugLog(self, label, "1) teleportou pro Exu")
-    task.wait()
-
-    -- 2) O Exu do Runtime ali -> o prompt dele.
-    local model, prompt = nearestRuntimeExu(position)
-    if not prompt then
-        debugLog(self, label, "2) sem prompt no Runtime perto (sem Exu aqui)")
+    -- 1) Acha o Exu do Runtime perto do Nest e a posicao REAL do Root dele.
+    local model, prompt, rootPart = nearestRuntimeExu(position)
+    if not prompt or not rootPart then
+        debugLog(self, label, "1) sem Exu no Runtime perto do Nest")
         self:TeleportTo(anchor)
         task.wait(options.validateWait or VALIDATE_WAIT)
         return false
     end
 
+    -- 2) Teleporta pra CIMA do Root do Exu (nao pro Nest) -- e o que faz o prompt
+    --    valer de verdade no servidor.
+    self:TeleportTo(rootPart.CFrame)
+    debugLog(self, label, "2) teleportou pro Root do Exu (",
+        rootPart:GetFullName(), ")")
+    task.wait()
+
     local root = self:_root()
-    local rootPos = root and root.Position or position
-    local distance = (prompt.Parent.Position - rootPos).Magnitude
+    local rootPos = root and root.Position or rootPart.Position
+    local distance = (rootPart.Position - rootPos).Magnitude
     local range = prompt.MaxActivationDistance or 10
-    debugLog(self, label, "2) prompt achado; dist=", string.format("%.1f", distance),
+    debugLog(self, label, "3) dist ate o prompt=", string.format("%.1f", distance),
         "range=", tostring(prompt.MaxActivationDistance), "enabled=", tostring(prompt.Enabled))
 
     -- Deixa o prompt assentar (corpo parado no ar em cima do Exu).
     task.wait(options.settleWait or SETTLE_WAIT)
 
     if not promptInRange(prompt, rootPos) then
-        debugLog(self, label, "AVISO: prompt fora do alcance mesmo em cima (dist=",
+        debugLog(self, label, "AVISO: ainda fora do alcance (dist=",
             string.format("%.1f", distance), "range=", tostring(range), ")")
     end
 
     -- Escuta o Triggered ANTES de disparar (o trigger pode ser sincrono).
     local waitTriggered, cleanup = armPromptTrigger(prompt)
 
-    -- 3a) Mais forte: tenta de longe primeiro (instantaneo, sem depender do
-    --     alcance). Se o jogo revalidar no servidor, o disparo no alcance
-    --     abaixo cobre.
+    -- 4a) Mais forte (Steal All): tenta de longe tambem.
     if options.wide then
         local wideOk = firePromptWide(prompt)
-        debugLog(self, label, "3a) disparo de longe ->", tostring(wideOk))
+        debugLog(self, label, "4a) disparo de longe ->", tostring(wideOk))
     end
 
-    -- 3b) Dispara normal, com o personagem em cima do Exu.
+    -- 4b) Dispara normal, com o personagem em cima do Exu.
     local fire = fireproximityprompt
     if type(fire) == "function" then
         local firedOk = pcall(fire, prompt)
-        debugLog(self, label, "3b) fireproximityprompt ->", tostring(firedOk))
+        debugLog(self, label, "4b) fireproximityprompt ->", tostring(firedOk))
     else
-        debugLog(self, label, "3b) fireproximityprompt INDISPONIVEL (executor sem essa funcao?)")
+        debugLog(self, label, "4b) fireproximityprompt INDISPONIVEL (executor sem essa funcao?)")
     end
 
     local didFire = waitTriggered(options.promptTimeout or PROMPT_TIMEOUT)
     cleanup()
-    debugLog(self, label, "3c) Triggered (ativou) ->", tostring(didFire))
+    debugLog(self, label, "5) Triggered (ativou) ->", tostring(didFire))
 
-    -- 4) Volta pra base e espera pra o jogo confirmar o guardar.
+    -- 5) Volta pra base e espera pra o jogo confirmar o guardar.
     self:TeleportTo(anchor)
-    debugLog(self, label, "4) voltou pra base; validando por",
+    debugLog(self, label, "6) voltou pra base; validando por",
         tostring(options.validateWait or VALIDATE_WAIT), "s")
     task.wait(options.validateWait or VALIDATE_WAIT)
 
@@ -513,20 +531,14 @@ function AutoSteal:StealAll()
                 local nest = nests:FindFirstChild("Nest" .. nestIndex)
                 local target = nest and nestPosition(nest)
                 if target then
-                    local _, prompt = nearestRuntimeExu(target.Position)
-                    if prompt then
-                        local ok = self:_stealAt(target, target.Position, {
-                            label = "T" .. terreiroIndex .. ".Nest" .. nestIndex,
-                            validateWait = ALL_VALIDATE_WAIT,
-                            settleWait = ALL_SETTLE_WAIT,
-                            promptTimeout = ALL_PROMPT_TIMEOUT,
-                            wide = true,
-                        })
-                        if ok then stole = stole + 1 else skipped = skipped + 1 end
-                    else
-                        skipped = skipped + 1
-                        debugLog(self, "T" .. terreiroIndex .. ".Nest" .. nestIndex, "sem Exu no Runtime")
-                    end
+                    local ok = self:_stealAt(target, target.Position, {
+                        label = "T" .. terreiroIndex .. ".Nest" .. nestIndex,
+                        validateWait = ALL_VALIDATE_WAIT,
+                        settleWait = ALL_SETTLE_WAIT,
+                        promptTimeout = ALL_PROMPT_TIMEOUT,
+                        wide = true,
+                    })
+                    if ok then stole = stole + 1 else skipped = skipped + 1 end
                     task.wait(ALL_STEP_GAP)
                 end
             end

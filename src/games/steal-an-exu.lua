@@ -121,12 +121,70 @@ function State:Destroy()
     end
 end
 
+local AutoUpgradeModule, autoUpgradeError = loadFeature("src/games/features/stealanexu/autoupgrade.lua", function(module)
+    return type(module.new) == "function"
+end)
+
+-- Contexto COMPARTILHADO das features: os helpers de mundo que as duas usam
+-- (achar a MINHA base pelo Owner, e navegar um caminho dentro dela). Fica aqui,
+-- num lugar so, pra nao duplicar a logica de Owner em cada feature.
+local FeatureContext = {}
+do
+    local Players = game:GetService("Players")
+    local Workspace = game:GetService("Workspace")
+    local LocalPlayer = Players.LocalPlayer
+
+    -- A minha base: varre Map.Pens e compara o atributo Owner com o MEU UserId.
+    -- Nunca Pen1/Pen2 fixo -- a numeracao muda por servidor -- e funciona pra
+    -- quem receber o script, nao so pra mim.
+    function FeatureContext.MyPen()
+        local map = Workspace:FindFirstChild("Map")
+        local pens = map and map:FindFirstChild("Pens")
+        if not pens then return nil end
+        local myUserId = LocalPlayer and LocalPlayer.UserId
+        if not myUserId then return nil end
+        local wanted = tostring(myUserId)
+        for _, pen in ipairs(pens:GetChildren()) do
+            local owner = pen:GetAttribute("Owner")
+            if owner ~= nil and tostring(owner) == wanted then return pen end
+        end
+        return nil
+    end
+
+    -- Navega um caminho pontuado a partir da minha base (ex.:
+    -- "PenSign.Board.ClickDetector"). Devolve a instancia, ou nil.
+    function FeatureContext.PenPart(path)
+        local instance = FeatureContext.MyPen()
+        if not instance then return nil end
+        for segment in tostring(path or ""):gmatch("[^.]+") do
+            instance = instance:FindFirstChild(segment)
+            if not instance then return nil end
+        end
+        return instance
+    end
+end
+
 -- Instancia o Auto Steal Exu (mecanismo pronto; so roda quando o toggle ligar).
 if AutoStealModule then
-    State.AutoSteal = AutoStealModule.new()
+    State.AutoSteal = AutoStealModule.new(FeatureContext)
     State.Features.AutoSteal = State.AutoSteal
 else
     warn("[DepHub] Steal An Exu autosteal unavailable: " .. tostring(autoStealError))
+end
+
+-- Auto Upgrade: duas instancias do MESMO mecanismo (o botao da base e o da
+-- esteira sao o mesmo click), mudando so o caminho dentro do pen.
+if AutoUpgradeModule then
+    State.UpgradeBase = AutoUpgradeModule.new(FeatureContext, {
+        label = "base", path = "PenSign.Board.ClickDetector",
+    })
+    State.UpgradeTread = AutoUpgradeModule.new(FeatureContext, {
+        label = "tread", path = "TreadSign.Board.ClickDetector",
+    })
+    State.Features.UpgradeBase = State.UpgradeBase
+    State.Features.UpgradeTread = State.UpgradeTread
+else
+    warn("[DepHub] Steal An Exu autoupgrade unavailable: " .. tostring(autoUpgradeError))
 end
 
 State:Start()
@@ -140,23 +198,43 @@ State:Start()
 -- ---------------------------------------------------------------------------
 do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
-    local feature = State.AutoSteal
-    if Kit and feature then
+    if Kit then
         local tab = Kit.Tab("Auto Steal", "Farming")
-        local section = Kit.Section(tab, "Auto Steal Exu", "Left")
-        if section then
-            section:CreateToggle("Auto Steal Exu", false, function(value)
-                feature:SetEnabled(value)
-            end)
-            section:CreateDropdown("Terreiro", AutoStealModule.terreiros(), feature.Terreiro, function(choice)
-                feature:SetTerreiro(choice)
-            end)
+
+        local feature = State.AutoSteal
+        if feature then
+            local section = Kit.Section(tab, "Auto Steal Exu", "Left")
+            if section then
+                section:CreateToggle("Auto Steal Exu", false, function(value)
+                    feature:SetEnabled(value)
+                end)
+                section:CreateDropdown("Terreiro", AutoStealModule.terreiros(), feature.Terreiro, function(choice)
+                    feature:SetTerreiro(choice)
+                end)
+            end
+            local allSection = Kit.Section(tab, "Steal All", "Left")
+            if allSection then
+                allSection:CreateButton("Steal All", function()
+                    feature:StartStealAll()
+                end)
+            end
         end
-        local allSection = Kit.Section(tab, "Steal All", "Left")
-        if allSection then
-            allSection:CreateButton("Steal All", function()
-                feature:StartStealAll()
-            end)
+
+        -- Auto Upgrade: um toggle por botao (o da base e o da esteira).
+        if State.UpgradeBase or State.UpgradeTread then
+            local upgradeSection = Kit.Section(tab, "Auto Upgrade", "Left")
+            if upgradeSection then
+                if State.UpgradeBase then
+                    upgradeSection:CreateToggle("Auto Upgrade Base", false, function(value)
+                        State.UpgradeBase:SetEnabled(value)
+                    end)
+                end
+                if State.UpgradeTread then
+                    upgradeSection:CreateToggle("Auto Upgrade Esteira", false, function(value)
+                        State.UpgradeTread:SetEnabled(value)
+                    end)
+                end
+            end
         end
     end
 end
