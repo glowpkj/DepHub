@@ -8,6 +8,7 @@ local pcall = pcall
 local tostring = tostring
 local table = table
 local select = select
+local math = math
 
 local SELL_INTERVAL = 1
 local RETRY_INTERVAL = 1
@@ -124,6 +125,19 @@ function AutoSell:_plazaPart()
     return part
 end
 
+function AutoSell:IsAtPlaza()
+    local part = self:_plazaPart()
+    local player = game:GetService("Players").LocalPlayer
+    local character = player and player.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not part or not root then return false end
+
+    local delta = root.Position - part.Position
+    return math.abs(delta.X) <= part.Size.X / 2 + 6
+        and math.abs(delta.Z) <= part.Size.Z / 2 + 6
+        and math.abs(delta.Y) <= 18
+end
+
 function AutoSell:_teleport()
     local part, reason = self:_plazaPart()
     if not part then return false, reason end
@@ -188,8 +202,11 @@ function AutoSell:_loop(runId)
     end
 
     while self.Enabled and not self.Destroyed and self.RunId == runId and self.AtPlaza do
-        local button, reason = self:Button()
-        if button then
+        if not self:IsAtPlaza() then
+            task.wait(0.2)
+        else
+            local button, reason = self:Button()
+            if button then
             local ok, clickError = self:Click(button)
             if ok then
                 self.ClickCount = self.ClickCount + 1
@@ -199,10 +216,11 @@ function AutoSell:_loop(runId)
                 debugLog(self, "falha no clique:", tostring(clickError))
             end
             task.wait(SELL_INTERVAL)
-        else
-            self.LastError = reason
-            debugLog(self, "aguardando botao:", tostring(reason))
-            task.wait(2)
+            else
+                self.LastError = reason
+                debugLog(self, "aguardando botao:", tostring(reason))
+                task.wait(2)
+            end
         end
     end
 
