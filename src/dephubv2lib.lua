@@ -1587,7 +1587,7 @@ local a2=0
 u(a1.Activated,function()
 if(tick()-a2)<0 then return end
 
-if ar.Parent and not aC then
+if ar.Parent then
 a2=tick()+0.2
 aF(a_)
 end
