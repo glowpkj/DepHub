@@ -129,12 +129,10 @@ do
     check(ctx.State.__DEPHUB.StealAnExu ~= nil, "universe id exposes the Steal An Exu backend")
 end
 
-print("SAE_TEST: entry")
 -- The entry loads, registers the features, and mounts the controls.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     local ui = ctx:MountUI()
-    print("SAE_TEST: entry UI mounted")
 
     local map = Instance.new("Folder"); map.Name = "Map"; map.Parent = ctx.Services.Workspace
     local terreiros = Instance.new("Folder"); terreiros.Name = "Terreiros"; terreiros.Parent = map
@@ -142,10 +140,8 @@ do
         local terreiro = Instance.new("Folder"); terreiro.Name = name; terreiro.Parent = terreiros
         local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
     end
-    print("SAE_TEST: entry map ready")
 
     local backend = ctx:Run("src/games/steal-an-exu.lua")
-    print("SAE_TEST: entry backend returned")
     check(type(backend) == "table" and backend.Destroyed == false, "Steal An Exu entry returns a live backend")
     check(backend.Started == true, "the backend starts itself")
     check(type(backend.Features.AutoSteal) == "nil", "the unfiltered Auto Steal feature is removed")
@@ -156,7 +152,6 @@ do
     check(type(backend.Store) == "table", "the shared config store is loaded")
     check(ctx.State.__DEPHUB.StealAnExu == backend, "the backend publishes itself")
 
-    print("SAE_TEST: entry features passed")
     local labels = {}
     for _, control in ipairs(ui.Library._Controls) do
         if control.Label ~= nil then labels[control.Label] = control end
@@ -191,7 +186,6 @@ do
         "the panel has the Save Config button")
     check(labels["Load Config"] ~= nil and labels["Load Config"].Kind == "button",
         "the panel has the Load Config button")
-    print("SAE_TEST: entry UI assertions passed")
 
     -- Auto Upgrade: one toggle per board (base, tread), each a live feature.
     check(type(backend.Features.UpgradeBase) == "table", "the Auto Upgrade Base feature is registered")
@@ -228,9 +222,6 @@ do
     backend.AutoHop:SetEnabled(false)
     backend.AutoSell:SetEnabled(false)
     local loaded = backend:LoadConfig()
-    print("SAE_LOAD DEBUG", "applied", loaded and table.concat(loaded.applied, ","), "failed", loaded and table.concat(loaded.failed, ","))
-    print("SAE_LOAD DEBUG", "config", backend.Config.selectedTerreiros and table.concat(backend.Config.selectedTerreiros, ","))
-    print("SAE_LOAD DEBUG", "feature", table.concat(backend.AutoStealSelection:SelectedTerreiros(), ","))
     check(loaded and #loaded.failed == 0, "Load Config reapplies all saved controls without failures")
     check(backend.AutoStealSelection.Terreiros.Terreiro1 == true
         and backend.AutoStealSelection.Terreiros.Terreiro4 == true,
@@ -255,11 +246,10 @@ do
     check(ctx.State.__DEPHUB.StealAnExu == nil, "destroy clears the published state")
 end
 
-print("SAE_TEST: general selection behavior")
 -- Auto Steal Exu: the loop collects the Runtime exus and, per exu, opens the
 -- prompt (MaxActivationDistance=1000, HoldDuration=0, RequiresLineOfSight=false),
 -- teleports onto the Root + 3 studs, fires InputHoldBegin/End, and returns to the
--- original position. Driven one step at a time (_step) because the harness does not
+-- player's base or Plaza according to Auto Sell. Driven one step at a time (_step) because the harness does not
 -- run the infinite loop.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -319,7 +309,6 @@ do
     check(feature:SetEnabled(true) == false, "a destroyed steal refuses to turn on")
 end
 
-print("SAE_TEST: stale recovery")
 -- The stale-recovery step: when the loop's current target is gone, it re-collects
 -- the Runtime so an exu that SPAWNED after the list was built is picked up -- the
 -- "as vezes nao pega o prompt" fix. The refresh is the very code the loop runs, so
@@ -354,8 +343,7 @@ do
     backend:Destroy()
 end
 
-print("SAE_TEST: selected mapping and steal")
--- Selected Terreiro mode maps each Nest to its nearest unique Runtime Exu.
+-- Selected Terreiro mode maps every Runtime Exu to its nearest Nest.
 do
     local ctx = saeContext(103076400317371, 10771168447)
     ctx:MountUI()
@@ -448,7 +436,6 @@ do
     backend:Destroy()
 end
 
-print("SAE_TEST: missing Runtime")
 -- Auto Steal Exu degrades cleanly when the world is missing: no Runtime, no crash,
 -- a reason.
 do
@@ -465,7 +452,6 @@ do
     backend:Destroy()
 end
 
-print("SAE_TEST: Auto Hop")
 -- Auto Hop waits for Runtime to exist and counts only actual Exus carrying
 -- Root.ProximityPrompt; an empty Runtime returns zero without starting a hop.
 do
@@ -523,7 +509,6 @@ do
     backend:Destroy()
 end
 
-print("SAE_TEST: Auto Place")
 -- Auto Place only sends tools mapped to selected source Terreiros.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -578,7 +563,6 @@ do
     backend:Destroy()
 end
 
-print("SAE_TEST: upgrades")
 -- Auto Upgrade: each toggle clicks the ClickDetector of MY pen (found by Owner,
 -- never Pen1), on its own board. Driven directly because the harness does not run
 -- spawned threads.
@@ -625,7 +609,6 @@ do
     check(base:SetEnabled(true) == false, "a destroyed upgrade refuses to turn on")
 end
 
-print("SAE_TEST: missing upgrade target")
 -- Auto Upgrade degrades cleanly with no pen: no detector, no crash, a reason.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -642,7 +625,6 @@ do
     backend:Destroy()
 end
 
-print("SAE_TEST: manual teleports")
 -- Manual teleport buttons resolve the player's pen by Owner and the sell Plaza by path.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -668,7 +650,6 @@ do
     backend:Destroy()
 end
 
-print("SAE_TEST: Auto Sell")
 -- Auto Sell: use the exact local GUI path and run as a toggle.
 do
     local ctx = saeContext(103076400317371, 10771168447)
@@ -744,7 +725,6 @@ do
     backend:Destroy()
 end
 
-print("SAE_TEST: missing Auto Sell GUI")
 -- Auto Sell degrades cleanly with no PlayerGui: no button, no crash, a reason.
 do
     local ctx = saeContext(103076400317371, 10771168447)
