@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-02T22:55:57.324507+00:00",
-  "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
-  "version": "0.1.67",
+  "generatedAt": "2026-11-02T22:56:58.868781+00:00",
+  "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
+  "version": "0.1.68",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "36516f9d7b1d3c5cefc37717bc1331f5711390d643cbf9397b7ea77f4e689778",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "8c380fa75265ce824a9038ed003c15f86b18785bd8337c79883d42178f629145",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "8b9bf2bd9b5a0f461d608d2e2dd0beb72cea813751a28b96eca3f855896912b1",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "e60f8d6281a68b424c2af41f9df65aff659fe1f1b033965a621f32fe733ddb15",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,8 +57,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "33494006a8bc98d4abbd05b2cce666c4bd8c0b821c1ef55c261f14db2f36f999",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "66b72309f0197efb8e5d0a513fc3ea8f2c73912d69f1dcbb1a83d4756ebc69a3",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -78,8 +78,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "06c602be49109ef1b02426eee3e430a19c0f990d324016b82c272c494230d1d7",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "f64f32783f28f4a31610f9c9a6a4c39df35944ca81c24580e4d714bdcb17cc18",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -100,8 +100,8 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "a83ad8e95d7d265f3a4bc67fc64f0b8dfa77acdf9a7192126159f1f4c1b58a7d",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "47a7f542083c70caa41ac2e8ad4ef0a1c0f0186233d96cfc0b93d5610c3c61fb",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -118,8 +118,8 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "b614b86e94fb13515c0633dc3580b92bf65870ff3ad17c46e86b57e1e6dd72f2",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "53dacabdb90bc681ab09feb87cc0b6ed2b4ff1e3d24b3d90755a885c72adae53",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -136,8 +136,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "5e670398ab8c4463a2e6b593ff86f68e81cef5b1bd7222078aac21676fe8009f",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "36d74ebe8568e0ca72625ea205dd71dca9169451d9e0dc4a148bca519678d3c7",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -163,8 +163,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "bfba64685649af4cfb939bfe191fd219b1c1dd32470276ec45f06847ef0d7722",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "39ac575c8a07cd26494fd6f1995457173151c777fac0db138e6cd8e694f48f00",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -190,8 +190,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "e1ab1afa91a376c54a2f2574303a9cca95ec6b2e32a9ce7a2053f8a5bae0b160",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "ba94f310080d177ecc75a6bad4f249cc30b730e060229d9e286dec893ca9c5bd",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -220,8 +220,8 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "7dbd0e7f625e7c726ce58831c1f3d4c6efb928d98f660258cf0dfada35a8a44b",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "dae413a36b44b7c49193c22ddb4bb43ecba99b849ac09f60468aafe16f6ed35f",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -238,8 +238,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "409c8348fbb8575c352c362051c35f475d7eaeb56b77d28adea8c7cc210ee0a6",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "d76b3657d217097a1a1117c52965b54a63c540b0c81db999fff76636937b4b32",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -261,8 +261,8 @@
     },
     "103076400317371": {
       "name": "Steal An Exu",
-      "version": "885744582cfa7a26cd6b5d90086565a136755471c797ac78f809383729b56824",
-      "commit": "443cf5dd8ce1816c56d6f9d0e99a857e88f5d028",
+      "version": "f85e75ca478572dc597e1125fab5293e6b3af5bd801dcc2487eeeda953d42fb0",
+      "commit": "47086aba92653fdbd6a20c1b4840938eb985f07b",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -286,38 +286,38 @@
   },
   "recentUpdates": [
     {
+      "Version": "47086ab",
+      "Date": "2026-11-02T19:56:50-03:00",
+      "Changes": [
+        "Document Auto Place diagnostics, faster Steal and robust Auto Hop in 0.1.68"
+      ]
+    },
+    {
+      "Version": "e63d7ec",
+      "Date": "2026-11-02T19:56:47-03:00",
+      "Changes": [
+        "Bump loader version to 0.1.68"
+      ]
+    },
+    {
+      "Version": "ab2c8a7",
+      "Date": "2026-11-02T19:56:44-03:00",
+      "Changes": [
+        "Bump DepHub to 0.1.68"
+      ]
+    },
+    {
+      "Version": "cbbc530",
+      "Date": "2026-11-02T19:56:42-03:00",
+      "Changes": [
+        "Set Steal An Exu backend version to 0.1.68"
+      ]
+    },
+    {
       "Version": "443cf5d",
       "Date": "2026-11-02T19:55:49-03:00",
       "Changes": [
         "Remove obsolete synchronous source confirmation delay"
-      ]
-    },
-    {
-      "Version": "63fa322",
-      "Date": "2026-11-02T19:55:32-03:00",
-      "Changes": [
-        "Debounce Exu source config writes in the background"
-      ]
-    },
-    {
-      "Version": "e7727ab",
-      "Date": "2026-11-02T19:55:22-03:00",
-      "Changes": [
-        "Move Exu source discovery to a background queue so Steal never waits for inventory replication"
-      ]
-    },
-    {
-      "Version": "a7096a5",
-      "Date": "2026-11-02T19:53:38-03:00",
-      "Changes": [
-        "Expose Auto Hop activity to pause Auto Sell clicks during teleport"
-      ]
-    },
-    {
-      "Version": "62b3dc1",
-      "Date": "2026-11-02T19:53:23-03:00",
-      "Changes": [
-        "Pause Auto Sell button spam while Auto Hop is teleporting"
       ]
     }
   ]
