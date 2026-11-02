@@ -72,6 +72,7 @@ function AutoHop.new(options)
         SawExu = false,
         NextAttempt = 0,
         PendingServerId = nil,
+        HopStartedAt = nil,
         LastError = nil,
         LastStatus = "idle",
         DebugLog = {},
@@ -90,6 +91,7 @@ function AutoHop.new(options)
             end
 
             self.PendingServerId = nil
+            self.HopStartedAt = nil
             self.Hopping = false
             self.LastError = tostring(message or result or "teleporte recusado")
             self.LastStatus = "teleport failed"
@@ -204,6 +206,7 @@ end
 function AutoHop:Hop()
     if self.Destroyed or self.Hopping then return false end
     self.Hopping = true
+    self.HopStartedAt = os.clock()
     self.LastStatus = "searching server"
     log(self, "Runtime vazio; procurando servidor publico.")
 
@@ -215,6 +218,7 @@ function AutoHop:Hop()
     end
     if #candidates == 0 then
         self.Hopping = false
+        self.HopStartedAt = nil
         self.LastError = reason or "nenhum servidor novo com vagas encontrado"
         self.LastStatus = "waiting for server"
         self.NextAttempt = os.clock() + RETRY_INTERVAL
@@ -239,6 +243,7 @@ function AutoHop:Hop()
     if not ok then
         if type(visited) == "table" then visited[selected.id] = nil end
         self.PendingServerId = nil
+        self.HopStartedAt = nil
         self.Hopping = false
         self.LastError = tostring(err)
         self.LastStatus = "teleport failed"
@@ -261,6 +266,18 @@ function AutoHop:_loop(runId)
             self.EmptySince = nil
             self.LastStatus = "waiting for Runtime"
             self.LastError = reason
+        elseif self.Hopping and self.HopStartedAt and os.clock() - self.HopStartedAt >= 30 then
+            local visited = env.__DEPHUB_STEALANEXU_VISITED_SERVERS
+            if type(visited) == "table" and self.PendingServerId then
+                visited[self.PendingServerId] = nil
+            end
+            self.PendingServerId = nil
+            self.HopStartedAt = nil
+            self.Hopping = false
+            self.NextAttempt = os.clock() + RETRY_INTERVAL
+            self.LastStatus = "teleport timeout"
+            self.LastError = "o teleporte nao iniciou; tentando outro servidor"
+            log(self, self.LastError)
         elseif count > 0 then
             if self.EmptySince ~= nil then
                 log(self, count, "Exus detectados; monitor de vazio reiniciado.")
@@ -279,7 +296,7 @@ function AutoHop:_loop(runId)
                 self.LastStatus = "Runtime empty; confirming"
                 log(self, "nenhum Exu no Runtime; confirmando antes de trocar.")
             elseif os.clock() - self.EmptySince >= self.EmptyGrace and os.clock() >= self.NextAttempt then
-                if self:Hop() then break end
+                self:Hop()
             end
         end
 
