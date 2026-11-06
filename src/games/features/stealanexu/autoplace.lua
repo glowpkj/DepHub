@@ -1,6 +1,7 @@
 local game = game
 local task = task
 local type = type
+local typeof = typeof or function(value) return type(value) end
 local tostring = tostring
 local tonumber = tonumber
 local pcall = pcall
@@ -78,6 +79,38 @@ local function instanceName(instance)
     if ok and value then return value end
     local okName, name = pcall(function() return instance.Name end)
     return okName and tostring(name) or tostring(instance)
+end
+
+local function penCoordinates(value, depth)
+    if value == nil or (depth or 0) > 3 then return nil, nil, "nil" end
+    local valueType = typeof(value)
+
+    if valueType == "Vector3" then
+        return tonumber(value.X), tonumber(value.Z), valueType
+    elseif valueType == "Vector2" then
+        return tonumber(value.X), tonumber(value.Y), valueType
+    elseif valueType == "CFrame" then
+        local position = value.Position
+        return tonumber(position.X), tonumber(position.Z), valueType
+    end
+
+    if type(value) == "table" then
+        local nested = value.Position or value.position or value.CFrame or value.cframe
+            or value.Center or value.center or value.Origin or value.origin
+        if nested ~= nil then
+            local x, z, nestedType = penCoordinates(nested, (depth or 0) + 1)
+            if x ~= nil and z ~= nil then
+                return x, z, valueType .. "." .. nestedType
+            end
+        end
+
+        local x = tonumber(value.X or value.x or value[1])
+        local z = tonumber(value.Z or value.z or value[3])
+        if z == nil then z = tonumber(value.Y or value.y or value[2]) end
+        return x, z, valueType
+    end
+
+    return nil, nil, valueType
 end
 
 function AutoPlace.new(ctx, options)
@@ -237,7 +270,7 @@ function AutoPlace:_setup()
     local penConfig = configModule.Pens[index]
         or configModule.Pens[tostring(index)]
         or configModule.Pens[tonumber(index)]
-    if type(penConfig) ~= "table" then
+    if penConfig == nil then
         local available = {}
         for key in pairs(configModule.Pens) do available[#available + 1] = tostring(key) end
         table.sort(available)
@@ -245,11 +278,10 @@ function AutoPlace:_setup()
     end
 
     local penSize = tonumber(configModule.PEN_SIZE)
-    local x = tonumber(penConfig.X)
-    local z = tonumber(penConfig.Z)
-    if not penSize or not x or not z then
+    local x, z, penFormat = penCoordinates(penConfig)
+    if not penSize or x == nil or z == nil then
         return nil, "config da base invalida: PEN_SIZE=" .. tostring(configModule.PEN_SIZE)
-            .. " X=" .. tostring(penConfig.X) .. " Z=" .. tostring(penConfig.Z)
+            .. " formato=" .. tostring(penFormat) .. " X=" .. tostring(x) .. " Z=" .. tostring(z)
     end
 
     local remote = self.Remote
@@ -266,7 +298,7 @@ function AutoPlace:_setup()
     end
 
     self.Pen = pen
-    self.Config = {X = x, Z = z, Half = penSize / 2 - 3, PenSize = penSize, Index = index}
+    self.Config = {X = x, Z = z, Half = penSize / 2 - 3, PenSize = penSize, Index = index, Format = penFormat}
     self.Remote = remote
 
     local signature = table.concat({
@@ -275,7 +307,7 @@ function AutoPlace:_setup()
     }, "|")
     if signature ~= self.LastSetupError then
         log(self, "setup OK; base =", instanceName(pen), "| origem =", penSource,
-            "| Index =", index, "| centro =", x .. "," .. z, "| PEN_SIZE =", penSize,
+            "| Index =", index, "| centro =", x .. "," .. z, "| formato =", penFormat, "| PEN_SIZE =", penSize,
             "| remote =", instanceName(remote))
         self.LastSetupError = signature
     end
@@ -431,7 +463,8 @@ function AutoPlace:Diagnose()
     log(self, "Setup =", setup and "OK" or "FALHOU", "| motivo =", setupReason or "nenhum")
     if self.Pen then
         log(self, "base =", instanceName(self.Pen), "| Index =", self.Config and self.Config.Index,
-            "| centro =", self.Config and (tostring(self.Config.X) .. "," .. tostring(self.Config.Z)))
+            "| centro =", self.Config and (tostring(self.Config.X) .. "," .. tostring(self.Config.Z)),
+            "| formato =", self.Config and self.Config.Format)
     end
     if self.Remote then log(self, "remote =", instanceName(self.Remote)) end
     log(self, "Backpack =", self.LastInventoryStats.backpackFound,

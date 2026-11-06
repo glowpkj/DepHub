@@ -459,6 +459,7 @@ do
     ctx:MountUI()
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local feature = backend.Features.AutoHop
+    check(feature.EmptyGrace == 0, "Auto Hop starts the server search immediately after selected Terreiros empty")
 
     local count, reason = feature:RuntimeCount()
     check(count == nil and type(reason) == "string", "Auto Hop waits when Runtime has not spawned")
@@ -469,6 +470,10 @@ do
     local nests = Instance.new("Folder"); nests.Name = "Nests"; nests.Parent = terreiro
     local nest = Instance.new("Part"); nest.Name = "Nest1"; nest.Parent = nests
     nest.CFrame = CFrame.new(100, 0, 0)
+    local otherTerreiro = Instance.new("Folder"); otherTerreiro.Name = "Terreiro2"; otherTerreiro.Parent = terreiros
+    local otherNests = Instance.new("Folder"); otherNests.Name = "Nests"; otherNests.Parent = otherTerreiro
+    local otherNest = Instance.new("Part"); otherNest.Name = "Nest1"; otherNest.Parent = otherNests
+    otherNest.CFrame = CFrame.new(10000, 0, 0)
     backend.AutoStealSelection:SetTerreiros({"Terreiro1"})
 
     local runtime = Instance.new("Folder"); runtime.Name = "Runtime"; runtime.Parent = ctx.Services.Workspace
@@ -482,9 +487,15 @@ do
     count = feature:RuntimeCount()
     check(count == 1, "Auto Hop counts only the selected Terreiro Exus")
 
+    local otherExu = Instance.new("Model"); otherExu.Name = "UnselectedExu"; otherExu.Parent = runtime
+    local otherRoot = Instance.new("Part"); otherRoot.Name = "Root"; otherRoot.Parent = otherExu
+    otherRoot.CFrame = CFrame.new(10000, 0, 0)
+    local otherPrompt = Instance.new("ProximityPrompt"); otherPrompt.Name = "ProximityPrompt"; otherPrompt.Parent = otherRoot
+    count = feature:RuntimeCount()
+    check(count == 1, "Auto Hop ignores Exus belonging to unselected Terreiros")
     prompt:Destroy()
     count = feature:RuntimeCount()
-    check(count == 0, "Auto Hop sees that the Runtime Exu prompt has disappeared")
+    check(count == 0, "Auto Hop sees that the selected Terreiro is empty even while unselected Exus remain")
 
     feature._serverCandidates = function()
         return {{id = "next-public-server", playing = 2, maxPlayers = 8}}
@@ -530,7 +541,7 @@ do
     local backend = ctx:Run("src/games/steal-an-exu.lua")
     local feature = backend.Features.AutoPlace
     local remote = Instance.new("RemoteEvent")
-    feature.ConfigModule = {PEN_SIZE = 64, Pens = {[4] = {X = 100, Z = 200}}}
+    feature.ConfigModule = {PEN_SIZE = 64, Pens = {[4] = Vector3.new(100, 0, 200)}}
     feature.Remote = remote
     feature:SetTerreiros({"Terreiro1"})
 

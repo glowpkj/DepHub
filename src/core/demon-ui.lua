@@ -34,18 +34,16 @@ DemonUI.__index = DemonUI
 -- Window options shared by every game so the interface is identical everywhere.
 -- Changing anything here changes it for all games at once.
 --
--- Size is a compact {width, height} in pixels. RedzLib reads the starting window
--- size from `Library.Default.UISize` (a UDim2) -- it does NOT take a Size option
--- in MakeWindow -- and clamps it to width 430..1000, height 200..500. The adapter
--- writes the UDim2 there before building the window, so 600x420 is applied for
--- real instead of being declared and dropped (which is what the old adapter did).
+-- Size is a large fixed pixel size. RedzLib reads the starting window size from
+-- Library.Default.UISize (a UDim2), not from MakeWindow options. The UI keeps a
+-- native 1:1 scale and enforces a large minimum size so old saved settings cannot
+-- reopen the panel as a tiny window.
 local WINDOW_OPTIONS = {
     Title = "DepHub",
     SubTitle = "DepHub",
-    Size = { 600, 420 },
-    -- The global open/close key. RedzLib has no key toggle of its own, so the
-    -- adapter binds this: N by default, rebindable per run through `options`.
-    ToggleKey = Enum.KeyCode.N
+    Size = { 900, 500 },
+    -- The global open/close key is bound by the adapter and can be overridden per run.
+    ToggleKey = Enum.KeyCode.B
 }
 
 -- The one category every game has. Backends that want more (the Blox Fruits
@@ -404,11 +402,8 @@ function DemonUI.new(options)
     options = options or {}
     local library = loadLibrary()
 
-    -- Apply the compact window size through RedzLib's real API: MakeWindow takes
-    -- its starting size from `Library.Default.UISize`, which is a UDim2 (offset).
-    -- A `Size` argument to MakeWindow is ignored, so writing the UDim2 here is
-    -- what actually resizes the panel. RedzLib clamps it to width 430..1000,
-    -- height 200..500. Accept {w, h} pixels from options or the default.
+    -- MakeWindow ignores a Size option; set the default UDim2 before constructing
+    -- the window. The library clamps this to 850..1000 by 480..500 pixels.
     local size = options.Size or WINDOW_OPTIONS.Size
     if type(size) == "table" and type(size[1]) == "number" and type(size[2]) == "number"
         and type(library.Default) == "table" then
@@ -458,41 +453,30 @@ function DemonUI.new(options)
     end
     env.__DEPHUB_TOGGLE = self.ToggleCallback
 
-    -- Open/close key (N by default), bound through the LIBRARY'S OWN toggle: the
-    -- RedzLib window exposes NewMinimizer(keyCode), which connects the key and
-    -- calls the window Minimize() (it flips the main frame's Visible). The shell
-    -- used to hand-roll a UserInputService.InputBegan just for this; using the
-    -- library's own path keeps the behaviour identical to the library's.
+    -- Ignore the executor's gameProcessed flag. A focused TextBox is the only
+    -- case where typing B should not toggle the interface.
     self.ToggleKey = options.ToggleKey or WINDOW_OPTIONS.ToggleKey
     do
-        local minimizer = nil
-        local ok, result = pcall(function()
-            if type(window.NewMinimizer) == "function" then
-                return window:NewMinimizer(self.ToggleKey)
-            end
-            return nil
-        end)
-        if ok and result ~= nil then
-            minimizer = result
-        else
-            -- Fallback: only if the library ever drops NewMinimizer. Same shape as
-            -- before (a non-game-processed keyboard press flips the window).
-            local okService, input = pcall(function() return game:GetService("UserInputService") end)
-            if okService and input then
-                local okConnect, connection = pcall(function()
-                    return input.InputBegan:Connect(function(io, gameProcessed)
-                        if gameProcessed then return end
-                        if self.Destroyed then return end
-                        if io.UserInputType ~= Enum.UserInputType.Keyboard then return end
-                        if io.KeyCode == self.ToggleKey then
-                            pcall(function() self.Library:Toggle() end)
+        local okService, input = pcall(function() return game:GetService("UserInputService") end)
+        if okService and input then
+            local okConnect, connection = pcall(function()
+                return input.InputBegan:Connect(function(io)
+                    if self.Destroyed then return end
+                    if io.UserInputType ~= Enum.UserInputType.Keyboard then return end
+                    if io.KeyCode ~= self.ToggleKey then return end
+
+                    local focused = nil
+                    pcall(function()
+                        if type(input.GetFocusedTextBox) == "function" then
+                            focused = input:GetFocusedTextBox()
                         end
                     end)
+                    if focused then return end
+                    pcall(function() self.Library:Toggle() end)
                 end)
-                if okConnect and connection then self._toggleKeyConnection = connection end
-            end
+            end)
+            if okConnect and connection then self._toggleKeyConnection = connection end
         end
-        self._minimizer = minimizer
     end
 
     return self

@@ -71,7 +71,7 @@ if ConfigStoreModule then
 end
 
 local State = {
-    Version = "0.1.69",
+    Version = "0.1.70",
     Destroyed = false,
     Started = false,
     Features = {},
@@ -628,6 +628,7 @@ if AutoHopModule then
                 return #FeatureContext.InventoryExuIds()
             end
             if State.AutoPlace and State.AutoPlace:IsEnabled() then
+                if State.AutoPlace.LastStatus == "setup error" then return 0 end
                 return State.AutoPlace:PendingCount()
             end
             return 0

@@ -16,9 +16,9 @@ local TeleportService = game:GetService("TeleportService")
 local LocalPlayer = Players.LocalPlayer
 local env = type(getgenv) == "function" and getgenv() or _G
 
-local POLL_INTERVAL = 2
-local EMPTY_GRACE = 15
-local RETRY_INTERVAL = 10
+local POLL_INTERVAL = 0.25
+local EMPTY_GRACE = 0
+local RETRY_INTERVAL = 2
 local MAX_PAGES = 5
 local SERVER_LIMIT = 100
 local MAX_CANDIDATES = 10
@@ -249,6 +249,7 @@ function AutoHop:_serverCandidates()
             end
         end
 
+        if #candidates >= MAX_CANDIDATES then break end
         cursor = data.nextPageCursor
         if type(cursor) ~= "string" or cursor == "" then break end
     end
@@ -417,9 +418,10 @@ function AutoHop:_loop(runId)
         else
             if self.EmptySince == nil then
                 self.EmptySince = os.clock()
-                self.LastStatus = "Runtime empty; confirming"
-                log(self, "nenhum Exu no Runtime; confirmando antes de trocar.")
-            elseif os.clock() - self.EmptySince >= self.EmptyGrace and os.clock() >= self.NextAttempt then
+                self.LastStatus = "Runtime empty; hopping"
+                log(self, "nenhum Exu nos terreiros selecionados; iniciando troca imediatamente.")
+            end
+            if os.clock() - self.EmptySince >= self.EmptyGrace and os.clock() >= self.NextAttempt then
                 self:Hop()
             end
         end

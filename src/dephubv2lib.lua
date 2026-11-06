@@ -159,7 +159,7 @@ GitHubOwner="tlredz"
 },
 Default={
 Theme="Darker",
-UISize=UDim2.fromOffset(550,380),
+UISize=UDim2.fromOffset(900,500),
 TabSize=160
 },
 
@@ -179,15 +179,9 @@ Library.Save=Library.Default
 -- Signal connection helper, theme path reader, theme value/collection appliers,
 -- and the wrapped file writer used to persist flags.
 -- ===========================================================================
--- DepHub: a escala da UI. O redz original usa ViewportSize.Y/450, ou seja a
--- janela CRESCE em telas grandes (numa tela 1080p a escala passa de 2.2x e o
--- painel de 600x420 vira 1356x949 -- enorme). Aqui a escala e relativa a uma
--- altura de referencia (900), presa ao intervalo [0.75, 1.25]: numa tela 1080p a
--- escala fica ~1.13x e o painel aparece perto do tamanho declarado, sem encher a
--- tela. A referencia e fixa de proposito -- a janela deve ter o MESMO tamanho em
--- qualquer tela, em vez de crescer com a resolucao.
-local ViewportSize=workspace.CurrentCamera.ViewportSize
-local SCALE_DIVISOR=900
+-- DepHub: a escala da UI e fixa em 1:1. As dimensoes em pixels permanecem
+-- iguais entre resolucoes, sem encolher em telas menores ou crescer em telas maiores.
+-- Pixel sizing is independent of the camera viewport.
 local u=function(
 
 u, v, w)
@@ -603,10 +597,7 @@ return O:sub(1,#P)==P end local P=function(
 
 
 P)
--- A escala final: ViewportSize.Y / SCALE_DIVISOR, presa a [0.75, 1.25] para nao
--- ficar minuscula nem gigante em telas extremas. Numa tela 1080p (~1017 de
--- altura util) da ~1.13x -- o painel de 600x420 aparece com ~678x474 na tela.
-return(math.clamp((ViewportSize and ViewportSize.Y or SCALE_DIVISOR)/SCALE_DIVISOR,0.75,1.25))*P end local Q=function(
+return P end local Q=function(
 
 
 Q)
@@ -4057,8 +4048,8 @@ local ak,al=unpack(af.UISize)
 
 if type(ak)=="number"and type(al)=="number"then
 local am=I.AbsoluteSize
-ak=math.clamp(ak,430,1000)
-al=math.clamp(al,200,500)
+ak=math.clamp(ak,850,1000)
+al=math.clamp(al,480,500)
 ah=UDim2.fromOffset(ak,al)
 end
 end
@@ -4243,7 +4234,7 @@ af.TabSize=az.X.Offset
 end)
 
 InstanceFactory.Draggable(aw,ad,0.68,function(az,aA,aB,aC)
-return UDim2.fromOffset(math.clamp(aA,430,1000),math.clamp(aC,200,500))
+return UDim2.fromOffset(math.clamp(aA,850,1000),math.clamp(aC,480,500))
 end)
 
 InstanceFactory.Draggable(ax,ad,0.68,function(aA,aB)
