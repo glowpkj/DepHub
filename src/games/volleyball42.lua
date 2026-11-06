@@ -44,9 +44,8 @@ if not Actions then
     warn("[DepHub] Volleyball actions unavailable: " .. tostring(actionsError))
 end
 
--- Carrega o modulo de Jump Anywhere + impulso (um unico recurso, um unico
--- toggle). Nao bloquear o load se falhar: sem ele o backend sobe e o toggle
--- reporta indisponivel.
+-- Carrega o modulo de Jump Anywhere (um unico recurso, um unico toggle).
+-- Nao bloquear o load se falhar: sem ele o backend sobe e o toggle reporta indisponivel.
 local function loadFeature(relativePath, validate)
     local cacheBust = tostring((env.__DEPHUB or {}).SourceCacheBust or "")
     local okGet, source = pcall(function()
@@ -122,17 +121,11 @@ function State:Start()
     return true
 end
 
--- === JUMP ANYWHERE (bypass + impulso) ===
+-- === JUMP ANYWHERE ===
 
--- Uma unica chave liga as duas partes: o bypass (pular em qualquer lugar) e o
--- impulso (acelerar o pulo). O slider so muda a intensidade do impulso; com 0%
--- fica so o bypass, com o pulo original.
---
--- Devolve true quando o IMPULSO ficou ligado -- ele nao depende do jogo. O
--- bypass e um extra: se nao puder ser aplicado (executor sem
--- debug.getupvalue/setupvalue, ou o modulo do jogo ausente), o impulso continua
--- valendo e o segundo retorno traz "bypass:<motivo>" para a UI avisar SEM dizer
--- que a feature inteira esta indisponivel. Nunca derruba o backend.
+-- O modulo reaplica JumpPower, JumpHeight e os estados de pulo a cada frame,
+-- neutralizando zonas que zeram esses valores ou desabilitam o estado Jumping.
+-- O estado original do Humanoid e restaurado ao desligar, respawn ou unload.
 function State:SetJumpEnabled(enabled)
     if self.Destroyed then return false end
     local wanted = enabled == true
@@ -176,7 +169,7 @@ function State:SetCharacterDirectionEnabled(enabled)
     return true
 end
 
--- Impulso em % (0-150). Grava sempre; o efeito so vale com o toggle ligado.
+-- Jump Power (50-500). Grava sempre; o efeito so vale com o toggle ligado.
 function State:SetJumpPower(value)
     if self.Destroyed then return false end
     local numeric = tonumber(value)
@@ -190,7 +183,7 @@ function State:Destroy()
     if self.Destroyed then return end
     self.Destroyed = true
 
-    -- Desliga o recurso de pulo (restaura o upvalue original do jogo e desconecta).
+    -- Desliga o recurso de pulo e restaura os valores/estados originais do Humanoid.
     if self.Jump then
         pcall(self.Jump.Stop, self.Jump)
         self.Jump = nil
@@ -245,10 +238,6 @@ do
                 if not ok then
                     State.LastError = tostring(err)
                     warn("[DepHub] Jump Anywhere unavailable: " .. tostring(err))
-                elseif err then
-                    -- O impulso esta ativo; so o bypass do jogo nao entrou.
-                    State.LastError = tostring(err)
-                    warn("[DepHub] Jump Anywhere: impulse on, jump bypass unavailable (" .. tostring(err) .. ")")
                 end
             end)
             section:CreateSlider("Jump Power", 50, 500, State.JumpPower, function(value)
