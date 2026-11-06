@@ -1,3 +1,4 @@
+0.1.71 | Volleyball 4.2: restore Jump Anywhere using the proven per-frame Humanoid bypass. The feature re-applies JumpPower, JumpHeight and jump states through no-jump zones, the slider now controls Jump Power (50-500), and original values/states are restored on disable, respawn and unload.
 0.1.58 | Volleyball 4.2: add ESP Character Direction in Visual. Each opponent gets a distinct bright beam while jumping, capped at 50 studs; transparent and non-collidable surfaces are skipped, and disabling/unloading removes all visuals.
 0.1.57 | Blox Fruits: Auto random fruit now flies to the fruit-gacha NPC first and only rolls after arriving near it. The NPC is found at runtime on any sea, with no hardcoded path.
 0.1.56 | Blox Fruits: new Fast attack feature (Combat). Same auto-swing as Blade hits but with a longer gap between hits (0.30s) and hits players too. Only one of Blade hits / Fast attack runs at a time.
