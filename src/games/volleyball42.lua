@@ -77,7 +77,7 @@ if not CharacterDirection then
 end
 
 local State = {
-    Version = "0.3.0",
+    Version = "0.3.1",
     Destroyed = false,
     Started = false,
     Actions = Actions,
@@ -86,10 +86,10 @@ local State = {
     ServeTask = nil,
     LastAnimation = nil,
     LastError = nil,
-    -- Um unico recurso ligado a um unico toggle: jump bypass + impulso.
+    -- Um unico recurso ligado a um unico toggle: bypass de zona + Jump Power.
     Jump = nil,
     JumpEnabled = false,
-    JumpImpulse = 25,
+    JumpPower = 120,
     CharacterDirection = nil,
     CharacterDirectionEnabled = false,
 }
@@ -140,7 +140,7 @@ function State:SetJumpEnabled(enabled)
     if wanted then
         if not self.Jump then return false, "unavailable:feature" end
         if not self.JumpEnabled then
-            self.Jump:SetImpulse(self.JumpImpulse)
+            self.Jump:SetPower(self.JumpPower)
             local bypassOk, bypassErr = self.Jump:Start()
             self.JumpEnabled = true
             if bypassOk ~= true then return true, "bypass:" .. tostring(bypassErr or "indisponivel") end
@@ -177,11 +177,12 @@ function State:SetCharacterDirectionEnabled(enabled)
 end
 
 -- Impulso em % (0-150). Grava sempre; o efeito so vale com o toggle ligado.
-function State:SetJumpImpulse(percent)
+function State:SetJumpPower(value)
     if self.Destroyed then return false end
-    local value = math.clamp(math.floor((tonumber(percent) or 0) + 0.5), 0, 150)
-    self.JumpImpulse = value
-    if self.Jump and self.JumpEnabled then self.Jump:SetImpulse(value) end
+    local numeric = tonumber(value)
+    if not numeric then return false end
+    self.JumpPower = math.clamp(math.floor(numeric + 0.5), 50, 500)
+    if self.Jump then self.Jump:SetPower(self.JumpPower) end
     return true
 end
 
@@ -228,8 +229,8 @@ State:Start()
 
 -- ---------------------------------------------------------------------------
 -- Apresentacao: uma aba Movement com uma secao e UM recurso. O toggle "Jump
--- Anywhere" liga o bypass + impulso juntos; o slider define a intensidade do
--- impulso. Cada um na sua linha: um SLIDER nao pode entrar num HStack estreito
+-- Anywhere" reaplica o estado de pulo a cada frame; o slider define o Jump Power.
+-- Cada um na sua linha: um SLIDER nao pode entrar num HStack estreito
 -- (os internos dele sao ancorados a direita com offsets fixos, entao em meia
 -- largura o label colapsa e os botoes -/+ vazam pra fora da borda).
 -- ---------------------------------------------------------------------------
@@ -250,8 +251,8 @@ do
                     warn("[DepHub] Jump Anywhere: impulse on, jump bypass unavailable (" .. tostring(err) .. ")")
                 end
             end)
-            section:CreateSlider("Impulse", 0, 150, State.JumpImpulse, function(value)
-                State:SetJumpImpulse(value)
+            section:CreateSlider("Jump Power", 50, 500, State.JumpPower, function(value)
+                State:SetJumpPower(value)
             end)
         end
     end
