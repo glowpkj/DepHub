@@ -374,10 +374,10 @@ do
     check(names["Combat"] == true, "a aba Combat e criada para a blade hit")
     check(names["Farm"] == true, "a aba Farm e criada para a fruta")
 
-    -- O tamanho compacto (600x420) foi APLICADO na criacao da janela: a shell
+    -- O tamanho grande (900x500) foi APLICADO na criacao da janela: a shell
     -- escreve o UDim2 em Library.Default.UISize, que e o que o RedzLib le.
     local applied = ui.Library.Default and ui.Library.Default.UISize
-    check(applied and applied.X.Offset == 600 and applied.Y.Offset == 420, "o painel abre em 600x420 de verdade")
+    check(applied and applied.X.Offset == 900 and applied.Y.Offset == 500, "o painel abre em 900x500 de verdade")
 
     -- A aba de fruta NAO tem mais os sliders de distancia nem campos de texto:
     -- as listas agora sao dropdowns de selecao multipla.
