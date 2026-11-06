@@ -711,9 +711,24 @@ do
         check(type(ui) == "table", "the adapter builds a shell")
         check(ui:CreateCategory("Farm", "sprout") == true, "the shell creates a category")
 
-        -- The compact size is written where the real library reads it.
+        -- The fixed large size is written where the real library reads it.
         local appliedSize = ui.Library.Default and ui.Library.Default.UISize
-        check(appliedSize and appliedSize.X.Offset == 600 and appliedSize.Y.Offset == 420, "the shell applies the 600x420 size")
+        check(appliedSize and appliedSize.X.Offset == 900 and appliedSize.Y.Offset == 500, "the shell applies the 900x500 size")
+
+        local mainFrame = ui.Window:GetElements().MainFrame
+        local inputService = renderServices.UserInputService
+        local visibleBefore = mainFrame.Visible
+        inputService.InputBegan:Fire({
+            KeyCode = renderEnum.KeyCode.B,
+            UserInputType = renderEnum.UserInputType.Keyboard
+        }, true)
+        check(mainFrame.Visible ~= visibleBefore, "tecla B alterna o painel mesmo quando o executor marca a entrada como processada")
+        local visibleAfter = mainFrame.Visible
+        inputService.InputBegan:Fire({
+            KeyCode = renderEnum.KeyCode.N,
+            UserInputType = renderEnum.UserInputType.Keyboard
+        }, false)
+        check(mainFrame.Visible == visibleAfter, "tecla antiga N nao alterna o painel")
 
         local shellTab = ui:CreateTab("Auto Farm", "Farm", "sprout")
         check(type(shellTab) == "table", "the shell creates a tab with a named icon")
