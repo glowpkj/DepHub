@@ -209,6 +209,10 @@ Library.Save=Library.Default
 -- iguais entre resolucoes, sem encolher em telas menores ou crescer em telas maiores.
 -- Pixel sizing is independent of the camera viewport.
 local u=function(signal,callback,method,scope)
+if scope==nil and typeof(method)=="Instance" then
+scope=method
+method=nil
+end
 local connection=signal[method or "Connect"](signal,callback)
 table.insert(Library.Connections,connection)
 if scope and typeof(scope)=="Instance" then
