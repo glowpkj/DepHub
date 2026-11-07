@@ -266,6 +266,10 @@ y(Library.CurrentTheme,C,D)
 end
 end
 
+function v:remove(instance)
+self.Descendants[instance]=nil
+end
+
 function v:update()
 if self.IS_RENDERING and not self.UPDATED_OBJECTS then
 local C=Library.CurrentTheme
@@ -1732,13 +1736,17 @@ aI=...
 end,
 SetThemeGroup=function(group)
 if dropdownThemeGroup~=group then
-for instance in pairs(aB) do
-pcall(instance.Destroy,instance)
-end
-table.clear(aB)
 if aG then
-for _,option in ipairs(aG) do option.Instance=nil end
+for _,option in ipairs(aG) do
+if option.Instance then
+if dropdownThemeGroup then dropdownThemeGroup:remove(option.Instance) end
+pcall(option.Instance.Destroy,option.Instance)
+option.Instance=nil
 end
+end
+end
+for instance in pairs(aB) do pcall(instance.Destroy,instance) end
+table.clear(aB)
 dropdownThemeGroup=group
 end
 end
@@ -2856,7 +2864,9 @@ table.remove(aR,a7)
 end
 
 if a6.Instance then
+aD:remove(a6.Instance)
 a6.Instance:Destroy()
+a6.Instance=nil
 end
 
 aS[a6.Name]=nil end local a7=function(
@@ -2950,7 +2960,9 @@ aL.CLEAR_DROPDOWN=function()
 for a8=#aR,1,-1 do
 local a9=aR[a8]
 if a9.Instance then
+aD:remove(a9.Instance)
 a9.Instance:Destroy()
+a9.Instance=nil
 end
 
 -- DepHub: limpar tambem a SELECAO da opcao removida. O conjunto da selecao
@@ -3127,6 +3139,10 @@ end
 function ai:Destroy()
 assert(typeof(self.DESTROY_ELEMENT)=="Instance",`"Option.Destroy". cannot destroy this option {self.KIND}:{self.Title}`)
 
+local parentGroup=self.Parent and V[self.Parent]
+if parentGroup and type(parentGroup.remove)=="function" then
+parentGroup:remove(self.DESTROY_ELEMENT)
+end
 self.DESTROY_ELEMENT:Destroy()
 setmetatable(self,nil)
 
@@ -3677,6 +3693,7 @@ Corner=UDim.new(0,9),
 Gradient={
 Rotation=45,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 Color="Colors.Background"
 }
 }
@@ -3830,11 +3847,7 @@ aH.Text=Q(countdown)
 lastCountdown=countdown
 end
 progressFill.Size=UDim2.new(math.clamp(az/totalDuration,0,1),0,1,0)
-if aI==true then
-aM:Wait()
-else
 az-=task.wait(0.05)
-end
 end
 
 aL:Close()end
