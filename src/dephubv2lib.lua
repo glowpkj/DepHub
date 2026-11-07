@@ -1214,6 +1214,12 @@ Childs={aq,at}
 }
 })
 
+if am._CurrentSection then
+local section=am._CurrentSection
+section.Items[#section.Items+1]=av
+if section.Collapsed then av.Visible=false end
+end
+
 local aw=av.Holder local ax=function(
 
 ax, ay)
@@ -1887,42 +1893,82 @@ end
 -- AddDropdown / AddKeybind / AddColorPicker / AddDiscordInvite and the option
 -- prototype methods (SetValue / Set / AddCallback / Destroy / ...).
 -- ===========================================================================
-function ah:AddSection(av)
+function ah:AddSection(av,options)
+if type(av)=="table" then
+options=av
+av=options.Title or options.Name or ""
+end
 assert(av==nil or type(av)=="string",`"Tab.AddSection[param 1]". 'string', or 'nil' expected, got {typeof(av)}`)
-av=av or""
-
-local aw=V[self]
-
-local ax=createInstance("Frame","Option",T[self].Container,{
-Size=UDim2.new(1,0,0,20),
-BackgroundTransparency=1
+assert(options==nil or type(options)=="table" or type(options)=="boolean",`"Tab.AddSection[param 2]". 'table', 'boolean', or 'nil' expected, got {typeof(options)}`)
+av=av or ""
+local collapsible=options==true or (type(options)=="table" and options.Collapsible==true)
+local group=V[self]
+local header=createInstance("TextButton","Option",T[self].Container,{
+Size=UDim2.new(1,0,0,24),
+BackgroundTransparency=1,
+AutoButtonColor=false,
+Active=collapsible,
+Text="",
+Elements={Corner=UDim.new(0,5)}
 })
-
-local ay=createInstance("TextLabel",ax,{
+local titleLabel=createInstance("TextLabel","Title",header,{
 TextXAlignment=Enum.TextXAlignment.Left,
 TextTruncate=Enum.TextTruncate.AtEnd,
-Size=UDim2.new(1,-25,1,0),
-Position=UDim2.new(0,5),
+Size=UDim2.new(1,-28,1,0),
+Position=UDim2.fromOffset(5,0),
 BackgroundTransparency=1,
-TextSize=17,
+TextSize=15,
 Text=av,
-ThemeTag={
-OBJECTS=aw,
-TextColor3="Colors.Text.Default",
-Font="Font.Bold"
-}
+ThemeTag={OBJECTS=group,TextColor3="Colors.Text.Default",Font="Font.Bold"}
 })
-
-return setmetatable({
+local indicator
+if collapsible then
+indicator=createInstance("TextLabel","Indicator",header,{
+Size=UDim2.fromOffset(20,20),
+Position=UDim2.new(1,-5,0.5,0),
+AnchorPoint=Vector2.new(1,0.5),
+BackgroundTransparency=1,
+Text="−",
+TextSize=15,
+ThemeTag={OBJECTS=group,TextColor3="Colors.Text.Darker",Font="Font.Bold"}
+})
+end
+local section={Items={},Collapsed=false,Collapsible=collapsible,Header=header,Indicator=indicator,Title=av}
+self._CurrentSection=section
+self._Sections=self._Sections or {}
+self._Sections[#self._Sections+1]=section
+local handle=setmetatable({
 Title=av,
-
-DESTROY_ELEMENT=ax,
-VISIBLE_ELEMENT=ax,
-TITLE_LABEL=ay,
-
+DESTROY_ELEMENT=header,
+VISIBLE_ELEMENT=header,
+TITLE_LABEL=titleLabel,
+Section=section,
 Kind="Section",
 Parent=self
 },ai)
+function handle:SetCollapsed(collapsed)
+assert(type(collapsed)=="boolean",`"Section.SetCollapsed". 'boolean' expected, got {typeof(collapsed)}`)
+assert(section.Collapsible,`"Section.SetCollapsed". this section is not collapsible`)
+section.Collapsed=collapsed
+for index=#section.Items,1,-1 do
+local item=section.Items[index]
+if item and item.Parent then
+item.Visible=not collapsed
+else
+table.remove(section.Items,index)
+end
+end
+if section.Indicator then section.Indicator.Text=collapsed and "+" or "−" end
+return self
+end
+if collapsible then
+u(header.Activated,function()
+handle:SetCollapsed(not section.Collapsed)
+end,nil,header)
+u(header.MouseEnter,function() header.BackgroundTransparency=0.9 end,nil,header)
+u(header.MouseLeave,function() header.BackgroundTransparency=1 end,nil,header)
+end
+return handle
 end
 
 function ah:AddToggle(av)
@@ -2465,6 +2511,10 @@ local aF=createInstance("Frame","Option",aE,{
 BackgroundTransparency=1,
 Size=UDim2.new(1,0,0,148)
 })
+if self._CurrentSection then
+self._CurrentSection.Items[#self._CurrentSection.Items+1]=aF
+if self._CurrentSection.Collapsed then aF.Visible=false end
+end
 
 local aG=createInstance("CanvasGroup",aF,{
 Size=UDim2.new(0,178,1,-15),
@@ -2848,6 +2898,10 @@ BorderSizePixel=0,
 BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke")
 })
 group:add(line,{BackgroundColor3="Colors.Stroke"})
+if self._CurrentSection then
+self._CurrentSection.Items[#self._CurrentSection.Items+1]=line
+if self._CurrentSection.Collapsed then line.Visible=false end
+end
 return setmetatable({
 DESTROY_ELEMENT=line,
 VISIBLE_ELEMENT=line,
