@@ -4664,7 +4664,7 @@ pcall(group.destroy,group)
 end
 table.clear(C.Descendants)
 C.UPDATED_OBJECTS=false
-self.LOADED_UI_LIBRARY=false
+self.LOADED_UI_LIBRARY=true
 self._Destroying=false
 end
 
