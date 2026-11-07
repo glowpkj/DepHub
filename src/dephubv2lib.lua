@@ -1891,6 +1891,7 @@ end
 function ak.ColorPicker:SetEnabled(enabled)
 assert(type(enabled)=="boolean",`"ColorPicker.SetEnabled". 'boolean' expected, got {typeof(enabled)}`)
 self.Enabled=enabled
+if self.DESTROY_ELEMENT then self.DESTROY_ELEMENT.Active=enabled end
 if self.COLOR_INPUT then self.COLOR_INPUT.TextEditable=enabled self.COLOR_INPUT.Active=enabled end
 return self
 end
@@ -2230,6 +2231,7 @@ ThemeTag=aJ
 if az~=nil then
 aI.Text=az
 end
+if ay~=nil then ae[ay]=aI.Text end
 
 if aC~=nil then
 aI.ClearTextOnFocus=aC
