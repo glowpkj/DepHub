@@ -712,6 +712,8 @@ ak.Dropdown=ap
 
 local aq=al()
 ak.Keybind=aq
+local colorPickerPrototype=al()
+ak.ColorPicker=colorPickerPrototype
 
 local ar=al()
 ak.Dialog=ar local as=function()
@@ -1767,6 +1769,39 @@ end
 
 return typeof(au)=="EnumItem"and aq[au]end
 
+function ak.Keybind:SetKeyCode(keyCode)
+assert(au(keyCode),`"Keybind.SetKeyCode". 'KeyCode' expected, got {typeof(keyCode)}`)
+self.KeyCode=keyCode
+if self.KEY_BUTTON then self.KEY_BUTTON.Text=keyCode.Name end
+if self.Flag then ae[self.Flag]=keyCode.Name end
+return self
+end
+
+function ak.Keybind:SetEnabled(enabled)
+assert(type(enabled)=="boolean",`"Keybind.SetEnabled". 'boolean' expected, got {typeof(enabled)}`)
+self.Enabled=enabled
+if self.KEY_BUTTON then self.KEY_BUTTON.Active=enabled end
+return self
+end
+
+function ak.ColorPicker:SetColor(color)
+assert(typeof(color)=="Color3",`"ColorPicker.SetColor". 'Color3' expected, got {typeof(color)}`)
+self.Value=color
+local hex=string.format("%02X%02X%02X",math.round(color.R*255),math.round(color.G*255),math.round(color.B*255))
+if self.COLOR_INPUT then self.COLOR_INPUT.Text="#"..hex end
+if self.COLOR_SWATCH then self.COLOR_SWATCH.BackgroundColor3=color end
+if self.Flag then ae[self.Flag]=hex end
+G(self.CALLBACKS,color)
+return self
+end
+
+function ak.ColorPicker:SetEnabled(enabled)
+assert(type(enabled)=="boolean",`"ColorPicker.SetEnabled". 'boolean' expected, got {typeof(enabled)}`)
+self.Enabled=enabled
+if self.COLOR_INPUT then self.COLOR_INPUT.TextEditable=enabled self.COLOR_INPUT.Active=enabled end
+return self
+end
+
 
 function ah:GetNoSelfCall(av)
 assert(type(av)=="string",`"Tab.GetNoSelfCall". 'string' expected, got {typeof(av)}`)
@@ -1960,6 +1995,7 @@ Image="Icons.Button"
 local aF=0
 
 u(aB.Activated,function()
+if aB:GetAttribute("Loading") then return end
 if az~=nil and(tick()-aF)<0 then return end
 
 if az~=nil then
@@ -1969,7 +2005,7 @@ end
 G(ay)
 end)
 
-return setmetatable({
+local buttonHandle=setmetatable({
 CALLBACKS=ay,
 DESTROY_ELEMENT=aB,
 VISIBLE_ELEMENT=aB,
@@ -1980,8 +2016,10 @@ Title=aw,
 Description=ax,
 
 Parent=self,
-Kind="Button"
+Kind="Button",
+LoadingIcon=aE
 },ai)
+return buttonHandle
 end
 
 function ah:AddTextBox(av)
@@ -2062,7 +2100,15 @@ if aB~=nil then
 aI.PlaceholderText=aB
 end
 
-local aL=ak.TextBox.new(self,aF,aG,aE,aI,aA)local aM=function(
+local errorStroke=createInstance("UIStroke",aH,{
+Color=w(Library.CurrentTheme,"Colors.Error"),
+Transparency=1,
+Thickness=1.2,
+ThemeTag={OBJECTS=aD,Color="Colors.Error"}
+})
+local aL=ak.TextBox.new(self,aF,aG,aE,aI,aA)
+aL.ERROR_STROKE=errorStroke
+local aM=function(
 
 aM)
 aJ.ImageColor3=aM
@@ -2590,6 +2636,202 @@ TITLE_LABEL=aK,
 Kind="DiscordInvite",
 Parent=self
 },ai)
+end
+
+function ah:AddKeybind(av)
+local title,description=an("Keybind",av)
+local flag=ao("Keybind",av[4]or av.Flag)
+local default=av[2]or av.KeyCode or av.Default or Enum.KeyCode.Unknown
+local callbacks=F(av[3]or av.Callback)
+if type(default)=="string" then default=Enum.KeyCode[default] end
+if not au(default) then error(`"Tab.AddKeybind.KeyCode". 'KeyCode' expected, got {typeof(default)}`,2) end
+if flag and type(ae[flag])=="string" and Enum.KeyCode[ae[flag]] then default=Enum.KeyCode[ae[flag]] end
+local group=V[self]
+local row,titleLabel,descriptionLabel=am(self,title,description,UDim2.new(1,-105,0,0))
+local keyButton=createInstance("TextButton",row,{
+Size=UDim2.fromOffset(92,22),
+Position=UDim2.new(1,-10,0.5,0),
+AnchorPoint=Vector2.new(1,0.5),
+AutoButtonColor=false,
+Text=default.Name,
+TextSize=10,
+TextTruncate=Enum.TextTruncate.AtEnd,
+ThemeTag={OBJECTS=group,BackgroundColor3="Colors.Stroke",TextColor3="Colors.Text.Default",Font="Font.Bold"},
+Elements={Corner=UDim.new(0,5)}
+})
+local handle=setmetatable({
+CALLBACKS=callbacks,
+DESTROY_ELEMENT=row,
+VISIBLE_ELEMENT=row,
+TITLE_LABEL=titleLabel,
+DESCRIPTION_LABEL=descriptionLabel,
+KEY_BUTTON=keyButton,
+KeyCode=default,
+Flag=flag,
+Enabled=true,
+Title=title,
+Description=description,
+Parent=self,
+Kind="Keybind"
+},ak.Keybind)
+if flag then ae[flag]=default.Name end
+u(keyButton.Activated,function()
+if handle.Enabled==false then return end
+handle.Capturing=true
+keyButton.Text="Press a key..."
+end,nil,keyButton)
+u(UserInputService.InputBegan,function(input,processed)
+if input.UserInputType~=Enum.UserInputType.Keyboard then return end
+if handle.Capturing then
+if input.KeyCode==Enum.KeyCode.Escape then
+handle.Capturing=false
+keyButton.Text=handle.KeyCode.Name
+return
+end
+handle:SetKeyCode(input.KeyCode)
+handle.Capturing=false
+return
+end
+if processed or handle.Enabled==false then return end
+if UserInputService:GetFocusedTextBox() then return end
+if input.KeyCode==handle.KeyCode and handle.KeyCode~=Enum.KeyCode.Unknown then G(callbacks) end
+end,nil,keyButton)
+return handle
+end
+
+function ah:AddColorPicker(av)
+local title,description=an("ColorPicker",av)
+local flag=ao("ColorPicker",av[4]or av.Flag)
+local default=av[2]or av.Default or Color3.new(1,1,1)
+local callbacks=F(av[3]or av.Callback)
+if type(default)=="string" then
+local hex=default:gsub("^#","")
+if #hex==6 and tonumber(hex,16) then
+default=Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16))
+else
+default=Color3.new(1,1,1)
+end
+end
+if flag and type(ae[flag])=="string" then
+local hex=ae[flag]:gsub("^#","")
+if #hex==6 and tonumber(hex,16) then
+default=Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16))
+end
+end
+assert(typeof(default)=="Color3",`"Tab.AddColorPicker.Default". 'Color3' or hex string expected, got {typeof(default)}`,2)
+local group=V[self]
+local row,titleLabel,descriptionLabel=am(self,title,description,UDim2.new(1,-125,0,0))
+local swatch=createInstance("Frame",row,{
+Size=UDim2.fromOffset(22,22),
+Position=UDim2.new(1,-10,0.5,0),
+AnchorPoint=Vector2.new(1,0.5),
+BackgroundColor3=default,
+Elements={Corner=UDim.new(0,5),Stroke={ThemeTag={OBJECTS=group,Color="Colors.Stroke"}}}
+})
+local input=createInstance("TextBox",row,{
+Size=UDim2.fromOffset(82,22),
+Position=UDim2.new(1,-39,0.5,0),
+AnchorPoint=Vector2.new(1,0.5),
+BackgroundTransparency=1,
+Text="#"..string.format("%02X%02X%02X",math.round(default.R*255),math.round(default.G*255),math.round(default.B*255)),
+PlaceholderText="#RRGGBB",
+TextSize=10,
+ClearTextOnFocus=false,
+TextColor3=w(Library.CurrentTheme,"Colors.Text.Default")
+})
+local handle=setmetatable({
+CALLBACKS=callbacks,
+DESTROY_ELEMENT=row,
+VISIBLE_ELEMENT=row,
+TITLE_LABEL=titleLabel,
+DESCRIPTION_LABEL=descriptionLabel,
+COLOR_INPUT=input,
+COLOR_SWATCH=swatch,
+Value=default,
+Flag=flag,
+Title=title,
+Description=description,
+Parent=self,
+Kind="ColorPicker"
+},ak.ColorPicker)
+if flag then ae[flag]=input.Text:gsub("^#","") end
+u(input.FocusLost,function()
+local hex=input.Text:gsub("^#","")
+if #hex~=6 or not tonumber(hex,16) then
+handle.HasError=true
+input.Text="#"..string.format("%02X%02X%02X",math.round(handle.Value.R*255),math.round(handle.Value.G*255),math.round(handle.Value.B*255))
+return
+end
+handle.HasError=false
+handle:SetColor(Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16)))
+end,nil,input)
+return handle
+end
+
+function ah:AddLabel(text)
+assert(type(text)=="string",`"Tab.AddLabel". 'string' expected, got {typeof(text)}`,2)
+return self:AddParagraph(text,"")
+end
+
+function ah:AddDivider()
+local group=V[self]
+local line=createInstance("Frame",T[self].Container,{
+Size=UDim2.new(1,-4,0,1),
+BorderSizePixel=0,
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke")
+})
+group:add(line,{BackgroundColor3="Colors.Stroke"})
+return setmetatable({
+DESTROY_ELEMENT=line,
+VISIBLE_ELEMENT=line,
+Parent=self,
+Kind="Divider"
+},ai)
+end
+
+function ah:AddProgressBar(av)
+local title,description=an("ProgressBar",av)
+local group=V[self]
+local row,titleLabel,descriptionLabel=am(self,title,description,UDim2.new(1,0,0,0))
+local track=createInstance("Frame",row,{
+Size=UDim2.new(1,-20,0,5),
+Position=UDim2.new(0,10,1,-8),
+AnchorPoint=Vector2.new(0,1),
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke"),
+ThemeTag={OBJECTS=group,BackgroundColor3="Colors.Stroke"},
+Elements={Corner=UDim.new(0.5,0)}
+})
+local fill=createInstance("Frame",track,{
+Size=UDim2.fromScale(0,1),
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Primary"),
+ThemeTag={OBJECTS=group,BackgroundColor3="Colors.Primary"},
+Elements={Corner=UDim.new(0.5,0)}
+})
+local handle=setmetatable({
+DESTROY_ELEMENT=row,
+VISIBLE_ELEMENT=row,
+TITLE_LABEL=titleLabel,
+DESCRIPTION_LABEL=descriptionLabel,
+FILL=fill,
+TRACK=track,
+Value=0,
+Parent=self,
+Kind="ProgressBar"
+},ai)
+function handle:SetValue(value)
+assert(type(value)=="number",`"ProgressBar.SetValue". 'number' expected, got {typeof(value)}`,2)
+self.Value=math.clamp(value,0,100)
+self.FILL.Size=UDim2.fromScale(self.Value/100,1)
+return self
+end
+handle.Set=handle.SetValue
+local originalDestroy=ai.Destroy
+handle.Destroy=function(option)
+group:remove(fill)
+group:remove(track)
+return originalDestroy(option)
+end
+return handle
 end
 
 function ah:AddParagraph(av,aw)
@@ -3136,9 +3378,69 @@ end
 return self
 end
 
+function ai:SetLoading(loading)
+assert(type(loading)=="boolean",`"Option.SetLoading". 'boolean' expected, got {typeof(loading)}`)
+assert(self.Kind=="Button",`"Option.SetLoading" is only available for Button options`)
+self.Loading=loading
+local element=self.DESTROY_ELEMENT
+if typeof(element)=="Instance" then element:SetAttribute("Loading",loading) element.Active=not loading and self.Enabled~=false end
+if self.LoadingTween then self.LoadingTween:Cancel() self.LoadingTween=nil end
+if self.LoadingIcon then
+if loading then
+self.LoadingTween=TweenService:Create(self.LoadingIcon,TweenInfo.new(0.8,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut,-1),{Rotation=360})
+self.LoadingTween:Play()
+else
+self.LoadingIcon.Rotation=0
+end
+end
+return self
+end
+
+function ai:SetError(hasError)
+assert(type(hasError)=="boolean",`"Option.SetError". 'boolean' expected, got {typeof(hasError)}`)
+if self.ERROR_STROKE then
+self.ERROR_STROKE.Color=w(Library.CurrentTheme,"Colors.Error")
+self.ERROR_STROKE.Transparency=hasError and 0 or 1
+end
+self.HasError=hasError
+return self
+end
+
+function ai:SetTooltip(text)
+assert(text==nil or type(text)=="string",`"Option.SetTooltip". 'string', or 'nil' expected, got {typeof(text)}`)
+if self.TOOLTIP then self.TOOLTIP:Destroy() self.TOOLTIP=nil end
+if not text or text=="" then return self end
+local target=self.VISIBLE_ELEMENT or self.DESTROY_ELEMENT
+if typeof(target)~="Instance" then return self end
+local tooltip=createInstance("TextLabel",I,{
+Visible=false,
+ZIndex=2000,
+AutomaticSize=Enum.AutomaticSize.XY,
+Size=UDim2.fromOffset(0,0),
+BackgroundColor3=Color3.fromRGB(20,20,20),
+TextColor3=Color3.new(1,1,1),
+TextSize=11,
+TextWrapped=true,
+Text=text,
+Position=UDim2.fromOffset(0,0),
+Elements={Corner=UDim.new(0,5),Padding={PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)}}
+})
+self.TOOLTIP=tooltip
+u(target.MouseEnter,function() tooltip.Visible=true end,nil,target)
+u(target.MouseLeave,function() tooltip.Visible=false end,nil,target)
+u(UserInputService.InputChanged,function(input)
+if tooltip.Visible and input.UserInputType==Enum.UserInputType.MouseMovement then
+local position=UserInputService:GetMouseLocation()-GuiService:GetGuiInset()
+tooltip.Position=UDim2.fromOffset(position.X+12,position.Y+12)
+end
+end,nil,target)
+return self
+end
+
 function ai:Destroy()
 assert(typeof(self.DESTROY_ELEMENT)=="Instance",`"Option.Destroy". cannot destroy this option {self.KIND}:{self.Title}`)
-
+if self.LoadingTween then self.LoadingTween:Cancel() self.LoadingTween=nil end
+if self.TOOLTIP then self.TOOLTIP:Destroy() self.TOOLTIP=nil end
 local parentGroup=self.Parent and V[self.Parent]
 if parentGroup and type(parentGroup.remove)=="function" then
 parentGroup:remove(self.DESTROY_ELEMENT)
