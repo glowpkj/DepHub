@@ -1934,9 +1934,13 @@ ThemeTag={OBJECTS=group,TextColor3="Colors.Text.Darker",Font="Font.Bold"}
 })
 end
 local section={Items={},Collapsed=false,Collapsible=collapsible,Header=header,Indicator=indicator,Title=av}
+if collapsible then
 self._CurrentSection=section
 self._Sections=self._Sections or {}
 self._Sections[#self._Sections+1]=section
+else
+self._CurrentSection=nil
+end
 local handle=setmetatable({
 Title=av,
 DESTROY_ELEMENT=header,
