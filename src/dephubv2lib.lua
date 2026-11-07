@@ -1712,13 +1712,13 @@ SEARCH_RESULT_COUNT=a5
 as.Size=UDim2.fromOffset(ap,aN(a5))end
 
 
-u(ab:GetPropertyChangedSignal"Visible",aV)
-u(ab:GetPropertyChangedSignal"Size",aV)
-u(ar.MouseButton1Down,aV)
-u(ar.Activated,aV)
+u(ab:GetPropertyChangedSignal"Visible",aV,nil,ar)
+u(ab:GetPropertyChangedSignal"Size",aV,nil,ar)
+u(ar.MouseButton1Down,aV,nil,ar)
+u(ar.Activated,aV,nil,ar)
 
-u(at.Activated,aS)
-u(aw:GetPropertyChangedSignal"Text",a1)
+u(at.Activated,aS,nil,at)
+u(aw:GetPropertyChangedSignal"Text",a1,nil,aw)
 
 return table.freeze{
 CreateOptionTemplate=a_,
@@ -2003,7 +2003,7 @@ aF=tick()+az
 end
 
 G(ay)
-end)
+end,nil,aB)
 
 local buttonHandle=setmetatable({
 CALLBACKS=ay,
@@ -2118,12 +2118,12 @@ J(aK,"ImageColor3",w(Library.CurrentTheme,aM),0.5):Play()end
 if ay~=nil then
 u(aI:GetPropertyChangedSignal"Text",function()
 ae[ay]=aI.Text
-end)
+end,nil,aI)
 end
 
 u(aI.Focused,function()
 aM"Colors.Primary"
-end)
+end,nil,aI)
 
 u(aI.FocusLost,function()
 aM"Colors.Icons"
@@ -2137,11 +2137,11 @@ end
 end
 
 G(aA,aI.Text)
-end)
+end,nil,aI)
 
 u(aE.Activated,function()
 aI:CaptureFocus()
-end)
+end,nil,aE)
 
 return aL
 end
@@ -2608,7 +2608,7 @@ warn("DepHub: clipboard is unavailable in this executor")
 end
 task.wait(4)
 aO.Text=aQ
-end)
+end,nil,aO)
 
 if type(az)=="string"then
 aH.ScaleType=Enum.ScaleType.Crop
@@ -3258,7 +3258,7 @@ end
 
 u(aE.Activated,function()
 a1(not aO)
-end)
+end,nil,aE)
 
 return aL
 end
@@ -3480,7 +3480,7 @@ aw:SetAttribute("DragMoved",false)
 return
 end
 ag:Minimize()
-end)
+end,nil,aw)
 
 av.Elements={}
 
@@ -3635,7 +3635,7 @@ table.insert(S,ay)
 
 u(aC.Activated,function()
 ay:Select()
-end)
+end,nil,aC)
 
 if ay.Selected then
 ay:Select()
@@ -3881,7 +3881,7 @@ if az or ay.UserInputType~=Enum.UserInputType.Keyboard then return end
 if ay.KeyCode==ax.KeyCode then
 ag:Minimize()
 end
-end)
+end,nil,ab)
 
 return ax
 end
@@ -4639,7 +4639,7 @@ end)
 u(I:GetAttributeChangedSignal"UID",function()
 self:Destroy()
 ak:Destroy()
-end)
+end,nil,I)
 
 InstanceFactory.Draggable(ak,ad,0.5)
 
@@ -4783,7 +4783,7 @@ ay(aw)
 local az=aw.Position
 ak.Size=az
 af.UISize={az.X.Offset,az.Y.Offset}
-end)
+end,nil,aw)
 
 u(ax:GetPropertyChangedSignal"Position",function()
 ay(ax)
@@ -4791,7 +4791,7 @@ local az=ax.Position
 at.Size=UDim2.new(0,az.X.Offset,1,-an.Size.Y.Offset)
 au.Size=UDim2.new(1,-at.Size.X.Offset,1,-an.Size.Y.Offset)
 af.TabSize=az.X.Offset
-end)
+end,nil,ax)
 
 InstanceFactory.Draggable(aw,ad,0.68,function(az,aA,aB,aC)
 return UDim2.fromOffset(math.clamp(aA,850,1000),math.clamp(aC,480,500))
@@ -4815,11 +4815,11 @@ Title="No"
 }
 }
 
-u(aq.MouseEnter,function()aq.BackgroundTransparency=0.65 end)
-u(aq.MouseLeave,function()aq.BackgroundTransparency=1.00 end)
+u(aq.MouseEnter,function()aq.BackgroundTransparency=0.65 end,nil,aq)
+u(aq.MouseLeave,function()aq.BackgroundTransparency=1.00 end,nil,aq)
 
-u(ar.MouseEnter,function()ar.BackgroundTransparency=0.65 end)
-u(ar.MouseLeave,function()ar.BackgroundTransparency=1.00 end)
+u(ar.MouseEnter,function()ar.BackgroundTransparency=0.65 end,nil,ar)
+u(ar.MouseLeave,function()ar.BackgroundTransparency=1.00 end,nil,ar)
 
 as.SetUIScale=self.SetUIScale
 as.SUBTITLE_LABEL=ao.SubTitle
@@ -4841,11 +4841,11 @@ Flags=ag
 
 u(aq.Activated,function()
 as:MinimizeButton()
-end)
+end,nil,aq)
 
 u(ar.Activated,function()
 as:Dialog(aA)
-end)
+end,nil,ar)
 
 return as
 end
