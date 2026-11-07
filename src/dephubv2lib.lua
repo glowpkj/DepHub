@@ -30,7 +30,7 @@
 --   lib:GetIconByName(name) / lib:SetTheme(name) / lib:SetUIScale(scale)
 --
 -- The adapter that maps this API onto DepHub's own shell contract lives in
--- src/core/demon-ui.lua; backends never call RedzLib directly.
+-- src/core/ui-adapter.lua; backends never call RedzLib directly.
 
 -- ===========================================================================
 -- SECTION: Executor shims and services
@@ -267,7 +267,7 @@ end
 end
 
 function v:destroy()
-local C=self.Parent and table.find(self.Parent.Descendants)
+local C=self.Parent and table.find(self.Parent.Descendants,self)
 
 if C then
 table.remove(self.Parent.Descendants,C)
@@ -539,7 +539,11 @@ return table.pack(F)end local G=function(
 
 G, ...)
 for H=1,#G do
-task.spawn(G[H],...)
+local callback=G[H]
+task.spawn(function(...)
+local ok,err=pcall(callback,...)
+if not ok then warn("DepHub callback error: "..tostring(err)) end
+end,...)
 end end
 
 
@@ -553,7 +557,7 @@ IgnoreGuiInset=true
 end local J=function(
 
 J, K, L, M, ...)
-local N=TweenInfo.new(M,EasingStyle or Enum.EasingStyle.Quint,...)
+local N=TweenInfo.new(M,Enum.EasingStyle.Quint,...)
 
 return TweenService:Create(J,N,{
 [K]=L
@@ -749,7 +753,7 @@ end
 
 function ar.new(au,av)
 return setmetatable({
-TITLE_LABEL=au,
+TITLE_LABEL=av,
 DESCRIPTION_LABEL=au,
 Content=au.Text,
 Title=av.Text,
@@ -945,7 +949,7 @@ Font=Enum.Font.GothamMedium,
 Text=am.Title,
 TextSize=10,
 TextXAlignment=Enum.TextXAlignment.Left,
-TextTransparency=(FirstTab and 0.3)or 0,
+TextTransparency=0.3,
 TextTruncate=Enum.TextTruncate.AtEnd,
 ThemeTag={
 TextColor3="Colors.Text.Default"
@@ -1310,6 +1314,7 @@ local aH
 local aI
 
 local aJ=0
+local SEARCH_RESULT_COUNT=0
 
 local aK=25
 local aL=(aK*12)+10
@@ -1510,7 +1515,7 @@ end
 if aY then
 local aZ=aY.Instance
 local a_=M(aw.Text)
-aZ.Visible=#a_==0 or aY.SearchText:find(a_)~=nil
+aZ.Visible=#a_==0 or aY.SearchText:find(a_,1,true)~=nil
 
 if aZ.Visible~=false then
 SEARCH_RESULT_COUNT+=1
@@ -2452,7 +2457,11 @@ if(tick()-aP)<0 then return end
 aP=tick()+5
 local aQ=aO.Text
 aO.Text="Copied to Clipboard!"
+if type(setclipboard)=="function" then
 setclipboard(aC)
+else
+warn("DepHub: clipboard is unavailable in this executor")
+end
 task.wait(4)
 aO.Text=aQ
 end)
@@ -2903,17 +2912,36 @@ assert(type(self)=="table"and self.IS_A_TAB,`"Tab.Destroy". {tostring(self)} is 
 if self.IS_DESTROYED then return end
 local av=table.find(S,self)
 assert(av,`"Tab.Destroy". failed to destroy '{self.Title}'`)
+local wasSelected=ac==self
+self.IS_DESTROYED=true
 
-table.remove(S,av)
-
-for aw,ax in T[self]do
-ax:Destroy()
+if wasSelected and X then
+pcall(X.CloseDropdown)
 end
 
-V[self]:destroy()
+for aw,ax in T[self] or {} do
+if typeof(ax)=="Instance" then
+pcall(ax.Destroy,ax)
+end
+end
+
+local themeGroup=V[self]
+if themeGroup then
+pcall(themeGroup.destroy,themeGroup)
+end
 
 T[self]=nil
+U[self]=nil
 V[self]=nil
+table.remove(S,av)
+
+if wasSelected then
+ac=nil
+local nextTab=S[math.min(av,#S)]
+if nextTab then
+nextTab:Select()
+end
+end
 
 setmetatable(self,nil)
 end
@@ -3346,33 +3374,30 @@ end
 
 function ag:ReadFile(av)
 assert(type(av)=="string",`"Window.ReadFile[param 1]". 'string' expected, got {typeof(av)}`)
-av=`{self.ScriptFolder}/{av}`
-
-if readFileSafe~=nil and(isfile==nil or not isfile(av))then
-return readFileSafe(av)
+local path=self.ScriptFolder and (`{self.ScriptFolder}/{av}`) or av
+if readFileSafe and (isfile==nil or isfile(path)) then
+return readFileSafe(path)
 end
+return nil
 end
 
 function ag:WriteFile(av,aw)
 assert(type(av)=="string",`"Window.WriteFile[param 1]". 'string' expected, got {typeof(av)}`)
-av=`{self.ScriptFolder}/{av}`
-
 if aw~=nil and type(aw)~="string"then
 error(`"Window.WriteFile[param 2]". 'string', or 'nil' expected, got {typeof(aw)}`,2)
 end
-
+local path=self.ScriptFolder and (`{self.ScriptFolder}/{av}`) or av
 if aw==nil then
-if deleteFileSafe~=nil then
-deleteFileSafe(`{self.ScriptFolder}/{av}`)
-return true
+if deleteFileSafe and (isfile==nil or isfile(path)) then
+ deleteFileSafe(path)
+ return true
 end
 else
-if writeFileSafe~=nil then
-z(`{self.ScriptFolder}/{av}`)
+if writeFileSafe then
+z(path,aw)
 return true
 end
 end
-
 return false
 end
 
@@ -3477,7 +3502,7 @@ if ay==nil then ay=self.Icon end
 end
 
 assert(type(aw)=="string",`"Window.Notify.Title". 'string' expected, got {typeof(aw)}`)
-assert(type(ax)=="string",`"Window.Notify.Content". 'string' expected, got {typeof(aw)}`)
+assert(type(ax)=="string",`"Window.Notify.Content". 'string' expected, got {typeof(ax)}`)
 assert(ay==nil or type(ay)=="string",`"Window.Notify.Icon". 'nil' or 'string' expected, got {typeof(ay)}`)
 
 if az~=nil and type(az)~="number"then
@@ -3599,21 +3624,24 @@ Parent=self
 
 function aL:Close()
 if self.Closed==true then return end
-
-self:Destroy()
 self.Closed=true
-
-local aM=J(aB,"Position",UDim2.fromScale(3,0),0.8)
-aM:Play()
-aM.Completed:Wait()
-aA:Destroy()
+local exitTween=J(aB,"Position",UDim2.fromScale(1.15,0),0.22)
+local scaleTween=J(aC,"Scale",0.94,0.22)
+exitTween:Play()
+scaleTween:Play()
+exitTween.Completed:Wait()
+if aA.Parent then aA:Destroy() end
+self.Destroyed=true
+setmetatable(self,nil)
 end local aM=function()
 
 
-ay=Library:GetIconByName(ay or af)
-aG.Image=ay
-
-if not O(ay)then
+local resolvedIcon=Library:GetIconByName(ay or af)
+if O(resolvedIcon) then
+aG.Image=resolvedIcon
+aG.Visible=true
+else
+aG.Image=""
 aG.Visible=false
 aD.UIPadding.PaddingLeft=UDim.new(0,15)
 end
@@ -3687,7 +3715,7 @@ end
 end
 
 ag.NewNotificationGroup=ag.NewNotifyGroup
-ag.SetDefaultNotifyIcon=SetNotifyDefaultIcon
+ag.SetDefaultNotifyIcon=ag.SetNotifyDefaultIcon
 ag.GetTabByName=ag.GetTabByTitle
 ag.Notificafion=ag.Notify
 
@@ -3797,7 +3825,16 @@ assert(ac,`"Library.SetTheme". theme not found: {ab}`)
 
 self.CurrentTheme=ac
 self.WindowSettings.SelectedTheme=ac.Name
-
+local function resetThemeGroups(group)
+if not group then return end
+group.UPDATED_OBJECTS=false
+for _,child in pairs(group.Descendants or {}) do
+if type(child)=="table" and child.Descendants then
+resetThemeGroups(child)
+end
+end
+end
+resetThemeGroups(C)
 C:update()
 end
 
