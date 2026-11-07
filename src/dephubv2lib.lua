@@ -766,8 +766,9 @@ end
 
 function ap:SetEnabled(au)
 assert(type(au)=="table",`"Dropdown.SetEnabled[param 1]". 'table' expected, got {typeof(au)}`)
-
+assert(type(self.SET_ENABLED_OPTIONS)=="function",`"Dropdown.SetEnabled". option registry is unavailable`)
 self.SET_ENABLED_OPTIONS(au)
+return self
 end
 
 function ap:Clear()
@@ -1578,13 +1579,9 @@ TextColor3="Colors.Text.Default"
 }
 })
 
-local a2=0
-
 u(a1.Activated,function()
-if(tick()-a2)<0 then return end
-
+if a_.Enabled==false then return end
 if ar.Parent then
-a2=tick()+0.2
 aF(a_)
 end
 end)
@@ -1855,10 +1852,8 @@ aP:SetValue(az)
 local aQ=0
 
 u(aC.Activated,function()
-if(tick()-aQ)>=aK then
 aQ=tick()
 aP:SetValue(not aP.Value)
-end
 end)
 
 return aP
@@ -1949,7 +1944,9 @@ Size=UDim2.new(0.85,0,0.85,0),
 AnchorPoint=Vector2.new(0.5,0.5),
 Position=UDim2.new(0.5,0,0.5,0),
 BackgroundTransparency=1,
-TextScaled=true,
+TextScaled=false,
+TextSize=10,
+TextTruncate=Enum.TextTruncate.AtEnd,
 Active=true,
 Text="",
 PlaceholderText=B.TEXTBOX.PLACEHOLDER_TEXT,
@@ -2044,6 +2041,8 @@ end
 
 assert(type(az)=="number",`"Tab.AddSlider.Min", 'number' expected, got {typeof(az)}`)
 assert(type(aA)=="number",`"Tab.AddSlider.Max", 'number' expected, got {typeof(aA)}`)
+assert(aA>az,`"Tab.AddSlider". Max must be greater than Min`)
+assert(aB==nil or aB>0,`"Tab.AddSlider.Increment". must be greater than zero`)
 
 local aE=V[self]
 local aF=T[self].Container
@@ -2121,8 +2120,6 @@ Font="Font.SliderValue"
 }
 })
 
-local aO=createInstance("UIScale",aN)
-
 local aP=ak.Slider.new(self,aG,aH,aI,aD)
 
 aP.Min=az
@@ -2138,7 +2135,8 @@ return(aR*(aA-az))+az end local aS=function(
 
 
 aS)
-return math.round(aS/aB)*aB end local aT=function(
+local steps=math.floor(((aS-az)/aB)+0.5)
+return math.floor((az+steps*aB)*1000000+0.5)/1000000 end local aT=function(
 
 
 aT, aU)
@@ -2156,13 +2154,9 @@ local aW=UDim2.fromScale(aU,1)
 
 aN.Text=tostring(math.floor(aT*1000)/1000)
 
-if self.Selected then
-J(aM,"Position",aV,0.3):Play()
-J(aL,"Size",aW,0.3):Play()
-else
 aM.Position=aV
 aL.Size=aW
-end end local aU=function(
+end local aU=function(
 
 
 aU)
@@ -2170,54 +2164,66 @@ local aV=math.clamp(aS(aU),az,aA)
 aT(aV,aQ(aV))end
 
 
-aP.WHEN_VALUE_CHANGED=aU local aV=function(
-
-aV, aW)
-local aX=(Mouse.X-aV.X)/aW.X
-local aY=math.clamp(aX,0,1)
-local aZ=aR(aY)
-local a_=aS(aZ)
-local a0=math.clamp(a_,az,aA)
-aT(a0,aQ(a0))end
-
-
-local aW=Random.new()
-aU(aC)
-
-u(aJ.MouseButton1Down,function()
-if A~=false then return end
-
-J(aM,"BackgroundTransparency",0,0.3):Play()
-aF.ScrollingEnabled=false
-A=true
-
-local aX=aK.AbsolutePosition
-local aY=aK.AbsoluteSize
-
-while UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)do
-aV(aX,aY)
-task.wait()
+aP.WHEN_VALUE_CHANGED=aU local aV=function(position,trackPosition,trackSize)
+local alpha=math.clamp((position.X-trackPosition.X)/math.max(trackSize.X,1),0,1)
+local rawValue=aR(alpha)
+local rounded=math.clamp(aS(rawValue),az,aA)
+aT(rounded,aQ(rounded))
 end
 
+
+local activeInput=nil
+local function updateSlider(position)
+local trackPosition=aK.AbsolutePosition
+local trackSize=aK.AbsoluteSize
+aV(position,trackPosition,trackSize)
+end
+
+local function finishDrag()
+if not activeInput then return end
+activeInput=nil
 A=false
-J(aM,"BackgroundTransparency",0.2,0.3):Play()
+J(aM,"BackgroundTransparency",0.2,0.15):Play()
 aF.ScrollingEnabled=true
+end
+
+u(aJ.InputBegan,function(input)
+if A~=false then return end
+if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
+activeInput=input
+A=true
+J(aM,"BackgroundTransparency",0,0.15):Play()
+aF.ScrollingEnabled=false
+updateSlider(input.Position)
 end)
 
-u(aN:GetPropertyChangedSignal"Text",function()
-if not self.Selected then return end
-
-aO.Scale=0.3
-J(aO,"Scale",1.2,0.1):Play()
-
-local aX=J(aN,"Rotation",aW:NextNumber(-7.5,7.5),0.15)
-aX:Play()
-aX.Completed:Wait()
-
-J(aO,"Scale",1,0.2):Play()
-J(aN,"Rotation",0,0.1):Play()
+local changedConnection=UserInputService.InputChanged:Connect(function(input)
+if not activeInput then return end
+if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseMovement then
+updateSlider(UserInputService:GetMouseLocation())
+elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
+updateSlider(input.Position)
+end
 end)
+local endedConnection=UserInputService.InputEnded:Connect(function(input)
+if not activeInput then return end
+if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1 then
+finishDrag()
+elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
+finishDrag()
+end
+end)
+aP.INPUT_CONNECTIONS={changedConnection,endedConnection}
+local originalDestroy=ai.Destroy
+aP.Destroy=function(option)
+for _,connection in ipairs(option.INPUT_CONNECTIONS or {}) do
+pcall(function() connection:Disconnect() end)
+end
+option.INPUT_CONNECTIONS=nil
+return originalDestroy(option)
+end
 
+aU(aC)
 return aP
 end
 
@@ -2564,7 +2570,9 @@ Size=UDim2.new(0.85,0,0.85,0),
 AnchorPoint=Vector2.new(0.5,0.5),
 Position=UDim2.new(0.5,0,0.5,0),
 BackgroundTransparency=1,
-TextScaled=true,
+TextScaled=false,
+TextSize=10,
+TextTruncate=Enum.TextTruncate.AtEnd,
 Text="...",
 ThemeTag={
 OBJECTS=aD,
@@ -2778,6 +2786,19 @@ return aM and aM.Name==a7.Name
 end end
 
 
+aL.SET_ENABLED_OPTIONS=function(enabledOptions)
+for name,option in pairs(aS) do
+local enabled=enabledOptions[name]
+if enabled==nil then enabled=true end
+option.Enabled=enabled==true
+if option.Instance then
+option.Instance.Active=option.Enabled
+option.Instance.BackgroundTransparency=option.Enabled and 0 or 0.45
+option.Instance.TextLabel.TextTransparency=option.Enabled and 0.4 or 0.7
+end
+end
+end
+
 aL.ADD_DROPDOWN_OPTION=function(a8)
 if type(a8)=="table"then
 for a9=1,#a8 do
@@ -2790,6 +2811,7 @@ end
 local a9=a0(a8)
 
 if a9 then
+if a9.Enabled==nil then a9.Enabled=true end
 if aL.Opened then
 X.CreateOptionTemplate(a9,true)
 end
@@ -2997,8 +3019,24 @@ end
 function ai:SetVisible(av)
 assert(typeof(self.VISIBLE_ELEMENT)=="Instance",`"Option.SetVisible". cannot change this option visibility {self.KIND}:{self.Title}`)
 assert(type(av)=="boolean",`"Option.SetVisible". 'boolean' expected, got {typeof(av)}`)
-
 self.VISIBLE_ELEMENT.Visible=av
+return self
+end
+
+function ai:SetEnabled(av)
+assert(type(av)=="boolean",`"Option.SetEnabled". 'boolean' expected, got {typeof(av)}`)
+self.Enabled=av
+local element=self.DESTROY_ELEMENT
+if typeof(element)=="Instance" then
+if element:IsA("GuiButton") then
+ element.Active=av
+ element.AutoButtonColor=false
+elseif element:IsA("TextBox") then
+ element.TextEditable=av
+ element.Active=av
+end
+end
+return self
 end
 
 function ai:Destroy()
