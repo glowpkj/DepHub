@@ -55,18 +55,12 @@ return rawget(g,h)
 end
 })
 
-local MarketplaceService = Services.MarketplaceService
 local UserInputService = Services.UserInputService
 local GuiService = Services.GuiService
 local TweenService = Services.TweenService
 local HttpService = Services.HttpService
 local RunService = Services.RunService
 local PlayersService = Services.Players
-
-local Heartbeat = RunService.Heartbeat
-
-local LocalPlayer = PlayersService.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 
 local GuiParent = (gethui or function() return Services.CoreGui end)()
 
@@ -194,6 +188,7 @@ TabSize=160
 },
 
 Themes=Themes,
+CurrentTheme=Themes.Darker,
 
 Connections={},
 Options={},
@@ -296,7 +291,12 @@ end
 end
 
 function v:remove(instance)
+if typeof(instance)=="Instance" then
 self.Descendants[instance]=nil
+for _,descendant in ipairs(instance:GetDescendants()) do
+self.Descendants[descendant]=nil
+end
+end
 end
 
 function v:update()
@@ -566,10 +566,6 @@ elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputTy
 stopDrag()
 end
 end,nil,frame)
-end
-
-function InstanceFactory:CreateNewTemplate(J)
-return InstanceFactory.CloneObject(F[self],J)
 end
 
 function InstanceFactory.new(J,...)
@@ -1686,6 +1682,7 @@ Elements={
 Corner=UDim.new(0.5,0)
 },
 ThemeTag={
+OBJECTS=dropdownThemeGroup,
 BackgroundColor3="Colors.Primary"
 }
 }),
@@ -1699,6 +1696,7 @@ TextTransparency=0.4,
 Text=a_.DisplayName,
 TextSize=9,
 ThemeTag={
+OBJECTS=dropdownThemeGroup,
 Font="Font.Bold",
 TextColor3="Colors.Text.Default"
 }
@@ -4194,12 +4192,14 @@ Size=UDim2.new(1,-16,0,2),
 Position=UDim2.new(0,8,1,-4),
 AnchorPoint=Vector2.new(0,1),
 BorderSizePixel=0,
-BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke")
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke"),
+ThemeTag={OBJECTS=notificationThemeGroup,BackgroundColor3="Colors.Stroke"}
 })
 local progressFill=createInstance("Frame","Progress",progressTrack,{
 Size=UDim2.fromScale(1,1),
 BorderSizePixel=0,
-BackgroundColor3=w(Library.CurrentTheme,"Colors.Primary")
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Primary"),
+ThemeTag={OBJECTS=notificationThemeGroup,BackgroundColor3="Colors.Primary"}
 })
 
 local aL=setmetatable({
@@ -4435,7 +4435,7 @@ local ac=self.Themes[ab]
 assert(ac,`"Library.SetTheme". theme not found: {ab}`)
 
 self.CurrentTheme=ac
-self.WindowSettings.SelectedTheme=ac.Name
+if self.WindowSettings then self.WindowSettings.SelectedTheme=ac.Name end
 local function resetThemeGroups(group)
 if not group then return end
 group.UPDATED_OBJECTS=false
