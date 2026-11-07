@@ -1873,6 +1873,7 @@ function ak.Keybind:SetEnabled(enabled)
 assert(type(enabled)=="boolean",`"Keybind.SetEnabled". 'boolean' expected, got {typeof(enabled)}`)
 self.Enabled=enabled
 if not enabled and self.Capturing then self.Capturing=false if self.KEY_BUTTON then self.KEY_BUTTON.Text=self.KeyCode.Name end end
+if self.DESTROY_ELEMENT then self.DESTROY_ELEMENT.Active=enabled end
 if self.KEY_BUTTON then self.KEY_BUTTON.Active=enabled end
 return self
 end
