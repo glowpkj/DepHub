@@ -122,6 +122,10 @@ Flag = "smoke_color",
 Callback = function() end
 })
 option:SetColor(Color3.fromRGB(20, 160, 120))
+option:SetError(true)
+option:SetError(false)
+option.PALETTE.Visible = true
+option.PALETTE.Visible = false
 assert(type(window:GetFlag("smoke_color")) == "string")
 option:SetEnabled(false)
 option:SetEnabled(true)
@@ -185,6 +189,9 @@ Icon = "__unknown_icon__",
 Duration = 0.5
 })
 assert(#window:GetNotificationHistory() > 0)
+local historyDialog = window:ShowNotificationHistory()
+assert(historyDialog)
+historyDialog:Close()
 window:ClearNotificationHistory()
 assert(#window:GetNotificationHistory() == 0)
 end)
