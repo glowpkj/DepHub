@@ -1048,7 +1048,7 @@ as()
 return ao,aq,ap,ar end local am=function(
 
 
-am, an, ao, ap)
+am, an, ao, ap, kind)
 local aq=createInstance("TextLabel",{
 TextXAlignment=Enum.TextXAlignment.Left,
 TextTruncate=Enum.TextTruncate.AtEnd,
@@ -1075,7 +1075,7 @@ Size=UDim2.new(1,-20),
 Position=UDim2.new(0,12,0,15),
 BackgroundTransparency=1,
 TextWrapped=true,
-TextSize=8,
+TextSize=9,
 RichText=true,
 ThemeTag={
 OBJECTS=ar,
@@ -1084,15 +1084,17 @@ Font="Font.Normal"
 }
 })
 
-local au={
-OBJECTS=ar,
-BackgroundColor3="Colors.Buttons.Default"
-}
+local au={OBJECTS=ar}
+if kind~="Paragraph" then
+au.BackgroundColor3="Colors.Buttons.Default"
+end
 
 local av=createInstance("TextButton","Option",{
 AutomaticSize=Enum.AutomaticSize.Y,
 Size=UDim2.new(1,0,0,25),
 AutoButtonColor=false,
+Active=kind~="Paragraph",
+BackgroundTransparency=kind=="Paragraph" and 1 or 0,
 Text="",
 ThemeTag=au,
 Elements={
@@ -1139,8 +1141,10 @@ au.BackgroundColor3=ax
 J(av,"BackgroundColor3",w(Library.CurrentTheme,ax),0.2):Play()end
 
 
+if kind~="Paragraph" then
 u(av.MouseLeave,function()ax("Colors.Buttons.Default",false)end)
 u(av.MouseEnter,function()ax("Colors.Buttons.Holding",true)end)
+end
 
 u(at:GetPropertyChangedSignal"Text",function()
 local ay=#at.Text>0
@@ -1849,8 +1853,8 @@ G(aA,aO)
 
 local aP=UDim2.new(aO and 1 or 0,0,0.5,0)
 local aQ=Vector2.new(aO and 1 or 0,0.5)
-local aR=aO and"Colors.Primary"or"Colors.OnPrimary"
-local aS=w(Library.CurrentTheme,aR)
+local aR=aO and"Colors.Primary"or"Colors.Stroke"
+local aS=w(Library.CurrentTheme,aO and"Colors.Text.Default"or"Colors.OnPrimary")
 
 aH.BackgroundColor3=aR
 
@@ -2197,10 +2201,18 @@ end
 
 
 local activeInput=nil
+local changedConnection=nil
+local endedConnection=nil
+
 local function updateSlider(position)
 local trackPosition=aK.AbsolutePosition
 local trackSize=aK.AbsoluteSize
 aV(position,trackPosition,trackSize)
+end
+
+local function disconnectDragInput()
+if changedConnection then changedConnection:Disconnect() changedConnection=nil end
+if endedConnection then endedConnection:Disconnect() endedConnection=nil end
 end
 
 local function finishDrag()
@@ -2212,19 +2224,6 @@ J(aM,"BackgroundTransparency",0.2,0.15):Play()
 aF.ScrollingEnabled=true
 end
 
-u(aJ.InputBegan,function(input)
-if A~=false then return end
-if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
-activeInput=input
-A=true
-connectDragInput()
-J(aM,"BackgroundTransparency",0,0.15):Play()
-aF.ScrollingEnabled=false
-updateSlider(input.Position)
-end)
-
-local changedConnection=nil
-local endedConnection=nil
 local function connectDragInput()
 changedConnection=UserInputService.InputChanged:Connect(function(input)
 if not activeInput then return end
@@ -2243,17 +2242,25 @@ finishDrag()
 end
 end)
 end
-local function disconnectDragInput()
-if changedConnection then changedConnection:Disconnect() changedConnection=nil end
-if endedConnection then endedConnection:Disconnect() endedConnection=nil end
-end
-aP.INPUT_CONNECTIONS={changedConnection,endedConnection}
+
+u(aJ.InputBegan,function(input)
+if A~=false then return end
+if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
+activeInput=input
+A=true
+connectDragInput()
+J(aM,"BackgroundTransparency",0,0.15):Play()
+aF.ScrollingEnabled=false
+updateSlider(input.Position)
+end,nil,aJ)
+
+u(aJ.Destroying,function()
+finishDrag()
+end,nil,aJ)
+
 local originalDestroy=ai.Destroy
 aP.Destroy=function(option)
-for _,connection in ipairs(option.INPUT_CONNECTIONS or {}) do
-pcall(function() connection:Disconnect() end)
-end
-option.INPUT_CONNECTIONS=nil
+finishDrag()
 return originalDestroy(option)
 end
 
@@ -2413,7 +2420,7 @@ Position=UDim2.new(0,12,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
 AutomaticSize=Enum.AutomaticSize.X,
 BackgroundTransparency=1,
-TextSize=7,
+TextSize=8,
 Text=aN,
 ThemeTag={
 OBJECTS=aD,
@@ -2542,7 +2549,7 @@ error(`"Tab.AddParagraph[param 2]". 'string', or 'nil' expected, got {typeof(aw)
 end
 
 local ax=V[self]
-local ay,az,aA=am(self,av,aw,UDim2.new(1,0,0,0))
+local ay,az,aA=am(self,av,aw,UDim2.new(1,0,0,0),"Paragraph")
 
 return setmetatable({
 DESTROY_ELEMENT=ay,
@@ -4229,7 +4236,7 @@ Text=ae.SubTitle,
 BackgroundTransparency=1,
 TextXAlignment="Left",
 TextYAlignment="Bottom",
-TextSize=8,
+TextSize=9,
 ThemeTag={
 TextColor3="Colors.Text.Dark",
 Font="Font.Normal"
