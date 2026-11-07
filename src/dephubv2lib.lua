@@ -1530,11 +1530,11 @@ aC=false end local aV=function()
 
 
 if aw:IsFocused()then
-aJ=tick()
+aJ=os.clock()
 return nil
 end
 
-if(tick()-aJ)>=0.3 and not aO()then
+if(os.clock()-aJ)>=0.3 and not aO()then
 aU()
 end end local aW=function()
 
@@ -1653,6 +1653,12 @@ end,nil,a1)
 
 a_.SearchText=M(a_.DisplayName)
 a_.Instance=a1
+a1.Active=a_.Enabled~=false
+if a_.Enabled==false then
+ a1.BackgroundTransparency=0.45
+ local optionLabel=a1:FindFirstChildOfClass("TextLabel")
+ if optionLabel then optionLabel.TextTransparency=0.7 end
+end
 
 if a0 then
 local a3=aw.Text
@@ -1911,7 +1917,7 @@ Corner=UDim.new(0.5,0)
 ThemeTag=aH
 })
 
-local aJ=tick()
+local aJ=os.clock()
 local aK=0.2
 local aL={}local aM=function(
 
@@ -1944,7 +1950,7 @@ local aS=w(Library.CurrentTheme,aO and"Colors.Text.Default"or"Colors.OnPrimary")
 
 aH.BackgroundColor3=aR
 
-if self.Selected and(tick()-aJ)>=aK then
+if self.Selected and(os.clock()-aJ)>=aK then
 aM{
 J(aI,"Position",aP,0.25),
 J(aI,"AnchorPoint",aQ,0.25),
@@ -1957,7 +1963,7 @@ aI.AnchorPoint=aQ
 aI.BackgroundColor3=aS
 end
 
-aJ=tick()end
+aJ=os.clock()end
 
 
 local aP=ak.Toggle.new(self,aC,aD,aE,aO,aA)
@@ -1966,9 +1972,9 @@ aP:SetValue(az)
 local aQ=0
 
 u(aC.Activated,function()
-aQ=tick()
+aQ=os.clock()
 aP:SetValue(not aP.Value)
-end)
+end,nil,aC)
 
 return aP
 end
@@ -1996,10 +2002,10 @@ local aF=0
 
 u(aB.Activated,function()
 if aB:GetAttribute("Loading") then return end
-if az~=nil and(tick()-aF)<0 then return end
+if az~=nil and(os.clock()-aF)<0 then return end
 
 if az~=nil then
-aF=tick()+az
+aF=os.clock()+az
 end
 
 G(ay)
@@ -2353,7 +2359,7 @@ end,nil,aJ)
 
 u(aJ.Destroying,function()
 finishDrag()
-end,nil,aJ)
+end,nil,aG)
 
 local originalDestroy=ai.Destroy
 aP.Destroy=function(option)
@@ -2596,9 +2602,9 @@ Font="Font.Bold"
 local aP=0
 
 u(aO.Activated,function()
-if(tick()-aP)<0 then return end
+if(os.clock()-aP)<0 then return end
 
-aP=tick()+5
+aP=os.clock()+5
 local aQ=aO.Text
 aO.Text="Copied to Clipboard!"
 if type(setclipboard)=="function" then
@@ -2607,7 +2613,7 @@ else
 warn("DepHub: clipboard is unavailable in this executor")
 end
 task.wait(4)
-aO.Text=aQ
+if aO.Parent then aO.Text=aQ end
 end,nil,aO)
 
 if type(az)=="string"then
@@ -3131,7 +3137,8 @@ option.Enabled=enabled==true
 if option.Instance then
 option.Instance.Active=option.Enabled
 option.Instance.BackgroundTransparency=option.Enabled and 0 or 0.45
-option.Instance.TextLabel.TextTransparency=option.Enabled and 0.4 or 0.7
+local optionLabel=option.Instance:FindFirstChildOfClass("TextLabel")
+if optionLabel then optionLabel.TextTransparency=option.Enabled and 0.4 or 0.7 end
 end
 end
 end
@@ -3172,7 +3179,7 @@ end
 -- Select reproduz exatamente a logica do clique para marcar/desmarcar.
 aL.SELECT_DROPDOWN_OPTION=function(a8,a9)
 local a0_=aS[tostring(a8)]
-if not a0_ then return false end
+if not a0_ or a0_.Enabled==false then return false end
 
 if aC then
 local want=(a9~=false)
@@ -3662,7 +3669,7 @@ local aC=ax.Size
 local aD=0
 
 function ag:MinimizeButton()
-if(tick()-aD)<0 then
+if(os.clock()-aD)<0 then
 return false
 end
 
@@ -3680,7 +3687,7 @@ aF.Visible=self.Minimized
 end
 
 self.Minimized=not self.Minimized
-aD=tick()+0.5
+aD=os.clock()+0.5
 
 return true
 end
@@ -3805,7 +3812,7 @@ u(aa.Activated,function()
 if Z~=nil and not Z.Closing and not Z.Closed then
 Z:Close()
 end
-end)
+end,nil,aa)
 
 ag.StartWindow=nil
 end
@@ -3837,9 +3844,13 @@ end
 function ag:ReadFile(av)
 assert(type(av)=="string",`"Window.ReadFile[param 1]". 'string' expected, got {typeof(av)}`)
 local path=self.ScriptFolder and (`{self.ScriptFolder}/{av}`) or av
-if readFileSafe and (isfile==nil or isfile(path)) then
-return readFileSafe(path)
+if not readFileSafe then return nil end
+if isfile then
+local ok,exists=pcall(isfile,path)
+if not ok or not exists then return nil end
 end
+local ok,result=pcall(readFileSafe,path)
+if ok then return result end
 return nil
 end
 
@@ -3850,9 +3861,13 @@ error(`"Window.WriteFile[param 2]". 'string', or 'nil' expected, got {typeof(aw)
 end
 local path=self.ScriptFolder and (`{self.ScriptFolder}/{av}`) or av
 if aw==nil then
-if deleteFileSafe and (isfile==nil or isfile(path)) then
- deleteFileSafe(path)
- return true
+if deleteFileSafe then
+if isfile then
+local ok,exists=pcall(isfile,path)
+if not ok or not exists then return false end
+end
+local ok=pcall(deleteFileSafe,path)
+return ok
 end
 else
 if writeFileSafe then
@@ -3881,7 +3896,7 @@ if az or ay.UserInputType~=Enum.UserInputType.Keyboard then return end
 if ay.KeyCode==ax.KeyCode then
 ag:Minimize()
 end
-end,nil,ab)
+end,nil,I)
 
 return ax
 end
@@ -4634,7 +4649,7 @@ Color="Colors.Background"
 
 u(ak.Destroying,function()
 self:Destroy()
-end)
+end,nil,I)
 
 u(I:GetAttributeChangedSignal"UID",function()
 self:Destroy()
@@ -4767,14 +4782,14 @@ BackgroundColor3="Colors.OnPrimary"
 
 ay)
 local az=ay:GetAttribute"Resizing"
-ay:SetAttribute("Resizing",tick())
+ay:SetAttribute("Resizing",os.clock())
 
-if az and(tick()-az)<=0.1 then
+if az and(os.clock()-az)<=0.1 then
 return nil
 end
 
 J(ay,"BackgroundTransparency",0.5,0.3):Play()
-while tick()-ay:GetAttribute"Resizing"<=0.1 do task.wait()end
+while os.clock()-ay:GetAttribute"Resizing"<=0.1 do task.wait()end
 J(ay,"BackgroundTransparency",1,0.4):Play()end
 
 
