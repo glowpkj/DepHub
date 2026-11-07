@@ -142,6 +142,35 @@ BackgroundTransparency=0.03
 }
 }
 
+local LightTheme=table.clone(Themes.Darker)
+LightTheme.Colors=table.clone(Themes.Darker.Colors)
+LightTheme.Colors.Text=table.clone(Themes.Darker.Colors.Text)
+LightTheme.Colors.Buttons=table.clone(Themes.Darker.Colors.Buttons)
+LightTheme.Colors.Border=table.clone(Themes.Darker.Colors.Border)
+LightTheme.Colors.Dialog=table.clone(Themes.Darker.Colors.Dialog)
+LightTheme.Colors.Slider=table.clone(Themes.Darker.Colors.Slider)
+LightTheme.Colors.Dropdown=table.clone(Themes.Darker.Colors.Dropdown)
+LightTheme.Colors.Background=ColorSequence.new{
+ColorSequenceKeypoint.new(0,Color3.fromRGB(248,248,250)),
+ColorSequenceKeypoint.new(0.5,Color3.fromRGB(238,239,243)),
+ColorSequenceKeypoint.new(1,Color3.fromRGB(248,248,250))
+}
+LightTheme.Colors.Stroke=Color3.fromRGB(205,207,214)
+LightTheme.Colors.OnPrimary=Color3.fromRGB(65,74,160)
+LightTheme.Colors.ScrollBar=Color3.fromRGB(130,137,158)
+LightTheme.Colors.Icons=Color3.fromRGB(65,68,78)
+LightTheme.Colors.Text.Default=Color3.fromRGB(35,36,42)
+LightTheme.Colors.Text.Dark=Color3.fromRGB(75,77,86)
+LightTheme.Colors.Text.Darker=Color3.fromRGB(105,108,118)
+LightTheme.Colors.Buttons.Default=Color3.fromRGB(231,232,237)
+LightTheme.Colors.Buttons.Holding=Color3.fromRGB(218,220,228)
+LightTheme.Colors.Border.Default=Color3.fromRGB(210,212,219)
+LightTheme.Colors.Border.Holding=Color3.fromRGB(185,188,198)
+LightTheme.Colors.Dialog.Background=Color3.fromRGB(250,250,252)
+LightTheme.Colors.Slider.SliderBar=LightTheme.Colors.Primary
+LightTheme.Colors.Dropdown.Holder=Color3.fromRGB(244,245,248)
+Themes.Light=LightTheme
+
 for Library,ViewportSize in Themes do
 ViewportSize.Name=Library
 table.freeze(ViewportSize)
@@ -454,13 +483,13 @@ local renderConnection=nil
 local moved=false
 local smoothing=lerpFactor or 0.28
 
+local latestTarget=nil
 local function pointerPosition(input)
-if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.MouseMovement then
-local position=UserInputService:GetMouseLocation()
 local inset=GuiService:GetGuiInset()
-return position-inset
+if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.MouseMovement then
+return UserInputService:GetMouseLocation()-inset
 end
-return input.Position
+return input.Position-inset
 end
 
 local function stopDrag()
@@ -469,6 +498,8 @@ activeInput=nil
 startPointer=nil
 startPosition=nil
 latestPointer=nil
+if latestTarget and frame.Parent then frame.Position=latestTarget end
+latestTarget=nil
 if renderConnection then
 renderConnection:Disconnect()
 renderConnection=nil
@@ -513,6 +544,7 @@ local maxX=math.max(minX,viewport.X-size.X*(1-frame.AnchorPoint.X))
 local maxY=math.max(minY,viewport.Y-size.Y*(1-frame.AnchorPoint.Y))
 target=UDim2.fromOffset(math.clamp(targetAnchor.X,minX,maxX),math.clamp(targetAnchor.Y,minY,maxY))
 end
+latestTarget=target
 frame.Position=frame.Position:Lerp(target,factor)
 end)
 end,nil,frame)
@@ -804,7 +836,12 @@ Kind="Dialog"
 end
 
 function ap:SetEnabled(au)
-assert(type(au)=="table",`"Dropdown.SetEnabled[param 1]". 'table' expected, got {typeof(au)}`)
+if type(au)=="boolean" then
+self.Enabled=au
+if self.DESTROY_ELEMENT then self.DESTROY_ELEMENT.Active=au end
+return self
+end
+assert(type(au)=="table",`"Dropdown.SetEnabled[param 1]". 'boolean' or 'table' expected, got {typeof(au)}`)
 assert(type(self.SET_ENABLED_OPTIONS)=="function",`"Dropdown.SetEnabled". option registry is unavailable`)
 self.SET_ENABLED_OPTIONS(au)
 return self
@@ -1786,6 +1823,7 @@ end
 function ak.Keybind:SetEnabled(enabled)
 assert(type(enabled)=="boolean",`"Keybind.SetEnabled". 'boolean' expected, got {typeof(enabled)}`)
 self.Enabled=enabled
+if not enabled and self.Capturing then self.Capturing=false if self.KEY_BUTTON then self.KEY_BUTTON.Text=self.KeyCode.Name end end
 if self.KEY_BUTTON then self.KEY_BUTTON.Active=enabled end
 return self
 end
@@ -2109,8 +2147,7 @@ end
 local errorStroke=createInstance("UIStroke",aH,{
 Color=w(Library.CurrentTheme,"Colors.Error"),
 Transparency=1,
-Thickness=1.2,
-Color=w(Library.CurrentTheme,"Colors.Error")
+Thickness=1.2
 })
 local aL=ak.TextBox.new(self,aF,aG,aE,aI,aA)
 aL.ERROR_STROKE=errorStroke
@@ -2255,7 +2292,8 @@ local aP=ak.Slider.new(self,aG,aH,aI,aD)
 
 aP.Min=az
 aP.Max=aA
-aP.Increment=aB local aQ=function(
+aP.Increment=aB
+aP.INPUT_BUTTON=aJ local aQ=function(
 
 aQ)
 return(aQ-az)/(aA-az)end local aR=function(
@@ -2333,7 +2371,7 @@ if not activeInput then return end
 if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseMovement then
 updateSlider(UserInputService:GetMouseLocation()-GuiService:GetGuiInset())
 elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
-updateSlider(input.Position)
+updateSlider(input.Position-GuiService:GetGuiInset())
 end
 end)
 endedConnection=UserInputService.InputEnded:Connect(function(input)
@@ -2354,7 +2392,7 @@ A=true
 connectDragInput()
 J(aM,"BackgroundTransparency",0,0.15):Play()
 aF.ScrollingEnabled=false
-updateSlider(input.Position)
+updateSlider(input.Position-GuiService:GetGuiInset())
 end,nil,aJ)
 
 u(aJ.Destroying,function()
@@ -3373,15 +3411,14 @@ function ai:SetEnabled(av)
 assert(type(av)=="boolean",`"Option.SetEnabled". 'boolean' expected, got {typeof(av)}`)
 self.Enabled=av
 local element=self.DESTROY_ELEMENT
-if typeof(element)=="Instance" then
-if element:IsA("GuiButton") then
+if typeof(element)=="Instance" and element:IsA("GuiButton") then
  element.Active=av and not self.Loading
  element.AutoButtonColor=false
-elseif element:IsA("TextBox") then
- element.TextEditable=av
- element.Active=av
 end
-end
+if self.TEXTBOX then self.TEXTBOX.TextEditable=av self.TEXTBOX.Active=av end
+if self.COLOR_INPUT then self.COLOR_INPUT.TextEditable=av self.COLOR_INPUT.Active=av end
+if self.KEY_BUTTON then self.KEY_BUTTON.Active=av end
+if self.INPUT_BUTTON then self.INPUT_BUTTON.Active=av end
 return self
 end
 
@@ -3435,6 +3472,7 @@ Elements={Corner=UDim.new(0,5),Padding={PaddingLeft=UDim.new(0,8),PaddingRight=U
 self.TOOLTIP=tooltip
 u(target.MouseEnter,function() tooltip.Visible=true end,nil,target)
 u(target.MouseLeave,function() tooltip.Visible=false end,nil,target)
+u(target.Destroying,function() if tooltip.Parent then tooltip:Destroy() end end,nil,I)
 u(UserInputService.InputChanged,function(input)
 if tooltip.Visible and input.UserInputType==Enum.UserInputType.MouseMovement then
 local position=UserInputService:GetMouseLocation()-GuiService:GetGuiInset()
@@ -4353,6 +4391,20 @@ end
 end
 resetThemeGroups(C)
 C:update()
+end
+
+function Library:SetAccent(color)
+assert(typeof(color)=="Color3",`"Library.SetAccent". 'Color3' expected, got {typeof(color)}`)
+local theme=self.CurrentTheme or self.Themes[self.Default.Theme]
+assert(theme and theme.Colors,`"Library.SetAccent". current theme is unavailable`)
+theme.Colors.Primary=color
+theme.Colors.Slider.SliderBar=color
+theme.Colors.OnPrimary=color:Lerp(theme.Colors.Text.Default,0.55)
+self.CurrentTheme=theme
+if self.LOADED_UI_LIBRARY then
+self:SetTheme(theme.Name)
+end
+return self
 end
 
 function Library:SetUIScale(ab)
