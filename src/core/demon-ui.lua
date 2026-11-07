@@ -455,27 +455,84 @@ function DemonUI.new(options)
 
     -- Ignore the executor's gameProcessed flag. A focused TextBox is the only
     -- case where typing B should not toggle the interface.
-    self.ToggleKey = options.ToggleKey or WINDOW_OPTIONS.ToggleKey
-    do
-        local okService, input = pcall(function() return game:GetService("UserInputService") end)
-        if okService and input then
-            local okConnect, connection = pcall(function()
-                return input.InputBegan:Connect(function(io)
-                    if self.Destroyed then return end
+    local UserInputService = game:GetService("UserInputService")
+    local savedKey = type(env.__DEPHUB_PANEL_KEY) == "string" and Enum.KeyCode[env.__DEPHUB_PANEL_KEY] or nil
+    self.ToggleKey = options.ToggleKey or savedKey or WINDOW_OPTIONS.ToggleKey
+    self._capturingToggleKey = false
+
+    function self:SetToggleKey(keyCode)
+        if self.Destroyed or typeof(keyCode) ~= "EnumItem" or keyCode.EnumType ~= Enum.KeyCode then
+            return false
+        end
+        if keyCode == Enum.KeyCode.Unknown then return false end
+        self.ToggleKey = keyCode
+        env.__DEPHUB_PANEL_KEY = keyCode.Name
+        return true
+    end
+
+    local okConnect, connection = pcall(function()
+        return UserInputService.InputBegan:Connect(function(io)
+            if self.Destroyed or self._capturingToggleKey then return end
+            if io.UserInputType ~= Enum.UserInputType.Keyboard then return end
+            if io.KeyCode ~= self.ToggleKey then return end
+
+            local focused = nil
+            pcall(function()
+                focused = UserInputService:GetFocusedTextBox()
+            end)
+            if focused then return end
+            pcall(function() self.Library:Toggle() end)
+        end)
+    end)
+    if okConnect and connection then self._toggleKeyConnection = connection end
+
+    local settingsTab = self:CreateTab("Interface", "Settings", "keyboard")
+    if settingsTab then
+        local settingsSection = settingsTab:CreateSection("Panel")
+        if settingsSection then
+            settingsSection:CreateParagraph(
+                "Tecla de abertura/fechamento",
+                "Tecla atual: " .. self.ToggleKey.Name
+            )
+            settingsSection:CreateButton("Alterar tecla do painel", function()
+                if self.Destroyed or self._capturingToggleKey then return end
+                self._capturingToggleKey = true
+                self:Notify("Atalho do painel", "Pressione uma tecla. ESC cancela.", "info")
+
+                local captureConnection
+                captureConnection = UserInputService.InputBegan:Connect(function(io)
+                    if self.Destroyed then
+                        if captureConnection then captureConnection:Disconnect() end
+                        self._toggleKeyCaptureConnection = nil
+                        self._capturingToggleKey = false
+                        return
+                    end
                     if io.UserInputType ~= Enum.UserInputType.Keyboard then return end
-                    if io.KeyCode ~= self.ToggleKey then return end
 
                     local focused = nil
                     pcall(function()
-                        if type(input.GetFocusedTextBox) == "function" then
-                            focused = input:GetFocusedTextBox()
-                        end
+                        focused = UserInputService:GetFocusedTextBox()
                     end)
                     if focused then return end
-                    pcall(function() self.Library:Toggle() end)
+
+                    if io.KeyCode == Enum.KeyCode.Escape then
+                        self._capturingToggleKey = false
+                        captureConnection:Disconnect()
+                        self._toggleKeyCaptureConnection = nil
+                        self:Notify("Atalho do painel", "Alteração cancelada.", "info")
+                        return
+                    end
+
+                    if io.KeyCode == Enum.KeyCode.Unknown then return end
+
+                    self:SetToggleKey(io.KeyCode)
+                    self._capturingToggleKey = false
+                    captureConnection:Disconnect()
+                    self._toggleKeyCaptureConnection = nil
+                    self:Notify("Atalho atualizado", "O painel agora abre e fecha com " .. io.KeyCode.Name .. ".", "success")
                 end)
+                self._toggleKeyCaptureConnection = captureConnection
             end)
-            if okConnect and connection then self._toggleKeyConnection = connection end
         end
     end
 
@@ -607,6 +664,11 @@ end
 function DemonUI:Destroy()
     if self.Destroyed then return end
     self.Destroyed = true
+    self._capturingToggleKey = false
+    if self._toggleKeyCaptureConnection then
+        pcall(function() self._toggleKeyCaptureConnection:Disconnect() end)
+        self._toggleKeyCaptureConnection = nil
+    end
     if self._toggleKeyConnection then
         pcall(function() self._toggleKeyConnection:Disconnect() end)
         self._toggleKeyConnection = nil
