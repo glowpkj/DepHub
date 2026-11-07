@@ -255,7 +255,7 @@ function Visual:_apply()
     end
 
     self.RetryCounter += 1
-    if not self.BypassReady or self.RetryCounter >= 30 then
+    if self.RetryCounter >= 30 then
         self.RetryCounter = 0
         self:_applyBypass()
     end
@@ -266,6 +266,7 @@ function Visual:Start()
     self.Active = true
     self.RetryCounter = 0
     self:_apply()
+    self:_applyBypass()
     self.Connection = RunService.Heartbeat:Connect(function()
         self:_apply()
     end)
