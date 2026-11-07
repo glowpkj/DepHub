@@ -3974,12 +3974,12 @@ function ag:SaveProfile(name)
 assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.SaveProfile". profile name must contain only letters, numbers, '_' or '-'`)
 local ok,encoded=pcall(HttpService.JSONEncode,HttpService,ae)
 if not ok then return false end
-return self:WriteFile("profiles/"..name..".json",encoded)
+return self:WriteFile("profile_"..name..".json",encoded)
 end
 
 function ag:LoadProfile(name)
 assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.LoadProfile". profile name must contain only letters, numbers, '_' or '-'`)
-local content=self:ReadFile("profiles/"..name..".json")
+local content=self:ReadFile("profile_"..name..".json")
 if type(content)~="string" then return false end
 local ok,profile=pcall(HttpService.JSONDecode,HttpService,content)
 if not ok or type(profile)~="table" then return false end
@@ -4005,7 +4005,7 @@ end
 
 function ag:DeleteProfile(name)
 assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.DeleteProfile". profile name must contain only letters, numbers, '_' or '-'`)
-return self:WriteFile("profiles/"..name..".json",nil)
+return self:WriteFile("profile_"..name..".json",nil)
 end
 
 function ag:DeleteFlags()
