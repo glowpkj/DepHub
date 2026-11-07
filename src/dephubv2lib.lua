@@ -1898,6 +1898,8 @@ assert(type(enabled)=="boolean",`"ColorPicker.SetEnabled". 'boolean' expected, g
 self.Enabled=enabled
 if self.DESTROY_ELEMENT then self.DESTROY_ELEMENT.Active=enabled end
 if self.COLOR_INPUT then self.COLOR_INPUT.TextEditable=enabled self.COLOR_INPUT.Active=enabled end
+if self.COLOR_SWATCH then self.COLOR_SWATCH.Active=enabled end
+if not enabled and self.PALETTE then self.PALETTE.Visible=false end
 return self
 end
 
@@ -2875,8 +2877,10 @@ end
 assert(typeof(default)=="Color3",`"Tab.AddColorPicker.Default". 'Color3' or hex string expected, got {typeof(default)}`,2)
 local group=V[self]
 local row,titleLabel,descriptionLabel=am(self,title,description,UDim2.new(1,-125,0,0))
-local swatch=createInstance("Frame",row,{
+local swatch=createInstance("TextButton",row,{
 Size=UDim2.fromOffset(22,22),
+AutoButtonColor=false,
+Text="",
 Position=UDim2.new(1,-10,0.5,0),
 AnchorPoint=Vector2.new(1,0.5),
 BackgroundColor3=default,
@@ -2908,6 +2912,53 @@ Description=description,
 Parent=self,
 Kind="ColorPicker"
 },ak.ColorPicker)
+local palette=createInstance("Frame","ColorPalette",I,{
+Visible=false,
+ZIndex=1500,
+Size=UDim2.fromOffset(150,64),
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Buttons.Default"),
+BorderSizePixel=0,
+Elements={Corner=UDim.new(0,6),Stroke={Color=w(Library.CurrentTheme,"Colors.Stroke")},Padding={PaddingLeft=UDim.new(0,5),PaddingRight=UDim.new(0,5),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)}}
+})
+local paletteLayout=createInstance("UIGridLayout",palette,{
+CellSize=UDim2.fromOffset(20,20),
+CellPadding=UDim2.fromOffset(4,4),
+FillDirectionMaxCells=6,
+SortOrder=Enum.SortOrder.LayoutOrder
+})
+local paletteColors={
+Color3.fromRGB(239,68,68),Color3.fromRGB(249,115,22),Color3.fromRGB(234,179,8),Color3.fromRGB(132,204,22),Color3.fromRGB(34,197,94),Color3.fromRGB(20,184,166),
+Color3.fromRGB(14,165,233),Color3.fromRGB(59,130,246),Color3.fromRGB(99,102,241),Color3.fromRGB(139,92,246),Color3.fromRGB(217,70,239),Color3.fromRGB(236,72,153),
+Color3.fromRGB(255,255,255),Color3.fromRGB(180,180,180),Color3.fromRGB(90,90,90),Color3.fromRGB(20,20,20)
+}
+for index,color in ipairs(paletteColors) do
+local colorButton=createInstance("TextButton",palette,{
+LayoutOrder=index,
+ZIndex=1501,
+Size=UDim2.fromOffset(20,20),
+BackgroundColor3=color,
+AutoButtonColor=false,
+Text="",
+Elements={Corner=UDim.new(0,4),Stroke={Color=Color3.fromRGB(100,100,100),Transparency=0.55}}
+})
+u(colorButton.Activated,function()
+handle:SetColor(color)
+palette.Visible=false
+end,nil,colorButton)
+end
+handle.PALETTE=palette
+u(swatch.Activated,function()
+if handle.Enabled==false then return end
+palette.Visible=not palette.Visible
+if palette.Visible then
+local position=swatch.AbsolutePosition
+local viewport=I.AbsoluteSize
+palette.Position=UDim2.fromOffset(math.clamp(position.X,4,math.max(4,viewport.X-154)),math.clamp(position.Y+26,4,math.max(4,viewport.Y-68)))
+end
+end,nil,swatch)
+u(row.Destroying,function()
+if palette.Parent then palette:Destroy() end
+end,nil,I)
 if flag then ae[flag]=input.Text:gsub("^#","") Library.Options[flag]=handle end
 u(input.FocusLost,function()
 local hex=input.Text:gsub("^#","")
@@ -3617,6 +3668,11 @@ assert(typeof(self.DESTROY_ELEMENT)=="Instance",`"Option.Destroy". cannot destro
 if self.LoadingTween then self.LoadingTween:Cancel() self.LoadingTween=nil end
 if self.TOOLTIP then self.TOOLTIP:Destroy() self.TOOLTIP=nil end
 local parentGroup=self.Parent and V[self.Parent]
+if self.PALETTE then
+if parentGroup then parentGroup:remove(self.PALETTE) end
+self.PALETTE:Destroy()
+self.PALETTE=nil
+end
 if parentGroup and type(parentGroup.remove)=="function" then
 parentGroup:remove(self.DESTROY_ELEMENT)
 end
@@ -4208,6 +4264,25 @@ end
 
 function ag:ClearNotificationHistory()
 table.clear(notificationHistory)
+end
+
+function ag:ShowNotificationHistory()
+local entries=self:GetNotificationHistory()
+local lines={}
+local first=math.max(1,#entries-9)
+for index=#entries,first,-1 do
+local entry=entries[index]
+lines[#lines+1]=string.format("%s\n%s",tostring(entry.Title or "Notification"),tostring(entry.Content or ""))
+end
+local content=#lines>0 and table.concat(lines,"\n\n────────\n\n") or "No notifications yet."
+return self:Dialog({
+Title="Notification History",
+Content=content,
+Options={
+{Title="Clear history",Callback=function() self:ClearNotificationHistory() end},
+{Title="Close",Callback=function() end}
+}
+})
 end
 
 function ag:Notify(av)
