@@ -670,6 +670,7 @@ local ad
 local ae
 
 local af=""
+local activeNotifications={}
 
 local ag={SelectedTab=1,Minimized=false}
 ag.__index=ag
@@ -753,9 +754,9 @@ Font="Font.Normal"
 local ay=J(ax,"BackgroundTransparency",0,0.3)
 local az=J(ax,"BackgroundTransparency",1,0.3)
 
-u(ax.MouseLeave,function()az:Play()end)
-u(ax.MouseEnter,function()ay:Play()end)
-u(ax.Activated,function()G(aw)end)
+u(ax.MouseLeave,function()az:Play()end,nil,ax)
+u(ax.MouseEnter,function()ay:Play()end,nil,ax)
+u(ax.Activated,function()G(aw)end,nil,ax)
 
 ax.Parent=aa.Template.Options
 end
@@ -1165,8 +1166,8 @@ J(av,"BackgroundColor3",w(Library.CurrentTheme,ax),0.2):Play()end
 
 
 if kind~="Paragraph" then
-u(av.MouseLeave,function()ax("Colors.Buttons.Default",false)end)
-u(av.MouseEnter,function()ax("Colors.Buttons.Holding",true)end)
+u(av.MouseLeave,function()ax("Colors.Buttons.Default",false)end,nil,av)
+u(av.MouseEnter,function()ax("Colors.Buttons.Holding",true)end,nil,av)
 end
 
 u(at:GetPropertyChangedSignal"Text",function()
@@ -1178,7 +1179,7 @@ at.Visible=ay
 aw.Position=UDim2.fromScale(0,az)
 aw.AnchorPoint=Vector2.new(0,az)
 end
-end)
+end,nil,av)
 
 aq.Text=an
 at.Text=ao or""
@@ -1635,7 +1636,7 @@ if a_.Enabled==false then return end
 if ar.Parent then
 aF(a_)
 end
-end)
+end,nil,a1)
 
 a_.SearchText=M(a_.DisplayName)
 a_.Instance=a1
@@ -3730,8 +3731,21 @@ Font="Font.Normal"
 
 local aI=false
 
-local aJ=J(aC,"Scale",1.22,0.35)
+local aJ=J(aC,"Scale",0.97,0.12)
 local aK=J(aC,"Scale",1.00,0.35)
+
+local progressTrack=createInstance("Frame","ProgressTrack",aB,{
+Size=UDim2.new(1,-16,0,2),
+Position=UDim2.new(0,8,1,-4),
+AnchorPoint=Vector2.new(0,1),
+BorderSizePixel=0,
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke")
+})
+local progressFill=createInstance("Frame","Progress",progressTrack,{
+Size=UDim2.fromScale(1,1),
+BorderSizePixel=0,
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Primary")
+})
 
 local aL=setmetatable({
 TITLE_LABEL=aE,
@@ -3754,6 +3768,9 @@ exitTween:Play()
 scaleTween:Play()
 exitTween.Completed:Wait()
 if aA.Parent then aA:Destroy() end
+for index=#activeNotifications,1,-1 do
+if activeNotifications[index]==self then table.remove(activeNotifications,index) end
+end
 self.Destroyed=true
 setmetatable(self,nil)
 end local aM=function()
@@ -3776,18 +3793,37 @@ aE.Text=aw
 aF.Text=ax
 
 local aM=aB.MouseLeave
-
+local totalDuration=math.max(az,0.1)
+local lastCountdown=nil
 while az>0 do
-aH.Text=Q(az)
-if aI==true then aM:Wait()end
-az-=task.wait()
+local countdown=math.ceil(az*10)/10
+if countdown~=lastCountdown then
+aH.Text=Q(countdown)
+lastCountdown=countdown
+end
+progressFill.Size=UDim2.new(math.clamp(az/totalDuration,0,1),0,1,0)
+if aI==true then
+aM:Wait()
+else
+az-=task.wait(0.05)
+end
 end
 
 aL:Close()end
 
 
-u(aB.MouseButton1Down,function()aJ:Play()aI=true end)
-u(aB.MouseLeave,function()aK:Play()aI=false end)
+u(aB.MouseButton1Down,function()aJ:Play()aI=true end,nil,aA)
+u(aB.MouseLeave,function()aK:Play()aI=false end,nil,aA)
+
+activeNotifications[#activeNotifications+1]=aL
+while #activeNotifications>4 do
+local oldest=activeNotifications[1]
+if oldest and not oldest.Closed then
+oldest:Close()
+else
+table.remove(activeNotifications,1)
+end
+end
 
 task.defer(aM)
 
