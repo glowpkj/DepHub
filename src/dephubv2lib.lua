@@ -30,7 +30,7 @@
 --   lib:GetIconByName(name) / lib:SetTheme(name) / lib:SetUIScale(scale)
 --
 -- The adapter that maps this API onto DepHub's own shell contract lives in
--- src/core/demon-ui.lua; backends never call RedzLib directly.
+-- src/core/ui-adapter.lua; backends never call RedzLib directly.
 
 -- ===========================================================================
 -- SECTION: Executor shims and services
@@ -55,17 +55,12 @@ return rawget(g,h)
 end
 })
 
-local MarketplaceService = Services.MarketplaceService
 local UserInputService = Services.UserInputService
+local GuiService = Services.GuiService
 local TweenService = Services.TweenService
 local HttpService = Services.HttpService
 local RunService = Services.RunService
 local PlayersService = Services.Players
-
-local Heartbeat = RunService.Heartbeat
-
-local LocalPlayer = PlayersService.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
 
 local GuiParent = (gethui or function() return Services.CoreGui end)()
 
@@ -141,6 +136,35 @@ BackgroundTransparency=0.03
 }
 }
 
+local LightTheme=table.clone(Themes.Darker)
+LightTheme.Colors=table.clone(Themes.Darker.Colors)
+LightTheme.Colors.Text=table.clone(Themes.Darker.Colors.Text)
+LightTheme.Colors.Buttons=table.clone(Themes.Darker.Colors.Buttons)
+LightTheme.Colors.Border=table.clone(Themes.Darker.Colors.Border)
+LightTheme.Colors.Dialog=table.clone(Themes.Darker.Colors.Dialog)
+LightTheme.Colors.Slider=table.clone(Themes.Darker.Colors.Slider)
+LightTheme.Colors.Dropdown=table.clone(Themes.Darker.Colors.Dropdown)
+LightTheme.Colors.Background=ColorSequence.new{
+ColorSequenceKeypoint.new(0,Color3.fromRGB(248,248,250)),
+ColorSequenceKeypoint.new(0.5,Color3.fromRGB(238,239,243)),
+ColorSequenceKeypoint.new(1,Color3.fromRGB(248,248,250))
+}
+LightTheme.Colors.Stroke=Color3.fromRGB(205,207,214)
+LightTheme.Colors.OnPrimary=Color3.fromRGB(65,74,160)
+LightTheme.Colors.ScrollBar=Color3.fromRGB(130,137,158)
+LightTheme.Colors.Icons=Color3.fromRGB(65,68,78)
+LightTheme.Colors.Text.Default=Color3.fromRGB(35,36,42)
+LightTheme.Colors.Text.Dark=Color3.fromRGB(75,77,86)
+LightTheme.Colors.Text.Darker=Color3.fromRGB(105,108,118)
+LightTheme.Colors.Buttons.Default=Color3.fromRGB(231,232,237)
+LightTheme.Colors.Buttons.Holding=Color3.fromRGB(218,220,228)
+LightTheme.Colors.Border.Default=Color3.fromRGB(210,212,219)
+LightTheme.Colors.Border.Holding=Color3.fromRGB(185,188,198)
+LightTheme.Colors.Dialog.Background=Color3.fromRGB(250,250,252)
+LightTheme.Colors.Slider.SliderBar=LightTheme.Colors.Primary
+LightTheme.Colors.Dropdown.Holder=Color3.fromRGB(244,245,248)
+Themes.Light=LightTheme
+
 for Library,ViewportSize in Themes do
 ViewportSize.Name=Library
 table.freeze(ViewportSize)
@@ -153,6 +177,7 @@ end
 -- and the aliases the rest of the file uses.
 -- ===========================================================================
 local Library={
+ReducedMotion=false,
 Information={
 Version="v2.0.1",
 GitHubOwner="tlredz"
@@ -164,6 +189,7 @@ TabSize=160
 },
 
 Themes=Themes,
+CurrentTheme=Themes.Darker,
 
 Connections={},
 Options={},
@@ -182,10 +208,27 @@ Library.Save=Library.Default
 -- DepHub: a escala da UI e fixa em 1:1. As dimensoes em pixels permanecem
 -- iguais entre resolucoes, sem encolher em telas menores ou crescer em telas maiores.
 -- Pixel sizing is independent of the camera viewport.
-local u=function(
-
-u, v, w)
-table.insert(Library.Connections,u[w or"Connect"](u,v))end
+local u=function(signal,callback,method,scope)
+if scope==nil and typeof(method)=="Instance" then
+scope=method
+method=nil
+end
+local connection=signal[method or "Connect"](signal,callback)
+table.insert(Library.Connections,connection)
+if scope and typeof(scope)=="Instance" then
+local cleanup
+cleanup=scope.Destroying:Connect(function()
+if connection.Connected then connection:Disconnect() end
+for index=#Library.Connections,1,-1 do
+if Library.Connections[index]==connection or Library.Connections[index]==cleanup then
+ table.remove(Library.Connections,index)
+end
+end
+end)
+table.insert(Library.Connections,cleanup)
+end
+return connection
+end
 
 
 local v={}
@@ -252,6 +295,15 @@ y(Library.CurrentTheme,C,D)
 end
 end
 
+function v:remove(instance)
+if typeof(instance)=="Instance" then
+self.Descendants[instance]=nil
+for _,descendant in ipairs(instance:GetDescendants()) do
+self.Descendants[descendant]=nil
+end
+end
+end
+
 function v:update()
 if self.IS_RENDERING and not self.UPDATED_OBJECTS then
 local C=Library.CurrentTheme
@@ -267,7 +319,7 @@ end
 end
 
 function v:destroy()
-local C=self.Parent and table.find(self.Parent.Descendants)
+local C=self.Parent and table.find(self.Parent.Descendants,self)
 
 if C then
 table.remove(self.Parent.Descendants,C)
@@ -427,86 +479,98 @@ end
 
 local I
 
-function InstanceFactory:Draggable(J,K,L)
-local M,N,O,P
-local Q=K or 0.28
-local R=0
-local S local T=function(
+function InstanceFactory:Draggable(frame,scaleObject,lerpFactor,clampPosition)
+local activeInput=nil
+local startPointer=nil
+local startPosition=nil
+local latestPointer=nil
+local renderConnection=nil
+local moved=false
+local smoothing=lerpFactor or 0.28
 
-T)
-local U=T.Position-N
-local V
-R=tick()
+local latestTarget=nil
+local function pointerPosition(input)
+local inset=GuiService:GetGuiInset()
+if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.MouseMovement then
+return UserInputService:GetMouseLocation()-inset
+end
+return input.Position-inset
+end
 
-if L then
-V=L(
-O.X.Scale,O.X.Offset+U.X/J.Scale,
-O.Y.Scale,O.Y.Offset+U.Y/J.Scale
+local function stopDrag()
+if not activeInput then return end
+activeInput=nil
+startPointer=nil
+startPosition=nil
+latestPointer=nil
+if latestTarget and frame.Parent then frame.Position=latestTarget end
+latestTarget=nil
+if renderConnection then
+renderConnection:Disconnect()
+renderConnection=nil
+end
+A=false
+end
+
+u(frame.InputBegan,function(input)
+if A or activeInput then return end
+if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
+activeInput=input
+startPointer=pointerPosition(input)
+latestPointer=startPointer
+startPosition=frame.Position
+moved=false
+A=true
+renderConnection=RunService.RenderStepped:Connect(function(deltaTime)
+if not activeInput or not frame.Parent then
+stopDrag()
+return
+end
+local delta=latestPointer-startPointer
+if math.abs(delta.X)>4 or math.abs(delta.Y)>4 then
+moved=true
+frame:SetAttribute("DragMoved",true)
+end
+local factor=1-math.pow(1-math.clamp(smoothing,0,1),math.max(deltaTime,0)*60)
+local target
+if clampPosition then
+target=clampPosition(
+startPosition.X.Scale,startPosition.X.Offset+delta.X/math.max(scaleObject.Scale,0.001),
+startPosition.Y.Scale,startPosition.Y.Offset+delta.Y/math.max(scaleObject.Scale,0.001)
 )
 else
-V=UDim2.new(
-O.X.Scale,O.X.Offset+U.X/J.Scale,
-O.Y.Scale,O.Y.Offset+U.Y/J.Scale
-)
+local viewport=I.AbsoluteSize
+local size=frame.AbsoluteSize
+local anchorPosition=frame.AbsolutePosition+Vector2.new(size.X*frame.AnchorPoint.X,size.Y*frame.AnchorPoint.Y)
+local targetAnchor=anchorPosition+delta
+local minX=size.X*frame.AnchorPoint.X
+local minY=size.Y*frame.AnchorPoint.Y
+local maxX=math.max(minX,viewport.X-size.X*(1-frame.AnchorPoint.X))
+local maxY=math.max(minY,viewport.Y-size.Y*(1-frame.AnchorPoint.Y))
+target=UDim2.fromOffset(math.clamp(targetAnchor.X,minX,maxX),math.clamp(targetAnchor.Y,minY,maxY))
 end
-self.Position=self.Position:Lerp(V,Q)end local U=function()
-
-
-
-while I==self do
-if(tick()-R)>=1 then
-S()
-break
-end
-task.wait()
-end end
-
-
-local V={
-[Enum.UserInputType.MouseButton1]=true,
-[Enum.UserInputType.Touch]=true
-}
-
-local W={
-[Enum.UserInputType.MouseMovement]=true,
-[Enum.UserInputType.Touch]=true
-}
-
-u(self.InputBegan,function(X)
-if A==false and I==nil and V[X.UserInputType]then
-N=X.Position
-O=self.Position
-I=self
-R=tick()
-A=true
-
-local Y;
-
-function S()
-A=false
-I=nil
-Y:Disconnect()
-end
-
-task.spawn(U)
-
-Y=X.Changed:Connect(function()
-if X.UserInputState==Enum.UserInputState.End then
-S()
-end
+latestTarget=target
+frame.Position=frame.Position:Lerp(target,factor)
 end)
-end
-end)
+end,nil,frame)
 
-u(UserInputService.InputChanged,function(X)
-if I==self and W[X.UserInputType]then
-T(X)
+u(UserInputService.InputChanged,function(input)
+if not activeInput then return end
+if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseMovement then
+latestPointer=pointerPosition(input)
+elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
+latestPointer=input.Position
 end
-end)
-end
+end,nil,frame)
 
-function InstanceFactory:CreateNewTemplate(J)
-return InstanceFactory.CloneObject(F[self],J)
+u(UserInputService.InputEnded,function(input)
+if not activeInput then return end
+if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1 then
+stopDrag()
+elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
+stopDrag()
+end
+end,nil,frame)
 end
 
 function InstanceFactory.new(J,...)
@@ -539,7 +603,11 @@ return table.pack(F)end local G=function(
 
 G, ...)
 for H=1,#G do
-task.spawn(G[H],...)
+local callback=G[H]
+task.spawn(function(...)
+local ok,err=pcall(callback,...)
+if not ok then warn("DepHub callback error: "..tostring(err)) end
+end,...)
 end end
 
 
@@ -550,10 +618,12 @@ if not I then
 I=createInstance("ScreenGui",H,GuiParent,{
 IgnoreGuiInset=true
 })
-end local J=function(
+end local ReducedMotion=false
+local J=function(
 
 J, K, L, M, ...)
-local N=TweenInfo.new(M,EasingStyle or Enum.EasingStyle.Quint,...)
+if ReducedMotion then M=0 end
+local N=TweenInfo.new(M,Enum.EasingStyle.Quint,...)
 
 return TweenService:Create(J,N,{
 [K]=L
@@ -639,6 +709,8 @@ local ad
 local ae
 
 local af=""
+local activeNotifications={}
+local notificationHistory={}
 
 local ag={SelectedTab=1,Minimized=false}
 ag.__index=ag
@@ -676,6 +748,8 @@ ak.Dropdown=ap
 
 local aq=al()
 ak.Keybind=aq
+local colorPickerPrototype=al()
+ak.ColorPicker=colorPickerPrototype
 
 local ar=al()
 ak.Dialog=ar local as=function()
@@ -713,6 +787,7 @@ Elements={
 Corner=UDim.new(1,0)
 },
 ThemeTag={
+OBJECTS=self.ThemeGroup,
 BackgroundColor3="Colors.Buttons.Default",
 TextColor3="Colors.Text.Dark",
 Font="Font.Normal"
@@ -722,9 +797,9 @@ Font="Font.Normal"
 local ay=J(ax,"BackgroundTransparency",0,0.3)
 local az=J(ax,"BackgroundTransparency",1,0.3)
 
-u(ax.MouseLeave,function()az:Play()end)
-u(ax.MouseEnter,function()ay:Play()end)
-u(ax.Activated,function()G(aw)end)
+u(ax.MouseLeave,function()az:Play()end,nil,ax)
+u(ax.MouseEnter,function()ay:Play()end,nil,ax)
+u(ax.Activated,function()G(aw)end,nil,ax)
 
 ax.Parent=aa.Template.Options
 end
@@ -735,21 +810,50 @@ return nil
 end
 
 self.Closing=true
-
-local av=J(self.TEMPLATE,"Size",self.NEW_SIZE,0.1)
-av:Play()
-
+local fadeDuration=ReducedMotion and 0 or 0.16
+local fadeTweens={}
+local backdropTween=J(aa,"BackgroundTransparency",1,fadeDuration)
+local bodyTween=J(self.TEMPLATE,"BackgroundTransparency",1,fadeDuration)
+table.insert(fadeTweens,backdropTween)
+table.insert(fadeTweens,bodyTween)
+for _,object in ipairs(self.TEMPLATE:GetDescendants()) do
+if object:IsA("GuiObject") then
+local tween=J(object,"BackgroundTransparency",1,fadeDuration)
+table.insert(fadeTweens,tween)
+end
+if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+local tween=J(object,"TextTransparency",1,fadeDuration)
+table.insert(fadeTweens,tween)
+end
+if object:IsA("ImageLabel") or object:IsA("ImageButton") then
+local tween=J(object,"ImageTransparency",1,fadeDuration)
+table.insert(fadeTweens,tween)
+end
+if object:IsA("UIStroke") then
+local tween=J(object,"Transparency",1,fadeDuration)
+table.insert(fadeTweens,tween)
+end
+end
+for _,tween in ipairs(fadeTweens) do tween:Play() end
+local sizeTween=J(self.TEMPLATE,"Size",self.NEW_SIZE,0.1)
+sizeTween:Play()
 if au then
-av.Completed:Wait()
+sizeTween.Completed:Wait()
+task.wait(fadeDuration)
+if self.ThemeGroup then self.ThemeGroup:destroy() self.ThemeGroup=nil end
 as()
 else
-u(av.Completed,as)
+u(sizeTween.Completed,function()
+task.wait(fadeDuration)
+if self.ThemeGroup then self.ThemeGroup:destroy() self.ThemeGroup=nil end
+as()
+end,nil,self.TEMPLATE)
 end
 end
 
 function ar.new(au,av)
 return setmetatable({
-TITLE_LABEL=au,
+TITLE_LABEL=av,
 DESCRIPTION_LABEL=au,
 Content=au.Text,
 Title=av.Text,
@@ -760,10 +864,32 @@ Kind="Dialog"
 },ar)
 end
 
-function ap:SetEnabled(au)
-assert(type(au)=="table",`"Dropdown.SetEnabled[param 1]". 'table' expected, got {typeof(au)}`)
+function ap:SetValue(value)
+if type(value)=="table" then
+for _,option in ipairs(self.DROPDOWN_OPTIONS) do
+self.SELECT_DROPDOWN_OPTION(option.Name,false)
+end
+for name,selected in pairs(value) do
+self.SELECT_DROPDOWN_OPTION(name,selected==true)
+end
+elseif type(value)=="string" or type(value)=="number" then
+self.SELECT_DROPDOWN_OPTION(tostring(value),true)
+else
+error(`"Dropdown.SetValue". 'string', 'number', or 'table' expected, got {typeof(value)}`,2)
+end
+return self
+end
 
+function ap:SetEnabled(au)
+if type(au)=="boolean" then
+self.Enabled=au
+if self.DESTROY_ELEMENT then self.DESTROY_ELEMENT.Active=au end
+return self
+end
+assert(type(au)=="table",`"Dropdown.SetEnabled[param 1]". 'boolean' or 'table' expected, got {typeof(au)}`)
+assert(type(self.SET_ENABLED_OPTIONS)=="function",`"Dropdown.SetEnabled". option registry is unavailable`)
 self.SET_ENABLED_OPTIONS(au)
+return self
 end
 
 function ap:Clear()
@@ -931,6 +1057,7 @@ al, am, an)
 local ao=createInstance("TextButton","Button",an,{
 Size=UDim2.new(1,0,0,24),
 AutoButtonColor=false,
+BackgroundTransparency=1,
 Text="",
 Elements={
 Corner=UDim.new(0,6)
@@ -941,11 +1068,11 @@ BackgroundColor3="Colors.Buttons.Default"
 Childs={
 createInstance("TextLabel","Title",{
 BackgroundTransparency=1,
-Font=Enum.Font.GothamMedium,
+Font=w(Library.CurrentTheme,"Font.Medium"),
 Text=am.Title,
 TextSize=10,
 TextXAlignment=Enum.TextXAlignment.Left,
-TextTransparency=(FirstTab and 0.3)or 0,
+TextTransparency=0.3,
 TextTruncate=Enum.TextTruncate.AtEnd,
 ThemeTag={
 TextColor3="Colors.Text.Default"
@@ -971,7 +1098,7 @@ local aq=createInstance("ScrollingFrame","Container",{
 Size=UDim2.new(1,0,1,0),
 Position=UDim2.new(0,0,1),
 AnchorPoint=Vector2.new(0,1),
-ScrollBarThickness=1.5,
+ScrollBarThickness=UserInputService.TouchEnabled and 5 or 1.5,
 BackgroundTransparency=1,
 ScrollBarImageTransparency=0.2,
 AutomaticCanvasSize=Enum.AutomaticSize.Y,
@@ -1014,13 +1141,31 @@ ar.Visible=as
 at.Size=UDim2.new(1,as and-25 or-15,1)
 at.Position=UDim2.fromOffset(as and 25 or 15)end
 
-u(ar:GetPropertyChangedSignal"Image",as)
+u(ar:GetPropertyChangedSignal"Image",as,nil,ao)
+u(ao.MouseEnter,function()
+if not al.Selected then
+J(ao,"BackgroundTransparency",0.92,0.12):Play()
+J(ao,"BackgroundColor3",w(Library.CurrentTheme,"Colors.Buttons.Holding"),0.12):Play()
+end
+end,nil,ao)
+u(ao.MouseLeave,function()
+if not al.Selected then
+J(ao,"BackgroundTransparency",1,0.12):Play()
+J(ao,"BackgroundColor3",w(Library.CurrentTheme,"Colors.Buttons.Default"),0.12):Play()
+end
+end,nil,ao)
+u(ao.MouseButton1Down,function()
+J(ao,"BackgroundTransparency",0.88,0.06):Play()
+end,nil,ao)
+u(ao.MouseButton1Up,function()
+J(ao,"BackgroundTransparency",al.Selected and 0.85 or 0.92,0.08):Play()
+end,nil,ao)
 as()
 
 return ao,aq,ap,ar end local am=function(
 
 
-am, an, ao, ap)
+am, an, ao, ap, kind)
 local aq=createInstance("TextLabel",{
 TextXAlignment=Enum.TextXAlignment.Left,
 TextTruncate=Enum.TextTruncate.AtEnd,
@@ -1047,7 +1192,7 @@ Size=UDim2.new(1,-20),
 Position=UDim2.new(0,12,0,15),
 BackgroundTransparency=1,
 TextWrapped=true,
-TextSize=8,
+TextSize=9,
 RichText=true,
 ThemeTag={
 OBJECTS=ar,
@@ -1056,15 +1201,17 @@ Font="Font.Normal"
 }
 })
 
-local au={
-OBJECTS=ar,
-BackgroundColor3="Colors.Buttons.Default"
-}
+local au={OBJECTS=ar}
+if kind~="Paragraph" then
+au.BackgroundColor3="Colors.Buttons.Default"
+end
 
 local av=createInstance("TextButton","Option",{
 AutomaticSize=Enum.AutomaticSize.Y,
 Size=UDim2.new(1,0,0,25),
 AutoButtonColor=false,
+Active=kind~="Paragraph",
+BackgroundTransparency=kind=="Paragraph" and 1 or 0,
 Text="",
 ThemeTag=au,
 Elements={
@@ -1091,6 +1238,12 @@ Childs={aq,at}
 }
 })
 
+if am._CurrentSection then
+local section=am._CurrentSection
+section.Items[#section.Items+1]=av
+if section.Collapsed then av.Visible=false end
+end
+
 local aw=av.Holder local ax=function(
 
 ax, ay)
@@ -1111,8 +1264,10 @@ au.BackgroundColor3=ax
 J(av,"BackgroundColor3",w(Library.CurrentTheme,ax),0.2):Play()end
 
 
-u(av.MouseLeave,function()ax("Colors.Buttons.Default",false)end)
-u(av.MouseEnter,function()ax("Colors.Buttons.Holding",true)end)
+if kind~="Paragraph" then
+u(av.MouseLeave,function()ax("Colors.Buttons.Default",false)end,nil,av)
+u(av.MouseEnter,function()ax("Colors.Buttons.Holding",true)end,nil,av)
+end
 
 u(at:GetPropertyChangedSignal"Text",function()
 local ay=#at.Text>0
@@ -1123,7 +1278,7 @@ at.Visible=ay
 aw.Position=UDim2.fromScale(0,az)
 aw.AnchorPoint=Vector2.new(0,az)
 end
-end)
+end,nil,av)
 
 aq.Text=an
 at.Text=ao or""
@@ -1267,7 +1422,7 @@ ZIndex=1002,
 Size=UDim2.new(1,-6,1,-6),
 Position=UDim2.fromScale(0.5,0.5),
 AnchorPoint=Vector2.new(0.5,0.5),
-ScrollBarThickness=3,
+ScrollBarThickness=UserInputService.TouchEnabled and 6 or 3,
 BackgroundTransparency=1,
 BorderSizePixel=0,
 CanvasSize=UDim2.new(),
@@ -1301,6 +1456,7 @@ local az=J(aw,"Size",UDim2.new(0,ax-30,1,0),0.3)
 local aA=J(aw,"Size",UDim2.new(0,0,1,0),0.2)
 
 local aB={}
+local dropdownThemeGroup=nil
 local aC=false
 local aD=false
 local aE
@@ -1310,6 +1466,7 @@ local aH
 local aI
 
 local aJ=0
+local SEARCH_RESULT_COUNT=0
 
 local aK=25
 local aL=(aK*12)+10
@@ -1326,7 +1483,8 @@ return math.min((aK*math.max(aN,0.5))+10,aL,aO/1.75)end local aO=function()
 local aO=as.AbsolutePosition
 local aP=as.AbsoluteSize
 
-local aQ=Vector2.new(Mouse.X,Mouse.Y)
+local mousePosition=UserInputService:GetMouseLocation()-GuiService:GetGuiInset()
+local aQ=Vector2.new(mousePosition.X,mousePosition.Y)
 
 local aR=aQ.X>=aO.X and aQ.X<=(aO.X+aP.X)
 local aS=aQ.Y>=aO.Y and aQ.Y<=(aO.Y+aP.Y)
@@ -1460,11 +1618,11 @@ aC=false end local aV=function()
 
 
 if aw:IsFocused()then
-aJ=tick()
+aJ=os.clock()
 return nil
 end
 
-if(tick()-aJ)>=0.3 and not aO()then
+if(os.clock()-aJ)>=0.3 and not aO()then
 aU()
 end end local aW=function()
 
@@ -1510,7 +1668,7 @@ end
 if aY then
 local aZ=aY.Instance
 local a_=M(aw.Text)
-aZ.Visible=#a_==0 or aY.SearchText:find(a_)~=nil
+aZ.Visible=#a_==0 or aY.SearchText:find(a_,1,true)~=nil
 
 if aZ.Visible~=false then
 SEARCH_RESULT_COUNT+=1
@@ -1540,6 +1698,7 @@ Elements={
 Corner=UDim.new(0,4)
 },
 ThemeTag={
+OBJECTS=dropdownThemeGroup,
 BackgroundColor3="Colors.Buttons.Default"
 },
 Childs={
@@ -1553,6 +1712,7 @@ Elements={
 Corner=UDim.new(0.5,0)
 },
 ThemeTag={
+OBJECTS=dropdownThemeGroup,
 BackgroundColor3="Colors.Primary"
 }
 }),
@@ -1566,6 +1726,7 @@ TextTransparency=0.4,
 Text=a_.DisplayName,
 TextSize=9,
 ThemeTag={
+OBJECTS=dropdownThemeGroup,
 Font="Font.Bold",
 TextColor3="Colors.Text.Default"
 }
@@ -1573,19 +1734,21 @@ TextColor3="Colors.Text.Default"
 }
 })
 
-local a2=0
-
 u(a1.Activated,function()
-if(tick()-a2)<0 then return end
-
+if a_.Enabled==false then return end
 if ar.Parent then
-a2=tick()+0.2
 aF(a_)
 end
-end)
+end,nil,a1)
 
 a_.SearchText=M(a_.DisplayName)
 a_.Instance=a1
+a1.Active=a_.Enabled~=false
+if a_.Enabled==false then
+ a1.BackgroundTransparency=0.45
+ local optionLabel=a1:FindFirstChildOfClass("TextLabel")
+ if optionLabel then optionLabel.TextTransparency=0.7 end
+end
 
 if a0 then
 local a3=aw.Text
@@ -1645,13 +1808,13 @@ SEARCH_RESULT_COUNT=a5
 as.Size=UDim2.fromOffset(ap,aN(a5))end
 
 
-u(ab:GetPropertyChangedSignal"Visible",aV)
-u(ab:GetPropertyChangedSignal"Size",aV)
-u(ar.MouseButton1Down,aV)
-u(ar.Activated,aV)
+u(ab:GetPropertyChangedSignal"Visible",aV,nil,ar)
+u(ab:GetPropertyChangedSignal"Size",aV,nil,ar)
+u(ar.MouseButton1Down,aV,nil,ar)
+u(ar.Activated,aV,nil,ar)
 
-u(at.Activated,aS)
-u(aw:GetPropertyChangedSignal"Text",a1)
+u(at.Activated,aS,nil,at)
+u(aw:GetPropertyChangedSignal"Text",a1,nil,aw)
 
 return table.freeze{
 CreateOptionTemplate=a_,
@@ -1668,6 +1831,22 @@ aH=...
 end,
 SetHolder=function(...)
 aI=...
+end,
+SetThemeGroup=function(group)
+if dropdownThemeGroup~=group then
+if aG then
+for _,option in ipairs(aG) do
+if option.Instance then
+if dropdownThemeGroup then dropdownThemeGroup:remove(option.Instance) end
+pcall(option.Instance.Destroy,option.Instance)
+option.Instance=nil
+end
+end
+end
+for instance in pairs(aB) do pcall(instance.Destroy,instance) end
+table.clear(aB)
+dropdownThemeGroup=group
+end
 end
 }end
 
@@ -1685,6 +1864,44 @@ aq=K(Enum.KeyCode:GetEnumItems())
 end
 
 return typeof(au)=="EnumItem"and aq[au]end
+
+function ak.Keybind:SetKeyCode(keyCode)
+assert(au(keyCode),`"Keybind.SetKeyCode". 'KeyCode' expected, got {typeof(keyCode)}`)
+self.KeyCode=keyCode
+if self.KEY_BUTTON then self.KEY_BUTTON.Text=keyCode.Name end
+if self.Flag then ae[self.Flag]=keyCode.Name end
+return self
+end
+
+function ak.Keybind:SetEnabled(enabled)
+assert(type(enabled)=="boolean",`"Keybind.SetEnabled". 'boolean' expected, got {typeof(enabled)}`)
+self.Enabled=enabled
+if not enabled and self.Capturing then self.Capturing=false if self.KEY_BUTTON then self.KEY_BUTTON.Text=self.KeyCode.Name end end
+if self.DESTROY_ELEMENT then self.DESTROY_ELEMENT.Active=enabled end
+if self.KEY_BUTTON then self.KEY_BUTTON.Active=enabled end
+return self
+end
+
+function ak.ColorPicker:SetColor(color)
+assert(typeof(color)=="Color3",`"ColorPicker.SetColor". 'Color3' expected, got {typeof(color)}`)
+self.Value=color
+local hex=string.format("%02X%02X%02X",math.round(color.R*255),math.round(color.G*255),math.round(color.B*255))
+if self.COLOR_INPUT then self.COLOR_INPUT.Text="#"..hex end
+if self.COLOR_SWATCH then self.COLOR_SWATCH.BackgroundColor3=color end
+if self.Flag then ae[self.Flag]=hex end
+G(self.CALLBACKS,color)
+return self
+end
+
+function ak.ColorPicker:SetEnabled(enabled)
+assert(type(enabled)=="boolean",`"ColorPicker.SetEnabled". 'boolean' expected, got {typeof(enabled)}`)
+self.Enabled=enabled
+if self.DESTROY_ELEMENT then self.DESTROY_ELEMENT.Active=enabled end
+if self.COLOR_INPUT then self.COLOR_INPUT.TextEditable=enabled self.COLOR_INPUT.Active=enabled end
+if self.COLOR_SWATCH then self.COLOR_SWATCH.Active=enabled end
+if not enabled and self.PALETTE then self.PALETTE.Visible=false end
+return self
+end
 
 
 function ah:GetNoSelfCall(av)
@@ -1704,42 +1921,86 @@ end
 -- AddDropdown / AddKeybind / AddColorPicker / AddDiscordInvite and the option
 -- prototype methods (SetValue / Set / AddCallback / Destroy / ...).
 -- ===========================================================================
-function ah:AddSection(av)
+function ah:AddSection(av,options)
+if type(av)=="table" then
+options=av
+av=options.Title or options.Name or ""
+end
 assert(av==nil or type(av)=="string",`"Tab.AddSection[param 1]". 'string', or 'nil' expected, got {typeof(av)}`)
-av=av or""
-
-local aw=V[self]
-
-local ax=createInstance("Frame","Option",T[self].Container,{
-Size=UDim2.new(1,0,0,20),
-BackgroundTransparency=1
+assert(options==nil or type(options)=="table" or type(options)=="boolean",`"Tab.AddSection[param 2]". 'table', 'boolean', or 'nil' expected, got {typeof(options)}`)
+av=av or ""
+local collapsible=options==true or (type(options)=="table" and options.Collapsible==true)
+local group=V[self]
+local header=createInstance("TextButton","Option",T[self].Container,{
+Size=UDim2.new(1,0,0,24),
+BackgroundTransparency=1,
+AutoButtonColor=false,
+Active=collapsible,
+Text="",
+Elements={Corner=UDim.new(0,5)}
 })
-
-local ay=createInstance("TextLabel",ax,{
+local titleLabel=createInstance("TextLabel","Title",header,{
 TextXAlignment=Enum.TextXAlignment.Left,
 TextTruncate=Enum.TextTruncate.AtEnd,
-Size=UDim2.new(1,-25,1,0),
-Position=UDim2.new(0,5),
+Size=UDim2.new(1,-28,1,0),
+Position=UDim2.fromOffset(5,0),
 BackgroundTransparency=1,
-TextSize=17,
+TextSize=15,
 Text=av,
-ThemeTag={
-OBJECTS=aw,
-TextColor3="Colors.Text.Default",
-Font="Font.Bold"
-}
+ThemeTag={OBJECTS=group,TextColor3="Colors.Text.Default",Font="Font.Bold"}
 })
-
-return setmetatable({
+local indicator
+if collapsible then
+indicator=createInstance("TextLabel","Indicator",header,{
+Size=UDim2.fromOffset(20,20),
+Position=UDim2.new(1,-5,0.5,0),
+AnchorPoint=Vector2.new(1,0.5),
+BackgroundTransparency=1,
+Text="−",
+TextSize=15,
+ThemeTag={OBJECTS=group,TextColor3="Colors.Text.Darker",Font="Font.Bold"}
+})
+end
+local section={Items={},Collapsed=false,Collapsible=collapsible,Header=header,Indicator=indicator,Title=av}
+if collapsible then
+self._CurrentSection=section
+self._Sections=self._Sections or {}
+self._Sections[#self._Sections+1]=section
+else
+self._CurrentSection=nil
+end
+local handle=setmetatable({
 Title=av,
-
-DESTROY_ELEMENT=ax,
-VISIBLE_ELEMENT=ax,
-TITLE_LABEL=ay,
-
+DESTROY_ELEMENT=header,
+VISIBLE_ELEMENT=header,
+TITLE_LABEL=titleLabel,
+Section=section,
 Kind="Section",
 Parent=self
 },ai)
+function handle:SetCollapsed(collapsed)
+assert(type(collapsed)=="boolean",`"Section.SetCollapsed". 'boolean' expected, got {typeof(collapsed)}`)
+assert(section.Collapsible,`"Section.SetCollapsed". this section is not collapsible`)
+section.Collapsed=collapsed
+for index=#section.Items,1,-1 do
+local item=section.Items[index]
+if item and item.Parent then
+item.Visible=not collapsed
+else
+table.remove(section.Items,index)
+end
+end
+if section.Indicator then section.Indicator.Text=collapsed and "+" or "−" end
+return self
+end
+if collapsible then
+u(header.Activated,function()
+handle:SetCollapsed(not section.Collapsed)
+end,nil,header)
+u(header.MouseEnter,function() header.BackgroundTransparency=0.9 end,nil,header)
+u(header.MouseLeave,function() header.BackgroundTransparency=1 end,nil,header)
+end
+return handle
 end
 
 function ah:AddToggle(av)
@@ -1795,7 +2056,7 @@ Corner=UDim.new(0.5,0)
 ThemeTag=aH
 })
 
-local aJ=tick()
+local aJ=os.clock()
 local aK=0.2
 local aL={}local aM=function(
 
@@ -1823,12 +2084,12 @@ G(aA,aO)
 
 local aP=UDim2.new(aO and 1 or 0,0,0.5,0)
 local aQ=Vector2.new(aO and 1 or 0,0.5)
-local aR=aO and"Colors.Primary"or"Colors.OnPrimary"
-local aS=w(Library.CurrentTheme,aR)
+local aR=aO and"Colors.Primary"or"Colors.Stroke"
+local aS=w(Library.CurrentTheme,aO and"Colors.Text.Default"or"Colors.OnPrimary")
 
 aH.BackgroundColor3=aR
 
-if self.Selected and(tick()-aJ)>=aK then
+if self.Selected and(os.clock()-aJ)>=aK then
 aM{
 J(aI,"Position",aP,0.25),
 J(aI,"AnchorPoint",aQ,0.25),
@@ -1841,20 +2102,20 @@ aI.AnchorPoint=aQ
 aI.BackgroundColor3=aS
 end
 
-aJ=tick()end
+aJ=os.clock()end
 
 
 local aP=ak.Toggle.new(self,aC,aD,aE,aO,aA)
+aP.Flag=ay
+if ay then Library.Options[ay]=aP end
 aP:SetValue(az)
 
 local aQ=0
 
 u(aC.Activated,function()
-if(tick()-aQ)>=aK then
-aQ=tick()
+aQ=os.clock()
 aP:SetValue(not aP.Value)
-end
-end)
+end,nil,aC)
 
 return aP
 end
@@ -1881,16 +2142,17 @@ Image="Icons.Button"
 local aF=0
 
 u(aB.Activated,function()
-if az~=nil and(tick()-aF)<0 then return end
+if aB:GetAttribute("Loading") then return end
+if az~=nil and(os.clock()-aF)<0 then return end
 
 if az~=nil then
-aF=tick()+az
+aF=os.clock()+az
 end
 
 G(ay)
-end)
+end,nil,aB)
 
-return setmetatable({
+local buttonHandle=setmetatable({
 CALLBACKS=ay,
 DESTROY_ELEMENT=aB,
 VISIBLE_ELEMENT=aB,
@@ -1901,8 +2163,10 @@ Title=aw,
 Description=ax,
 
 Parent=self,
-Kind="Button"
+Kind="Button",
+LoadingIcon=aE
 },ai)
+return buttonHandle
 end
 
 function ah:AddTextBox(av)
@@ -1944,7 +2208,9 @@ Size=UDim2.new(0.85,0,0.85,0),
 AnchorPoint=Vector2.new(0.5,0.5),
 Position=UDim2.new(0.5,0,0.5,0),
 BackgroundTransparency=1,
-TextScaled=true,
+TextScaled=false,
+TextSize=10,
+TextTruncate=Enum.TextTruncate.AtEnd,
 Active=true,
 Text="",
 PlaceholderText=B.TEXTBOX.PLACEHOLDER_TEXT,
@@ -1972,6 +2238,7 @@ ThemeTag=aJ
 if az~=nil then
 aI.Text=az
 end
+if ay~=nil then ae[ay]=aI.Text end
 
 if aC~=nil then
 aI.ClearTextOnFocus=aC
@@ -1981,7 +2248,16 @@ if aB~=nil then
 aI.PlaceholderText=aB
 end
 
-local aL=ak.TextBox.new(self,aF,aG,aE,aI,aA)local aM=function(
+local errorStroke=createInstance("UIStroke",aH,{
+Color=w(Library.CurrentTheme,"Colors.Error"),
+Transparency=1,
+Thickness=1.2
+})
+local aL=ak.TextBox.new(self,aF,aG,aE,aI,aA)
+aL.Flag=ay
+if ay then Library.Options[ay]=aL end
+aL.ERROR_STROKE=errorStroke
+local aM=function(
 
 aM)
 aJ.ImageColor3=aM
@@ -1991,12 +2267,12 @@ J(aK,"ImageColor3",w(Library.CurrentTheme,aM),0.5):Play()end
 if ay~=nil then
 u(aI:GetPropertyChangedSignal"Text",function()
 ae[ay]=aI.Text
-end)
+end,nil,aI)
 end
 
 u(aI.Focused,function()
 aM"Colors.Primary"
-end)
+end,nil,aI)
 
 u(aI.FocusLost,function()
 aM"Colors.Icons"
@@ -2010,11 +2286,11 @@ end
 end
 
 G(aA,aI.Text)
-end)
+end,nil,aI)
 
 u(aE.Activated,function()
 aI:CaptureFocus()
-end)
+end,nil,aE)
 
 return aL
 end
@@ -2039,6 +2315,8 @@ end
 
 assert(type(az)=="number",`"Tab.AddSlider.Min", 'number' expected, got {typeof(az)}`)
 assert(type(aA)=="number",`"Tab.AddSlider.Max", 'number' expected, got {typeof(aA)}`)
+assert(aA>az,`"Tab.AddSlider". Max must be greater than Min`)
+assert(aB==nil or aB>0,`"Tab.AddSlider.Increment". must be greater than zero`)
 
 local aE=V[self]
 local aF=T[self].Container
@@ -2116,13 +2394,14 @@ Font="Font.SliderValue"
 }
 })
 
-local aO=createInstance("UIScale",aN)
-
 local aP=ak.Slider.new(self,aG,aH,aI,aD)
+aP.Flag=ay
+if ay then Library.Options[ay]=aP end
 
 aP.Min=az
 aP.Max=aA
-aP.Increment=aB local aQ=function(
+aP.Increment=aB
+aP.INPUT_BUTTON=aJ local aQ=function(
 
 aQ)
 return(aQ-az)/(aA-az)end local aR=function(
@@ -2133,7 +2412,8 @@ return(aR*(aA-az))+az end local aS=function(
 
 
 aS)
-return math.round(aS/aB)*aB end local aT=function(
+local steps=math.floor(((aS-az)/aB)+0.5)
+return math.floor((az+steps*aB)*1000000+0.5)/1000000 end local aT=function(
 
 
 aT, aU)
@@ -2151,13 +2431,9 @@ local aW=UDim2.fromScale(aU,1)
 
 aN.Text=tostring(math.floor(aT*1000)/1000)
 
-if self.Selected then
-J(aM,"Position",aV,0.3):Play()
-J(aL,"Size",aW,0.3):Play()
-else
 aM.Position=aV
 aL.Size=aW
-end end local aU=function(
+end local aU=function(
 
 
 aU)
@@ -2165,54 +2441,79 @@ local aV=math.clamp(aS(aU),az,aA)
 aT(aV,aQ(aV))end
 
 
-aP.WHEN_VALUE_CHANGED=aU local aV=function(
-
-aV, aW)
-local aX=(Mouse.X-aV.X)/aW.X
-local aY=math.clamp(aX,0,1)
-local aZ=aR(aY)
-local a_=aS(aZ)
-local a0=math.clamp(a_,az,aA)
-aT(a0,aQ(a0))end
-
-
-local aW=Random.new()
-aU(aC)
-
-u(aJ.MouseButton1Down,function()
-if A~=false then return end
-
-J(aM,"BackgroundTransparency",0,0.3):Play()
-aF.ScrollingEnabled=false
-A=true
-
-local aX=aK.AbsolutePosition
-local aY=aK.AbsoluteSize
-
-while UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)do
-aV(aX,aY)
-task.wait()
+aP.WHEN_VALUE_CHANGED=aU local aV=function(position,trackPosition,trackSize)
+local alpha=math.clamp((position.X-trackPosition.X)/math.max(trackSize.X,1),0,1)
+local rawValue=aR(alpha)
+local rounded=math.clamp(aS(rawValue),az,aA)
+aT(rounded,aQ(rounded))
 end
 
+
+local activeInput=nil
+local changedConnection=nil
+local endedConnection=nil
+
+local function updateSlider(position)
+local trackPosition=aK.AbsolutePosition
+local trackSize=aK.AbsoluteSize
+aV(position,trackPosition,trackSize)
+end
+
+local function disconnectDragInput()
+if changedConnection then changedConnection:Disconnect() changedConnection=nil end
+if endedConnection then endedConnection:Disconnect() endedConnection=nil end
+end
+
+local function finishDrag()
+if not activeInput then return end
+activeInput=nil
 A=false
-J(aM,"BackgroundTransparency",0.2,0.3):Play()
+disconnectDragInput()
+J(aM,"BackgroundTransparency",0.2,0.15):Play()
 aF.ScrollingEnabled=true
+end
+
+local function connectDragInput()
+changedConnection=UserInputService.InputChanged:Connect(function(input)
+if not activeInput then return end
+if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseMovement then
+updateSlider(UserInputService:GetMouseLocation()-GuiService:GetGuiInset())
+elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
+updateSlider(input.Position-GuiService:GetGuiInset())
+end
 end)
-
-u(aN:GetPropertyChangedSignal"Text",function()
-if not self.Selected then return end
-
-aO.Scale=0.3
-J(aO,"Scale",1.2,0.1):Play()
-
-local aX=J(aN,"Rotation",aW:NextNumber(-7.5,7.5),0.15)
-aX:Play()
-aX.Completed:Wait()
-
-J(aO,"Scale",1,0.2):Play()
-J(aN,"Rotation",0,0.1):Play()
+endedConnection=UserInputService.InputEnded:Connect(function(input)
+if not activeInput then return end
+if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1 then
+finishDrag()
+elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
+finishDrag()
+end
 end)
+end
 
+u(aJ.InputBegan,function(input)
+if A~=false then return end
+if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
+activeInput=input
+A=true
+connectDragInput()
+J(aM,"BackgroundTransparency",0,0.15):Play()
+aF.ScrollingEnabled=false
+updateSlider(input.Position-GuiService:GetGuiInset())
+end,nil,aJ)
+
+u(aJ.Destroying,function()
+finishDrag()
+end,nil,aG)
+
+local originalDestroy=ai.Destroy
+aP.Destroy=function(option)
+finishDrag()
+return originalDestroy(option)
+end
+
+aU(aC)
 return aP
 end
 
@@ -2249,6 +2550,10 @@ local aF=createInstance("Frame","Option",aE,{
 BackgroundTransparency=1,
 Size=UDim2.new(1,0,0,148)
 })
+if self._CurrentSection then
+self._CurrentSection.Items[#self._CurrentSection.Items+1]=aF
+if self._CurrentSection.Collapsed then aF.Visible=false end
+end
 
 local aG=createInstance("CanvasGroup",aF,{
 Size=UDim2.new(0,178,1,-15),
@@ -2368,7 +2673,7 @@ Position=UDim2.new(0,12,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
 AutomaticSize=Enum.AutomaticSize.X,
 BackgroundTransparency=1,
-TextSize=7,
+TextSize=8,
 Text=aN,
 ThemeTag={
 OBJECTS=aD,
@@ -2447,15 +2752,19 @@ Font="Font.Bold"
 local aP=0
 
 u(aO.Activated,function()
-if(tick()-aP)<0 then return end
+if(os.clock()-aP)<0 then return end
 
-aP=tick()+5
+aP=os.clock()+5
 local aQ=aO.Text
 aO.Text="Copied to Clipboard!"
+if type(setclipboard)=="function" then
 setclipboard(aC)
+else
+warn("DepHub: clipboard is unavailable in this executor")
+end
 task.wait(4)
-aO.Text=aQ
-end)
+if aO.Parent then aO.Text=aQ end
+end,nil,aO)
 
 if type(az)=="string"then
 aH.ScaleType=Enum.ScaleType.Crop
@@ -2485,6 +2794,262 @@ Parent=self
 },ai)
 end
 
+function ah:AddKeybind(av)
+local title,description=an("Keybind",av)
+local flag=ao("Keybind",av[4]or av.Flag)
+local default=av[2]or av.KeyCode or av.Default or Enum.KeyCode.Unknown
+local callbacks=F(av[3]or av.Callback)
+if type(default)=="string" then default=Enum.KeyCode[default] end
+if not au(default) then error(`"Tab.AddKeybind.KeyCode". 'KeyCode' expected, got {typeof(default)}`,2) end
+if flag and type(ae[flag])=="string" and Enum.KeyCode[ae[flag]] then default=Enum.KeyCode[ae[flag]] end
+local group=V[self]
+local row,titleLabel,descriptionLabel=am(self,title,description,UDim2.new(1,-105,0,0))
+local keyButton=createInstance("TextButton",row,{
+Size=UDim2.fromOffset(92,22),
+Position=UDim2.new(1,-10,0.5,0),
+AnchorPoint=Vector2.new(1,0.5),
+AutoButtonColor=false,
+Text=default.Name,
+TextSize=10,
+TextTruncate=Enum.TextTruncate.AtEnd,
+ThemeTag={OBJECTS=group,BackgroundColor3="Colors.Stroke",TextColor3="Colors.Text.Default",Font="Font.Bold"},
+Elements={Corner=UDim.new(0,5)}
+})
+local handle=setmetatable({
+CALLBACKS=callbacks,
+DESTROY_ELEMENT=row,
+VISIBLE_ELEMENT=row,
+TITLE_LABEL=titleLabel,
+DESCRIPTION_LABEL=descriptionLabel,
+KEY_BUTTON=keyButton,
+KeyCode=default,
+Flag=flag,
+Enabled=true,
+Title=title,
+Description=description,
+Parent=self,
+Kind="Keybind"
+},ak.Keybind)
+if flag then ae[flag]=default.Name Library.Options[flag]=handle end
+u(keyButton.Activated,function()
+if handle.Enabled==false then return end
+handle.Capturing=true
+keyButton.Text="Press a key..."
+end,nil,keyButton)
+u(UserInputService.InputBegan,function(input,processed)
+if input.UserInputType~=Enum.UserInputType.Keyboard then return end
+if handle.Capturing then
+if input.KeyCode==Enum.KeyCode.Escape then
+handle.Capturing=false
+keyButton.Text=handle.KeyCode.Name
+return
+end
+handle:SetKeyCode(input.KeyCode)
+handle.Capturing=false
+return
+end
+if processed or handle.Enabled==false then return end
+if UserInputService:GetFocusedTextBox() then return end
+if input.KeyCode==handle.KeyCode and handle.KeyCode~=Enum.KeyCode.Unknown then G(callbacks) end
+end,nil,keyButton)
+return handle
+end
+
+function ah:AddColorPicker(av)
+local title,description=an("ColorPicker",av)
+local flag=ao("ColorPicker",av[4]or av.Flag)
+local default=av[2]or av.Default or Color3.new(1,1,1)
+local callbacks=F(av[3]or av.Callback)
+if type(default)=="string" then
+local hex=default:gsub("^#","")
+if #hex==6 and tonumber(hex,16) then
+default=Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16))
+else
+default=Color3.new(1,1,1)
+end
+end
+if flag and type(ae[flag])=="string" then
+local hex=ae[flag]:gsub("^#","")
+if #hex==6 and tonumber(hex,16) then
+default=Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16))
+end
+end
+assert(typeof(default)=="Color3",`"Tab.AddColorPicker.Default". 'Color3' or hex string expected, got {typeof(default)}`,2)
+local group=V[self]
+local row,titleLabel,descriptionLabel=am(self,title,description,UDim2.new(1,-125,0,0))
+local swatch=createInstance("TextButton",row,{
+Size=UDim2.fromOffset(22,22),
+AutoButtonColor=false,
+Text="",
+Position=UDim2.new(1,-10,0.5,0),
+AnchorPoint=Vector2.new(1,0.5),
+BackgroundColor3=default,
+Elements={Corner=UDim.new(0,5),Stroke={Color=w(Library.CurrentTheme,"Colors.Stroke")}}
+})
+local input=createInstance("TextBox",row,{
+Size=UDim2.fromOffset(82,22),
+Position=UDim2.new(1,-39,0.5,0),
+AnchorPoint=Vector2.new(1,0.5),
+BackgroundTransparency=1,
+Text="#"..string.format("%02X%02X%02X",math.round(default.R*255),math.round(default.G*255),math.round(default.B*255)),
+PlaceholderText="#RRGGBB",
+TextSize=10,
+ClearTextOnFocus=false,
+TextColor3=w(Library.CurrentTheme,"Colors.Text.Default")
+})
+local handle=setmetatable({
+CALLBACKS=callbacks,
+DESTROY_ELEMENT=row,
+VISIBLE_ELEMENT=row,
+TITLE_LABEL=titleLabel,
+DESCRIPTION_LABEL=descriptionLabel,
+COLOR_INPUT=input,
+COLOR_SWATCH=swatch,
+Value=default,
+Flag=flag,
+Title=title,
+Description=description,
+Parent=self,
+Kind="ColorPicker"
+},ak.ColorPicker)
+local palette=createInstance("Frame","ColorPalette",I,{
+Visible=false,
+ZIndex=1500,
+Size=UDim2.fromOffset(150,84),
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Buttons.Default"),
+BorderSizePixel=0,
+ThemeTag={OBJECTS=group,BackgroundColor3="Colors.Buttons.Default"},
+Elements={Corner=UDim.new(0,6),Stroke={ThemeTag={OBJECTS=group,Color="Colors.Stroke"}},Padding={PaddingLeft=UDim.new(0,5),PaddingRight=UDim.new(0,5),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)}}
+})
+local paletteLayout=createInstance("UIGridLayout",palette,{
+CellSize=UDim2.fromOffset(20,20),
+CellPadding=UDim2.fromOffset(4,4),
+FillDirectionMaxCells=6,
+SortOrder=Enum.SortOrder.LayoutOrder
+})
+local paletteColors={
+Color3.fromRGB(239,68,68),Color3.fromRGB(249,115,22),Color3.fromRGB(234,179,8),Color3.fromRGB(132,204,22),Color3.fromRGB(34,197,94),Color3.fromRGB(20,184,166),
+Color3.fromRGB(14,165,233),Color3.fromRGB(59,130,246),Color3.fromRGB(99,102,241),Color3.fromRGB(139,92,246),Color3.fromRGB(217,70,239),Color3.fromRGB(236,72,153),
+Color3.fromRGB(255,255,255),Color3.fromRGB(180,180,180),Color3.fromRGB(90,90,90),Color3.fromRGB(20,20,20)
+}
+for index,color in ipairs(paletteColors) do
+local colorButton=createInstance("TextButton",palette,{
+LayoutOrder=index,
+ZIndex=1501,
+Size=UDim2.fromOffset(20,20),
+BackgroundColor3=color,
+AutoButtonColor=false,
+Text="",
+Elements={Corner=UDim.new(0,4),Stroke={Color=Color3.fromRGB(100,100,100),Transparency=0.55}}
+})
+u(colorButton.Activated,function()
+handle:SetColor(color)
+palette.Visible=false
+end,nil,colorButton)
+end
+local colorErrorStroke=createInstance("UIStroke",row,{
+Color=w(Library.CurrentTheme,"Colors.Error"),
+Transparency=1,
+Thickness=1.2
+})
+handle.ERROR_STROKE=colorErrorStroke
+handle.PALETTE=palette
+u(swatch.Activated,function()
+if handle.Enabled==false then return end
+palette.Visible=not palette.Visible
+if palette.Visible then
+local position=swatch.AbsolutePosition
+local viewport=I.AbsoluteSize
+palette.Position=UDim2.fromOffset(math.clamp(position.X,4,math.max(4,viewport.X-154)),math.clamp(position.Y+26,4,math.max(4,viewport.Y-88)))
+end
+end,nil,swatch)
+u(row.Destroying,function()
+if palette.Parent then palette:Destroy() end
+end,nil,I)
+if flag then ae[flag]=input.Text:gsub("^#","") Library.Options[flag]=handle end
+u(input.FocusLost,function()
+local hex=input.Text:gsub("^#","")
+if #hex~=6 or not tonumber(hex,16) then
+handle:SetError(true)
+input.Text="#"..string.format("%02X%02X%02X",math.round(handle.Value.R*255),math.round(handle.Value.G*255),math.round(handle.Value.B*255))
+return
+end
+handle:SetError(false)
+handle:SetColor(Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16)))
+end,nil,input)
+return handle
+end
+
+function ah:AddLabel(text)
+assert(type(text)=="string",`"Tab.AddLabel". 'string' expected, got {typeof(text)}`,2)
+return self:AddParagraph(text,"")
+end
+
+function ah:AddDivider()
+local group=V[self]
+local line=createInstance("Frame",T[self].Container,{
+Size=UDim2.new(1,-4,0,1),
+BorderSizePixel=0,
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke")
+})
+group:add(line,{BackgroundColor3="Colors.Stroke"})
+if self._CurrentSection then
+self._CurrentSection.Items[#self._CurrentSection.Items+1]=line
+if self._CurrentSection.Collapsed then line.Visible=false end
+end
+return setmetatable({
+DESTROY_ELEMENT=line,
+VISIBLE_ELEMENT=line,
+Parent=self,
+Kind="Divider"
+},ai)
+end
+
+function ah:AddProgressBar(av)
+local title,description=an("ProgressBar",av)
+local group=V[self]
+local row,titleLabel,descriptionLabel=am(self,title,description,UDim2.new(1,0,0,0))
+local track=createInstance("Frame",row,{
+Size=UDim2.new(1,-20,0,5),
+Position=UDim2.new(0,10,1,-8),
+AnchorPoint=Vector2.new(0,1),
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke"),
+ThemeTag={OBJECTS=group,BackgroundColor3="Colors.Stroke"},
+Elements={Corner=UDim.new(0.5,0)}
+})
+local fill=createInstance("Frame",track,{
+Size=UDim2.fromScale(0,1),
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Primary"),
+ThemeTag={OBJECTS=group,BackgroundColor3="Colors.Primary"},
+Elements={Corner=UDim.new(0.5,0)}
+})
+local handle=setmetatable({
+DESTROY_ELEMENT=row,
+VISIBLE_ELEMENT=row,
+TITLE_LABEL=titleLabel,
+DESCRIPTION_LABEL=descriptionLabel,
+FILL=fill,
+TRACK=track,
+Value=0,
+Parent=self,
+Kind="ProgressBar"
+},ai)
+function handle:SetValue(value)
+assert(type(value)=="number",`"ProgressBar.SetValue". 'number' expected, got {typeof(value)}`,2)
+self.Value=math.clamp(value,0,100)
+self.FILL.Size=UDim2.fromScale(self.Value/100,1)
+return self
+end
+handle.Set=handle.SetValue
+local originalDestroy=ai.Destroy
+handle.Destroy=function(option)
+group:remove(fill)
+group:remove(track)
+return originalDestroy(option)
+end
+return handle
+end
+
 function ah:AddParagraph(av,aw)
 assert(type(av)=="string",`"Tab.AddParagraph[param 1]". 'string' expected, got {typeof(av)}`)
 
@@ -2493,7 +3058,7 @@ error(`"Tab.AddParagraph[param 2]". 'string', or 'nil' expected, got {typeof(aw)
 end
 
 local ax=V[self]
-local ay,az,aA=am(self,av,aw,UDim2.new(1,0,0,0))
+local ay,az,aA=am(self,av,aw,UDim2.new(1,0,0,0),"Paragraph")
 
 return setmetatable({
 DESTROY_ELEMENT=ay,
@@ -2555,7 +3120,9 @@ Size=UDim2.new(0.85,0,0.85,0),
 AnchorPoint=Vector2.new(0.5,0.5),
 Position=UDim2.new(0.5,0,0.5,0),
 BackgroundTransparency=1,
-TextScaled=true,
+TextScaled=false,
+TextSize=10,
+TextTruncate=Enum.TextTruncate.AtEnd,
 Text="...",
 ThemeTag={
 OBJECTS=aD,
@@ -2579,6 +3146,8 @@ ThemeTag=aJ
 })
 
 local aL=ak.Dropdown.new(self,aE,aF,aG,aB)
+aL.Flag=ay
+if ay then Library.Options[ay]=aL end
 
 local aM
 local aN=false
@@ -2699,6 +3268,7 @@ end
 if a1 then
 if not X.OpenDropdown(aV)then return end
 
+X.SetThemeGroup(aD)
 X.SetHolder(aH)
 X.SetMultiSelect(aC)
 X.SetOnClicked(a_)
@@ -2754,7 +3324,9 @@ table.remove(aR,a7)
 end
 
 if a6.Instance then
+aD:remove(a6.Instance)
 a6.Instance:Destroy()
+a6.Instance=nil
 end
 
 aS[a6.Name]=nil end local a7=function(
@@ -2769,6 +3341,20 @@ return aM and aM.Name==a7.Name
 end end
 
 
+aL.SET_ENABLED_OPTIONS=function(enabledOptions)
+for name,option in pairs(aS) do
+local enabled=enabledOptions[name]
+if enabled==nil then enabled=true end
+option.Enabled=enabled==true
+if option.Instance then
+option.Instance.Active=option.Enabled
+option.Instance.BackgroundTransparency=option.Enabled and 0 or 0.45
+local optionLabel=option.Instance:FindFirstChildOfClass("TextLabel")
+if optionLabel then optionLabel.TextTransparency=option.Enabled and 0.4 or 0.7 end
+end
+end
+end
+
 aL.ADD_DROPDOWN_OPTION=function(a8)
 if type(a8)=="table"then
 for a9=1,#a8 do
@@ -2781,6 +3367,7 @@ end
 local a9=a0(a8)
 
 if a9 then
+if a9.Enabled==nil then a9.Enabled=true end
 if aL.Opened then
 X.CreateOptionTemplate(a9,true)
 end
@@ -2804,7 +3391,7 @@ end
 -- Select reproduz exatamente a logica do clique para marcar/desmarcar.
 aL.SELECT_DROPDOWN_OPTION=function(a8,a9)
 local a0_=aS[tostring(a8)]
-if not a0_ then return false end
+if not a0_ or a0_.Enabled==false then return false end
 
 if aC then
 local want=(a9~=false)
@@ -2834,7 +3421,9 @@ aL.CLEAR_DROPDOWN=function()
 for a8=#aR,1,-1 do
 local a9=aR[a8]
 if a9.Instance then
+aD:remove(a9.Instance)
 a9.Instance:Destroy()
+a9.Instance=nil
 end
 
 -- DepHub: limpar tambem a SELECAO da opcao removida. O conjunto da selecao
@@ -2888,7 +3477,7 @@ end
 
 u(aE.Activated,function()
 a1(not aO)
-end)
+end,nil,aE)
 
 return aL
 end
@@ -2903,17 +3492,41 @@ assert(type(self)=="table"and self.IS_A_TAB,`"Tab.Destroy". {tostring(self)} is 
 if self.IS_DESTROYED then return end
 local av=table.find(S,self)
 assert(av,`"Tab.Destroy". failed to destroy '{self.Title}'`)
+local wasSelected=ac==self
+self.IS_DESTROYED=true
 
-table.remove(S,av)
-
-for aw,ax in T[self]do
-ax:Destroy()
+if wasSelected and X then
+pcall(X.CloseDropdown)
 end
 
-V[self]:destroy()
+for aw,ax in T[self] or {} do
+if typeof(ax)=="Instance" then
+pcall(ax.Destroy,ax)
+end
+end
 
+local themeGroup=V[self]
+if themeGroup then
+pcall(themeGroup.destroy,themeGroup)
+end
+
+for flag,option in pairs(Library.Options) do
+if option.Parent==self then Library.Options[flag]=nil end
+end
+self._CurrentSection=nil
+self._Sections=nil
 T[self]=nil
+U[self]=nil
 V[self]=nil
+table.remove(S,av)
+
+if wasSelected then
+ac=nil
+local nextTab=S[math.min(av,#S)]
+if nextTab then
+nextTab:Select()
+end
+end
 
 setmetatable(self,nil)
 end
@@ -2969,13 +3582,108 @@ end
 function ai:SetVisible(av)
 assert(typeof(self.VISIBLE_ELEMENT)=="Instance",`"Option.SetVisible". cannot change this option visibility {self.KIND}:{self.Title}`)
 assert(type(av)=="boolean",`"Option.SetVisible". 'boolean' expected, got {typeof(av)}`)
-
 self.VISIBLE_ELEMENT.Visible=av
+return self
+end
+
+function ai:SetEnabled(av)
+assert(type(av)=="boolean",`"Option.SetEnabled". 'boolean' expected, got {typeof(av)}`)
+self.Enabled=av
+local element=self.DESTROY_ELEMENT
+if typeof(element)=="Instance" and element:IsA("GuiButton") then
+ element.Active=av and not self.Loading
+ element.AutoButtonColor=false
+end
+if self.TEXTBOX then self.TEXTBOX.TextEditable=av self.TEXTBOX.Active=av end
+if self.COLOR_INPUT then self.COLOR_INPUT.TextEditable=av self.COLOR_INPUT.Active=av end
+if self.KEY_BUTTON then self.KEY_BUTTON.Active=av end
+if self.INPUT_BUTTON then self.INPUT_BUTTON.Active=av end
+return self
+end
+
+function ai:SetLoading(loading)
+assert(type(loading)=="boolean",`"Option.SetLoading". 'boolean' expected, got {typeof(loading)}`)
+assert(self.Kind=="Button",`"Option.SetLoading" is only available for Button options`)
+self.Loading=loading
+local element=self.DESTROY_ELEMENT
+if typeof(element)=="Instance" then element:SetAttribute("Loading",loading) element.Active=not loading and self.Enabled~=false end
+if self.LoadingTween then self.LoadingTween:Cancel() self.LoadingTween=nil end
+if self.LoadingIcon then
+if loading and not ReducedMotion then
+self.LoadingTween=TweenService:Create(self.LoadingIcon,TweenInfo.new(0.8,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut,-1),{Rotation=360})
+self.LoadingTween:Play()
+else
+self.LoadingIcon.Rotation=0
+end
+end
+return self
+end
+
+function ai:SetError(hasError)
+assert(type(hasError)=="boolean",`"Option.SetError". 'boolean' expected, got {typeof(hasError)}`)
+if self.ERROR_STROKE then
+self.ERROR_STROKE.Color=w(Library.CurrentTheme,"Colors.Error")
+self.ERROR_STROKE.Transparency=hasError and 0 or 1
+end
+self.HasError=hasError
+return self
+end
+
+function ai:SetTooltip(text)
+assert(text==nil or type(text)=="string",`"Option.SetTooltip". 'string', or 'nil' expected, got {typeof(text)}`)
+if self.TOOLTIP then self.TOOLTIP:Destroy() self.TOOLTIP=nil end
+if not text or text=="" then return self end
+local target=self.VISIBLE_ELEMENT or self.DESTROY_ELEMENT
+if typeof(target)~="Instance" then return self end
+local tooltip=createInstance("TextLabel",I,{
+Visible=false,
+ZIndex=2000,
+AutomaticSize=Enum.AutomaticSize.Y,
+Size=UDim2.fromOffset(220,0),
+BackgroundColor3=Color3.fromRGB(20,20,20),
+TextColor3=Color3.new(1,1,1),
+TextSize=11,
+TextWrapped=true,
+Text=text,
+Position=UDim2.fromOffset(0,0),
+Elements={Corner=UDim.new(0,5),Padding={PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)}}
+})
+self.TOOLTIP=tooltip
+local function updateTooltipPosition()
+local position=UserInputService:GetMouseLocation()-GuiService:GetGuiInset()
+local viewport=I.AbsoluteSize
+local x=math.min(position.X+12,math.max(4,viewport.X-tooltip.AbsoluteSize.X-4))
+local y=math.min(position.Y+12,math.max(4,viewport.Y-tooltip.AbsoluteSize.Y-4))
+tooltip.Position=UDim2.fromOffset(x,y)
+end
+u(target.MouseEnter,function()
+updateTooltipPosition()
+tooltip.Visible=true
+end,nil,target)
+u(target.MouseLeave,function() tooltip.Visible=false end,nil,target)
+u(target.Destroying,function() if tooltip.Parent then tooltip:Destroy() end end,nil,I)
+u(UserInputService.InputChanged,function(input)
+if tooltip.Visible and input.UserInputType==Enum.UserInputType.MouseMovement then
+updateTooltipPosition()
+end
+end,nil,target)
+return self
 end
 
 function ai:Destroy()
 assert(typeof(self.DESTROY_ELEMENT)=="Instance",`"Option.Destroy". cannot destroy this option {self.KIND}:{self.Title}`)
-
+if self.LoadingTween then self.LoadingTween:Cancel() self.LoadingTween=nil end
+if self.TOOLTIP then self.TOOLTIP:Destroy() self.TOOLTIP=nil end
+local parentGroup=self.Parent and V[self.Parent]
+if self.PALETTE then
+if parentGroup then parentGroup:remove(self.PALETTE) end
+self.PALETTE:Destroy()
+self.PALETTE=nil
+end
+if parentGroup and type(parentGroup.remove)=="function" then
+parentGroup:remove(self.DESTROY_ELEMENT)
+end
+if self.Flag and Library.Options[self.Flag]==self then Library.Options[self.Flag]=nil end
 self.DESTROY_ELEMENT:Destroy()
 setmetatable(self,nil)
 
@@ -3006,8 +3714,12 @@ BackgroundColor3="Colors.Buttons.Default"
 })
 
 u(aw.Activated,function()
+if aw:GetAttribute("DragMoved") then
+aw:SetAttribute("DragMoved",false)
+return
+end
 ag:Minimize()
-end)
+end,nil,aw)
 
 av.Elements={}
 
@@ -3106,17 +3818,29 @@ J(aE,"Size",UDim2.fromOffset(4,4),aH)
 }
 
 local aK=C:new()
-V[ay]=aK local aL=function(
-
-aL)
-for aM=1,#aL do
-aL[aM]:Play()
-end end local aM=function()
+V[ay]=aK local activeTabTweens={}
+local aL=function(tweens)
+for _,tween in ipairs(activeTabTweens) do
+if tween.PlaybackState==Enum.PlaybackState.Playing then tween:Cancel() end
+end
+table.clear(activeTabTweens)
+for index=1,#tweens do
+local tween=tweens[index]
+activeTabTweens[#activeTabTweens+1]=tween
+tween:Play()
+end
+end local aM=function()
 
 
 
 aL(aI)
 ay.Selected=true
+J(aC,"BackgroundColor3",w(Library.CurrentTheme,"Colors.Primary"),aH):Play()
+J(aC,"BackgroundTransparency",0.85,aH):Play()
+local titleLabel=aC:FindFirstChild("Title")
+local iconImage=aC:FindFirstChild("ImageLabel")
+if titleLabel then J(titleLabel,"TextTransparency",0,aH):Play() end
+if iconImage then J(iconImage,"ImageTransparency",0,aH):Play() end
 aK:changeRendering(true)
 aK:update()
 aD.Parent=aB
@@ -3127,6 +3851,11 @@ aF:Play()end local aN=function()
 
 aL(aJ)
 ay.Selected=false
+J(aC,"BackgroundTransparency",1,aH):Play()
+local titleLabel=aC:FindFirstChild("Title")
+local iconImage=aC:FindFirstChild("ImageLabel")
+if titleLabel then J(titleLabel,"TextTransparency",0.3,aH):Play() end
+if iconImage then J(iconImage,"ImageTransparency",0.3,aH):Play() end
 aD.Parent=nil
 aK:changeRendering(false)end
 
@@ -3145,7 +3874,7 @@ table.insert(S,ay)
 
 u(aC.Activated,function()
 ay:Select()
-end)
+end,nil,aC)
 
 if ay.Selected then
 ay:Select()
@@ -3172,7 +3901,7 @@ local aC=ax.Size
 local aD=0
 
 function ag:MinimizeButton()
-if(tick()-aD)<0 then
+if(os.clock()-aD)<0 then
 return false
 end
 
@@ -3190,7 +3919,7 @@ aF.Visible=self.Minimized
 end
 
 self.Minimized=not self.Minimized
-aD=tick()+0.5
+aD=os.clock()+0.5
 
 return true
 end
@@ -3315,9 +4044,47 @@ u(aa.Activated,function()
 if Z~=nil and not Z.Closing and not Z.Closed then
 Z:Close()
 end
-end)
+end,nil,aa)
 
 ag.StartWindow=nil
+end
+
+function ag:SaveProfile(name)
+assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.SaveProfile". profile name must contain only letters, numbers, '_' or '-'`)
+local ok,encoded=pcall(HttpService.JSONEncode,HttpService,ae)
+if not ok then return false end
+return self:WriteFile("profile_"..name..".json",encoded)
+end
+
+function ag:LoadProfile(name)
+assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.LoadProfile". profile name must contain only letters, numbers, '_' or '-'`)
+local content=self:ReadFile("profile_"..name..".json")
+if type(content)~="string" then return false end
+local ok,profile=pcall(HttpService.JSONDecode,HttpService,content)
+if not ok or type(profile)~="table" then return false end
+for flag,value in pairs(profile) do
+if at[typeof(value)] then
+ ae[flag]=value
+ local option=Library.Options[flag]
+ if option and option.Parent and not option.Destroyed then
+  if option.Kind=="Toggle" and type(value)=="number" then pcall(option.SetValue,option,value==0)
+  elseif option.Kind=="Slider" and type(value)=="number" then pcall(option.SetValue,option,value)
+  elseif option.Kind=="TextBox" and type(value)=="string" then pcall(option.SetText,option,value)
+  elseif option.Kind=="Dropdown" then pcall(option.SetValue,option,value)
+  elseif option.Kind=="Keybind" and type(value)=="string" and Enum.KeyCode[value] then pcall(option.SetKeyCode,option,Enum.KeyCode[value])
+  elseif option.Kind=="ColorPicker" and type(value)=="string" then
+   local hex=value:gsub("^#","")
+   if #hex==6 and tonumber(hex,16) then pcall(option.SetColor,option,Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16))) end
+  end
+ end
+end
+end
+return true
+end
+
+function ag:DeleteProfile(name)
+assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.DeleteProfile". profile name must contain only letters, numbers, '_' or '-'`)
+return self:WriteFile("profile_"..name..".json",nil)
 end
 
 function ag:DeleteFlags()
@@ -3346,33 +4113,38 @@ end
 
 function ag:ReadFile(av)
 assert(type(av)=="string",`"Window.ReadFile[param 1]". 'string' expected, got {typeof(av)}`)
-av=`{self.ScriptFolder}/{av}`
-
-if readFileSafe~=nil and(isfile==nil or not isfile(av))then
-return readFileSafe(av)
+local path=self.ScriptFolder and (`{self.ScriptFolder}/{av}`) or av
+if not readFileSafe then return nil end
+if isfile then
+local ok,exists=pcall(isfile,path)
+if not ok or not exists then return nil end
 end
+local ok,result=pcall(readFileSafe,path)
+if ok then return result end
+return nil
 end
 
 function ag:WriteFile(av,aw)
 assert(type(av)=="string",`"Window.WriteFile[param 1]". 'string' expected, got {typeof(av)}`)
-av=`{self.ScriptFolder}/{av}`
-
 if aw~=nil and type(aw)~="string"then
 error(`"Window.WriteFile[param 2]". 'string', or 'nil' expected, got {typeof(aw)}`,2)
 end
-
+local path=self.ScriptFolder and (`{self.ScriptFolder}/{av}`) or av
 if aw==nil then
-if deleteFileSafe~=nil then
-deleteFileSafe(`{self.ScriptFolder}/{av}`)
-return true
+if deleteFileSafe then
+if isfile then
+local ok,exists=pcall(isfile,path)
+if not ok or not exists then return false end
+end
+local ok=pcall(deleteFileSafe,path)
+return ok
 end
 else
-if writeFileSafe~=nil then
-z(`{self.ScriptFolder}/{av}`)
+if writeFileSafe then
+z(path,aw)
 return true
 end
 end
-
 return false
 end
 
@@ -3394,7 +4166,7 @@ if az or ay.UserInputType~=Enum.UserInputType.Keyboard then return end
 if ay.KeyCode==ax.KeyCode then
 ag:Minimize()
 end
-end)
+end,nil,I)
 
 return ax
 end
@@ -3433,8 +4205,40 @@ aB.Text=aw
 J(az,"Size",aC,0.3):Play()
 
 local aE=ak.Dialog.new(aA,aB)
+aE.ThemeGroup=C:new()
 aE.NEW_SIZE=aD
 aE.TEMPLATE=az
+if aa:GetAttribute("DepHubOriginalBackgroundTransparency")==nil then
+ aa:SetAttribute("DepHubOriginalBackgroundTransparency",aa.BackgroundTransparency)
+end
+aa.BackgroundTransparency=aa:GetAttribute("DepHubOriginalBackgroundTransparency")
+for _,object in ipairs(az:GetDescendants()) do
+if object:IsA("GuiObject") then
+if object:GetAttribute("DepHubOriginalBackgroundTransparency")==nil then
+object:SetAttribute("DepHubOriginalBackgroundTransparency",object.BackgroundTransparency)
+end
+object.BackgroundTransparency=object:GetAttribute("DepHubOriginalBackgroundTransparency")
+end
+if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+if object:GetAttribute("DepHubOriginalTextTransparency")==nil then
+object:SetAttribute("DepHubOriginalTextTransparency",object.TextTransparency)
+end
+object.TextTransparency=object:GetAttribute("DepHubOriginalTextTransparency")
+end
+if object:IsA("ImageLabel") or object:IsA("ImageButton") then
+if object:GetAttribute("DepHubOriginalImageTransparency")==nil then
+object:SetAttribute("DepHubOriginalImageTransparency",object.ImageTransparency)
+end
+object.ImageTransparency=object:GetAttribute("DepHubOriginalImageTransparency")
+end
+if object:IsA("UIStroke") then
+if object:GetAttribute("DepHubOriginalStrokeTransparency")==nil then
+object:SetAttribute("DepHubOriginalStrokeTransparency",object.Transparency)
+end
+object.Transparency=object:GetAttribute("DepHubOriginalStrokeTransparency")
+end
+end
+az.BackgroundTransparency=0
 
 for aF,aG in az.Options:GetChildren()do
 if aG:IsA"GuiObject"then
@@ -3459,6 +4263,35 @@ assert(type(av)=="string",`"Window.SetNotifyDefaultIcon[param 1]". 'string' expe
 af=av
 end
 
+function ag:GetNotificationHistory()
+local history={}
+for index,entry in ipairs(notificationHistory) do history[index]=table.clone(entry) end
+return history
+end
+
+function ag:ClearNotificationHistory()
+table.clear(notificationHistory)
+end
+
+function ag:ShowNotificationHistory()
+local entries=self:GetNotificationHistory()
+local lines={}
+local first=math.max(1,#entries-9)
+for index=#entries,first,-1 do
+local entry=entries[index]
+lines[#lines+1]=string.format("%s\n%s",tostring(entry.Title or "Notification"),tostring(entry.Content or ""))
+end
+local content=#lines>0 and table.concat(lines,"\n\n────────\n\n") or "No notifications yet."
+return self:Dialog({
+Title="Notification History",
+Content=content,
+Options={
+{Title="Clear history",Callback=function() self:ClearNotificationHistory() end},
+{Title="Close",Callback=function() end}
+}
+})
+end
+
 function ag:Notify(av)
 if type(av)~="table"then
 av={}
@@ -3477,7 +4310,7 @@ if ay==nil then ay=self.Icon end
 end
 
 assert(type(aw)=="string",`"Window.Notify.Title". 'string' expected, got {typeof(aw)}`)
-assert(type(ax)=="string",`"Window.Notify.Content". 'string' expected, got {typeof(aw)}`)
+assert(type(ax)=="string",`"Window.Notify.Content". 'string' expected, got {typeof(ax)}`)
 assert(ay==nil or type(ay)=="string",`"Window.Notify.Icon". 'nil' or 'string' expected, got {typeof(ay)}`)
 
 if az~=nil and type(az)~="number"then
@@ -3486,6 +4319,9 @@ elseif az==nil then
 az=5
 end
 
+notificationHistory[#notificationHistory+1]={Title=aw,Content=ax,Icon=ay,Duration=az,Timestamp=os.clock()}
+if #notificationHistory>100 then table.remove(notificationHistory,1) end
+local notificationThemeGroup=C:new()
 local aA=createInstance("Frame","Notification",W,{
 Size=UDim2.new(0.85,0,0,60),
 BackgroundTransparency=1,
@@ -3498,6 +4334,7 @@ Size=UDim2.fromScale(1,1),
 AutoButtonColor=false,
 Text="",
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 BackgroundTransparency="BackgroundTransparency"
 },
 Elements={
@@ -3505,6 +4342,7 @@ Corner=UDim.new(0,9),
 Gradient={
 Rotation=45,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 Color="Colors.Background"
 }
 }
@@ -3539,6 +4377,7 @@ TextYAlignment=Enum.TextYAlignment.Bottom,
 BackgroundTransparency=1,
 TextSize=14,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 TextColor3="Colors.Text.Default",
 Font="Font.Bold"
 }
@@ -3553,6 +4392,7 @@ BackgroundTransparency=1,
 TextWrapped=true,
 TextSize=12,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 TextColor3="Colors.Text.Dark",
 Font="Font.Normal"
 }
@@ -3564,6 +4404,7 @@ Position=UDim2.new(0,8,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
 BackgroundTransparency=1,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 ImageColor3="Colors.Icons"
 }
 })
@@ -3575,6 +4416,7 @@ AnchorPoint=Vector2.new(1,0),
 BackgroundTransparency=1,
 TextSize=10,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 TextColor3="Colors.Text.Darker",
 Font="Font.Normal"
 }
@@ -3582,8 +4424,23 @@ Font="Font.Normal"
 
 local aI=false
 
-local aJ=J(aC,"Scale",1.22,0.35)
+local aJ=J(aC,"Scale",0.97,0.12)
 local aK=J(aC,"Scale",1.00,0.35)
+
+local progressTrack=createInstance("Frame","ProgressTrack",aB,{
+Size=UDim2.new(1,-16,0,2),
+Position=UDim2.new(0,8,1,-4),
+AnchorPoint=Vector2.new(0,1),
+BorderSizePixel=0,
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Stroke"),
+ThemeTag={OBJECTS=notificationThemeGroup,BackgroundColor3="Colors.Stroke"}
+})
+local progressFill=createInstance("Frame","Progress",progressTrack,{
+Size=UDim2.fromScale(1,1),
+BorderSizePixel=0,
+BackgroundColor3=w(Library.CurrentTheme,"Colors.Primary"),
+ThemeTag={OBJECTS=notificationThemeGroup,BackgroundColor3="Colors.Primary"}
+})
 
 local aL=setmetatable({
 TITLE_LABEL=aE,
@@ -3599,21 +4456,28 @@ Parent=self
 
 function aL:Close()
 if self.Closed==true then return end
-
-self:Destroy()
 self.Closed=true
-
-local aM=J(aB,"Position",UDim2.fromScale(3,0),0.8)
-aM:Play()
-aM.Completed:Wait()
-aA:Destroy()
+local exitTween=J(aB,"Position",UDim2.fromScale(1.15,0),0.22)
+local scaleTween=J(aC,"Scale",0.94,0.22)
+exitTween:Play()
+scaleTween:Play()
+exitTween.Completed:Wait()
+if aA.Parent then aA:Destroy() end
+if notificationThemeGroup then notificationThemeGroup:destroy() notificationThemeGroup=nil end
+for index=#activeNotifications,1,-1 do
+if activeNotifications[index]==self then table.remove(activeNotifications,index) end
+end
+self.Destroyed=true
+setmetatable(self,nil)
 end local aM=function()
 
 
-ay=Library:GetIconByName(ay or af)
-aG.Image=ay
-
-if not O(ay)then
+local resolvedIcon=Library:GetIconByName(ay or af)
+if O(resolvedIcon) then
+aG.Image=resolvedIcon
+aG.Visible=true
+else
+aG.Image=""
 aG.Visible=false
 aD.UIPadding.PaddingLeft=UDim.new(0,15)
 end
@@ -3625,18 +4489,33 @@ aE.Text=aw
 aF.Text=ax
 
 local aM=aB.MouseLeave
-
-while az>0 do
-aH.Text=Q(az)
-if aI==true then aM:Wait()end
-az-=task.wait()
+local totalDuration=math.max(az,0.1)
+local lastCountdown=nil
+while az>0 and not aL.Closed do
+local countdown=math.ceil(az*10)/10
+if countdown~=lastCountdown then
+aH.Text=Q(countdown)
+lastCountdown=countdown
+end
+progressFill.Size=UDim2.new(math.clamp(az/totalDuration,0,1),0,1,0)
+az-=task.wait(0.05)
 end
 
 aL:Close()end
 
 
-u(aB.MouseButton1Down,function()aJ:Play()aI=true end)
-u(aB.MouseLeave,function()aK:Play()aI=false end)
+u(aB.MouseButton1Down,function()aJ:Play()aI=true end,nil,aA)
+u(aB.MouseLeave,function()aK:Play()aI=false end,nil,aA)
+
+activeNotifications[#activeNotifications+1]=aL
+while #activeNotifications>4 do
+local oldest=activeNotifications[1]
+if oldest and not oldest.Closed then
+oldest:Close()
+else
+table.remove(activeNotifications,1)
+end
+end
 
 task.defer(aM)
 
@@ -3687,7 +4566,7 @@ end
 end
 
 ag.NewNotificationGroup=ag.NewNotifyGroup
-ag.SetDefaultNotifyIcon=SetNotifyDefaultIcon
+ag.SetDefaultNotifyIcon=ag.SetNotifyDefaultIcon
 ag.GetTabByName=ag.GetTabByTitle
 ag.Notificafion=ag.Notify
 
@@ -3704,7 +4583,7 @@ AutomaticCanvasSize=Enum.AutomaticSize.Y,
 ScrollingDirection=Enum.ScrollingDirection.Y,
 Position=UDim2.new(0,0,1,0),
 AnchorPoint=Vector2.new(0,1),
-ScrollBarThickness=2.2,
+ScrollBarThickness=UserInputService.TouchEnabled and 5 or 2.2,
 BackgroundTransparency=1,
 ScrollBarImageTransparency=0.2,
 CanvasSize=UDim2.new(),
@@ -3796,9 +4675,39 @@ local ac=self.Themes[ab]
 assert(ac,`"Library.SetTheme". theme not found: {ab}`)
 
 self.CurrentTheme=ac
-self.WindowSettings.SelectedTheme=ac.Name
-
+if self.WindowSettings then self.WindowSettings.SelectedTheme=ac.Name end
+local function resetThemeGroups(group)
+if not group then return end
+group.UPDATED_OBJECTS=false
+for _,child in pairs(group.Descendants or {}) do
+if type(child)=="table" and child.Descendants then
+resetThemeGroups(child)
+end
+end
+end
+resetThemeGroups(C)
 C:update()
+end
+
+function Library:SetReducedMotion(enabled)
+assert(type(enabled)=="boolean",`"Library.SetReducedMotion". 'boolean' expected, got {typeof(enabled)}`)
+ReducedMotion=enabled
+self.ReducedMotion=enabled
+return self
+end
+
+function Library:SetAccent(color)
+assert(typeof(color)=="Color3",`"Library.SetAccent". 'Color3' expected, got {typeof(color)}`)
+local theme=self.CurrentTheme or self.Themes[self.Default.Theme]
+assert(theme and theme.Colors,`"Library.SetAccent". current theme is unavailable`)
+theme.Colors.Primary=color
+theme.Colors.Slider.SliderBar=color
+theme.Colors.OnPrimary=color:Lerp(theme.Colors.Text.Default,0.55)
+self.CurrentTheme=theme
+if self.LOADED_UI_LIBRARY then
+self:SetTheme(theme.Name)
+end
+return self
 end
 
 function Library:SetUIScale(ab)
@@ -3827,13 +4736,31 @@ return self.CurrentTheme
 end
 
 function Library:Destroy()
-for ab,ac in self.Connections do
-ac:Disconnect()
+if self._Destroying then return end
+self._Destroying=true
+for _,connection in ipairs(self.Connections) do
+pcall(function() connection:Disconnect() end)
 end
+table.clear(self.Connections)
+table.clear(self.Options)
 
 if I and I:GetAttribute"UID"==self.SCREENGUI_UID then
 pcall(I.Destroy,I)
 end
+
+local themeGroups={}
+for _,child in pairs(C.Descendants or {}) do
+if type(child)=="table" and child.Descendants then
+themeGroups[#themeGroups+1]=child
+end
+end
+for _,group in ipairs(themeGroups) do
+pcall(group.destroy,group)
+end
+table.clear(C.Descendants)
+C.UPDATED_OBJECTS=false
+self.LOADED_UI_LIBRARY=true
+self._Destroying=false
 end
 
 function Library:MakeWindow(ab)
@@ -3846,9 +4773,29 @@ I:SetAttribute("UID",ac)
 self.SCREENGUI_UID=ac
 I:ClearAllChildren()
 
+local camera=Services.Workspace.CurrentCamera
+local viewportSize=camera and camera.ViewportSize or I.AbsoluteSize
+local responsiveScale=math.min(1,viewportSize.X/900,viewportSize.Y/500)
 local ad=createInstance("UIScale","Scale",I,{
-Scale=P(1)
+Scale=P(math.max(0.3,responsiveScale))
 })
+local function updateResponsiveScale()
+local currentCamera=Services.Workspace.CurrentCamera
+if not currentCamera then return end
+local size=currentCamera.ViewportSize
+local scale=math.min(1,size.X/900,size.Y/500)
+ad.Scale=math.max(0.3,scale)
+end
+if camera then
+u(camera:GetPropertyChangedSignal("ViewportSize"),updateResponsiveScale,nil,I)
+end
+u(Services.Workspace:GetPropertyChangedSignal("CurrentCamera"),function()
+local currentCamera=Services.Workspace.CurrentCamera
+if currentCamera then
+u(currentCamera:GetPropertyChangedSignal("ViewportSize"),updateResponsiveScale,nil,I)
+updateResponsiveScale()
+end
+end,nil,I)
 
 local ae={
 Title=ab[1]or ab.Name or ab.Title,
@@ -4074,12 +5021,12 @@ Color="Colors.Background"
 
 u(ak.Destroying,function()
 self:Destroy()
-end)
+end,nil,I)
 
 u(I:GetAttributeChangedSignal"UID",function()
 self:Destroy()
 ak:Destroy()
-end)
+end,nil,I)
 
 InstanceFactory.Draggable(ak,ad,0.5)
 
@@ -4113,7 +5060,7 @@ Text=ae.SubTitle,
 BackgroundTransparency=1,
 TextXAlignment="Left",
 TextYAlignment="Bottom",
-TextSize=8,
+TextSize=9,
 ThemeTag={
 TextColor3="Colors.Text.Dark",
 Font="Font.Normal"
@@ -4207,14 +5154,14 @@ BackgroundColor3="Colors.OnPrimary"
 
 ay)
 local az=ay:GetAttribute"Resizing"
-ay:SetAttribute("Resizing",tick())
+ay:SetAttribute("Resizing",os.clock())
 
-if az and(tick()-az)<=0.1 then
+if az and(os.clock()-az)<=0.1 then
 return nil
 end
 
 J(ay,"BackgroundTransparency",0.5,0.3):Play()
-while tick()-ay:GetAttribute"Resizing"<=0.1 do task.wait()end
+while os.clock()-ay:GetAttribute"Resizing"<=0.1 do task.wait()end
 J(ay,"BackgroundTransparency",1,0.4):Play()end
 
 
@@ -4223,7 +5170,7 @@ ay(aw)
 local az=aw.Position
 ak.Size=az
 af.UISize={az.X.Offset,az.Y.Offset}
-end)
+end,nil,aw)
 
 u(ax:GetPropertyChangedSignal"Position",function()
 ay(ax)
@@ -4231,7 +5178,7 @@ local az=ax.Position
 at.Size=UDim2.new(0,az.X.Offset,1,-an.Size.Y.Offset)
 au.Size=UDim2.new(1,-at.Size.X.Offset,1,-an.Size.Y.Offset)
 af.TabSize=az.X.Offset
-end)
+end,nil,ax)
 
 InstanceFactory.Draggable(aw,ad,0.68,function(az,aA,aB,aC)
 return UDim2.fromOffset(math.clamp(aA,850,1000),math.clamp(aC,480,500))
@@ -4255,11 +5202,11 @@ Title="No"
 }
 }
 
-u(aq.MouseEnter,function()aq.BackgroundTransparency=0.65 end)
-u(aq.MouseLeave,function()aq.BackgroundTransparency=1.00 end)
+u(aq.MouseEnter,function()aq.BackgroundTransparency=0.65 end,nil,aq)
+u(aq.MouseLeave,function()aq.BackgroundTransparency=1.00 end,nil,aq)
 
-u(ar.MouseEnter,function()ar.BackgroundTransparency=0.65 end)
-u(ar.MouseLeave,function()ar.BackgroundTransparency=1.00 end)
+u(ar.MouseEnter,function()ar.BackgroundTransparency=0.65 end,nil,ar)
+u(ar.MouseLeave,function()ar.BackgroundTransparency=1.00 end,nil,ar)
 
 as.SetUIScale=self.SetUIScale
 as.SUBTITLE_LABEL=ao.SubTitle
@@ -4281,11 +5228,11 @@ Flags=ag
 
 u(aq.Activated,function()
 as:MinimizeButton()
-end)
+end,nil,aq)
 
 u(ar.Activated,function()
 as:Dialog(aA)
-end)
+end,nil,ar)
 
 return as
 end
