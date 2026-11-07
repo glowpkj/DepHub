@@ -148,12 +148,27 @@ section:SetCollapsed(true)
 section:SetCollapsed(false)
 end)
 
-check("SetTheme and SetAccent", function()
+check("SetTheme, SetAccent and reduced motion", function()
 Library:SetTheme("Light")
 Library:SetAccent(Color3.fromRGB(120, 90, 240))
+Library:SetReducedMotion(true)
 Library:SetTheme("Darker")
+Library:SetReducedMotion(false)
 Library:SetTheme("Light")
 Library:SetTheme("Darker")
+end)
+
+check("Named configuration profiles", function()
+assert(window:SaveProfile("smoke"))
+toggle:SetValue(true)
+slider:SetValue(9)
+keybind:SetKeyCode(Enum.KeyCode.J)
+colorPicker:SetColor(Color3.fromRGB(250, 20, 20))
+assert(window:LoadProfile("smoke"))
+assert(toggle.Value == false)
+assert(math.abs(slider.Value - 5.1) < 0.000001)
+assert(keybind.KeyCode == Enum.KeyCode.H)
+assert(window:DeleteProfile("smoke"))
 end)
 
 check("ReadFile, WriteFile and delete", function()
@@ -162,13 +177,16 @@ assert(window:ReadFile("smoke.txt") == "DepHubV2")
 assert(window:WriteFile("smoke.txt", nil))
 end)
 
-check("Notify with invalid icon", function()
+check("Notify with invalid icon and notification history", function()
 window:Notify({
 Title = "Invalid icon test",
 Content = "This notification must still render and close.",
 Icon = "__unknown_icon__",
 Duration = 0.5
 })
+assert(#window:GetNotificationHistory() > 0)
+window:ClearNotificationHistory()
+assert(#window:GetNotificationHistory() == 0)
 end)
 
 check("Dialog lifecycle", function()
