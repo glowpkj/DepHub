@@ -806,16 +806,41 @@ return nil
 end
 
 self.Closing=true
-
-local av=J(self.TEMPLATE,"Size",self.NEW_SIZE,0.1)
-av:Play()
-
+local fadeDuration=0.16
+local fadeTweens={}
+local backdropTween=J(aa,"BackgroundTransparency",1,fadeDuration)
+local bodyTween=J(self.TEMPLATE,"BackgroundTransparency",1,fadeDuration)
+table.insert(fadeTweens,backdropTween)
+table.insert(fadeTweens,bodyTween)
+for _,object in ipairs(self.TEMPLATE:GetDescendants()) do
+if object:IsA("GuiObject") then
+local tween=J(object,"BackgroundTransparency",1,fadeDuration)
+table.insert(fadeTweens,tween)
+end
+if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+local tween=J(object,"TextTransparency",1,fadeDuration)
+table.insert(fadeTweens,tween)
+end
+if object:IsA("ImageLabel") or object:IsA("ImageButton") then
+local tween=J(object,"ImageTransparency",1,fadeDuration)
+table.insert(fadeTweens,tween)
+end
+if object:IsA("UIStroke") then
+local tween=J(object,"Transparency",1,fadeDuration)
+table.insert(fadeTweens,tween)
+end
+end
+for _,tween in ipairs(fadeTweens) do tween:Play() end
+local sizeTween=J(self.TEMPLATE,"Size",self.NEW_SIZE,0.1)
+sizeTween:Play()
 if au then
-av.Completed:Wait()
+sizeTween.Completed:Wait()
+task.wait(fadeDuration)
 if self.ThemeGroup then self.ThemeGroup:destroy() self.ThemeGroup=nil end
 as()
 else
-u(av.Completed,function()
+u(sizeTween.Completed,function()
+task.wait(fadeDuration)
 if self.ThemeGroup then self.ThemeGroup:destroy() self.ThemeGroup=nil end
 as()
 end,nil,self.TEMPLATE)
@@ -3976,6 +4001,37 @@ local aE=ak.Dialog.new(aA,aB)
 aE.ThemeGroup=C:new()
 aE.NEW_SIZE=aD
 aE.TEMPLATE=az
+if aa:GetAttribute("DepHubOriginalBackgroundTransparency")==nil then
+ aa:SetAttribute("DepHubOriginalBackgroundTransparency",aa.BackgroundTransparency)
+end
+aa.BackgroundTransparency=aa:GetAttribute("DepHubOriginalBackgroundTransparency")
+for _,object in ipairs(az:GetDescendants()) do
+if object:IsA("GuiObject") then
+if object:GetAttribute("DepHubOriginalBackgroundTransparency")==nil then
+object:SetAttribute("DepHubOriginalBackgroundTransparency",object.BackgroundTransparency)
+end
+object.BackgroundTransparency=object:GetAttribute("DepHubOriginalBackgroundTransparency")
+end
+if object:IsA("TextLabel") or object:IsA("TextButton") or object:IsA("TextBox") then
+if object:GetAttribute("DepHubOriginalTextTransparency")==nil then
+object:SetAttribute("DepHubOriginalTextTransparency",object.TextTransparency)
+end
+object.TextTransparency=object:GetAttribute("DepHubOriginalTextTransparency")
+end
+if object:IsA("ImageLabel") or object:IsA("ImageButton") then
+if object:GetAttribute("DepHubOriginalImageTransparency")==nil then
+object:SetAttribute("DepHubOriginalImageTransparency",object.ImageTransparency)
+end
+object.ImageTransparency=object:GetAttribute("DepHubOriginalImageTransparency")
+end
+if object:IsA("UIStroke") then
+if object:GetAttribute("DepHubOriginalStrokeTransparency")==nil then
+object:SetAttribute("DepHubOriginalStrokeTransparency",object.Transparency)
+end
+object.Transparency=object:GetAttribute("DepHubOriginalStrokeTransparency")
+end
+end
+az.BackgroundTransparency=0
 
 for aF,aG in az.Options:GetChildren()do
 if aG:IsA"GuiObject"then
