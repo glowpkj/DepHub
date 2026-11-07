@@ -135,8 +135,14 @@ function State:SetJumpEnabled(enabled)
         if not self.JumpEnabled then
             self.Jump:SetPower(self.JumpPower)
             local bypassOk, bypassErr = self.Jump:Start()
+            if bypassOk ~= true then
+                self.Jump:Stop()
+                self.JumpEnabled = false
+                self.LastError = tostring(bypassErr or "bypass indisponivel")
+                return false, "bypass:" .. self.LastError
+            end
             self.JumpEnabled = true
-            if bypassOk ~= true then return true, "bypass:" .. tostring(bypassErr or "indisponivel") end
+            self.LastError = nil
         end
     else
         if self.Jump and self.JumpEnabled then self.Jump:Stop() end
