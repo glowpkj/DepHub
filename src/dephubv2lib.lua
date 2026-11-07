@@ -1064,7 +1064,7 @@ BackgroundColor3="Colors.Buttons.Default"
 Childs={
 createInstance("TextLabel","Title",{
 BackgroundTransparency=1,
-Font=Enum.Font.GothamMedium,
+Font=w(Library.CurrentTheme,"Font.Medium"),
 Text=am.Title,
 TextSize=10,
 TextXAlignment=Enum.TextXAlignment.Left,
@@ -3587,13 +3587,22 @@ Position=UDim2.fromOffset(0,0),
 Elements={Corner=UDim.new(0,5),Padding={PaddingLeft=UDim.new(0,8),PaddingRight=UDim.new(0,8),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)}}
 })
 self.TOOLTIP=tooltip
-u(target.MouseEnter,function() tooltip.Visible=true end,nil,target)
+local function updateTooltipPosition()
+local position=UserInputService:GetMouseLocation()-GuiService:GetGuiInset()
+local viewport=I.AbsoluteSize
+local x=math.min(position.X+12,math.max(4,viewport.X-tooltip.AbsoluteSize.X-4))
+local y=math.min(position.Y+12,math.max(4,viewport.Y-tooltip.AbsoluteSize.Y-4))
+tooltip.Position=UDim2.fromOffset(x,y)
+end
+u(target.MouseEnter,function()
+updateTooltipPosition()
+tooltip.Visible=true
+end,nil,target)
 u(target.MouseLeave,function() tooltip.Visible=false end,nil,target)
 u(target.Destroying,function() if tooltip.Parent then tooltip:Destroy() end end,nil,I)
 u(UserInputService.InputChanged,function(input)
 if tooltip.Visible and input.UserInputType==Enum.UserInputType.MouseMovement then
-local position=UserInputService:GetMouseLocation()-GuiService:GetGuiInset()
-tooltip.Position=UDim2.fromOffset(position.X+12,position.Y+12)
+updateTooltipPosition()
 end
 end,nil,target)
 return self
