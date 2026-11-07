@@ -138,11 +138,14 @@ option:SetValue(100)
 return option
 end)
 
-check("AddLabel and AddDivider", function()
+check("AddLabel, AddDivider and collapsible sections", function()
 firstTab:AddLabel("Smoke label")
 firstTab:AddDivider()
 firstTab:AddParagraph("Paragraph", "Paragraph should not react like a button")
-firstTab:AddSection("Section")
+local section = firstTab:AddSection("Collapsible section", {Collapsible = true})
+firstTab:AddLabel("Inside collapsible section")
+section:SetCollapsed(true)
+section:SetCollapsed(false)
 end)
 
 check("SetTheme and SetAccent", function()
