@@ -2915,10 +2915,11 @@ Kind="ColorPicker"
 local palette=createInstance("Frame","ColorPalette",I,{
 Visible=false,
 ZIndex=1500,
-Size=UDim2.fromOffset(150,64),
+Size=UDim2.fromOffset(150,84),
 BackgroundColor3=w(Library.CurrentTheme,"Colors.Buttons.Default"),
 BorderSizePixel=0,
-Elements={Corner=UDim.new(0,6),Stroke={Color=w(Library.CurrentTheme,"Colors.Stroke")},Padding={PaddingLeft=UDim.new(0,5),PaddingRight=UDim.new(0,5),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)}}
+ThemeTag={OBJECTS=group,BackgroundColor3="Colors.Buttons.Default"},
+Elements={Corner=UDim.new(0,6),Stroke={ThemeTag={OBJECTS=group,Color="Colors.Stroke"}},Padding={PaddingLeft=UDim.new(0,5),PaddingRight=UDim.new(0,5),PaddingTop=UDim.new(0,5),PaddingBottom=UDim.new(0,5)}}
 })
 local paletteLayout=createInstance("UIGridLayout",palette,{
 CellSize=UDim2.fromOffset(20,20),
@@ -2946,6 +2947,12 @@ handle:SetColor(color)
 palette.Visible=false
 end,nil,colorButton)
 end
+local colorErrorStroke=createInstance("UIStroke",row,{
+Color=w(Library.CurrentTheme,"Colors.Error"),
+Transparency=1,
+Thickness=1.2
+})
+handle.ERROR_STROKE=colorErrorStroke
 handle.PALETTE=palette
 u(swatch.Activated,function()
 if handle.Enabled==false then return end
@@ -2953,7 +2960,7 @@ palette.Visible=not palette.Visible
 if palette.Visible then
 local position=swatch.AbsolutePosition
 local viewport=I.AbsoluteSize
-palette.Position=UDim2.fromOffset(math.clamp(position.X,4,math.max(4,viewport.X-154)),math.clamp(position.Y+26,4,math.max(4,viewport.Y-68)))
+palette.Position=UDim2.fromOffset(math.clamp(position.X,4,math.max(4,viewport.X-154)),math.clamp(position.Y+26,4,math.max(4,viewport.Y-88)))
 end
 end,nil,swatch)
 u(row.Destroying,function()
@@ -2963,11 +2970,11 @@ if flag then ae[flag]=input.Text:gsub("^#","") Library.Options[flag]=handle end
 u(input.FocusLost,function()
 local hex=input.Text:gsub("^#","")
 if #hex~=6 or not tonumber(hex,16) then
-handle.HasError=true
+handle:SetError(true)
 input.Text="#"..string.format("%02X%02X%02X",math.round(handle.Value.R*255),math.round(handle.Value.G*255),math.round(handle.Value.B*255))
 return
 end
-handle.HasError=false
+handle:SetError(false)
 handle:SetColor(Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16)))
 end,nil,input)
 return handle
