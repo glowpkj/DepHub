@@ -57,6 +57,7 @@ end
 
 local MarketplaceService = Services.MarketplaceService
 local UserInputService = Services.UserInputService
+local GuiService = Services.GuiService
 local TweenService = Services.TweenService
 local HttpService = Services.HttpService
 local RunService = Services.RunService
@@ -182,10 +183,23 @@ Library.Save=Library.Default
 -- DepHub: a escala da UI e fixa em 1:1. As dimensoes em pixels permanecem
 -- iguais entre resolucoes, sem encolher em telas menores ou crescer em telas maiores.
 -- Pixel sizing is independent of the camera viewport.
-local u=function(
-
-u, v, w)
-table.insert(Library.Connections,u[w or"Connect"](u,v))end
+local u=function(signal,callback,method,scope)
+local connection=signal[method or "Connect"](signal,callback)
+table.insert(Library.Connections,connection)
+if scope and typeof(scope)=="Instance" then
+local cleanup
+cleanup=scope.Destroying:Connect(function()
+if connection.Connected then connection:Disconnect() end
+for index=#Library.Connections,1,-1 do
+if Library.Connections[index]==connection or Library.Connections[index]==cleanup then
+ table.remove(Library.Connections,index)
+end
+end
+end)
+table.insert(Library.Connections,cleanup)
+end
+return connection
+end
 
 
 local v={}
@@ -427,82 +441,91 @@ end
 
 local I
 
-function InstanceFactory:Draggable(J,K,L)
-local M,N,O,P
-local Q=K or 0.28
-local R=0
-local S local T=function(
+function InstanceFactory:Draggable(frame,scaleObject,lerpFactor,clampPosition)
+local activeInput=nil
+local startPointer=nil
+local startPosition=nil
+local latestPointer=nil
+local renderConnection=nil
+local moved=false
+local smoothing=lerpFactor or 0.28
 
-T)
-local U=T.Position-N
-local V
-R=tick()
+local function pointerPosition(input)
+if input.UserInputType==Enum.UserInputType.MouseButton1 or input.UserInputType==Enum.UserInputType.MouseMovement then
+local position=UserInputService:GetMouseLocation()
+local inset=GuiService:GetGuiInset()
+return position-inset
+end
+return input.Position
+end
 
-if L then
-V=L(
-O.X.Scale,O.X.Offset+U.X/J.Scale,
-O.Y.Scale,O.Y.Offset+U.Y/J.Scale
+local function stopDrag()
+if not activeInput then return end
+activeInput=nil
+startPointer=nil
+startPosition=nil
+latestPointer=nil
+if renderConnection then
+renderConnection:Disconnect()
+renderConnection=nil
+end
+A=false
+end
+
+u(frame.InputBegan,function(input)
+if A or activeInput then return end
+if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
+activeInput=input
+startPointer=pointerPosition(input)
+latestPointer=startPointer
+startPosition=frame.Position
+moved=false
+A=true
+renderConnection=RunService.RenderStepped:Connect(function(deltaTime)
+if not activeInput or not frame.Parent then
+stopDrag()
+return
+end
+local delta=latestPointer-startPointer
+if math.abs(delta.X)>4 or math.abs(delta.Y)>4 then
+moved=true
+frame:SetAttribute("DragMoved",true)
+end
+local factor=1-math.pow(1-math.clamp(smoothing,0,1),math.max(deltaTime,0)*60)
+local target
+if clampPosition then
+target=clampPosition(
+startPosition.X.Scale,startPosition.X.Offset+delta.X/math.max(scaleObject.Scale,0.001),
+startPosition.Y.Scale,startPosition.Y.Offset+delta.Y/math.max(scaleObject.Scale,0.001)
 )
 else
-V=UDim2.new(
-O.X.Scale,O.X.Offset+U.X/J.Scale,
-O.Y.Scale,O.Y.Offset+U.Y/J.Scale
-)
+local viewport=I.AbsoluteSize
+local size=frame.AbsoluteSize
+local x=math.clamp(frame.AbsolutePosition.X+delta.X,0,math.max(0,viewport.X-size.X))
+local y=math.clamp(frame.AbsolutePosition.Y+delta.Y,0,math.max(0,viewport.Y-size.Y))
+target=UDim2.fromOffset(x,y)
 end
-self.Position=self.Position:Lerp(V,Q)end local U=function()
-
-
-
-while I==self do
-if(tick()-R)>=1 then
-S()
-break
-end
-task.wait()
-end end
-
-
-local V={
-[Enum.UserInputType.MouseButton1]=true,
-[Enum.UserInputType.Touch]=true
-}
-
-local W={
-[Enum.UserInputType.MouseMovement]=true,
-[Enum.UserInputType.Touch]=true
-}
-
-u(self.InputBegan,function(X)
-if A==false and I==nil and V[X.UserInputType]then
-N=X.Position
-O=self.Position
-I=self
-R=tick()
-A=true
-
-local Y;
-
-function S()
-A=false
-I=nil
-Y:Disconnect()
-end
-
-task.spawn(U)
-
-Y=X.Changed:Connect(function()
-if X.UserInputState==Enum.UserInputState.End then
-S()
-end
+frame.Position=frame.Position:Lerp(target,factor)
 end)
-end
-end)
+end,nil,frame)
 
-u(UserInputService.InputChanged,function(X)
-if I==self and W[X.UserInputType]then
-T(X)
+u(UserInputService.InputChanged,function(input)
+if not activeInput then return end
+if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseMovement then
+latestPointer=pointerPosition(input)
+elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
+latestPointer=input.Position
 end
-end)
+end,nil,frame)
+
+u(UserInputService.InputEnded,function(input)
+if not activeInput then return end
+if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1 then
+stopDrag()
+elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
+stopDrag()
+end
+end,nil,frame)
 end
 
 function InstanceFactory:CreateNewTemplate(J)
@@ -1332,7 +1355,8 @@ return math.min((aK*math.max(aN,0.5))+10,aL,aO/1.75)end local aO=function()
 local aO=as.AbsolutePosition
 local aP=as.AbsoluteSize
 
-local aQ=Vector2.new(Mouse.X,Mouse.Y)
+local mousePosition=UserInputService:GetMouseLocation()-GuiService:GetGuiInset()
+local aQ=Vector2.new(mousePosition.X,mousePosition.Y)
 
 local aR=aQ.X>=aO.X and aQ.X<=(aO.X+aP.X)
 local aS=aQ.Y>=aO.Y and aQ.Y<=(aO.Y+aP.Y)
@@ -2183,6 +2207,7 @@ local function finishDrag()
 if not activeInput then return end
 activeInput=nil
 A=false
+disconnectDragInput()
 J(aM,"BackgroundTransparency",0.2,0.15):Play()
 aF.ScrollingEnabled=true
 end
@@ -2192,20 +2217,24 @@ if A~=false then return end
 if input.UserInputType~=Enum.UserInputType.MouseButton1 and input.UserInputType~=Enum.UserInputType.Touch then return end
 activeInput=input
 A=true
+connectDragInput()
 J(aM,"BackgroundTransparency",0,0.15):Play()
 aF.ScrollingEnabled=false
 updateSlider(input.Position)
 end)
 
-local changedConnection=UserInputService.InputChanged:Connect(function(input)
+local changedConnection=nil
+local endedConnection=nil
+local function connectDragInput()
+changedConnection=UserInputService.InputChanged:Connect(function(input)
 if not activeInput then return end
 if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseMovement then
-updateSlider(UserInputService:GetMouseLocation())
+updateSlider(UserInputService:GetMouseLocation()-GuiService:GetGuiInset())
 elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputType==Enum.UserInputType.Touch then
 updateSlider(input.Position)
 end
 end)
-local endedConnection=UserInputService.InputEnded:Connect(function(input)
+endedConnection=UserInputService.InputEnded:Connect(function(input)
 if not activeInput then return end
 if activeInput.UserInputType==Enum.UserInputType.MouseButton1 and input.UserInputType==Enum.UserInputType.MouseButton1 then
 finishDrag()
@@ -2213,6 +2242,11 @@ elseif activeInput.UserInputType==Enum.UserInputType.Touch and input.UserInputTy
 finishDrag()
 end
 end)
+end
+local function disconnectDragInput()
+if changedConnection then changedConnection:Disconnect() changedConnection=nil end
+if endedConnection then endedConnection:Disconnect() endedConnection=nil end
+end
 aP.INPUT_CONNECTIONS={changedConnection,endedConnection}
 local originalDestroy=ai.Destroy
 aP.Destroy=function(option)
@@ -3072,6 +3106,10 @@ BackgroundColor3="Colors.Buttons.Default"
 })
 
 u(aw.Activated,function()
+if aw:GetAttribute("DragMoved") then
+aw:SetAttribute("DragMoved",false)
+return
+end
 ag:Minimize()
 end)
 
@@ -3902,9 +3940,10 @@ return self.CurrentTheme
 end
 
 function Library:Destroy()
-for ab,ac in self.Connections do
-ac:Disconnect()
+for _,connection in ipairs(self.Connections) do
+pcall(function() connection:Disconnect() end)
 end
+table.clear(self.Connections)
 
 if I and I:GetAttribute"UID"==self.SCREENGUI_UID then
 pcall(I.Destroy,I)
@@ -3921,8 +3960,10 @@ I:SetAttribute("UID",ac)
 self.SCREENGUI_UID=ac
 I:ClearAllChildren()
 
+local viewportSize=I.AbsoluteSize
+local responsiveScale=math.min(1,viewportSize.X/900,viewportSize.Y/500)
 local ad=createInstance("UIScale","Scale",I,{
-Scale=P(1)
+Scale=P(math.max(0.5,responsiveScale))
 })
 
 local ae={
