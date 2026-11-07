@@ -516,24 +516,24 @@ task.wait()
 -- The shell is identical for every game, so the loader only hands it the name
 -- and version. Categories and tabs are the backend's job: each game fills the
 -- shared shell with its own interface.
-local okDemon, demonModule = loadModule("src/core/demon-ui.lua", false)
-Diag:RegisterModule("src/core/demon-ui.lua")
-if not okDemon or type(demonModule) ~= "table" or type(demonModule.new) ~= "function" then
-    Diag:Module("src/core/demon-ui.lua", false, tostring(demonModule))
+local okUIAdapter, uiAdapterModule = loadModule("src/core/ui-adapter.lua", false)
+Diag:RegisterModule("src/core/ui-adapter.lua")
+if not okUIAdapter or type(uiAdapterModule) ~= "table" or type(uiAdapterModule.new) ~= "function" then
+    Diag:Module("src/core/ui-adapter.lua", false, tostring(demonModule))
     return fail("The UI shell did not load: " .. tostring(demonModule))
 end
-Diag:Module("src/core/demon-ui.lua", true, "loaded")
+Diag:Module("src/core/ui-adapter.lua", true, "loaded")
 log("UI module loaded; building window...")
 
-local okWindow, window = pcall(demonModule.new, {
+local okWindow, window = pcall(uiAdapterModule.new, {
     Name = "DepHub",
     Version = VERSION
 })
 if not okWindow or type(window) ~= "table" then
-    Diag:Module("demon-ui window", false, tostring(window))
+    Diag:Module("UI adapter window", false, tostring(window))
     return fail("Could not build the UI window: " .. tostring(window))
 end
-Diag:Module("demon-ui window", true, "janela criada")
+Diag:Module("UI adapter window", true, "janela criada")
 log("Window built; loading backend...")
 
 env.__DEPHUB.DemonUI = window
