@@ -1,24 +1,14 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
-local Visual = {}
-Visual.__index = Visual
+local JumpAnywhere = {}
+JumpAnywhere.__index = JumpAnywhere
 
-Visual.Id = "DepHub_JumpAnywhere"
-Visual.MinPower = 50
-Visual.MaxPower = 500
-Visual.DefaultPower = 120
-Visual.BypassStates = {
-    Enum.HumanoidStateType.Jumping,
-    Enum.HumanoidStateType.Climbing,
-}
-
-local function getEnvironment()
-    return type(getgenv) == "function" and getgenv() or _G
-end
+JumpAnywhere.Id = "DepHub_JumpAnywhere"
+JumpAnywhere.RetryFrames = 30
 
 local function getDebugLibrary()
-    local environment = getEnvironment()
+    local environment = type(getgenv) == "function" and getgenv() or _G
     local library = environment and environment.debug
     if type(library) ~= "table" then
         library = debug
@@ -29,12 +19,6 @@ local function getDebugLibrary()
         return nil
     end
     return library
-end
-
-local function getHumanoid()
-    local player = Players.LocalPlayer
-    local character = player and player.Character
-    return character and character:FindFirstChildOfClass("Humanoid") or nil
 end
 
 local function resolveCharacterActions()
@@ -95,7 +79,7 @@ local function writeUpvalue(library, fn, index, value)
 end
 
 local function findLinefaultUpvalue(library, jumpFunction)
-    local firstFunction
+    local fallback
     for index = 1, 32 do
         local name, value = readUpvalue(library, jumpFunction, index)
         if value == nil then break end
@@ -104,35 +88,31 @@ local function findLinefaultUpvalue(library, jumpFunction)
                 return index, value
             end
             if index == 3 then
-                firstFunction = {index, value}
+                fallback = {index, value}
             end
         end
     end
-    if firstFunction then
-        return firstFunction[1], firstFunction[2]
+    if fallback then
+        return fallback[1], fallback[2]
     end
     return nil, nil
 end
 
-function Visual.new()
+function JumpAnywhere.new()
     return setmetatable({
         Active = false,
-        Power = Visual.DefaultPower,
-        Humanoid = nil,
-        Original = nil,
         Connection = nil,
         RetryCounter = 0,
         BypassReady = false,
         BypassError = nil,
-        PatchedActions = nil,
         PatchedJump = nil,
         PatchedIndex = nil,
         OriginalCheck = nil,
         PatchedCheck = nil,
-    }, Visual)
+    }, JumpAnywhere)
 end
 
-function Visual:_restoreBypass()
+function JumpAnywhere:_restoreBypass()
     local library = getDebugLibrary()
     if library and self.PatchedJump and self.PatchedIndex and self.PatchedCheck then
         local _, current = readUpvalue(library, self.PatchedJump, self.PatchedIndex)
@@ -142,14 +122,13 @@ function Visual:_restoreBypass()
     end
 
     self.BypassReady = false
-    self.PatchedActions = nil
     self.PatchedJump = nil
     self.PatchedIndex = nil
     self.OriginalCheck = nil
     self.PatchedCheck = nil
 end
 
-function Visual:_applyBypass()
+function JumpAnywhere:_applyBypass()
     local actions = resolveCharacterActions()
     if not actions then
         self.BypassError = "CharacterActions indisponivel"
@@ -171,7 +150,7 @@ function Visual:_applyBypass()
 
     local index, original = findLinefaultUpvalue(library, jumpFunction)
     if not index or type(original) ~= "function" then
-        self.BypassError = "funcao checkLinefault nao encontrada em CharacterActions.Jump"
+        self.BypassError = "checkLinefault nao encontrado em CharacterActions.Jump"
         return false, self.BypassError
     end
 
@@ -184,7 +163,6 @@ function Visual:_applyBypass()
         return false, self.BypassError
     end
 
-    self.PatchedActions = actions
     self.PatchedJump = jumpFunction
     self.PatchedIndex = index
     self.OriginalCheck = original
@@ -194,90 +172,31 @@ function Visual:_applyBypass()
     return true
 end
 
-function Visual:_capture(humanoid)
-    local original = {
-        JumpPower = humanoid.JumpPower,
-        UseJumpPower = humanoid.UseJumpPower,
-        JumpHeight = humanoid.JumpHeight,
-        States = {},
-    }
-
-    for _, state in ipairs(Visual.BypassStates) do
-        local ok, enabled = pcall(humanoid.GetStateEnabled, humanoid, state)
-        if ok then
-            original.States[state] = enabled
-        end
+function JumpAnywhere:Start()
+    if self.Active then
+        return self.BypassReady, self.BypassError
     end
 
-    return original
-end
-
-function Visual:_restore()
-    local humanoid = self.Humanoid
-    local original = self.Original
-    if not humanoid or not original then return end
-
-    pcall(function()
-        if original.JumpPower ~= nil then humanoid.JumpPower = original.JumpPower end
-        if original.UseJumpPower ~= nil then humanoid.UseJumpPower = original.UseJumpPower end
-        if original.JumpHeight ~= nil then humanoid.JumpHeight = original.JumpHeight end
-    end)
-
-    for state, enabled in pairs(original.States) do
-        pcall(humanoid.SetStateEnabled, humanoid, state, enabled)
+    local ok, err = self:_applyBypass()
+    if not ok then
+        return false, err
     end
 
-    self.Humanoid = nil
-    self.Original = nil
-end
-
-function Visual:_apply()
-    if not self.Active then return end
-
-    local humanoid = getHumanoid()
-    if humanoid ~= self.Humanoid then
-        self:_restore()
-        if not humanoid then return end
-        self.Humanoid = humanoid
-        self.Original = self:_capture(humanoid)
-    end
-
-    if not humanoid then return end
-
-    pcall(function()
-        humanoid.UseJumpPower = true
-        humanoid.JumpPower = self.Power
-        humanoid.JumpHeight = math.max(tonumber(self.Original.JumpHeight) or 0, 7.2)
-    end)
-
-    for _, state in ipairs(Visual.BypassStates) do
-        pcall(humanoid.SetStateEnabled, humanoid, state, true)
-    end
-
-    self.RetryCounter += 1
-    if self.RetryCounter >= 30 then
-        self.RetryCounter = 0
-        self:_applyBypass()
-    end
-end
-
-function Visual:Start()
-    if self.Active then return self.BypassReady, self.BypassError end
     self.Active = true
     self.RetryCounter = 0
-    self:_apply()
-    self:_applyBypass()
     self.Connection = RunService.Heartbeat:Connect(function()
-        self:_apply()
+        if not self.Active then return end
+        self.RetryCounter += 1
+        if self.RetryCounter >= JumpAnywhere.RetryFrames then
+            self.RetryCounter = 0
+            self:_applyBypass()
+        end
     end)
-    return self.BypassReady, self.BypassError
+
+    return true
 end
 
-function Visual:Stop()
-    if not self.Active and not self.Humanoid and not self.BypassReady then
-        return false
-    end
-
+function JumpAnywhere:Stop()
     self.Active = false
 
     if self.Connection then
@@ -286,21 +205,12 @@ function Visual:Stop()
     end
 
     self:_restoreBypass()
-    self:_restore()
+    self.RetryCounter = 0
     return true
 end
 
-function Visual:SetPower(value)
-    local numeric = tonumber(value)
-    if not numeric then return false end
-    self.Power = math.clamp(math.floor(numeric + 0.5), Visual.MinPower, Visual.MaxPower)
-    if self.Active then self:_apply() end
-    return true
+function JumpAnywhere:Destroy()
+    return self:Stop()
 end
 
-function Visual:Destroy()
-    self:Stop()
-    return true
-end
-
-return Visual
+return JumpAnywhere
