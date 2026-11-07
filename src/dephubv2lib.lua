@@ -1016,7 +1016,7 @@ local aq=createInstance("ScrollingFrame","Container",{
 Size=UDim2.new(1,0,1,0),
 Position=UDim2.new(0,0,1),
 AnchorPoint=Vector2.new(0,1),
-ScrollBarThickness=1.5,
+ScrollBarThickness=UserInputService.TouchEnabled and 5 or 1.5,
 BackgroundTransparency=1,
 ScrollBarImageTransparency=0.2,
 AutomaticCanvasSize=Enum.AutomaticSize.Y,
@@ -1334,7 +1334,7 @@ ZIndex=1002,
 Size=UDim2.new(1,-6,1,-6),
 Position=UDim2.fromScale(0.5,0.5),
 AnchorPoint=Vector2.new(0.5,0.5),
-ScrollBarThickness=3,
+ScrollBarThickness=UserInputService.TouchEnabled and 6 or 3,
 BackgroundTransparency=1,
 BorderSizePixel=0,
 CanvasSize=UDim2.new(),
@@ -2104,7 +2104,7 @@ local errorStroke=createInstance("UIStroke",aH,{
 Color=w(Library.CurrentTheme,"Colors.Error"),
 Transparency=1,
 Thickness=1.2,
-ThemeTag={OBJECTS=aD,Color="Colors.Error"}
+Color=w(Library.CurrentTheme,"Colors.Error")
 })
 local aL=ak.TextBox.new(self,aF,aG,aE,aI,aA)
 aL.ERROR_STROKE=errorStroke
@@ -2726,7 +2726,7 @@ Size=UDim2.fromOffset(22,22),
 Position=UDim2.new(1,-10,0.5,0),
 AnchorPoint=Vector2.new(1,0.5),
 BackgroundColor3=default,
-Elements={Corner=UDim.new(0,5),Stroke={ThemeTag={OBJECTS=group,Color="Colors.Stroke"}}}
+Elements={Corner=UDim.new(0,5),Stroke={Color=w(Library.CurrentTheme,"Colors.Stroke")}}
 })
 local input=createInstance("TextBox",row,{
 Size=UDim2.fromOffset(82,22),
@@ -3368,7 +3368,7 @@ self.Enabled=av
 local element=self.DESTROY_ELEMENT
 if typeof(element)=="Instance" then
 if element:IsA("GuiButton") then
- element.Active=av
+ element.Active=av and not self.Loading
  element.AutoButtonColor=false
 elseif element:IsA("TextBox") then
  element.TextEditable=av
@@ -4234,7 +4234,7 @@ AutomaticCanvasSize=Enum.AutomaticSize.Y,
 ScrollingDirection=Enum.ScrollingDirection.Y,
 Position=UDim2.new(0,0,1,0),
 AnchorPoint=Vector2.new(0,1),
-ScrollBarThickness=2.2,
+ScrollBarThickness=UserInputService.TouchEnabled and 5 or 2.2,
 BackgroundTransparency=1,
 ScrollBarImageTransparency=0.2,
 CanvasSize=UDim2.new(),
@@ -4386,11 +4386,29 @@ I:SetAttribute("UID",ac)
 self.SCREENGUI_UID=ac
 I:ClearAllChildren()
 
-local viewportSize=I.AbsoluteSize
+local camera=Services.Workspace.CurrentCamera
+local viewportSize=camera and camera.ViewportSize or I.AbsoluteSize
 local responsiveScale=math.min(1,viewportSize.X/900,viewportSize.Y/500)
 local ad=createInstance("UIScale","Scale",I,{
-Scale=P(math.max(0.5,responsiveScale))
+Scale=P(math.max(0.3,responsiveScale))
 })
+local function updateResponsiveScale()
+local currentCamera=Services.Workspace.CurrentCamera
+if not currentCamera then return end
+local size=currentCamera.ViewportSize
+local scale=math.min(1,size.X/900,size.Y/500)
+ad.Scale=math.max(0.3,scale)
+end
+if camera then
+u(camera:GetPropertyChangedSignal("ViewportSize"),updateResponsiveScale,nil,I)
+end
+u(Services.Workspace:GetPropertyChangedSignal("CurrentCamera"),function()
+local currentCamera=Services.Workspace.CurrentCamera
+if currentCamera then
+u(currentCamera:GetPropertyChangedSignal("ViewportSize"),updateResponsiveScale,nil,I)
+updateResponsiveScale()
+end
+end,nil,I)
 
 local ae={
 Title=ab[1]or ab.Name or ab.Title,
