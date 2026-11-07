@@ -190,7 +190,6 @@ end)
 
 task.wait(1)
 check("Window and library cleanup", function()
-window:Destroy()
 Library:Destroy()
 end)
 
