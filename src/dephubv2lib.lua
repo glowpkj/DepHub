@@ -177,6 +177,7 @@ end
 -- and the aliases the rest of the file uses.
 -- ===========================================================================
 local Library={
+ReducedMotion=false,
 Information={
 Version="v2.0.1",
 GitHubOwner="tlredz"
@@ -613,9 +614,11 @@ if not I then
 I=createInstance("ScreenGui",H,GuiParent,{
 IgnoreGuiInset=true
 })
-end local J=function(
+end local ReducedMotion=false
+local J=function(
 
 J, K, L, M, ...)
+if ReducedMotion then M=0 end
 local N=TweenInfo.new(M,Enum.EasingStyle.Quint,...)
 
 return TweenService:Create(J,N,{
@@ -703,6 +706,7 @@ local ae
 
 local af=""
 local activeNotifications={}
+local notificationHistory={}
 
 local ag={SelectedTab=1,Minimized=false}
 ag.__index=ag
@@ -802,7 +806,7 @@ return nil
 end
 
 self.Closing=true
-local fadeDuration=0.16
+local fadeDuration=ReducedMotion and 0 or 0.16
 local fadeTweens={}
 local backdropTween=J(aa,"BackgroundTransparency",1,fadeDuration)
 local bodyTween=J(self.TEMPLATE,"BackgroundTransparency",1,fadeDuration)
@@ -854,6 +858,22 @@ Closed=false,
 Closing=false,
 Kind="Dialog"
 },ar)
+end
+
+function ap:SetValue(value)
+if type(value)=="table" then
+for _,option in ipairs(self.DROPDOWN_OPTIONS) do
+self.SELECT_DROPDOWN_OPTION(option.Name,false)
+end
+for name,selected in pairs(value) do
+self.SELECT_DROPDOWN_OPTION(name,selected==true)
+end
+elseif type(value)=="string" or type(value)=="number" then
+self.SELECT_DROPDOWN_OPTION(tostring(value),true)
+else
+error(`"Dropdown.SetValue". 'string', 'number', or 'table' expected, got {typeof(value)}`,2)
+end
+return self
 end
 
 function ap:SetEnabled(au)
@@ -2078,6 +2098,8 @@ aJ=os.clock()end
 
 
 local aP=ak.Toggle.new(self,aC,aD,aE,aO,aA)
+aP.Flag=ay
+if ay then Library.Options[ay]=aP end
 aP:SetValue(az)
 
 local aQ=0
@@ -2223,6 +2245,8 @@ Transparency=1,
 Thickness=1.2
 })
 local aL=ak.TextBox.new(self,aF,aG,aE,aI,aA)
+aL.Flag=ay
+if ay then Library.Options[ay]=aL end
 aL.ERROR_STROKE=errorStroke
 local aM=function(
 
@@ -2362,6 +2386,8 @@ Font="Font.SliderValue"
 })
 
 local aP=ak.Slider.new(self,aG,aH,aI,aD)
+aP.Flag=ay
+if ay then Library.Options[ay]=aP end
 
 aP.Min=az
 aP.Max=aA
@@ -2795,7 +2821,7 @@ Description=description,
 Parent=self,
 Kind="Keybind"
 },ak.Keybind)
-if flag then ae[flag]=default.Name end
+if flag then ae[flag]=default.Name Library.Options[flag]=handle end
 u(keyButton.Activated,function()
 if handle.Enabled==false then return end
 handle.Capturing=true
@@ -2875,7 +2901,7 @@ Description=description,
 Parent=self,
 Kind="ColorPicker"
 },ak.ColorPicker)
-if flag then ae[flag]=input.Text:gsub("^#","") end
+if flag then ae[flag]=input.Text:gsub("^#","") Library.Options[flag]=handle end
 u(input.FocusLost,function()
 local hex=input.Text:gsub("^#","")
 if #hex~=6 or not tonumber(hex,16) then
@@ -3055,6 +3081,8 @@ ThemeTag=aJ
 })
 
 local aL=ak.Dropdown.new(self,aE,aF,aG,aB)
+aL.Flag=ay
+if ay then Library.Options[ay]=aL end
 
 local aM
 local aN=false
@@ -3417,6 +3445,11 @@ if themeGroup then
 pcall(themeGroup.destroy,themeGroup)
 end
 
+for flag,option in pairs(Library.Options) do
+if option.Parent==self then Library.Options[flag]=nil end
+end
+self._CurrentSection=nil
+self._Sections=nil
 T[self]=nil
 U[self]=nil
 V[self]=nil
@@ -3511,7 +3544,7 @@ local element=self.DESTROY_ELEMENT
 if typeof(element)=="Instance" then element:SetAttribute("Loading",loading) element.Active=not loading and self.Enabled~=false end
 if self.LoadingTween then self.LoadingTween:Cancel() self.LoadingTween=nil end
 if self.LoadingIcon then
-if loading then
+if loading and not ReducedMotion then
 self.LoadingTween=TweenService:Create(self.LoadingIcon,TweenInfo.new(0.8,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut,-1),{Rotation=360})
 self.LoadingTween:Play()
 else
@@ -3571,6 +3604,7 @@ local parentGroup=self.Parent and V[self.Parent]
 if parentGroup and type(parentGroup.remove)=="function" then
 parentGroup:remove(self.DESTROY_ELEMENT)
 end
+if self.Flag and Library.Options[self.Flag]==self then Library.Options[self.Flag]=nil end
 self.DESTROY_ELEMENT:Destroy()
 setmetatable(self,nil)
 
@@ -3936,6 +3970,44 @@ end,nil,aa)
 ag.StartWindow=nil
 end
 
+function ag:SaveProfile(name)
+assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.SaveProfile". profile name must contain only letters, numbers, '_' or '-'`)
+local ok,encoded=pcall(HttpService.JSONEncode,HttpService,ae)
+if not ok then return false end
+return self:WriteFile("profiles/"..name..".json",encoded)
+end
+
+function ag:LoadProfile(name)
+assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.LoadProfile". profile name must contain only letters, numbers, '_' or '-'`)
+local content=self:ReadFile("profiles/"..name..".json")
+if type(content)~="string" then return false end
+local ok,profile=pcall(HttpService.JSONDecode,HttpService,content)
+if not ok or type(profile)~="table" then return false end
+for flag,value in pairs(profile) do
+if at[typeof(value)] then
+ ae[flag]=value
+ local option=Library.Options[flag]
+ if option and option.Parent and not option.Destroyed then
+  if option.Kind=="Toggle" and type(value)=="number" then pcall(option.SetValue,option,value==0)
+  elseif option.Kind=="Slider" and type(value)=="number" then pcall(option.SetValue,option,value)
+  elseif option.Kind=="TextBox" and type(value)=="string" then pcall(option.SetText,option,value)
+  elseif option.Kind=="Dropdown" then pcall(option.SetValue,option,value)
+  elseif option.Kind=="Keybind" and type(value)=="string" and Enum.KeyCode[value] then pcall(option.SetKeyCode,option,Enum.KeyCode[value])
+  elseif option.Kind=="ColorPicker" and type(value)=="string" then
+   local hex=value:gsub("^#","")
+   if #hex==6 and tonumber(hex,16) then pcall(option.SetColor,option,Color3.fromRGB(tonumber(hex:sub(1,2),16),tonumber(hex:sub(3,4),16),tonumber(hex:sub(5,6),16))) end
+  end
+ end
+end
+end
+return true
+end
+
+function ag:DeleteProfile(name)
+assert(type(name)=="string" and name:match("^[%w_-]+$"),`"Window.DeleteProfile". profile name must contain only letters, numbers, '_' or '-'`)
+return self:WriteFile("profiles/"..name..".json",nil)
+end
+
 function ag:DeleteFlags()
 return ae()
 end
@@ -4112,6 +4184,16 @@ assert(type(av)=="string",`"Window.SetNotifyDefaultIcon[param 1]". 'string' expe
 af=av
 end
 
+function ag:GetNotificationHistory()
+local history={}
+for index,entry in ipairs(notificationHistory) do history[index]=table.clone(entry) end
+return history
+end
+
+function ag:ClearNotificationHistory()
+table.clear(notificationHistory)
+end
+
 function ag:Notify(av)
 if type(av)~="table"then
 av={}
@@ -4139,6 +4221,8 @@ elseif az==nil then
 az=5
 end
 
+notificationHistory[#notificationHistory+1]={Title=aw,Content=ax,Icon=ay,Duration=az,Timestamp=os.clock()}
+if #notificationHistory>100 then table.remove(notificationHistory,1) end
 local notificationThemeGroup=C:new()
 local aA=createInstance("Frame","Notification",W,{
 Size=UDim2.new(0.85,0,0,60),
@@ -4507,6 +4591,13 @@ resetThemeGroups(C)
 C:update()
 end
 
+function Library:SetReducedMotion(enabled)
+assert(type(enabled)=="boolean",`"Library.SetReducedMotion". 'boolean' expected, got {typeof(enabled)}`)
+ReducedMotion=enabled
+self.ReducedMotion=enabled
+return self
+end
+
 function Library:SetAccent(color)
 assert(typeof(color)=="Color3",`"Library.SetAccent". 'Color3' expected, got {typeof(color)}`)
 local theme=self.CurrentTheme or self.Themes[self.Default.Theme]
@@ -4551,6 +4642,7 @@ for _,connection in ipairs(self.Connections) do
 pcall(function() connection:Disconnect() end)
 end
 table.clear(self.Connections)
+table.clear(self.Options)
 
 if I and I:GetAttribute"UID"==self.SCREENGUI_UID then
 pcall(I.Destroy,I)
