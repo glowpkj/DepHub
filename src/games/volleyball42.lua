@@ -88,7 +88,6 @@ local State = {
     -- Um unico recurso ligado a um unico toggle: bypass de zona + Jump Power.
     Jump = nil,
     JumpEnabled = false,
-    JumpPower = 120,
     CharacterDirection = nil,
     CharacterDirectionEnabled = false,
 }
@@ -123,9 +122,8 @@ end
 
 -- === JUMP ANYWHERE ===
 
--- O modulo reaplica JumpPower, JumpHeight e os estados de pulo a cada frame,
--- neutralizando zonas que zeram esses valores ou desabilitam o estado Jumping.
--- O estado original do Humanoid e restaurado ao desligar, respawn ou unload.
+-- O modulo remove somente a validacao de zona da funcao Jump original.
+-- O restante da mecanica de pulo do jogo permanece intacto.
 function State:SetJumpEnabled(enabled)
     if self.Destroyed then return false end
     local wanted = enabled == true
@@ -133,7 +131,6 @@ function State:SetJumpEnabled(enabled)
     if wanted then
         if not self.Jump then return false, "unavailable:feature" end
         if not self.JumpEnabled then
-            self.Jump:SetPower(self.JumpPower)
             local bypassOk, bypassErr = self.Jump:Start()
             if bypassOk ~= true then
                 self.Jump:Stop()
@@ -172,16 +169,6 @@ function State:SetCharacterDirectionEnabled(enabled)
         self.CharacterDirectionEnabled = false
     end
 
-    return true
-end
-
--- Jump Power (50-500). Grava sempre; o efeito so vale com o toggle ligado.
-function State:SetJumpPower(value)
-    if self.Destroyed then return false end
-    local numeric = tonumber(value)
-    if not numeric then return false end
-    self.JumpPower = math.clamp(math.floor(numeric + 0.5), 50, 500)
-    if self.Jump then self.Jump:SetPower(self.JumpPower) end
     return true
 end
 
@@ -227,11 +214,7 @@ end
 State:Start()
 
 -- ---------------------------------------------------------------------------
--- Apresentacao: uma aba Movement com uma secao e UM recurso. O toggle "Jump
--- Anywhere" reaplica o estado de pulo a cada frame; o slider define o Jump Power.
--- Cada um na sua linha: um SLIDER nao pode entrar num HStack estreito
--- (os internos dele sao ancorados a direita com offsets fixos, entao em meia
--- largura o label colapsa e os botoes -/+ vazam pra fora da borda).
+-- Apresentacao: uma aba Movement com um unico toggle para Jump Anywhere.
 -- ---------------------------------------------------------------------------
 do
     local Kit = env.__DEPHUB and env.__DEPHUB.UIKit
@@ -245,9 +228,6 @@ do
                     State.LastError = tostring(err)
                     warn("[DepHub] Jump Anywhere unavailable: " .. tostring(err))
                 end
-            end)
-            section:CreateSlider("Jump Power", 50, 500, State.JumpPower, function(value)
-                State:SetJumpPower(value)
             end)
         end
     end
