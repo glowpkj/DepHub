@@ -4641,6 +4641,8 @@ return self.CurrentTheme
 end
 
 function Library:Destroy()
+if self._Destroying then return end
+self._Destroying=true
 for _,connection in ipairs(self.Connections) do
 pcall(function() connection:Disconnect() end)
 end
@@ -4650,6 +4652,20 @@ table.clear(self.Options)
 if I and I:GetAttribute"UID"==self.SCREENGUI_UID then
 pcall(I.Destroy,I)
 end
+
+local themeGroups={}
+for _,child in pairs(C.Descendants or {}) do
+if type(child)=="table" and child.Descendants then
+themeGroups[#themeGroups+1]=child
+end
+end
+for _,group in ipairs(themeGroups) do
+pcall(group.destroy,group)
+end
+table.clear(C.Descendants)
+C.UPDATED_OBJECTS=false
+self.LOADED_UI_LIBRARY=false
+self._Destroying=false
 end
 
 function Library:MakeWindow(ab)
