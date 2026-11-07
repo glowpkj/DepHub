@@ -490,7 +490,7 @@ function DemonUI.new(options)
     if settingsTab then
         local settingsSection = settingsTab:CreateSection("Panel")
         if settingsSection then
-            settingsSection:CreateParagraph(
+            local currentKeyParagraph = settingsSection:CreateParagraph(
                 "Tecla de abertura/fechamento",
                 "Tecla atual: " .. self.ToggleKey.Name
             )
@@ -529,6 +529,11 @@ function DemonUI.new(options)
                     self._capturingToggleKey = false
                     captureConnection:Disconnect()
                     self._toggleKeyCaptureConnection = nil
+                    if currentKeyParagraph and type(currentKeyParagraph.SetDescription) == "function" then
+                        pcall(function()
+                            currentKeyParagraph:SetDescription("Tecla atual: " .. io.KeyCode.Name)
+                        end)
+                    end
                     self:Notify("Atalho atualizado", "O painel agora abre e fecha com " .. io.KeyCode.Name .. ".", "success")
                 end)
                 self._toggleKeyCaptureConnection = captureConnection
