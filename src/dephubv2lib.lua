@@ -745,6 +745,7 @@ Elements={
 Corner=UDim.new(1,0)
 },
 ThemeTag={
+OBJECTS=self.ThemeGroup,
 BackgroundColor3="Colors.Buttons.Default",
 TextColor3="Colors.Text.Dark",
 Font="Font.Normal"
@@ -773,9 +774,13 @@ av:Play()
 
 if au then
 av.Completed:Wait()
+if self.ThemeGroup then self.ThemeGroup:destroy() self.ThemeGroup=nil end
 as()
 else
-u(av.Completed,as)
+u(av.Completed,function()
+if self.ThemeGroup then self.ThemeGroup:destroy() self.ThemeGroup=nil end
+as()
+end,nil,self.TEMPLATE)
 end
 end
 
@@ -1357,6 +1362,7 @@ local az=J(aw,"Size",UDim2.new(0,ax-30,1,0),0.3)
 local aA=J(aw,"Size",UDim2.new(0,0,1,0),0.2)
 
 local aB={}
+local dropdownThemeGroup=nil
 local aC=false
 local aD=false
 local aE
@@ -1598,6 +1604,7 @@ Elements={
 Corner=UDim.new(0,4)
 },
 ThemeTag={
+OBJECTS=dropdownThemeGroup,
 BackgroundColor3="Colors.Buttons.Default"
 },
 Childs={
@@ -1722,6 +1729,18 @@ aH=...
 end,
 SetHolder=function(...)
 aI=...
+end,
+SetThemeGroup=function(group)
+if dropdownThemeGroup~=group then
+for instance in pairs(aB) do
+pcall(instance.Destroy,instance)
+end
+table.clear(aB)
+if aG then
+for _,option in ipairs(aG) do option.Instance=nil end
+end
+dropdownThemeGroup=group
+end
 end
 }end
 
@@ -2781,6 +2800,7 @@ end
 if a1 then
 if not X.OpenDropdown(aV)then return end
 
+X.SetThemeGroup(aD)
 X.SetHolder(aH)
 X.SetMultiSelect(aC)
 X.SetOnClicked(a_)
@@ -3582,6 +3602,7 @@ aB.Text=aw
 J(az,"Size",aC,0.3):Play()
 
 local aE=ak.Dialog.new(aA,aB)
+aE.ThemeGroup=C:new()
 aE.NEW_SIZE=aD
 aE.TEMPLATE=az
 
@@ -3635,6 +3656,7 @@ elseif az==nil then
 az=5
 end
 
+local notificationThemeGroup=C:new()
 local aA=createInstance("Frame","Notification",W,{
 Size=UDim2.new(0.85,0,0,60),
 BackgroundTransparency=1,
@@ -3647,6 +3669,7 @@ Size=UDim2.fromScale(1,1),
 AutoButtonColor=false,
 Text="",
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 BackgroundTransparency="BackgroundTransparency"
 },
 Elements={
@@ -3688,6 +3711,7 @@ TextYAlignment=Enum.TextYAlignment.Bottom,
 BackgroundTransparency=1,
 TextSize=14,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 TextColor3="Colors.Text.Default",
 Font="Font.Bold"
 }
@@ -3702,6 +3726,7 @@ BackgroundTransparency=1,
 TextWrapped=true,
 TextSize=12,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 TextColor3="Colors.Text.Dark",
 Font="Font.Normal"
 }
@@ -3713,6 +3738,7 @@ Position=UDim2.new(0,8,0.5,0),
 AnchorPoint=Vector2.new(0,0.5),
 BackgroundTransparency=1,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 ImageColor3="Colors.Icons"
 }
 })
@@ -3724,6 +3750,7 @@ AnchorPoint=Vector2.new(1,0),
 BackgroundTransparency=1,
 TextSize=10,
 ThemeTag={
+OBJECTS=notificationThemeGroup,
 TextColor3="Colors.Text.Darker",
 Font="Font.Normal"
 }
@@ -3768,6 +3795,7 @@ exitTween:Play()
 scaleTween:Play()
 exitTween.Completed:Wait()
 if aA.Parent then aA:Destroy() end
+if notificationThemeGroup then notificationThemeGroup:destroy() notificationThemeGroup=nil end
 for index=#activeNotifications,1,-1 do
 if activeNotifications[index]==self then table.remove(activeNotifications,index) end
 end
@@ -3795,7 +3823,7 @@ aF.Text=ax
 local aM=aB.MouseLeave
 local totalDuration=math.max(az,0.1)
 local lastCountdown=nil
-while az>0 do
+while az>0 and not aL.Closed do
 local countdown=math.ceil(az*10)/10
 if countdown~=lastCountdown then
 aH.Text=Q(countdown)
