@@ -501,9 +501,13 @@ startPosition.Y.Scale,startPosition.Y.Offset+delta.Y/math.max(scaleObject.Scale,
 else
 local viewport=I.AbsoluteSize
 local size=frame.AbsoluteSize
-local x=math.clamp(frame.AbsolutePosition.X+delta.X,0,math.max(0,viewport.X-size.X))
-local y=math.clamp(frame.AbsolutePosition.Y+delta.Y,0,math.max(0,viewport.Y-size.Y))
-target=UDim2.fromOffset(x,y)
+local anchorPosition=frame.AbsolutePosition+Vector2.new(size.X*frame.AnchorPoint.X,size.Y*frame.AnchorPoint.Y)
+local targetAnchor=anchorPosition+delta
+local minX=size.X*frame.AnchorPoint.X
+local minY=size.Y*frame.AnchorPoint.Y
+local maxX=math.max(minX,viewport.X-size.X*(1-frame.AnchorPoint.X))
+local maxY=math.max(minY,viewport.Y-size.Y*(1-frame.AnchorPoint.Y))
+target=UDim2.fromOffset(math.clamp(targetAnchor.X,minX,maxX),math.clamp(targetAnchor.Y,minY,maxY))
 end
 frame.Position=frame.Position:Lerp(target,factor)
 end)
@@ -959,6 +963,7 @@ al, am, an)
 local ao=createInstance("TextButton","Button",an,{
 Size=UDim2.new(1,0,0,24),
 AutoButtonColor=false,
+BackgroundTransparency=1,
 Text="",
 Elements={
 Corner=UDim.new(0,6)
@@ -1042,7 +1047,25 @@ ar.Visible=as
 at.Size=UDim2.new(1,as and-25 or-15,1)
 at.Position=UDim2.fromOffset(as and 25 or 15)end
 
-u(ar:GetPropertyChangedSignal"Image",as)
+u(ar:GetPropertyChangedSignal"Image",as,nil,ao)
+u(ao.MouseEnter,function()
+if not al.Selected then
+J(ao,"BackgroundTransparency",0.92,0.12):Play()
+J(ao,"BackgroundColor3",w(Library.CurrentTheme,"Colors.Buttons.Holding"),0.12):Play()
+end
+end,nil,ao)
+u(ao.MouseLeave,function()
+if not al.Selected then
+J(ao,"BackgroundTransparency",1,0.12):Play()
+J(ao,"BackgroundColor3",w(Library.CurrentTheme,"Colors.Buttons.Default"),0.12):Play()
+end
+end,nil,ao)
+u(ao.MouseButton1Down,function()
+J(ao,"BackgroundTransparency",0.88,0.06):Play()
+end,nil,ao)
+u(ao.MouseButton1Up,function()
+J(ao,"BackgroundTransparency",al.Selected and 0.85 or 0.92,0.08):Play()
+end,nil,ao)
 as()
 
 return ao,aq,ap,ar end local am=function(
@@ -3217,17 +3240,29 @@ J(aE,"Size",UDim2.fromOffset(4,4),aH)
 }
 
 local aK=C:new()
-V[ay]=aK local aL=function(
-
-aL)
-for aM=1,#aL do
-aL[aM]:Play()
-end end local aM=function()
+V[ay]=aK local activeTabTweens={}
+local aL=function(tweens)
+for _,tween in ipairs(activeTabTweens) do
+if tween.PlaybackState==Enum.PlaybackState.Playing then tween:Cancel() end
+end
+table.clear(activeTabTweens)
+for index=1,#tweens do
+local tween=tweens[index]
+activeTabTweens[#activeTabTweens+1]=tween
+tween:Play()
+end
+end local aM=function()
 
 
 
 aL(aI)
 ay.Selected=true
+J(aC,"BackgroundColor3",w(Library.CurrentTheme,"Colors.Primary"),aH):Play()
+J(aC,"BackgroundTransparency",0.85,aH):Play()
+local titleLabel=aC:FindFirstChild("Title")
+local iconImage=aC:FindFirstChild("ImageLabel")
+if titleLabel then J(titleLabel,"TextTransparency",0,aH):Play() end
+if iconImage then J(iconImage,"ImageTransparency",0,aH):Play() end
 aK:changeRendering(true)
 aK:update()
 aD.Parent=aB
@@ -3238,6 +3273,11 @@ aF:Play()end local aN=function()
 
 aL(aJ)
 ay.Selected=false
+J(aC,"BackgroundTransparency",1,aH):Play()
+local titleLabel=aC:FindFirstChild("Title")
+local iconImage=aC:FindFirstChild("ImageLabel")
+if titleLabel then J(titleLabel,"TextTransparency",0.3,aH):Play() end
+if iconImage then J(iconImage,"ImageTransparency",0.3,aH):Play() end
 aD.Parent=nil
 aK:changeRendering(false)end
 
