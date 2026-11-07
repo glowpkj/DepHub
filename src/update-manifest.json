@@ -1,13 +1,13 @@
 {
   "schema": 2,
-  "generatedAt": "2026-11-07T17:03:39.650674+00:00",
-  "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+  "generatedAt": "2026-11-07T17:03:53.467255+00:00",
+  "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
   "version": "0.1.71",
   "games": {
     "66654135": {
       "name": "Murder Mystery 2",
-      "version": "c451f416fd7c0d8f2e7ecb99e0236939cbd0ddb75140f3405caaa8c26c8881ae",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "f68b1ed3c9b7ed6679f3e5b041c172f1db2c9f4ead8577c98b357cd958052c00",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -30,8 +30,8 @@
     },
     "994732206": {
       "name": "Blox Fruits Sea 2",
-      "version": "e016b3c1f4292679322c834f4cad18534dd99cafe117d7bf3748d40e78afc8f0",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "4ddb414197cad43e9d11dfbf7c25734af7de75090fece732fa4bec0fee18b3a9",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -57,8 +57,8 @@
     },
     "1316421563": {
       "name": "Volleyball 4.2",
-      "version": "51025789c2f34fa4a4867b4bb15217af08af4115f287ea600d6439fae476ea0b",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "a52d2212a4532fc5c2ebe2c167be9f1fc009794224437d2628b29d7731523c50",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -78,8 +78,8 @@
     },
     "3808081382": {
       "name": "The Strongest Battlegrounds",
-      "version": "01891225269ebf39eff1606571ee237bf8236dc406c760fb75c466eb7bfaebf4",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "74ae65ec57684fe38179582be2cf7b321d65af16d8cf009895d453eb8d192983",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -100,8 +100,8 @@
     },
     "114234929420007": {
       "name": "Blood Strike",
-      "version": "11ff5c1db7b2802d92efc50ea0fd08330d20d210e7328950313e6c7f7bb5217c",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "ff7e15c4fb38b19259c33d29908a5db2acf52db7f7c248ad22224bec12e7d935",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -118,8 +118,8 @@
     },
     "107778070777162": {
       "name": "Steal An Egg",
-      "version": "47f0007fdb62c31b4ac24344bc0d77d5bc1fe2f037d16d8005ea584e90c23f45",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "d797339abfb48710c5ff09f6fcca50aca2aeff0ccd24e9c3a50be992ad67463a",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -136,8 +136,8 @@
     },
     "119048529960596": {
       "name": "Restaurant Tycoon 3",
-      "version": "f2bced88e774750bfd6c44a0b99ad20f749de02f326c69147331f8e53a6bcfc4",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "746ee9df418ed9af42c235ec58044acd33f26391759fcb197b82ae3c3434a07b",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -163,8 +163,8 @@
     },
     "85211729168715": {
       "name": "Blox Fruits Sea 1",
-      "version": "ead3885e3b0ad7261dd33d252d0574816b94747689355f4be3126e05c66642ff",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "22469c38859e9239a62eb9cabd3070ffc33748a191c538f586661dc7be24ee81",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -190,8 +190,8 @@
     },
     "84822469255086": {
       "name": "Noob Piece",
-      "version": "49d47ea0275d7e48a7f5bbfa882d397e9a353f790bbab18a84759b49d5d84b5d",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "7a5b6c5bb99edf7bf60abdc13529138f7bc308386b7dcaba93a13609bc1d440c",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -220,8 +220,8 @@
     },
     "93978595733734": {
       "name": "Violence District",
-      "version": "f794b6373bbf2928a94ffc31f624c39e0072404b02869b152acc52bf7d59ebd7",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "9ab2749e0579894a104986f88bfb39c69291a6547980d32653091362d2cf6603",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -238,8 +238,8 @@
     },
     "4658598196": {
       "name": "Attack on Titan Revolution",
-      "version": "8aa85e0c0a03c5dd98dcb45b0ff6c6076ad64235c773ab609e120a110e19d3ce",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "cb26823ec48a8f4503cfddd640318245f331591a448bbc7e5e8fa5c612c9600f",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -261,8 +261,8 @@
     },
     "103076400317371": {
       "name": "Steal An Exu",
-      "version": "ff1de01ea7396de32f67178237bed8fabfa6296f67a970150876cb91f43ec1dc",
-      "commit": "b878da95f60fb840e08ddf65d0319c0fa8f91f3b",
+      "version": "1783a2710b35e43a1d96158bea91439d2a80b92a14811934bcecb1c532b2e17b",
+      "commit": "6e06f055a4a84aa127a681a4cc72ed9c72c80310",
       "files": [
         "DepHub.lua",
         "src/version.txt",
@@ -285,6 +285,13 @@
     }
   },
   "recentUpdates": [
+    {
+      "Version": "6e06f05",
+      "Date": "2026-11-07T14:03:45-03:00",
+      "Changes": [
+        "feat(ui): show active panel toggle key"
+      ]
+    },
     {
       "Version": "b878da9",
       "Date": "2026-11-07T14:03:30-03:00",
@@ -311,13 +318,6 @@
       "Date": "2026-11-07T13:59:59-03:00",
       "Changes": [
         "fix(volleyball): report jump bypass activation failures"
-      ]
-    },
-    {
-      "Version": "e9bd4ed",
-      "Date": "2026-11-07T13:59:51-03:00",
-      "Changes": [
-        "fix(volleyball): throttle jump bypass retries"
       ]
     }
   ]
